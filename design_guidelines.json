@@ -1,0 +1,128 @@
+{
+  "theme": "light",
+  "archetype": "1_organic_and_earthy_with_luxury_accents",
+  "archetype_description": "Warm, sophisticated, trustworthy. A blend of Earthy/Organic for safety and approachability, with Luxury elements for the Premium matchmaking feel.",
+  "colors": {
+    "background": {
+      "default": "#FDFBF7",
+      "card": "#FFFFFF",
+      "elevated": "#F5F2EB"
+    },
+    "primary": {
+      "DEFAULT": "#9E4735",
+      "hover": "#8A3E2E",
+      "foreground": "#FFFFFF"
+    },
+    "secondary": {
+      "DEFAULT": "#2D5A4C",
+      "hover": "#244A3E",
+      "foreground": "#FFFFFF"
+    },
+    "premium": {
+      "gold": "#D4AF37",
+      "gold_light": "#F2E8C6",
+      "vip_dark": "#1A1A1A"
+    },
+    "text": {
+      "primary": "#2C2A29",
+      "secondary": "#595553",
+      "muted": "#8C8681"
+    },
+    "border": "#E8E4DF",
+    "status": {
+      "success": "#2D5A4C",
+      "warning": "#D4AF37",
+      "error": "#9E4735",
+      "info": "#4A6C8C"
+    }
+  },
+  "typography": {
+    "font_family": {
+      "heading": "Outfit, sans-serif",
+      "body": "Manrope, sans-serif"
+    },
+    "sizes": {
+      "h1": "text-4xl sm:text-5xl tracking-tight font-semibold",
+      "h2": "text-2xl sm:text-3xl tracking-tight font-medium",
+      "h3": "text-xl sm:text-2xl font-medium",
+      "body": "text-base leading-relaxed",
+      "small": "text-sm",
+      "tiny": "text-xs tracking-[0.05em] uppercase"
+    }
+  },
+  "spacing_and_layout": {
+    "container_padding": "p-4 sm:p-6",
+    "section_gap": "gap-8 sm:gap-12",
+    "border_radius": {
+      "base": "rounded-2xl",
+      "large": "rounded-3xl",
+      "full": "rounded-full"
+    },
+    "shadows": {
+      "card": "shadow-[0_8px_30px_rgb(0,0,0,0.04)]",
+      "elevated": "shadow-[0_20px_40px_rgb(0,0,0,0.08)]",
+      "premium": "shadow-[0_0_40px_rgba(212,175,55,0.15)]"
+    }
+  },
+  "components": {
+    "bottom_navigation": {
+      "style": "Fixed bottom bar, glassmorphism (backdrop-blur-xl bg-white/80), 1px top border (border-border/50), padded for mobile safe areas.",
+      "active_state": "Primary color icon with small dot indicator below. Font weight medium.",
+      "inactive_state": "Muted text color, line icons."
+    },
+    "candidate_card": {
+      "layout": "Vertical stack. Image container top, info bottom.",
+      "photo_treatment": "DEFAULT BLURRED: Apply `filter blur-2xl` and `scale-110` (to avoid blurred edges) to the image. Overlay with a dark gradient `bg-gradient-to-t from-black/60 to-transparent`.",
+      "unlock_overlay": "Center a glassmorphism button 'Unlock Photo' (`backdrop-blur-md bg-white/20 text-white border border-white/30`) over the blurred photo.",
+      "match_score": "Positioned top-left or top-right over the image. Pill shape, `bg-secondary text-white`, showing percentage.",
+      "info_section": "White background, padded (p-4). Large name, age, region. Badges inline with name."
+    },
+    "buttons": {
+      "primary": "rounded-2xl bg-primary text-white font-medium py-3 px-6 hover:-translate-y-0.5 transition-transform",
+      "secondary": "rounded-2xl bg-secondary text-white font-medium py-3 px-6 hover:-translate-y-0.5 transition-transform",
+      "premium": "rounded-2xl bg-gradient-to-r from-[#D4AF37] to-[#B5952F] text-white font-medium py-3 px-6 shadow-premium",
+      "outline": "rounded-2xl border border-border text-primary font-medium py-3 px-6 hover:bg-black/5"
+    },
+    "badges": {
+      "verified": "Pill shape, tiny text, bg-blue-50 text-blue-600 border border-blue-100. Icon: Check-circle.",
+      "financial": "Pill shape, tiny text, bg-premium-gold_light text-yellow-800 border border-premium-gold/30. Icon: Diamond 💎.",
+      "selfie": "Pill shape, tiny text, bg-secondary/10 text-secondary border border-secondary/20."
+    },
+    "completeness_bar": {
+      "style": "Thin rounded track (`bg-border`), filled with primary color. If 100%, fill with gold.",
+      "text": "Small text above showing 'Profile Completeness' and percentage aligned right."
+    },
+    "premium_tiers": {
+      "premium_card": "Border 1px solid #D4AF37, background white, subtle gold shadow. Gold text for features.",
+      "vip_card": "Background dark (vip_dark), text white. Border 1px solid white/10. Gold accents for buttons and icons."
+    }
+  },
+  "micro_interactions": {
+    "hover": "Subtle y-axis translation (`-translate-y-1`) on cards and buttons.",
+    "click": "Scale down (`active:scale-95`) for tactile feedback.",
+    "blur_reveal": "When photo unlocked, transition blur to 0 over 1.5s with a slight scale down (`scale-110` to `scale-100`) for a dramatic, premium reveal.",
+    "match_reasons": "Staggered fade-up entry for list of reasons why users match."
+  },
+  "media": {
+    "images": [
+      {
+        "category": "candidate_female_1",
+        "url": "https://images.pexels.com/photos/9207417/pexels-photo-9207417.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Stylish woman in a hat enjoying a drink indoors. Used for blurred profile example."
+      },
+      {
+        "category": "premium_background",
+        "url": "https://images.pexels.com/photos/7248765/pexels-photo-7248765.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Gold glitter texture. Use at low opacity for Premium/VIP section backgrounds."
+      }
+    ],
+    "icons": "Use lucide-react for standard icons. Use native emojis (🌹 🎁 💎 👑) for gifts as specified in requirements."
+  },
+  "instructions_to_main_agent": [
+    "Prioritize mobile-first view (max-w-md mx-auto for web view) to simulate Telegram Mini App constraints.",
+    "Always apply `data-testid` to interactive elements.",
+    "Photos must default to blurred on Candidate cards using Tailwind `blur-2xl`. Emphasize the blurred overlay treatment.",
+    "Do NOT use Inter or Roboto. Use Outfit for headings and Manrope for body text.",
+    "Keep the aesthetic warm and premium (Terracotta/Gold/Forest Green); avoid neon or typical dating app pinks."
+  ]
+}
