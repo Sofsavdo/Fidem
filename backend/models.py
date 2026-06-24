@@ -1,0 +1,260 @@
+"""Pydantic models for FIDEM."""
+from __future__ import annotations
+import uuid
+from datetime import datetime, timezone
+from typing import Optional, List, Literal
+from pydantic import BaseModel, Field, ConfigDict, EmailStr
+
+
+def now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def new_id() -> str:
+    return str(uuid.uuid4())
+
+
+# ---------- Auth ----------
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str
+    name: Optional[str] = None
+
+
+class TelegramAuthRequest(BaseModel):
+    init_data: str
+
+
+class AuthResponse(BaseModel):
+    token: str
+    user_id: str
+    is_admin: bool = False
+    onboarded: bool = False
+
+
+# ---------- User / Profile ----------
+GenderType = Literal["male", "female"]
+MaritalType = Literal["single", "divorced", "widowed"]
+
+
+class OnboardingProfile(BaseModel):
+    gender: GenderType
+    birth_date: str  # ISO YYYY-MM-DD
+    country: str
+    region: str
+    district: str
+    marital_status: MaritalType
+    has_children: bool
+    children_count: int = 0
+    height_cm: int
+    weight_kg: int
+    education: str
+    profession: str
+    religion: str
+    looking_for: str  # description text
+    search_gender: GenderType
+    search_age_min: int = 18
+    search_age_max: int = 60
+    search_region: str
+    photo_url: Optional[str] = None
+    bio: Optional[str] = ""
+    name: str
+
+
+class UserPublic(BaseModel):
+    id: str
+    name: str
+    gender: GenderType
+    age: int
+    region: str
+    district: str
+    marital_status: MaritalType
+    has_children: bool
+    children_count: int
+    height_cm: int
+    weight_kg: int
+    education: str
+    profession: str
+    religion: str
+    bio: str = ""
+    photo_url: Optional[str] = None
+    verified_identity: bool = False
+    verified_selfie: bool = False
+    verified_financial: bool = False
+    last_active: datetime
+    completeness: int = 0
+    avg_response_min: Optional[int] = None
+    online: bool = False
+    plan: Literal["free", "premium", "vip"] = "free"
+    balance: int = 0
+
+
+class CandidateCard(UserPublic):
+    match_score: int = 0
+    match_reasons: List[str] = []
+    photo_unlocked: bool = False
+    can_message: bool = True
+
+
+class UpdateProfileRequest(BaseModel):
+    name: Optional[str] = None
+    bio: Optional[str] = None
+    education: Optional[str] = None
+    profession: Optional[str] = None
+    religion: Optional[str] = None
+    region: Optional[str] = None
+    district: Optional[str] = None
+    looking_for: Optional[str] = None
+    search_region: Optional[str] = None
+    search_age_min: Optional[int] = None
+    search_age_max: Optional[int] = None
+    search_gender: Optional[GenderType] = None
+    photo_url: Optional[str] = None
+    # write-once fields included only if owner is forcing change (will require re-verify)
+    height_cm: Optional[int] = None
+    weight_kg: Optional[int] = None
+    marital_status: Optional[MaritalType] = None
+    has_children: Optional[bool] = None
+    children_count: Optional[int] = None
+
+
+class MessageFilters(BaseModel):
+    """Who can message me filters."""
+    age_min: int = 18
+    age_max: int = 60
+    region: Optional[str] = None
+    marital_status: Optional[MaritalType] = None
+    has_children: Optional[bool] = None
+    height_min: Optional[int] = None
+    height_max: Optional[int] = None
+    weight_min: Optional[int] = None
+    weight_max: Optional[int] = None
+    require_verified: bool = False
+    require_financial: bool = False
+
+
+# ---------- Messages ----------
+class SendMessageRequest(BaseModel):
+    to_user_id: str
+    text: str
+    is_super: bool = False
+
+
+class MessageOut(BaseModel):
+    id: str
+    chat_id: str
+    from_user_id: str
+    to_user_id: str
+    text: str
+    created_at: datetime
+    kind: Literal["text", "gift", "photo_request", "photo_grant", "super"] = "text"
+    meta: dict = {}
+
+
+class ChatOut(BaseModel):
+    chat_id: str
+    other: UserPublic
+    last_message: Optional[MessageOut] = None
+    unread: int = 0
+    status: Literal["chat", "application", "match"] = "chat"
+
+
+# ---------- Saved / Likes ----------
+class SaveRequest(BaseModel):
+    user_id: str
+
+
+# ---------- Verification ----------
+class VerificationRequest(BaseModel):
+    kind: Literal["identity", "selfie", "financial"]
+    note: Optional[str] = None
+    proof_url: Optional[str] = None
+
+
+# ---------- Payments ----------
+PlanType = Literal["premium", "vip"]
+
+
+class CreatePaymentRequest(BaseModel):
+    purpose: Literal["premium", "vip", "balance_topup", "super_application", "gift"]
+    amount: Optional[int] = None  # for balance / gift / super
+    target_user_id: Optional[str] = None  # for super application or gift
+    gift_kind: Optional[str] = None
+
+
+class PaymentOut(BaseModel):
+    id: str
+    user_id: str
+    amount: int
+    purpose: str
+    status: Literal["pending", "success", "failed"]
+    payment_link: Optional[str] = None
+    created_at: datetime
+
+
+# ---------- Gifts ----------
+class SendGiftRequest(BaseModel):
+    to_user_id: str
+    gift_kind: Literal["rose", "box", "diamond", "crown"]
+
+
+GIFT_PRICES = {"rose": 50, "box": 200, "diamond": 500, "crown": 1500}
+GIFT_EMOJI = {"rose": "🌹", "box": "🎁", "diamond": "💎", "crown": "👑"}
+
+
+# ---------- Notifications ----------
+class NotificationOut(BaseModel):
+    id: str
+    user_id: str
+    kind: str
+    text: str
+    created_at: datetime
+    read: bool = False
+    link: Optional[str] = None
+
+
+# ---------- Admin ----------
+class AdminUpdateUserRequest(BaseModel):
+    verified_identity: Optional[bool] = None
+    verified_selfie: Optional[bool] = None
+    verified_financial: Optional[bool] = None
+    plan: Optional[Literal["free", "premium", "vip"]] = None
+    balance: Optional[int] = None
+    blocked: Optional[bool] = None
+    add_balance: Optional[int] = None
+
+
+# ---------- Reports / blocks ----------
+class ReportRequest(BaseModel):
+    user_id: str
+    reason: str
+
+
+class PhotoUnlockRequest(BaseModel):
+    target_user_id: str
+
+
+class PhotoUnlockDecision(BaseModel):
+    request_id: str
+    approve: bool
+
+
+# ---------- Filter / Search ----------
+class CandidateFilter(BaseModel):
+    age_min: Optional[int] = None
+    age_max: Optional[int] = None
+    region: Optional[str] = None
+    marital_status: Optional[MaritalType] = None
+    has_children: Optional[bool] = None
+    height_min: Optional[int] = None
+    height_max: Optional[int] = None
+    weight_min: Optional[int] = None
+    weight_max: Optional[int] = None
+    verified_only: bool = False
+    financial_only: bool = False
+    sort: Literal["match", "active", "new"] = "match"
