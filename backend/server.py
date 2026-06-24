@@ -795,7 +795,7 @@ async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id
     await db.gifts.insert_one(gift)
     # also drop a chat message
     cid = chat_id_for(uid, req.to_user_id)
-    await db.messages.insert_one({
+    gift_msg = {
         "id": new_id(),
         "chat_id": cid,
         "from_user_id": uid,
@@ -805,7 +805,9 @@ async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id
         "meta": {"gift": req.gift_kind, "price": price},
         "created_at": iso(now_utc()),
         "read": False,
-    })
+    }
+    await db.messages.insert_one(gift_msg)
+    gift_msg.pop("_id", None)
     await push_notif(req.to_user_id, "gift", f"Sizga {GIFT_EMOJI[req.gift_kind]} sovg'a yuborildi")
     return {"ok": True, "balance": sender.get("balance", 0) - price}
 
@@ -928,16 +930,18 @@ async def click_callback(request: Request):
 
 
 async def apply_payment_success(payment: dict) -> None:
+    from datetime import timedelta as _td
     pid = payment["id"]
     await db.payments.update_one({"id": pid}, {"$set": {"status": "success", "paid_at": iso(now_utc())}})
     uid = payment["user_id"]
     purpose = payment["purpose"]
     amount = payment["amount"]
+    expiry_iso = iso(now_utc() + _td(days=30))
     if purpose == "premium":
-        await db.users.update_one({"id": uid}, {"$set": {"plan": "premium", "plan_until": iso(now_utc())}})
+        await db.users.update_one({"id": uid}, {"$set": {"plan": "premium", "plan_until": expiry_iso}})
         await push_notif(uid, "premium", "Premium tarif faollashtirildi 💎")
     elif purpose == "vip":
-        await db.users.update_one({"id": uid}, {"$set": {"plan": "vip", "plan_until": iso(now_utc())}})
+        await db.users.update_one({"id": uid}, {"$set": {"plan": "vip", "plan_until": expiry_iso}})
         await push_notif(uid, "premium", "VIP tarif faollashtirildi 👑")
     elif purpose == "balance_topup":
         await db.users.update_one({"id": uid}, {"$inc": {"balance": amount}})
