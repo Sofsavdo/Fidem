@@ -121,6 +121,9 @@ export default function ProfileDetail() {
           <Stat label={t("has_children")} value={c.has_children ? `${t("yes")}${c.children_count ? ` · ${c.children_count}` : ""}` : t("no")} />
           <Stat label={t("education")} value={c.education || "—"} />
           <Stat label={t("religion")} value={c.religion || "—"} />
+          <Stat label={t("smoking")} value={c.smoking ? t(c.smoking) : "—"} />
+          <Stat label={t("alcohol")} value={c.alcohol ? t(c.alcohol) : "—"} />
+          <Stat label={t("relocation")} value={c.relocation ? t("yes") : t("no")} />
         </div>
 
         {/* Profession card — separate row for clarity */}

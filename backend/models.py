@@ -64,6 +64,9 @@ class OnboardingProfile(BaseModel):
     photo_url: Optional[str] = None
     bio: Optional[str] = ""
     name: str
+    smoking: Literal["no", "sometimes", "yes"] = "no"
+    alcohol: Literal["no", "sometimes", "yes"] = "no"
+    relocation: bool = False
 
 
 class UserPublic(BaseModel):
@@ -121,6 +124,9 @@ class UpdateProfileRequest(BaseModel):
     marital_status: Optional[MaritalType] = None
     has_children: Optional[bool] = None
     children_count: Optional[int] = None
+    smoking: Optional[Literal["no", "sometimes", "yes"]] = None
+    alcohol: Optional[Literal["no", "sometimes", "yes"]] = None
+    relocation: Optional[bool] = None
 
 
 class MessageFilters(BaseModel):

@@ -40,6 +40,9 @@ export default function Onboarding() {
     search_region: "Toshkent",
     photo_url: "",
     bio: "",
+    smoking: "no",
+    alcohol: "no",
+    relocation: false,
   });
 
   const set = (patch) => setData((d) => ({ ...d, ...patch }));
@@ -185,6 +188,18 @@ export default function Onboarding() {
             <>
               <Field label={t("profession")}><input data-testid="ob-profession" className="input" value={data.profession} onChange={(e) => set({ profession: e.target.value })} /></Field>
               <Field label={t("religion")}><input data-testid="ob-religion" className="input" value={data.religion} onChange={(e) => set({ religion: e.target.value })} /></Field>
+              <Field label={t("smoking")}>
+                <RadioGroup testid="ob-smoking" value={data.smoking} onChange={(v) => set({ smoking: v })}
+                  options={[{ value: "no", label: t("no") }, { value: "sometimes", label: t("sometimes") }, { value: "yes", label: t("yes") }]} />
+              </Field>
+              <Field label={t("alcohol")}>
+                <RadioGroup testid="ob-alcohol" value={data.alcohol} onChange={(v) => set({ alcohol: v })}
+                  options={[{ value: "no", label: t("no") }, { value: "sometimes", label: t("sometimes") }, { value: "yes", label: t("yes") }]} />
+              </Field>
+              <Field label={t("relocation")}>
+                <RadioGroup testid="ob-relocation" value={data.relocation ? "yes" : "no"} onChange={(v) => set({ relocation: v === "yes" })}
+                  options={[{ value: "no", label: t("no") }, { value: "yes", label: t("yes") }]} />
+              </Field>
             </>
           )}
           {step === 5 && (
