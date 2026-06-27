@@ -47,7 +47,7 @@ export default function Verification() {
       toast.success("So'rov yuborildi. Admin tasdig'i kutilmoqda (odatda 1-2 ish kuni)");
       load();
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Yuklash xatosi");
+      toast.error("Yuklash xatosi");
     } finally { setBusy(false); }
   };
 

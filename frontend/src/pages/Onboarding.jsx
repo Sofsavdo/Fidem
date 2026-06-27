@@ -18,6 +18,9 @@ export default function Onboarding() {
   const { user, t, refresh } = useApp();
   const nav = useNavigate();
   const [step, setStep] = useState(0);
+  const [photoStatus, setPhotoStatus] = useState({ state: "idle", code: "", reason: "" });
+  // states: idle | verifying | ok | invalid
+  const [submitting, setSubmitting] = useState(false);
   const [data, setData] = useState({
     name: user?.name || "",
     gender: "male",
@@ -47,7 +50,29 @@ export default function Onboarding() {
 
   const set = (patch) => setData((d) => ({ ...d, ...patch }));
 
+  const verifyPhoto = async (url) => {
+    if (!url) return;
+    setPhotoStatus({ state: "verifying", code: "", reason: "" });
+    try {
+      const r = await api.post("/face/verify", { photo_url: url });
+      if (r.data?.valid) {
+        setPhotoStatus({ state: "ok", code: "ok", reason: "" });
+      } else {
+        const code = r.data?.code || "other";
+        const key = `photo_invalid_${code}`;
+        const localized = t(key);
+        const reason = localized && localized !== key ? localized : (r.data?.reason || t("photo_invalid"));
+        setPhotoStatus({ state: "invalid", code, reason });
+      }
+    } catch {
+      // Soft-fail: allow proceeding if AI is down
+      setPhotoStatus({ state: "ok", code: "ok", reason: "" });
+    }
+  };
+
   const submit = async () => {
+    if (submitting) return;
+    setSubmitting(true);
     try {
       // toggle search_gender opposite by default if user didn't pick
       const payload = { ...data };
@@ -57,13 +82,36 @@ export default function Onboarding() {
       await refresh();
       nav("/", { replace: true });
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Xato");
+      // Hide raw error details — map known codes to friendly messages
+      const detail = (e.response?.data?.detail || "").toString();
+      if (detail === "photo_required") {
+        toast.error(t("photo_required"));
+        setStep(STEPS - 1);
+      } else if (detail.startsWith("photo_invalid:")) {
+        const code = detail.split(":")[1] || "other";
+        const key = `photo_invalid_${code}`;
+        const localized = t(key);
+        toast.error(localized && localized !== key ? localized : t("photo_invalid"));
+        setPhotoStatus({ state: "invalid", code, reason: localized });
+        setStep(STEPS - 1);
+      } else {
+        toast.error(t("error"));
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const next = () => {
-    if (step === STEPS - 1) submit();
-    else setStep((s) => Math.min(STEPS - 1, s + 1));
+    // Block proceeding from photo step until photo is uploaded AND verified
+    if (step === STEPS - 1) {
+      if (!data.photo_url) { toast.error(t("photo_required")); return; }
+      if (photoStatus.state === "verifying") { return; }
+      if (photoStatus.state === "invalid") { toast.error(photoStatus.reason || t("photo_invalid")); return; }
+      submit();
+      return;
+    }
+    setStep((s) => Math.min(STEPS - 1, s + 1));
   };
   const back = () => setStep((s) => Math.max(0, s - 1));
 
@@ -233,8 +281,29 @@ export default function Onboarding() {
           )}
           {step === 6 && (
             <>
-              <Field label={t("photo")}>
-                <PhotoUpload value={data.photo_url} onChange={(url) => set({ photo_url: url })} testid="ob-photo" />
+              <Field label={`${t("photo")} *`}>
+                <PhotoUpload
+                  value={data.photo_url}
+                  onChange={(url) => { set({ photo_url: url }); verifyPhoto(url); }}
+                  testid="ob-photo"
+                />
+                <p className="text-[11px] text-muted-foreground mt-2">{t("photo_tip")}</p>
+                {photoStatus.state === "verifying" && (
+                  <div className="mt-3 rounded-xl bg-muted/50 border border-border p-3 text-xs flex items-center gap-2" data-testid="ob-photo-verifying">
+                    <span className="inline-block w-3 h-3 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                    {t("photo_verifying")}
+                  </div>
+                )}
+                {photoStatus.state === "ok" && (
+                  <div className="mt-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 p-3 text-xs" data-testid="ob-photo-ok">
+                    {t("photo_verified")}
+                  </div>
+                )}
+                {photoStatus.state === "invalid" && (
+                  <div className="mt-3 rounded-xl bg-red-50 border border-red-300 text-red-800 p-3 text-xs" data-testid="ob-photo-invalid">
+                    {photoStatus.reason || t("photo_invalid")}
+                  </div>
+                )}
               </Field>
               <Field label={t("bio")}>
                 <textarea data-testid="ob-bio" rows="3" className="input" value={data.bio} onChange={(e) => set({ bio: e.target.value })} />
@@ -256,9 +325,14 @@ export default function Onboarding() {
           <button
             data-testid="ob-next"
             onClick={next}
-            className="flex-1 rounded-2xl bg-primary text-white font-medium py-3 px-6 inline-flex items-center justify-center gap-2 hover:-translate-y-0.5 active:scale-[0.98] transition"
+            disabled={submitting || (step === STEPS - 1 && (photoStatus.state === "verifying" || photoStatus.state === "invalid" || !data.photo_url))}
+            className="flex-1 rounded-2xl bg-primary text-white font-medium py-3 px-6 inline-flex items-center justify-center gap-2 hover:-translate-y-0.5 active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {step === STEPS - 1 ? (<>{t("finish")} <Check className="w-4 h-4" /></>) : (<>{t("next")} <ChevronRight className="w-4 h-4" /></>)}
+            {step === STEPS - 1 ? (
+              submitting ? <>{t("loading")}</> : <>{t("finish")} <Check className="w-4 h-4" /></>
+            ) : (
+              <>{t("next")} <ChevronRight className="w-4 h-4" /></>
+            )}
           </button>
         </div>
       </div>

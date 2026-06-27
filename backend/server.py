@@ -33,7 +33,6 @@ from routers.growth_r import router as growth_router  # noqa: E402
 from routers.payments_r import router as payments_router  # noqa: E402
 from routers.telegram_r import router as telegram_router, setup_telegram_webhook  # noqa: E402
 from routers.personality_r import router as personality_router  # noqa: E402
-from routers.chaperone_r import router as chaperone_router  # noqa: E402
 from routers.roses_r import router as roses_router  # noqa: E402
 from routers.ai_r import router as ai_router  # noqa: E402
 from routers.prompts_r import router as prompts_router  # noqa: E402
@@ -44,6 +43,7 @@ from routers.family_r import router as family_router  # noqa: E402
 from routers.concierge_r import router as concierge_router  # noqa: E402
 from routers.travel_r import router as travel_router  # noqa: E402
 from routers.boost_analytics_r import router as boost_analytics_router  # noqa: E402
+from routers.face_r import router as face_router  # noqa: E402
 from services import compute_completeness  # noqa: E402
 from storage import init_storage  # noqa: E402
 
@@ -58,7 +58,6 @@ api.include_router(payments_router)
 api.include_router(admin_router)
 api.include_router(telegram_router)
 api.include_router(personality_router)
-api.include_router(chaperone_router)
 api.include_router(roses_router)
 api.include_router(ai_router)
 api.include_router(prompts_router)
@@ -69,6 +68,7 @@ api.include_router(family_router)
 api.include_router(concierge_router)
 api.include_router(travel_router)
 api.include_router(boost_analytics_router)
+api.include_router(face_router)
 app.include_router(api)
 
 

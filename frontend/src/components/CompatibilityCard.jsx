@@ -28,7 +28,7 @@ export default function CompatibilityCard({ targetId, lang = "uz" }) {
       toast.success("AI hisobot ochildi");
       load();
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Balans yetarli emas");
+      toast.error("Balans yetarli emas");
     } finally { setUnlocking(false); }
   };
 

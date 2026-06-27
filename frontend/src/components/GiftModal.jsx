@@ -47,7 +47,7 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
       onSent?.(item.kind);
       onClose();
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Xato yuz berdi");
+      toast.error("Xato yuz berdi");
     } finally {
       setSending(null);
     }

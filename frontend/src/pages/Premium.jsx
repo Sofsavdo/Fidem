@@ -72,7 +72,7 @@ export default function Premium() {
       window.open(r.data.payment_link, "_blank");
       setPayments((p) => [{ ...r.data, purpose, user_id: user.id, created_at: new Date() }, ...p]);
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Xato");
+      toast.error("Xato");
     } finally { setCreating(false); }
   };
   const topup = async () => {
@@ -82,7 +82,7 @@ export default function Premium() {
       window.open(r.data.payment_link, "_blank");
       setPayments((p) => [{ ...r.data, purpose: "balance_topup" }, ...p]);
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Xato");
+      toast.error("Xato");
     } finally { setCreating(false); }
   };
 
@@ -214,13 +214,13 @@ export default function Premium() {
         </button>
       </div>
 
-      {/* Sovchi Concierge — premium manual matching */}
+      {/* Concierge — premium manual matching */}
       <div className="rounded-3xl bg-gradient-to-br from-secondary/10 via-primary/5 to-gold-light/30 border-2 border-secondary/40 p-5" data-testid="concierge-section">
-        <p className="font-heading text-xl font-semibold flex items-center gap-2">👑 Sovchi Concierge</p>
-        <p className="text-sm mt-1 text-muted-foreground">Professional sovchi sizga 5 ta eng mos nomzodni qo'lda topib beradi (30 kun).</p>
+        <p className="font-heading text-xl font-semibold flex items-center gap-2">👑 Concierge</p>
+        <p className="text-sm mt-1 text-muted-foreground">Mutaxassis 30 kun ichida 5 ta qo'lda tanlangan mos profil taqdim etadi.</p>
         <ul className="text-xs mt-3 space-y-1 text-foreground/80">
           <li>✓ Inson nazoratidan o'tgan sifatli moslar</li>
-          <li>✓ Har bir mos uchun sovchi izohi</li>
+          <li>✓ Har bir mos uchun batafsil izoh</li>
           <li>✓ Tezroq va aniqroq natija</li>
         </ul>
         <a
@@ -228,7 +228,7 @@ export default function Premium() {
           data-testid="concierge-link"
           className="mt-3 block w-full text-center rounded-2xl bg-secondary text-white py-3 font-medium"
         >
-          Concierge sahifasiga o'tish · 199,000 so'm
+          Concierge · 199,000 so'm
         </a>
       </div>
 

@@ -159,6 +159,34 @@ async def me(uid: str = Depends(get_current_user_id)):
 @router.post("/profile/onboard")
 async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id)):
     update = req.model_dump()
+    # Photo is REQUIRED to complete onboarding
+    photo_url = (update.get("photo_url") or "").strip()
+    if not photo_url:
+        raise HTTPException(400, "photo_required")
+    # Auto-verify photo (best-effort; will not block if AI service is down)
+    user = await get_user(uid)
+    if not user.get("photo_verified"):
+        from ai_service import verify_face_photo
+        result = await verify_face_photo(image_url=photo_url)
+        if not result.get("valid"):
+            # Persist failure code, then reject onboarding
+            await db.users.update_one(
+                {"id": uid},
+                {"$set": {
+                    "photo_verified": False,
+                    "photo_verification_code": result.get("code"),
+                }},
+            )
+            # Use a SHORT code as detail so frontend can map to a localized message
+            raise HTTPException(400, f"photo_invalid:{result.get('code') or 'other'}")
+        await db.users.update_one(
+            {"id": uid},
+            {"$set": {
+                "photo_verified": True,
+                "photo_verified_at": iso(now_utc()),
+                "photo_verification_code": "ok",
+            }},
+        )
     update["onboarded"] = True
     update["last_active"] = iso(now_utc())
     await db.users.update_one({"id": uid}, {"$set": update})

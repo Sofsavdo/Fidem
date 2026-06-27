@@ -23,7 +23,7 @@ export default function PhotoUpload({ value, onChange, testid = "photo-upload" }
       onChange(absUrl);
       toast.success("Yuklandi");
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Yuklash xatosi");
+      toast.error("Yuklash xatosi");
     } finally {
       setUploading(false);
     }

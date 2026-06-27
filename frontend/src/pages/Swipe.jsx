@@ -85,7 +85,7 @@ export default function Swipe() {
       await api.post("/roses/send", { to_user_id: target.id, note: "Sizdan juda manfaatdorman!" });
       toast.success(`🌹 ${target.name} ga yuborildi`);
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Atirgul yuborib bo'lmadi");
+      toast.error("Atirgul yuborib bo'lmadi");
     }
   };
 

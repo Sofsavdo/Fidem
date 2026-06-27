@@ -196,7 +196,7 @@ export default function Welcome() {
         </section>
 
         <footer className="text-center text-xs text-muted-foreground pt-4 pb-8 space-y-1">
-          <p>© 2025 FIDEM — Halal Matchmaking</p>
+          <p>© 2025 FIDEM</p>
           <p>✨ {t("land_footer_tag")}</p>
           <div className="flex justify-center gap-4 pt-3">
             <Link to="/about" data-testid="footer-about" className="hover:text-foreground">{t("land_about")}</Link>

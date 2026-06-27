@@ -20,7 +20,7 @@ export default function RoseModal({ targetId, targetName, onClose, onSent }) {
       onSent && onSent();
       onClose();
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Xato");
+      toast.error("Xato");
     } finally { setSending(false); }
   };
 
@@ -31,7 +31,7 @@ export default function RoseModal({ targetId, targetName, onClose, onSent }) {
       const r = await api.get("/roses/status");
       setStatus(r.data);
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Balans yetarli emas — Balansga qo'shish kerak");
+      toast.error("Balans yetarli emas — Balansga qo'shish kerak");
     }
   };
 

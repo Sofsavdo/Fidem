@@ -45,7 +45,7 @@ async def compatibility_report(viewer: dict, candidate: dict, big5_viewer: dict,
     """Generate AI compatibility narrative based on Big 5 + profiles."""
     lang_label = {"uz": "o'zbek tilida", "ru": "на русском языке", "en": "in English"}.get(lang, "o'zbek tilida")
     sys = (
-        "Siz halol nikoh va oilaviy hayotga e'tibor qaratuvchi musulmon sovchi-mutaxassissiz. "
+        "Siz jiddiy munosabat va oila qurish platformasida professional moslik analitiksiz. "
         "Ikki kishining shaxsiyat profillarini (Big5 / OCEAN) va asosiy ma'lumotlarini tahlil qiling. "
         "Strikt JSON formatda javob bering: "
         '{"summary": "qisqa xulosa (2-3 jumla)", "strengths": ["3 ta moslik nuqtasi"], '
@@ -135,7 +135,7 @@ def _fallback_report(score: int, lang: str) -> dict:
 async def personalized_icebreakers(viewer: dict, candidate: dict, lang: str = "uz") -> list[str]:
     lang_label = {"uz": "o'zbek tilida", "ru": "на русском языке", "en": "in English"}.get(lang, "o'zbek tilida")
     sys = (
-        "Siz musulmon sovchi-mutaxassissiz, halol nikoh uchun ilk suhbat savollarini tayyorlaysiz. "
+        "Siz jiddiy tanishuv platformasi uchun ilk suhbat savollarini tayyorlovchi mutaxassissiz. "
         "Savollar samimiy, hurmatli, qiziqarli bo'lsin. JSON array qaytaring: [\"savol1\", \"savol2\", \"savol3\"]. "
         f"Til: {lang_label}. Faqat JSON array, boshqa matn yo'q."
     )
@@ -208,7 +208,7 @@ async def ai_moderation(text: str) -> tuple[bool, str]:
     if len(text) < 12:
         return True, ""
     sys = (
-        "Siz halol musulmon platforma uchun moderatorisz. Berilgan xabar ruxsat etilganmi? "
+        "Siz jiddiy tanishuv platformasi uchun moderatorisz. Berilgan xabar ruxsat etilganmi? "
         'JSON qaytaring: {"allowed": true/false, "reason": "qisqa sabab agar bloklansa"}. '
         "Bloklang: jinsiy, haqorat, telefon raqam, tashqi havola, firibgarlik, nikoh maqsadiga zid."
     )
@@ -244,3 +244,92 @@ def _extract_json(text: str):
 def _safe_age(u: dict) -> int:
     from services import age_from_birth
     return age_from_birth(u.get("birth_date", "2000-01-01"))
+
+
+
+# ---------- 5) Face verification (photo onboarding) ----------
+async def verify_face_photo(image_url: str = "", image_base64: str = "") -> dict:
+    """
+    Verify a photo is a real, single adult human face.
+    Returns: {"valid": bool, "code": "ok|no_face|multiple_faces|cartoon|minor|celebrity|other", "reason": str}
+    """
+    if not EMERGENT_LLM_KEY:
+        # Fail open in dev (no key) — accept but warn
+        return {"valid": True, "code": "ok", "reason": "verification skipped (no LLM key)"}
+
+    if not image_url and not image_base64:
+        return {"valid": False, "code": "no_image", "reason": "Rasm taqdim etilmadi"}
+
+    # If only URL provided, we need to fetch & base64-encode
+    if image_url and not image_base64:
+        try:
+            import httpx
+            import base64 as b64lib
+            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as cli:
+                r = await cli.get(image_url)
+                if r.status_code != 200:
+                    return {"valid": False, "code": "no_image", "reason": "Rasm yuklab bo'lmadi"}
+                content_type = r.headers.get("content-type", "image/jpeg").lower()
+                # Restrict to common image types
+                if not any(t in content_type for t in ("jpeg", "jpg", "png", "webp")):
+                    return {"valid": False, "code": "bad_format", "reason": "Faqat JPEG/PNG/WEBP qabul qilinadi"}
+                image_base64 = b64lib.b64encode(r.content).decode("ascii")
+        except Exception as exc:
+            log.error(f"face: image fetch failed: {exc}")
+            return {"valid": False, "code": "no_image", "reason": "Rasmni yuklab bo'lmadi"}
+
+    sys_msg = (
+        "You are a strict photo-verification AI for a serious matchmaking platform. "
+        "Analyze the user-uploaded profile photo and decide if it is acceptable. "
+        "Reject for ANY of these reasons:\n"
+        "1) NO real human face is clearly visible (drawing, blank, scenery, object, animal)\n"
+        "2) MULTIPLE distinct human faces in the same photo (must be exactly one person)\n"
+        "3) The person looks UNDER 18 (child / teenager younger than 18)\n"
+        "4) CARTOON, anime, painting, sketch, 3D render, AI-generated avatar, or heavily filtered/morphed\n"
+        "5) Recognizable CELEBRITY, politician, athlete, or other widely-known public figure\n"
+        "6) Face is too small, blurred beyond recognition, fully covered, or back of head only\n"
+        "Reply STRICTLY in JSON, no extra text:\n"
+        '{"valid": true|false, "code": "ok|no_face|multiple_faces|minor|cartoon|celebrity|too_blurry|other", '
+        '"reason": "short user-friendly Uzbek sentence (<=80 chars)"}'
+    )
+
+    try:
+        from emergentintegrations.llm.chat import ImageContent
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"face-verify-{os.urandom(4).hex()}",
+            system_message=sys_msg,
+        ).with_model("openai", "gpt-4o-mini")
+        msg = UserMessage(
+            text="Tekshiring va JSON qaytaring.",
+            file_contents=[ImageContent(image_base64=image_base64)],
+        )
+        resp = await chat.send_message(msg)
+        text = str(resp).strip()
+        # Parse JSON
+        cleaned = re.sub(r"^```(?:json)?|```$", "", text, flags=re.MULTILINE).strip()
+        m = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
+        if m:
+            cleaned = m.group(0)
+        data = json.loads(cleaned)
+        if not isinstance(data, dict):
+            raise ValueError("not dict")
+        valid = bool(data.get("valid"))
+        code = str(data.get("code") or ("ok" if valid else "other"))
+        reason = str(data.get("reason") or ("OK" if valid else "Rasm talablarga javob bermaydi"))
+        # Uzbek reason fallback by code
+        UZ_REASONS = {
+            "no_face": "Rasmda yuz aniqlanmadi",
+            "multiple_faces": "Faqat bitta odam bo'lishi kerak",
+            "minor": "Foydalanuvchi 18 yoshdan katta bo'lishi kerak",
+            "cartoon": "Rasm, multfilm yoki sun'iy tasvir qabul qilinmaydi",
+            "celebrity": "Mashhur shaxs rasmi taqiqlanadi — o'z rasmingizni yuklang",
+            "too_blurry": "Rasm xira yoki yuz aniq ko'rinmaydi",
+        }
+        if not valid and code in UZ_REASONS:
+            reason = UZ_REASONS[code]
+        return {"valid": valid, "code": code, "reason": reason}
+    except Exception as exc:
+        log.error(f"face: verify failed: {exc}")
+        # Fail open on transient errors so onboarding isn't broken
+        return {"valid": True, "code": "ok", "reason": "verification unavailable"}

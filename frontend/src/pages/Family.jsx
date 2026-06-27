@@ -40,7 +40,7 @@ export default function Family() {
       toast.success("Oilaviy aloqa saqlandi");
       load();
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Xato");
+      toast.error("Xato");
     } finally { setSavingContact(false); }
   };
 
@@ -50,7 +50,7 @@ export default function Family() {
       toast.success(accept ? "Qabul qilindi — telefonlar ko'rinishga tayyor!" : "Rad etildi");
       load();
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Xato");
+      toast.error("Xato");
     }
   };
 
@@ -157,7 +157,7 @@ function FamilyRow({ request, statusBadge }) {
       const r = await api.get(`/family/contact/${request.peer?.id}`);
       setContact(r.data);
       setShow(true);
-    } catch (e) { toast.error(e.response?.data?.detail || "Xato"); }
+    } catch (e) { toast.error("Xato"); }
   };
   return (
     <div className="p-3 rounded-xl bg-muted/40">

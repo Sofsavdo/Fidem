@@ -65,19 +65,15 @@ export default function Sidebar() {
         </Link>
         <Link to="/personality" data-testid="side-personality" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
           <Brain className="w-4 h-4 text-secondary" />
-          <span>Shaxsiyat testi</span>
-        </Link>
-        <Link to="/chaperone" data-testid="side-chaperone" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
-          <UsersRound className="w-4 h-4 text-secondary" />
-          <span>Sovchi (Wali)</span>
+          <span>{t("personality_test")}</span>
         </Link>
         <Link to="/prompts" data-testid="side-prompts" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
           <Pen className="w-4 h-4 text-secondary" />
-          <span>Profil promptlari</span>
+          <span>{t("profile_prompts")}</span>
         </Link>
         <Link to="/stories" data-testid="side-stories" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
           <BookOpen className="w-4 h-4 text-primary" />
-          <span>Hikoyalar</span>
+          <span>{t("success_stories")}</span>
         </Link>
         <Link to="/boost" data-testid="side-boost" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
           <Sparkles className="w-4 h-4 text-primary" />
@@ -85,7 +81,7 @@ export default function Sidebar() {
         </Link>
         <Link to="/concierge" data-testid="side-concierge" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
           <Crown className="w-4 h-4 text-secondary" />
-          <span>Sovchi Concierge</span>
+          <span>Concierge</span>
         </Link>
         <Link to="/travel" data-testid="side-travel" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
           <Plane className="w-4 h-4 text-secondary" />

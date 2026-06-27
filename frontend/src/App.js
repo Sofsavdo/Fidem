@@ -22,8 +22,9 @@ const Notifications = lazy(() => import("@/pages/Notifications"));
 const Quiz = lazy(() => import("@/pages/Quiz"));
 const Boost = lazy(() => import("@/pages/Boost"));
 const Personality = lazy(() => import("@/pages/Personality"));
-const Chaperone = lazy(() => import("@/pages/Chaperone"));
-const ChaperoneWard = lazy(() => import("@/pages/ChaperoneWard"));
+const Chaperone = null; // removed
+const ChaperoneWard = null; // removed
+void Chaperone; void ChaperoneWard;
 const Prompts = lazy(() => import("@/pages/Prompts"));
 const Stories = lazy(() => import("@/pages/Stories"));
 const Withdrawals = lazy(() => import("@/pages/Withdrawals"));
@@ -112,8 +113,6 @@ function Inner() {
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/quiz" element={<Quiz />} />
           <Route path="/personality" element={<Personality />} />
-          <Route path="/chaperone" element={<Chaperone />} />
-          <Route path="/chaperone/ward/:wardId" element={<ChaperoneWard />} />
           <Route path="/prompts" element={<Prompts />} />
           <Route path="/stories" element={<Stories />} />
           <Route path="/withdrawals" element={<Withdrawals />} />

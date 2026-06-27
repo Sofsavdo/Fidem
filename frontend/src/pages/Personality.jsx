@@ -40,7 +40,7 @@ export default function Personality() {
       toast.success(`Test tugatildi! +${r.data.bonus} so'm bonus 🎉`);
       refresh();
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Xato");
+      toast.error("Xato");
     } finally {
       setSubmitting(false);
     }

@@ -44,7 +44,7 @@ export default function Withdrawals() {
       setAmount(""); setCard(""); setHolder("");
       load();
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Xato yuz berdi");
+      toast.error("Xato yuz berdi");
     } finally { setLoading(false); }
   };
 

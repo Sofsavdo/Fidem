@@ -31,7 +31,7 @@ export default function ProfileDetail() {
       await api.post("/family/request", { target_user_id: id, note: "" });
       toast.success("So'rov yuborildi. Ikkala tomon ham qabul qilgach, oilaviy telefonlar ko'rinadi.");
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Xato");
+      toast.error("Xato");
     } finally { setFamSending(false); }
   };
 

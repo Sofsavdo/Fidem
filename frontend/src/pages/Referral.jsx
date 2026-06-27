@@ -29,7 +29,7 @@ export default function Referral() {
   };
 
   const share = () => {
-    const subtitle = "🌹 FIDEM — Halal";
+    const subtitle = "🌹 FIDEM";
     const txt = `${subtitle}\n\n${inviteLink}`;
     if (navigator.share) {
       navigator.share({ title: "FIDEM", text: txt }).catch(() => {});
@@ -47,7 +47,7 @@ export default function Referral() {
       await load();
       refresh && refresh();
     } catch (e) {
-      toast.error(e.response?.data?.detail || t("error"));
+      toast.error(t("error"));
     } finally { setRedeeming(false); }
   };
 

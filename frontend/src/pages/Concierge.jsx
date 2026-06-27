@@ -28,11 +28,11 @@ export default function Concierge() {
         toast.info("To'lov sahifasiga yo'naltirilmoqda...");
         setTimeout(() => { window.open(r.data.payment_link, "_blank"); }, 600);
       } else {
-        toast.success("🎉 Sovchi Concierge faollashtirildi! Admin sizga 5 ta mosni qo'lda topadi.");
+        toast.success("🎉 Concierge faollashtirildi! Mutaxassis 5 ta mos profil tanlaydi.");
       }
       load();
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Xato");
+      toast.error("Xato");
     } finally { setLoading(false); }
   };
 
@@ -42,9 +42,9 @@ export default function Concierge() {
     <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-heading font-semibold flex items-center gap-2">
-          <Sparkles className="w-6 h-6 text-secondary" /> Sovchi Concierge
+          <Sparkles className="w-6 h-6 text-secondary" /> Concierge
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">Professional sovchi sizga shaxsan 5 ta eng mos nomzodni qo'lda tanlab beradi.</p>
+        <p className="text-sm text-muted-foreground mt-1">Mutaxassis 30 kun ichida 5 ta qo'lda tanlangan mos profilni taqdim etadi.</p>
       </div>
 
       {/* Pricing card */}
@@ -62,7 +62,7 @@ export default function Concierge() {
         <ul className="text-sm space-y-2">
           <li className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" /> Admin sizning profilingiz va Big 5 testingizni chuqur tahlil qiladi</li>
           <li className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" /> Qo'lda tanlangan {info.max_matches} ta yuqori sifatli mos taqdim etiladi</li>
-          <li className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" /> Har bir mos haqida sovchi izohi (nima sababdan moskelishi)</li>
+          <li className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" /> Har bir mos uchun batafsil izoh</li>
           <li className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" /> Avtomatik tanlovdan farqli o'laroq — inson nazorati</li>
         </ul>
         {!info.active_order && (
@@ -120,7 +120,7 @@ export default function Concierge() {
 function statusLabel(s) {
   return ({
     awaiting_payment: "To'lov kutilmoqda",
-    in_progress: "Sovchi izlamoqda",
+    in_progress: "Tanlanmoqda",
     active: "Faol",
     completed: "Tugatildi",
     expired: "Muddati o'tdi",

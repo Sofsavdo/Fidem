@@ -72,7 +72,7 @@ export default function Chat() {
         await refreshAccess();
       }
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Error");
+      toast.error("Error");
     } finally {
       setUnlocking(false);
     }
@@ -113,7 +113,7 @@ export default function Chat() {
       setShowTemplates(false);
       load();
     } catch (e) {
-      toast.error(e.response?.data?.detail || t("error"));
+      toast.error(t("error"));
     } finally { setSending(false); }
   };
 
@@ -131,7 +131,7 @@ export default function Chat() {
       toast.success("✅");
       load();
     } catch (e) {
-      toast.error(e.response?.data?.detail || t("error"));
+      toast.error(t("error"));
     } finally { setSending(false); }
   };
 
@@ -172,8 +172,8 @@ export default function Chat() {
   if (!other) return <div className="p-6 text-center text-muted-foreground">{t("loading")}</div>;
 
   return (
-    <div className="flex flex-col min-h-screen pb-24">
-      <div className="sticky top-0 z-30 glass border-b border-border/60 px-4 py-3 flex items-center gap-3">
+    <div className="flex flex-col min-h-screen pb-32">
+      <div className="sticky top-0 z-30 glass border-b border-border/60 px-4 py-3 flex items-center gap-3" style={{ paddingTop: "max(12px, env(safe-area-inset-top))" }}>
         <Link to="/messages" className="p-2 rounded-full hover:bg-muted" data-testid="chat-back">
           <ArrowLeft className="w-4 h-4" />
         </Link>
@@ -283,7 +283,7 @@ export default function Chat() {
         </div>
       )}
 
-      <div className="fixed bottom-0 inset-x-0 z-40 glass border-t border-border/60 max-w-2xl xl:max-w-3xl mx-auto md:left-64 lg:left-72 md:right-0">
+      <div className="fixed bottom-0 inset-x-0 z-40 glass border-t border-border/60 max-w-2xl xl:max-w-3xl mx-auto md:left-64 lg:left-72 md:right-0" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         <div className="p-3 space-y-2">
           {/* Paywall banner (shown above the input — input remains visible & disabled) */}
           {access && access.requires_unlock && (

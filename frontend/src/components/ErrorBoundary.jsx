@@ -27,7 +27,7 @@ export default class ErrorBoundary extends React.Component {
             >
               Qayta yuklash
             </button>
-            <p className="text-[11px] text-muted-foreground pt-4">FIDEM — Halal Matchmaking</p>
+            <p className="text-[11px] text-muted-foreground pt-4">FIDEM</p>
           </div>
         </div>
       );

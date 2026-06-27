@@ -29,7 +29,7 @@ export default function Travel() {
       load();
       refresh && refresh();
     } catch (e) {
-      toast.error(e.response?.data?.detail || t("error"));
+      toast.error(t("error"));
     } finally { setLoading(false); }
   };
 

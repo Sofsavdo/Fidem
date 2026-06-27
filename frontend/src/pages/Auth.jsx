@@ -28,7 +28,12 @@ export default function Auth() {
       if (mode === "register") await register(email, password, name);
       else await login(email, password);
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Error");
+      // Hide raw backend errors — show friendly toast based on status
+      const status = err.response?.status;
+      if (status === 401) toast.error(t("error"));
+      else if (status === 400) toast.error(mode === "register" ? t("email") + " ✕" : t("error"));
+      else if (status === 429) toast.error(t("retry"));
+      else toast.error(t("error"));
     } finally {
       setLoading(false);
     }
@@ -37,7 +42,7 @@ export default function Auth() {
   const tryTelegram = async () => {
     const tg = window.Telegram?.WebApp;
     if (!tg?.initData) {
-      toast.error("Telegram Web App ichida bo'lishingiz kerak");
+      toast.error(t("error"));
       return;
     }
     setLoading(true);
@@ -46,7 +51,7 @@ export default function Auth() {
       localStorage.setItem("fidem_token", r.data.token);
       await refresh();
     } catch (err) {
-      toast.error("Telegram auth failed");
+      toast.error(t("error"));
     } finally {
       setLoading(false);
     }

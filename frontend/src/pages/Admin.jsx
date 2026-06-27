@@ -244,12 +244,12 @@ function AdminConcierge() {
     if (search.length >= 2) api.get("/admin/users", { params: { q: search } }).then((r) => setUsers(r.data || []));
   }, [search]);
   const addMatch = async (orderId, matchUserId) => {
-    const note = prompt("Bu mos haqida sovchi izohi (ixtiyoriy):") || "";
+    const note = prompt("Mos haqida izoh (ixtiyoriy):") || "";
     try {
       await api.post(`/admin/concierge/${orderId}/match`, { match_user_id: matchUserId, note });
       toast.success("Mos qo'shildi");
       load();
-    } catch (e) { toast.error(e.response?.data?.detail || "Xato"); }
+    } catch (e) { toast.error("Xato"); }
   };
   return (
     <div className="space-y-3" data-testid="admin-concierge">

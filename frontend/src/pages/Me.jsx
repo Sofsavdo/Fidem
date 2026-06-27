@@ -266,10 +266,6 @@ export default function Me() {
           <span className="flex items-center gap-3 text-sm"><Brain className="w-4 h-4 text-secondary" /> {t("personality_test")}</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
-        <Link to="/chaperone" data-testid="link-chaperone" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><UsersRound className="w-4 h-4 text-secondary" /> {t("sovchi_wali_title")}</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
         <Link to="/prompts" data-testid="link-prompts" className="flex items-center justify-between p-4">
           <span className="flex items-center gap-3 text-sm"><Pen className="w-4 h-4 text-secondary" /> {t("profile_prompts")}</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />

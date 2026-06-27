@@ -32,7 +32,7 @@ export default function DailyCheckIn() {
       await refresh();
       setOpen(false);
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Xato");
+      toast.error("Xato");
     } finally {
       setClaiming(false);
     }
