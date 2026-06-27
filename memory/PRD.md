@@ -66,3 +66,12 @@ Gift modal, settings filters, notifications page+bell, file upload via Object St
 
 ## Test Credentials
 See `/app/memory/test_credentials.md`
+
+## Status (Faza 3 — Monetization Sprint 1 COMPLETE)
+- ✅ Withdrawals (gift conversion, Bigo model, CLICK cash-out)
+- ✅ Family Contact Share (VIP only, two-sided accept)
+- ✅ Sovchi Concierge (199K UZS / 30d / 5 hand-picked matches)
+- ✅ Travel Mode (Premium+ only)
+- ✅ Admin panel: Withdrawals + Concierge tabs
+- ❌ Pending: Financial Verification upload UI expansion (basic exists)
+- ❌ Pending: Payme integration (next sprint)
