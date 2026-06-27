@@ -49,10 +49,10 @@ export default function Candidates() {
   };
 
   return (
-    <div className="px-4 pt-6 pb-4">
+    <div className="px-4 md:px-8 pt-6 pb-4">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="font-heading text-3xl font-semibold tracking-tight">{t("candidates")}</h1>
+          <h1 className="font-heading text-3xl md:text-4xl font-semibold tracking-tight">{t("candidates")}</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             {items.length} {t("candidates").toLowerCase()}
           </p>
@@ -103,8 +103,8 @@ export default function Candidates() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-3">
-          {[...Array(4)].map((_, i) => (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {[...Array(6)].map((_, i) => (
             <div key={i} className="aspect-[4/5] rounded-3xl bg-muted animate-pulse" />
           ))}
         </div>
@@ -113,7 +113,7 @@ export default function Candidates() {
           {t("no_data")}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 stagger" data-testid="candidates-grid">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 stagger" data-testid="candidates-grid">
           {items.map((c) => (
             <CandidateCard key={c.id} c={c} onSave={onSave} saved={savedIds.has(c.id)} />
           ))}

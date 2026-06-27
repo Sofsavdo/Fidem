@@ -152,6 +152,12 @@ const dict = {
     report: "Shikoyat",
     reported: "Shikoyat yuborildi",
     report_reason: "Sababini yozing:",
+    quiz_short: "Quiz",
+    boost: "Boost",
+    invite_friends: "Do'stlarni taklif qilish",
+    share_telegram: "Telegram orqali ulashish",
+    daily_streak: "Streak",
+    free_premium_week: "Bepul Premium hafta",
   },
   ru: {
     app_name: "FIDEM",
@@ -305,6 +311,12 @@ const dict = {
     report: "Жалоба",
     reported: "Жалоба отправлена",
     report_reason: "Укажите причину:",
+    quiz_short: "Quiz",
+    boost: "Boost",
+    invite_friends: "Пригласить друзей",
+    share_telegram: "Поделиться через Telegram",
+    daily_streak: "Streak",
+    free_premium_week: "Бесплатная неделя Premium",
   },
   en: {
     app_name: "FIDEM",
@@ -458,6 +470,12 @@ const dict = {
     report: "Report",
     reported: "Reported",
     report_reason: "Tell us the reason:",
+    quiz_short: "Quiz",
+    boost: "Boost",
+    invite_friends: "Invite Friends",
+    share_telegram: "Share via Telegram",
+    daily_streak: "Streak",
+    free_premium_week: "Free Premium week",
   },
 };
 

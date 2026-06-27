@@ -27,8 +27,8 @@ export default function Saved() {
   const items = data[tab] || [];
 
   return (
-    <div className="px-4 pt-6">
-      <h1 className="font-heading text-3xl font-semibold tracking-tight mb-4">{t("saved")}</h1>
+    <div className="px-4 md:px-8 pt-6">
+      <h1 className="font-heading text-3xl md:text-4xl font-semibold tracking-tight mb-4">{t("saved")}</h1>
       <div className="flex gap-1 mb-4 overflow-x-auto no-scrollbar -mx-4 px-4">
         {TABS.map((x) => (
           <button
@@ -47,7 +47,7 @@ export default function Saved() {
       {loading && <div className="text-center py-6 text-muted-foreground">{t("loading")}</div>}
       {!loading && items.length === 0 && <div className="text-center py-12 text-muted-foreground" data-testid="saved-empty">{t("no_data")}</div>}
 
-      <div className="grid grid-cols-2 gap-3 stagger" data-testid="saved-grid">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 stagger" data-testid="saved-grid">
         {items.map((c) => (
           c.locked ? (
             <div key={Math.random()} className="aspect-[4/5] rounded-3xl bg-card border border-border overflow-hidden relative">

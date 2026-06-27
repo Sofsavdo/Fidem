@@ -28,7 +28,19 @@ export default function CandidateCard({ c, onSave, saved }) {
 
           {/* Top row: match score + badges */}
           <div className="absolute top-3 left-3 right-3 flex items-start justify-between">
-            <MatchBadge score={c.match_score ?? 0} />
+            <div className="flex flex-col gap-1">
+              <MatchBadge score={c.match_score ?? 0} />
+              {c.spotlight && (
+                <span data-testid="badge-spotlight" className="inline-flex items-center gap-1 text-[9px] bg-gold text-ink rounded-full px-2 py-0.5 font-semibold">
+                  ★ Spotlight
+                </span>
+              )}
+              {c.boosted && !c.spotlight && (
+                <span data-testid="badge-boost" className="inline-flex items-center gap-1 text-[9px] bg-primary text-white rounded-full px-2 py-0.5 font-semibold">
+                  🚀 Boost
+                </span>
+              )}
+            </div>
             <div className="flex flex-col gap-1 items-end">
               <VerifiedBadge verified={c.verified_selfie} />
               <FinancialBadge verified={c.verified_financial} />

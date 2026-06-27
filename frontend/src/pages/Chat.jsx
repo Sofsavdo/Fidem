@@ -19,10 +19,15 @@ export default function Chat() {
   const [cannotMessage, setCannotMessage] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
+  const [icebreakers, setIcebreakers] = useState([]);
   const endRef = useRef(null);
 
   const chatId = user && otherId ? [user.id, otherId].sort().join("_") : null;
-  const { wsEvent } = useApp();
+  const { wsEvent, lang } = useApp();
+
+  useEffect(() => {
+    api.get(`/icebreakers?lang=${lang || "uz"}`).then((r) => setIcebreakers(r.data || [])).catch(() => {});
+  }, [lang]);
 
   const load = async () => {
     try {
@@ -173,7 +178,25 @@ export default function Chat() {
         </div>
       )}
 
-      <div className="fixed bottom-0 inset-x-0 z-40 glass border-t border-border/60 max-w-md mx-auto">
+      {messages.length > 0 && messages.length < 6 && icebreakers.length > 0 && (
+        <div className="px-4 pb-2" data-testid="icebreaker-chips">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Suhbat boshlash uchun savol</p>
+          <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+            {icebreakers.slice(0, 5).map((q, i) => (
+              <button
+                key={i}
+                data-testid={`icebreaker-${i}`}
+                onClick={() => setText(q)}
+                className="whitespace-nowrap rounded-full border border-border bg-card hover:bg-muted px-3 py-1.5 text-xs"
+              >
+                {q.length > 35 ? q.slice(0, 35) + "…" : q}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="fixed bottom-0 inset-x-0 z-40 glass border-t border-border/60 max-w-2xl xl:max-w-3xl mx-auto md:left-64 lg:left-72 md:right-0">
         <div className="p-3">
           {cannotMessage && (
             <div className="mb-2 rounded-2xl bg-gold/10 border border-gold/40 p-3">

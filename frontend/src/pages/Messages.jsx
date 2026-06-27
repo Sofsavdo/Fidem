@@ -27,8 +27,8 @@ export default function Messages() {
   const matches = chats.filter((c) => c.status === "match" || (c.last_message && c.last_message.kind !== "super"));
 
   return (
-    <div className="px-4 pt-6">
-      <h1 className="font-heading text-3xl font-semibold tracking-tight mb-4">{t("messages")}</h1>
+    <div className="px-4 md:px-8 pt-6">
+      <h1 className="font-heading text-3xl md:text-4xl font-semibold tracking-tight mb-4">{t("messages")}</h1>
       <div className="flex gap-2 mb-4 border-b border-border">
         {[
           { k: "chats", l: t("chats") },

@@ -29,6 +29,7 @@ from routers.admin_r import router as admin_router  # noqa: E402
 from routers.auth_r import router as auth_router  # noqa: E402
 from routers.candidates_r import router as candidates_router  # noqa: E402
 from routers.chat_r import router as chat_router  # noqa: E402
+from routers.growth_r import router as growth_router  # noqa: E402
 from routers.payments_r import router as payments_router  # noqa: E402
 from routers.telegram_r import router as telegram_router, setup_telegram_webhook  # noqa: E402
 from services import compute_completeness  # noqa: E402
@@ -40,6 +41,7 @@ api = APIRouter(prefix="/api")
 api.include_router(auth_router)
 api.include_router(candidates_router)
 api.include_router(chat_router)
+api.include_router(growth_router)
 api.include_router(payments_router)
 api.include_router(admin_router)
 api.include_router(telegram_router)

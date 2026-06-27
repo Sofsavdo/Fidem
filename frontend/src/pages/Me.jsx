@@ -18,7 +18,28 @@ export default function Me() {
   useEffect(() => {
     api.get("/referral/mine").then((r) => setReferral(r.data));
     api.get("/notifications").then((r) => setUnread((r.data || []).filter((n) => !n.read).length));
+    api.get("/invites/status").then((r) => setInvites(r.data)).catch(() => {});
+    api.get("/daily/status").then((r) => setDaily(r.data)).catch(() => {});
   }, []);
+
+  const [invites, setInvites] = useState(null);
+  const [daily, setDaily] = useState(null);
+
+  const redeemInvite = async () => {
+    try {
+      await api.post("/invites/redeem");
+      toast.success("Premium 7 kun faollashtirildi 🎉");
+      const r = await api.get("/invites/status");
+      setInvites(r.data);
+      refresh();
+    } catch (e) { toast.error(e.response?.data?.detail || "Xato"); }
+  };
+
+  const shareTelegram = (link) => {
+    const text = encodeURIComponent("FIDEM — jiddiy tanishuv platformasi. Menga qo'shiling 👇");
+    const url = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${text}`;
+    window.open(url, "_blank");
+  };
 
   // Increment unread on WS notification
   useEffect(() => {
@@ -45,7 +66,7 @@ export default function Me() {
   };
 
   return (
-    <div className="px-4 pt-6 space-y-5">
+    <div className="px-4 md:px-8 pt-6 pb-8 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-3xl font-semibold tracking-tight">{t("me")}</h1>
@@ -132,7 +153,7 @@ export default function Me() {
       </div>
 
       {/* Premium/balance row */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <Link to="/premium" data-testid="link-premium" className="rounded-3xl bg-gradient-to-br from-ink to-zinc-800 text-white p-4 hover:-translate-y-0.5 transition-transform">
           <Crown className="w-5 h-5 text-gold" />
           <p className="font-heading text-lg mt-2">{t("premium")}</p>
@@ -143,7 +164,75 @@ export default function Me() {
           <p className="font-heading text-lg mt-2">{(user.balance || 0).toLocaleString()} so'm</p>
           <p className="text-xs text-muted-foreground mt-0.5">{t("balance")}</p>
         </Link>
+        <Link to="/boost" data-testid="link-boost" className="rounded-3xl bg-gradient-to-br from-primary/10 to-card border border-primary/30 p-4 hover:-translate-y-0.5 transition-transform col-span-2 md:col-span-1">
+          <Trophy className="w-5 h-5 text-primary" />
+          <p className="font-heading text-lg mt-2">Boost & Spotlight</p>
+          <p className="text-xs text-muted-foreground mt-0.5">5x ko'rinish →</p>
+        </Link>
       </div>
+
+      {/* Daily streak */}
+      {daily && (
+        <div className="rounded-3xl bg-gradient-to-r from-gold/15 to-card border border-gold/30 p-4 flex items-center justify-between" data-testid="daily-strip">
+          <div>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("daily_streak")}</p>
+            <p className="font-heading text-2xl">{daily.streak} kun 🔥</p>
+          </div>
+          {daily.claimed_today ? (
+            <span className="text-xs text-secondary">✓ Bugun olindi</span>
+          ) : (
+            <button
+              data-testid="daily-claim-inline"
+              onClick={async () => {
+                try {
+                  const r = await api.post("/daily/claim");
+                  toast.success(`+${r.data.bonus} so'm`);
+                  const s = await api.get("/daily/status");
+                  setDaily(s.data);
+                  refresh();
+                } catch (e) {}
+              }}
+              className="rounded-xl bg-gold text-ink px-4 py-2 text-sm font-medium"
+            >
+              +{daily.next_bonus} so'm
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Invite friends → free Premium */}
+      {invites && (
+        <div className="rounded-3xl bg-gradient-to-r from-secondary/10 to-card border border-secondary/30 p-4" data-testid="invite-card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-heading text-lg flex items-center gap-2"><Share2 className="w-4 h-4 text-secondary" /> {t("invite_friends")}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">3 do'st → 1 hafta {t("premium")}</p>
+            </div>
+            <span className="text-xs">{invites.invited} / {invites.invited + invites.next_milestone}</span>
+          </div>
+          <div className="h-2 rounded-full bg-border overflow-hidden mt-3">
+            <div className="h-full bg-secondary transition-all" style={{ width: `${Math.min(100, ((invites.invited % 3) / 3) * 100)}%` }} />
+          </div>
+          <div className="flex gap-2 mt-3">
+            <button
+              data-testid="invite-share"
+              onClick={() => shareTelegram(invites.link)}
+              className="flex-1 rounded-2xl bg-secondary text-white py-2.5 text-sm font-medium"
+            >
+              {t("share_telegram")}
+            </button>
+            {invites.available_weeks > 0 && (
+              <button
+                data-testid="invite-redeem"
+                onClick={redeemInvite}
+                className="rounded-2xl bg-gold text-ink px-4 py-2.5 text-sm font-medium"
+              >
+                Olish ({invites.available_weeks})
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Verification actions */}
       <div className="rounded-3xl bg-card border border-border divide-y">

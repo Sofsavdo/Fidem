@@ -97,15 +97,41 @@ async def candidates(
         if height_max and d.get("height_cm", 999) > height_max:
             continue
         score, reasons = compute_match(me_doc, d)
+        # Quiz compatibility bonus (up to +10 score)
+        my_quiz = me_doc.get("quiz_answers") or {}
+        their_quiz = d.get("quiz_answers") or {}
+        if my_quiz and their_quiz:
+            common = set(my_quiz) & set(their_quiz)
+            if common:
+                agree = sum(1 for k in common if my_quiz[k] == their_quiz[k])
+                bonus = round(10 * agree / max(len(common), 1))
+                score = min(100, score + bonus)
+                if bonus >= 5:
+                    reasons.append(f"Quiz mosligi (+{bonus})")
         pub = user_public(d)
         pub["match_score"] = score
         pub["match_reasons"] = reasons
         pub["photo_unlocked"] = d["id"] in unlocked_set
         pub["can_message"] = candidate_can_message(d, me_doc)
+        # Boost / spotlight flags
+        now_iso2 = iso(now_utc())
+        pub["boosted"] = bool(d.get("boost_until") and d["boost_until"] > now_iso2)
+        pub["spotlight"] = bool(d.get("spotlight_until") and d["spotlight_until"] > now_iso2)
         enriched.append(pub)
 
     if sort == "match":
-        enriched.sort(key=lambda x: (-x["match_score"], -x["completeness"]))
+        # Boosted/spotlighted users float to top, then by match score
+        now_iso = iso(now_utc())
+        def _rank(x):
+            d = next((dd for dd in docs if dd["id"] == x["id"]), {})
+            boosted = d.get("boost_until", "") > now_iso
+            spotlight = d.get("spotlight_until", "") > now_iso
+            return (
+                -2 if spotlight else (-1 if boosted else 0),
+                -x["match_score"],
+                -x["completeness"],
+            )
+        enriched.sort(key=_rank)
     elif sort == "active":
         enriched.sort(key=lambda x: (not x["online"], x["last_active"]), reverse=False)
     elif sort == "new":

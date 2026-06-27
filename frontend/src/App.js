@@ -15,6 +15,8 @@ import Premium from "@/pages/Premium";
 import Admin from "@/pages/Admin";
 import Settings from "@/pages/Settings";
 import Notifications from "@/pages/Notifications";
+import Quiz from "@/pages/Quiz";
+import Boost from "@/pages/Boost";
 
 function Gate({ children }) {
   const { user, loading } = useApp();
@@ -49,6 +51,8 @@ function Inner() {
         <Route path="/premium" element={<Premium />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/notifications" element={<Notifications />} />
+        <Route path="/quiz" element={<Quiz />} />
+        <Route path="/boost" element={<Boost />} />
         <Route path="/admin" element={<Admin />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
