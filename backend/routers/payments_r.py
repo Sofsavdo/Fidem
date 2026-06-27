@@ -200,5 +200,15 @@ async def my_referral(uid: str = Depends(get_current_user_id)):
         code = uid[:8]
         await db.users.update_one({"id": uid}, {"$set": {"referral_code": code}})
     count = await db.users.count_documents({"referred_by": code})
+    bonus_per_invite = 10000
+    earned = count * bonus_per_invite
     link = f"https://t.me/{TELEGRAM_BOT_USERNAME}?start={code}"
-    return {"code": code, "link": link, "invited_count": count, "bonus_per_invite": 1000}
+    return {
+        "code": code,
+        "link": link,
+        "invited_count": count,
+        "invites_count": count,  # alias
+        "bonus_per_invite": bonus_per_invite,
+        "earned": earned,
+        "vip_bonus_threshold": 5,
+    }

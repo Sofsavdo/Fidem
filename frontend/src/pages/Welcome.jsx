@@ -130,6 +130,11 @@ export default function Welcome() {
         <footer className="text-center text-xs text-muted-foreground pt-8 pb-4 space-y-1">
           <p>© 2025 FIDEM — Halal Matchmaking</p>
           <p>✨ Sizga mos insonni xavfsiz topishga yordam beramiz</p>
+          <div className="flex justify-center gap-4 pt-3">
+            <Link to="/about" data-testid="footer-about" className="hover:text-foreground">Biz haqimizda</Link>
+            <Link to="/faq" data-testid="footer-faq" className="hover:text-foreground">FAQ</Link>
+            <Link to="/auth" className="hover:text-foreground">Kirish</Link>
+          </div>
         </footer>
       </main>
     </div>

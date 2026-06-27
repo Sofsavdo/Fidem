@@ -28,6 +28,10 @@ import Concierge from "@/pages/Concierge";
 import Travel from "@/pages/Travel";
 import Verification from "@/pages/Verification";
 import Welcome from "@/pages/Welcome";
+import About from "@/pages/About";
+import FAQ from "@/pages/FAQ";
+import Referral from "@/pages/Referral";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 function Gate({ children }) {
   const { user, loading } = useApp();
@@ -63,6 +67,8 @@ function Inner() {
   return (
     <Routes>
       <Route path="/welcome" element={<Welcome />} />
+      <Route path="/about" element={<About />} />
+      <Route path="/faq" element={<FAQ />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/onboarding" element={<Gate><Onboarding /></Gate>} />
       <Route element={<Gate><Layout /></Gate>}>
@@ -87,6 +93,7 @@ function Inner() {
         <Route path="/travel" element={<Travel />} />
         <Route path="/verification" element={<Verification />} />
         <Route path="/boost" element={<Boost />} />
+        <Route path="/referral" element={<Referral />} />
         <Route path="/admin" element={<Admin />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
@@ -96,11 +103,13 @@ function Inner() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <BrowserRouter>
-        <Toaster position="top-center" richColors />
-        <Inner />
-      </BrowserRouter>
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <BrowserRouter>
+          <Toaster position="top-center" richColors />
+          <Inner />
+        </BrowserRouter>
+      </AppProvider>
+    </ErrorBoundary>
   );
 }

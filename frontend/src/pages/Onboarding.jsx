@@ -7,6 +7,11 @@ import PhotoUpload from "@/components/PhotoUpload";
 import WheelDatePicker from "@/components/WheelDatePicker";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 
+const UZ_REGIONS = [
+  "Toshkent", "Samarqand", "Buxoro", "Andijon", "Farg'ona", "Namangan",
+  "Qashqadaryo", "Surxondaryo", "Sirdaryo", "Jizzax", "Navoiy", "Xorazm", "Qoraqalpog'iston",
+];
+
 const STEPS = 7;
 
 export default function Onboarding() {
@@ -114,9 +119,30 @@ export default function Onboarding() {
           )}
           {step === 1 && (
             <>
-              <Field label={t("country")}><input data-testid="ob-country" className="input" value={data.country} onChange={(e) => set({ country: e.target.value })} /></Field>
-              <Field label={t("region")}><input data-testid="ob-region" className="input" value={data.region} onChange={(e) => set({ region: e.target.value })} /></Field>
-              <Field label={t("district")}><input data-testid="ob-district" className="input" value={data.district} onChange={(e) => set({ district: e.target.value })} /></Field>
+              <Field label={t("country")}>
+                <input data-testid="ob-country" className="input" value={data.country} onChange={(e) => set({ country: e.target.value })} />
+              </Field>
+              <Field label={t("region")}>
+                <div className="grid grid-cols-2 gap-2" data-testid="ob-region-grid">
+                  {UZ_REGIONS.map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      data-testid={`ob-region-${r}`}
+                      onClick={() => set({ region: r, search_region: r })}
+                      className={`rounded-xl border px-3 py-2.5 text-sm transition ${
+                        data.region === r ? "bg-primary text-white border-primary" : "bg-card border-border hover:border-foreground/30"
+                      }`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+                <input data-testid="ob-region" type="hidden" value={data.region} readOnly />
+              </Field>
+              <Field label={t("district")}>
+                <input data-testid="ob-district" className="input" value={data.district} onChange={(e) => set({ district: e.target.value })} placeholder="Tuman/shahar (ixtiyoriy)" />
+              </Field>
             </>
           )}
           {step === 2 && (
@@ -166,7 +192,24 @@ export default function Onboarding() {
               <Field label={t("looking_for")}>
                 <textarea data-testid="ob-lookingfor" rows="3" className="input" value={data.looking_for} onChange={(e) => set({ looking_for: e.target.value })} />
               </Field>
-              <Field label={t("search_area")}><input data-testid="ob-searchregion" className="input" value={data.search_region} onChange={(e) => set({ search_region: e.target.value })} /></Field>
+              <Field label={t("search_area")}>
+                <div className="grid grid-cols-2 gap-2">
+                  {UZ_REGIONS.map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      data-testid={`ob-searchregion-${r}`}
+                      onClick={() => set({ search_region: r })}
+                      className={`rounded-xl border px-3 py-2.5 text-sm transition ${
+                        data.search_region === r ? "bg-primary text-white border-primary" : "bg-card border-border hover:border-foreground/30"
+                      }`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+                <input data-testid="ob-searchregion" type="hidden" value={data.search_region} readOnly />
+              </Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label={`${t("age")} min`}><input data-testid="ob-agemin" type="number" min="18" max="80" className="input" value={data.search_age_min} onChange={(e) => set({ search_age_min: +e.target.value })} /></Field>
                 <Field label={`${t("age")} max`}><input data-testid="ob-agemax" type="number" min="18" max="80" className="input" value={data.search_age_max} onChange={(e) => set({ search_age_max: +e.target.value })} /></Field>
