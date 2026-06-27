@@ -312,7 +312,7 @@ export default function Onboarding() {
           )}
         </div>
 
-        <div className="flex gap-3 pt-4">
+        <div className="flex gap-3 pt-4 pb-20 sticky bottom-0 bg-background/80 backdrop-blur-sm z-50" style={{ paddingBottom: "max(80px, calc(env(safe-area-inset-bottom) + 80px))" }}>
           {step > 0 && (
             <button
               data-testid="ob-back"

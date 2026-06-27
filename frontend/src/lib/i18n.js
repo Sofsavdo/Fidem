@@ -200,7 +200,6 @@ const dict = {
     no_results: "Hech narsa topilmadi",
     coming_soon: "Tez kunda",
     // Profile / Me page extras
-    sovchi_wali_title: "Sovchi (Wali) tizimi",
     personality_test: "Shaxsiyat testi (Big 5)",
     profile_prompts: "Profil promptlari",
     success_stories: "Muvaffaqiyat hikoyalari",
@@ -511,7 +510,6 @@ const dict = {
     no_results: "Ничего не найдено",
     coming_soon: "Скоро",
     // Profile / Me page extras
-    sovchi_wali_title: "Система Вали (Сват)",
     personality_test: "Тест личности (Big 5)",
     profile_prompts: "Промпты профиля",
     success_stories: "Истории успеха",
@@ -822,7 +820,6 @@ const dict = {
     no_results: "No results",
     coming_soon: "Coming soon",
     // Profile / Me page extras
-    sovchi_wali_title: "Wali (Matchmaker) system",
     personality_test: "Personality test (Big 5)",
     profile_prompts: "Profile prompts",
     success_stories: "Success stories",
