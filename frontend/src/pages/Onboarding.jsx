@@ -4,6 +4,7 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import PhotoUpload from "@/components/PhotoUpload";
+import WheelDatePicker from "@/components/WheelDatePicker";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 
 const STEPS = 7;
@@ -102,12 +103,12 @@ export default function Onboarding() {
                 />
               </Field>
               <Field label={t("birth_date")}>
-                <input
-                  data-testid="ob-birth"
-                  type="date" className="input"
+                <WheelDatePicker
                   value={data.birth_date}
-                  onChange={(e) => set({ birth_date: e.target.value })}
+                  onChange={(iso) => set({ birth_date: iso })}
                 />
+                {/* Hidden fallback to preserve test_id behavior */}
+                <input data-testid="ob-birth" type="hidden" value={data.birth_date} readOnly />
               </Field>
             </>
           )}

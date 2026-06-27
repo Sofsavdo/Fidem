@@ -203,8 +203,30 @@ class SendGiftRequest(BaseModel):
     gift_kind: Literal["rose", "box", "diamond", "crown"]
 
 
-GIFT_PRICES = {"rose": 50, "box": 200, "diamond": 500, "crown": 1500}
-GIFT_EMOJI = {"rose": "🌹", "box": "🎁", "diamond": "💎", "crown": "👑"}
+GIFT_PRICES = {
+    # 2 ta haftalik bepul gift (price=0)
+    "rose_free":   {"price": 0,       "emoji": "🌹", "label_uz": "Atirgul (bepul)",  "label_ru": "Роза (бесплатно)",   "label_en": "Rose (free)",      "tier": "free", "free_per_week": 1},
+    "heart_free":  {"price": 0,       "emoji": "💗", "label_uz": "Yurakcha (bepul)", "label_ru": "Сердечко (бесплатно)","label_en": "Heart (free)",     "tier": "free", "free_per_week": 1},
+    # 10 ta pulli gift (2000 so'm dan 499000 so'm gacha)
+    "heart":       {"price": 2000,    "emoji": "❤️", "label_uz": "Yurak",            "label_ru": "Сердце",             "label_en": "Heart",            "tier": "care"},
+    "chocolate":   {"price": 5000,    "emoji": "🍫", "label_uz": "Shokolad",         "label_ru": "Шоколад",            "label_en": "Chocolate",        "tier": "care"},
+    "coffee":      {"price": 10000,   "emoji": "☕", "label_uz": "Qahva",            "label_ru": "Кофе",               "label_en": "Coffee",           "tier": "care"},
+    "bouquet":     {"price": 25000,   "emoji": "💐", "label_uz": "Gulchambar",       "label_ru": "Букет",              "label_en": "Bouquet",          "tier": "love"},
+    "star":        {"price": 50000,   "emoji": "🌟", "label_uz": "Yulduz",           "label_ru": "Звезда",             "label_en": "Star",             "tier": "love"},
+    "ring":        {"price": 100000,  "emoji": "💍", "label_uz": "Uzuk",             "label_ru": "Кольцо",             "label_en": "Ring",             "tier": "love"},
+    "diamond":     {"price": 199000,  "emoji": "💎", "label_uz": "Olmos",            "label_ru": "Бриллиант",          "label_en": "Diamond",          "tier": "luxury"},
+    "trophy":      {"price": 299000,  "emoji": "🏆", "label_uz": "Kubok",            "label_ru": "Кубок",              "label_en": "Trophy",           "tier": "luxury"},
+    "crown":       {"price": 399000,  "emoji": "👑", "label_uz": "Toj",              "label_ru": "Корона",             "label_en": "Crown",            "tier": "luxury"},
+    "rocket":      {"price": 499000,  "emoji": "🚀", "label_uz": "Raketa",           "label_ru": "Ракета",             "label_en": "Rocket",           "tier": "luxury"},
+}
+
+# Weekly free gift quota per plan (rose_free, heart_free uchun)
+FREE_GIFTS_BY_PLAN = {"free": 1, "premium": 2, "vip": 3}
+# Backwards compatibility helper
+GIFT_EMOJI = {k: v["emoji"] for k, v in GIFT_PRICES.items()}
+GIFT_LABEL_UZ = {k: v["label_uz"] for k, v in GIFT_PRICES.items()}
+# Backwards compat: legacy gift kinds (rose/box/diamond/crown) map to new equivalents
+LEGACY_GIFT_MAP = {"rose": "rose_free", "box": "bouquet", "diamond": "diamond", "crown": "crown"}
 
 
 # ---------- Notifications ----------

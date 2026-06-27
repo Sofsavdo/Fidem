@@ -114,7 +114,7 @@ export function AppProvider({ children }) {
   return (
     <AppCtx.Provider
       value={{
-        user, loading, lang, t, changeLang,
+        user, loading, lang, t, changeLang, setLang: changeLang,
         login, register, logout, refresh: loadMe,
         wsEvent,
       }}

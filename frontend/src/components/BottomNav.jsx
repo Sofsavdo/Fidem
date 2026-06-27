@@ -1,11 +1,12 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
-import { Users, MessageCircle, Bookmark, User } from "lucide-react";
+import { Users, MessageCircle, Bookmark, User, Sparkles } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 
 const tabs = [
   { to: "/", icon: Users, key: "candidates", testid: "nav-candidates" },
   { to: "/messages", icon: MessageCircle, key: "messages", testid: "nav-messages" },
+  { to: "/boost", icon: Sparkles, key: "boost", testid: "nav-boost" },
   { to: "/saved", icon: Bookmark, key: "saved", testid: "nav-saved" },
   { to: "/me", icon: User, key: "me", testid: "nav-me" },
 ];
@@ -17,7 +18,7 @@ export default function BottomNav() {
       data-testid="bottom-nav"
       className="md:hidden fixed bottom-0 inset-x-0 z-40 glass border-t border-border/60 pb-[env(safe-area-inset-bottom)]"
     >
-      <div className="max-w-md mx-auto grid grid-cols-4">
+      <div className="max-w-md mx-auto grid grid-cols-5">
         {tabs.map((tab) => (
           <NavLink
             key={tab.key}
@@ -25,7 +26,7 @@ export default function BottomNav() {
             data-testid={tab.testid}
             end={tab.to === "/"}
             className={({ isActive }) =>
-              `flex flex-col items-center gap-1 py-3 transition-colors ${
+              `flex flex-col items-center gap-0.5 py-2.5 transition-colors ${
                 isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
               }`
             }
@@ -33,7 +34,7 @@ export default function BottomNav() {
             {({ isActive }) => (
               <>
                 <tab.icon className="w-5 h-5" strokeWidth={isActive ? 2.4 : 1.8} />
-                <span className={`text-[11px] tracking-wide ${isActive ? "font-medium" : ""}`}>
+                <span className={`text-[10px] tracking-wide ${isActive ? "font-medium" : ""}`}>
                   {t(tab.key)}
                 </span>
                 {isActive && <span className="w-1 h-1 rounded-full bg-primary -mt-0.5" />}

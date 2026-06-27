@@ -21,8 +21,11 @@ from core import (
     user_public,
 )
 from models import (
+    FREE_GIFTS_BY_PLAN,
     GIFT_EMOJI,
+    GIFT_LABEL_UZ,
     GIFT_PRICES,
+    LEGACY_GIFT_MAP,
     ReportRequest,
     SaveRequest,
     SendGiftRequest,
@@ -218,28 +221,85 @@ async def report_user(req: ReportRequest, uid: str = Depends(get_current_user_id
 
 
 # ---------- Gifts ----------
+@router.get("/gifts/catalog")
+async def gifts_catalog(uid: str = Depends(get_current_user_id)):
+    """Return full gift catalog with current free-quota status."""
+    me = await get_user(uid)
+    plan = me.get("plan", "free")
+    week_id = now_utc().strftime("%G-W%V")
+    used = me.get("free_gifts_used", {}) or {}
+    week_used = used.get(week_id, 0) if isinstance(used, dict) else 0
+    quota_per_week = FREE_GIFTS_BY_PLAN.get(plan, 1)
+    items = []
+    for kind, meta in GIFT_PRICES.items():
+        items.append({
+            "kind": kind,
+            "emoji": meta["emoji"],
+            "label_uz": meta["label_uz"],
+            "label_ru": meta["label_ru"],
+            "label_en": meta["label_en"],
+            "price": meta["price"],
+            "tier": meta["tier"],
+            "free": meta.get("tier") == "free",
+        })
+    return {
+        "items": items,
+        "free_quota_per_week": quota_per_week,
+        "free_used_this_week": week_used,
+        "free_remaining": max(0, quota_per_week - week_used),
+        "balance": me.get("balance", 0),
+        "plan": plan,
+    }
+
+
 @router.post("/gifts/send")
 async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id)):
-    price = GIFT_PRICES.get(req.gift_kind)
-    if not price:
+    # Map legacy gift kinds
+    kind = LEGACY_GIFT_MAP.get(req.gift_kind, req.gift_kind)
+    meta = GIFT_PRICES.get(kind)
+    if not meta:
         raise HTTPException(400, "Invalid gift")
+    price = meta["price"]
     sender = await get_user(uid)
-    if sender.get("balance", 0) < price:
-        raise HTTPException(402, "Insufficient balance")
+    is_free_gift = meta.get("tier") == "free"
+    # Validate free-quota for free gifts
+    if is_free_gift:
+        plan = sender.get("plan", "free")
+        week_id = now_utc().strftime("%G-W%V")
+        used_map = sender.get("free_gifts_used", {}) or {}
+        if not isinstance(used_map, dict):
+            used_map = {}
+        week_used = used_map.get(week_id, 0)
+        quota = FREE_GIFTS_BY_PLAN.get(plan, 1)
+        if week_used >= quota:
+            raise HTTPException(402, f"Bu hafta uchun bepul sovg'a kvotangiz tugadi ({quota} ta). Pulli gift yuboring yoki kelasi haftani kuting.")
+    elif sender.get("balance", 0) < price:
+        raise HTTPException(402, "Balansda mablag' yetarli emas")
     await get_user(req.to_user_id)  # validates exists
-    # 50% of gift price converts to recipient's withdrawable balance (Bigo model)
-    recipient_share = price // 2
-    await db.users.update_one({"id": uid}, {"$inc": {"balance": -price, "gifts_sent_total": price}})
-    await db.users.update_one(
-        {"id": req.to_user_id},
-        {"$inc": {"gifts_received_total": price, "withdrawable_balance": recipient_share}},
-    )
+    # Apply balance/quota change
+    if is_free_gift:
+        week_id = now_utc().strftime("%G-W%V")
+        await db.users.update_one(
+            {"id": uid},
+            {"$inc": {f"free_gifts_used.{week_id}": 1, "gifts_sent_count": 1}},
+        )
+    else:
+        # 50% of gift price converts to recipient's withdrawable balance (Bigo model)
+        recipient_share = price // 2
+        await db.users.update_one(
+            {"id": uid}, {"$inc": {"balance": -price, "gifts_sent_total": price, "gifts_sent_count": 1}}
+        )
+        await db.users.update_one(
+            {"id": req.to_user_id},
+            {"$inc": {"gifts_received_total": price, "withdrawable_balance": recipient_share}},
+        )
     gift = {
         "id": new_id(),
         "from_user_id": uid,
         "to_user_id": req.to_user_id,
-        "kind": req.gift_kind,
+        "kind": kind,
         "price": price,
+        "is_free": is_free_gift,
         "created_at": iso(now_utc()),
     }
     await db.gifts.insert_one(gift)
@@ -249,17 +309,18 @@ async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id
         "chat_id": cid,
         "from_user_id": uid,
         "to_user_id": req.to_user_id,
-        "text": f"{GIFT_EMOJI[req.gift_kind]} Sovg'a yuborildi",
+        "text": f"{meta['emoji']} {meta['label_uz']}",
         "kind": "gift",
-        "meta": {"gift": req.gift_kind, "price": price},
+        "meta": {"gift": kind, "price": price, "emoji": meta["emoji"], "label": meta["label_uz"], "is_free": is_free_gift},
         "created_at": iso(now_utc()),
         "read": False,
     }
     await db.messages.insert_one(gift_msg)
     gift_msg.pop("_id", None)
     await manager.broadcast_chat([uid, req.to_user_id], {"type": "message", "data": gift_msg})
-    await push_notif(req.to_user_id, "gift", f"Sizga {GIFT_EMOJI[req.gift_kind]} sovg'a yuborildi")
-    return {"ok": True, "balance": sender.get("balance", 0) - price}
+    await push_notif(req.to_user_id, "gift", f"Sizga {meta['emoji']} {meta['label_uz']} sovg'a yuborildi", link="/chat?id=" + cid)
+    new_balance = sender.get("balance", 0) if is_free_gift else (sender.get("balance", 0) - price)
+    return {"ok": True, "balance": new_balance, "gift": gift_msg["meta"]}
 
 
 # ---------- Leaderboard ----------

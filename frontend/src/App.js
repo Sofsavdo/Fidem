@@ -27,6 +27,7 @@ import Family from "@/pages/Family";
 import Concierge from "@/pages/Concierge";
 import Travel from "@/pages/Travel";
 import Verification from "@/pages/Verification";
+import Welcome from "@/pages/Welcome";
 
 function Gate({ children }) {
   const { user, loading } = useApp();
@@ -38,17 +39,30 @@ function Gate({ children }) {
 }
 
 function Inner() {
-  // Inject Telegram WebApp script at runtime
+  // Inject Telegram WebApp script at runtime; init expand & viewport
   useEffect(() => {
-    if (window.Telegram?.WebApp) return;
+    const init = () => {
+      const tg = window.Telegram?.WebApp;
+      if (!tg) return;
+      try {
+        tg.ready();
+        tg.expand();
+        if (tg.setHeaderColor) tg.setHeaderColor("#ffffff");
+        if (tg.setBackgroundColor) tg.setBackgroundColor("#ffffff");
+        if (tg.enableClosingConfirmation) tg.enableClosingConfirmation();
+      } catch (e) { /* ignore */ }
+    };
+    if (window.Telegram?.WebApp) { init(); return; }
     const s = document.createElement("script");
     s.src = "https://telegram.org/js/telegram-web-app.js";
     s.async = true;
+    s.onload = init;
     document.head.appendChild(s);
   }, []);
 
   return (
     <Routes>
+      <Route path="/welcome" element={<Welcome />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/onboarding" element={<Gate><Onboarding /></Gate>} />
       <Route element={<Gate><Layout /></Gate>}>

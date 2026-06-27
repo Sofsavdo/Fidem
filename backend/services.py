@@ -142,10 +142,36 @@ def compute_match(viewer: dict, candidate: dict) -> tuple[int, list[str]]:
         score += 10
         reasons.append(f"Din: {candidate.get('religion')}")
 
-    # 8. Goal text similarity / both seeking serious (10 pts placeholder)
-    if viewer.get("looking_for") and candidate.get("looking_for"):
-        score += 5
-        reasons.append("Oila qurish maqsadi")
+    # 8. Goal text & looking_for similarity (10 pts) — token overlap
+    a = (viewer.get("looking_for") or "").lower()
+    b = (candidate.get("looking_for") or "").lower()
+    if a and b:
+        a_tokens = set(t for t in a.split() if len(t) >= 3)
+        b_tokens = set(t for t in b.split() if len(t) >= 3)
+        if a_tokens and b_tokens:
+            overlap = len(a_tokens & b_tokens) / max(1, len(a_tokens | b_tokens))
+            if overlap >= 0.4:
+                score += 10
+                reasons.append("Maqsadlar yaqin")
+            elif overlap > 0:
+                score += 5
+                reasons.append("Maqsadlar qisman mos")
+            else:
+                score += 2  # both have goal text — minor bonus
+                reasons.append("Oila qurish maqsadi")
+        else:
+            score += 3
+    # Bio token overlap (5 pts)
+    ba = (viewer.get("bio") or "").lower()
+    bb = (candidate.get("bio") or "").lower()
+    if ba and bb:
+        ba_tokens = set(t for t in ba.split() if len(t) >= 4)
+        bb_tokens = set(t for t in bb.split() if len(t) >= 4)
+        if ba_tokens and bb_tokens:
+            o = len(ba_tokens & bb_tokens) / max(1, len(ba_tokens | bb_tokens))
+            if o >= 0.2:
+                score += 5
+                reasons.append("Qiziqishlar yaqin")
 
     return min(100, score), reasons[:6]
 
