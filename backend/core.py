@@ -124,6 +124,8 @@ def user_public(u: dict) -> dict:
         "relocation": bool(u.get("relocation", False)),
         "bio": u.get("bio", ""),
         "photo_url": u.get("photo_url"),
+        "photo_verified": bool(u.get("photo_verified", False)),
+        "photo_verification_code": u.get("photo_verification_code"),
         "verified_identity": u.get("verified_identity", False),
         "verified_selfie": u.get("verified_selfie", False),
         "verified_financial": u.get("verified_financial", False),
