@@ -83,4 +83,5 @@ MIME = {
     "mp3": "audio/mpeg", "wav": "audio/wav", "ogg": "audio/ogg",
     "webm": "audio/webm", "m4a": "audio/mp4",
     "mp4": "video/mp4", "mov": "video/quicktime",
+    "pdf": "application/pdf",
 }

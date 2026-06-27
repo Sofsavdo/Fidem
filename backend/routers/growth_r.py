@@ -87,7 +87,18 @@ async def boost_activate(use_balance: bool = Body(True, embed=True), uid: str = 
     until = now_utc() + timedelta(hours=24)
     await db.users.update_one(
         {"id": uid},
-        {"$set": {"boost_until": iso(until)}, "$inc": {"balance": -BOOST_PRICE}},
+        {
+            "$set": {
+                "boost_until": iso(until),
+                "boost_metrics.started_at": iso(now_utc()),
+                "boost_metrics.impressions": 0,
+                "boost_metrics.views": 0,
+                "boost_metrics.likes": 0,
+                "boost_metrics.messages": 0,
+                "boost_metrics.roses": 0,
+            },
+            "$inc": {"balance": -BOOST_PRICE},
+        },
     )
     await push_notif(uid, "boost", "Profile Boost faollashtirildi — 24 soat 5x ko'proq ko'rinish 🚀")
     return {"active": True, "until": iso(until), "balance_after": me.get("balance", 0) - BOOST_PRICE}
@@ -106,7 +117,15 @@ async def spotlight_activate(use_balance: bool = Body(True, embed=True), uid: st
     until = now_utc() + timedelta(days=7)
     await db.users.update_one(
         {"id": uid},
-        {"$set": {"spotlight_until": iso(until)}, "$inc": {"balance": -SPOTLIGHT_PRICE}},
+        {
+            "$set": {
+                "spotlight_until": iso(until),
+                "boost_metrics.sp_started_at": iso(now_utc()),
+                "boost_metrics.sp_impressions": 0,
+                "boost_metrics.sp_views": 0,
+            },
+            "$inc": {"balance": -SPOTLIGHT_PRICE},
+        },
     )
     await push_notif(uid, "boost", "Spotlight 7 kunlik faollashtirildi 🌟")
     return {"active": True, "until": iso(until)}

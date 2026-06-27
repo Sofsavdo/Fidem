@@ -132,11 +132,17 @@ def user_public(u: dict) -> dict:
     }
 
 
-async def notify_telegram(uid: str, text: str) -> None:
+async def notify_telegram(uid: str, text: str, link: Optional[str] = None) -> None:
     user = await db.users.find_one({"id": uid}, {"telegram_id": 1, "_id": 0})
     if user and user.get("telegram_id"):
         try:
-            await send_telegram_message(int(user["telegram_id"]), text)
+            reply_markup = None
+            if link:
+                base = os.environ.get("CLICK_RETURN_URL", "").split("/payment/return")[0] or ""
+                full = link if link.startswith("http") else f"{base}{link}" if base else None
+                if full:
+                    reply_markup = {"inline_keyboard": [[{"text": "🔗 Ochish", "url": full}]]}
+            await send_telegram_message(int(user["telegram_id"]), text, reply_markup=reply_markup)
         except Exception as e:
             log.warning(f"telegram notify failed: {e}")
 
@@ -163,7 +169,7 @@ async def push_notif(uid: str, kind: str, text: str, link: Optional[str] = None,
     }
     await db.notifications.insert_one(notif)
     notif.pop("_id", None)
-    asyncio.create_task(notify_telegram(uid, text))
+    asyncio.create_task(notify_telegram(uid, text, link))
     # WebSocket push (best-effort)
     asyncio.create_task(manager.send_to_user(uid, {"type": "notification", "data": notif, "payload": payload or {}}))
     return True

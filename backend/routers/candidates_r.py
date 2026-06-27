@@ -147,7 +147,28 @@ async def candidates(
         enriched.sort(key=lambda x: (not x["online"], x["last_active"]), reverse=False)
     elif sort == "new":
         enriched.sort(key=lambda x: x["last_active"], reverse=True)
-    return enriched[:limit]
+    result = enriched[:limit]
+    # Track impressions for boosted/spotlighted users
+    try:
+        now_iso3 = iso(now_utc())
+        boosted_ids = [d["id"] for d in docs if d.get("boost_until") and d["boost_until"] > now_iso3]
+        spotlight_ids = [d["id"] for d in docs if d.get("spotlight_until") and d["spotlight_until"] > now_iso3]
+        result_ids = {x["id"] for x in result}
+        boosted_hit = [i for i in boosted_ids if i in result_ids]
+        spotlight_hit = [i for i in spotlight_ids if i in result_ids]
+        if boosted_hit:
+            await db.users.update_many(
+                {"id": {"$in": boosted_hit}},
+                {"$inc": {"boost_metrics.impressions": 1, "impressions_total": 1}},
+            )
+        if spotlight_hit:
+            await db.users.update_many(
+                {"id": {"$in": spotlight_hit}},
+                {"$inc": {"boost_metrics.sp_impressions": 1, "impressions_total": 1}},
+            )
+    except Exception:
+        pass
+    return result
 
 
 @router.get("/candidates/{target_id}")
@@ -171,6 +192,17 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
     pub["photo_unlocked"] = bool(unlock and unlock.get("approved"))
     pub["photo_unlock_status"] = unlock.get("status") if unlock else "none"
     pub["can_message"] = candidate_can_message(target, me_doc)
+    # Track view metrics for boosted target
+    try:
+        now_iso = iso(now_utc())
+        inc = {"views_total": 1}
+        if target.get("boost_until") and target["boost_until"] > now_iso:
+            inc["boost_metrics.views"] = 1
+        if target.get("spotlight_until") and target["spotlight_until"] > now_iso:
+            inc["boost_metrics.sp_views"] = 1
+        await db.users.update_one({"id": target_id}, {"$inc": inc})
+    except Exception:
+        pass
     asyncio.create_task(push_notif(target_id, "view", f"Profilingizni {me_doc.get('name','')} ko'rdi"))
     return pub
 
@@ -235,11 +267,22 @@ async def decide_photo_unlock(req: PhotoUnlockDecision, uid: str = Depends(get_c
 async def save_user(req: SaveRequest, uid: str = Depends(get_current_user_id)):
     if req.user_id == uid:
         raise HTTPException(400, "Cannot save self")
+    is_new = await db.saved.find_one({"owner_id": uid, "target_id": req.user_id}) is None
     await db.saved.update_one(
         {"owner_id": uid, "target_id": req.user_id},
         {"$set": {"owner_id": uid, "target_id": req.user_id, "at": iso(now_utc())}},
         upsert=True,
     )
+    if is_new:
+        try:
+            target = await get_user(req.user_id)
+            now_iso = iso(now_utc())
+            inc = {"likes_received_total": 1}
+            if target.get("boost_until") and target["boost_until"] > now_iso:
+                inc["boost_metrics.likes"] = 1
+            await db.users.update_one({"id": req.user_id}, {"$inc": inc})
+        except Exception:
+            pass
     me_doc = await get_user(uid)
     await push_notif(req.user_id, "saved", f"{me_doc.get('name','')} sizni saqladi")
     return {"ok": True}

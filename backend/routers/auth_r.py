@@ -206,7 +206,7 @@ async def upload_file(request: Request, file: UploadFile = File(...), uid: str =
         raise HTTPException(413, "Max file size 8MB")
     ext = (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else "bin"
     if ext not in MIME:
-        raise HTTPException(400, "Only image files (jpg/png/gif/webp) are allowed")
+        raise HTTPException(400, "Only image (jpg/png/gif/webp) or PDF files are allowed")
     data = await file.read()
     if len(data) > 8 * 1024 * 1024:
         raise HTTPException(413, "Max file size 8MB")

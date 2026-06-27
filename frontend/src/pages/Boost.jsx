@@ -2,15 +2,22 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
-import { ArrowLeft, Sparkles, Star, Rocket } from "lucide-react";
+import { ArrowLeft, Sparkles, Star, Rocket, Eye, Heart, MessageSquare, Trophy, Activity } from "lucide-react";
 import { toast } from "sonner";
+import { photoSrc } from "@/lib/photo";
 
 export default function Boost() {
   const { t, user, refresh } = useApp();
   const [status, setStatus] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
+  const [leaderboard, setLeaderboard] = useState([]);
   const [busy, setBusy] = useState(false);
 
-  const load = () => api.get("/boost/status").then((r) => setStatus(r.data));
+  const load = () => Promise.all([
+    api.get("/boost/status").then((r) => setStatus(r.data)),
+    api.get("/boost/analytics").then((r) => setAnalytics(r.data)).catch(() => {}),
+    api.get("/boost/leaderboard").then((r) => setLeaderboard(r.data || [])).catch(() => {}),
+  ]);
   useEffect(() => { load(); }, []);
 
   const activate = async (kind) => {
@@ -128,6 +135,88 @@ export default function Boost() {
       <p className="text-xs text-muted-foreground text-center pt-2">
         💡 Maslahat: Spotlight + Premium birlashtirilsa, sizning profilingiz konversiyasi 10x oshadi
       </p>
+
+      {/* Analytics */}
+      {analytics && (
+        <div className="rounded-3xl border border-border bg-card p-5" data-testid="boost-analytics">
+          <h2 className="font-heading text-xl font-semibold flex items-center gap-2">
+            <Activity className="w-5 h-5 text-primary" /> Analytics
+          </h2>
+
+          {/* Boost session */}
+          <div className="mt-3 rounded-2xl bg-primary/5 border border-primary/20 p-4">
+            <p className="text-xs font-medium text-primary mb-2">Joriy Boost sessiyasi {analytics.boost.active ? "(faol)" : "(faolsiz)"}</p>
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+              <StatBox icon={<Eye className="w-4 h-4" />} label="Ko'rinishlar" value={analytics.boost.impressions} />
+              <StatBox icon={<Activity className="w-4 h-4" />} label="Ko'rishlar" value={analytics.boost.views} />
+              <StatBox icon={<Heart className="w-4 h-4" />} label="Likes" value={analytics.boost.likes} />
+              <StatBox icon={<MessageSquare className="w-4 h-4" />} label="Roses" value={analytics.boost.roses} />
+              <StatBox icon={<MessageSquare className="w-4 h-4" />} label="Msg" value={analytics.boost.messages} />
+            </div>
+          </div>
+
+          {/* Spotlight session */}
+          {analytics.spotlight.active && (
+            <div className="mt-3 rounded-2xl bg-gold-light/30 border border-gold/40 p-4">
+              <p className="text-xs font-medium text-gold-dark mb-2">Joriy Spotlight sessiyasi (faol)</p>
+              <div className="grid grid-cols-2 gap-3">
+                <StatBox icon={<Eye className="w-4 h-4" />} label="Ko'rinishlar" value={analytics.spotlight.impressions} />
+                <StatBox icon={<Activity className="w-4 h-4" />} label="Ko'rishlar" value={analytics.spotlight.views} />
+              </div>
+            </div>
+          )}
+
+          {/* Lifetime */}
+          <div className="mt-3">
+            <p className="text-xs font-medium text-muted-foreground mb-2">Umumiy statistika</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <StatBox icon={<Eye className="w-4 h-4" />} label="Jami ko'rinish" value={analytics.lifetime.total_impressions} />
+              <StatBox icon={<Activity className="w-4 h-4" />} label="Jami ko'rish" value={analytics.lifetime.total_views} />
+              <StatBox icon={<Heart className="w-4 h-4" />} label="Jami likes" value={analytics.lifetime.total_likes} />
+              <StatBox icon={<Sparkles className="w-4 h-4" />} label="Gift olingan" value={(analytics.lifetime.gifts_received || 0).toLocaleString() + " so'm"} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Leaderboard */}
+      {leaderboard.length > 0 && (
+        <div className="rounded-3xl border border-border bg-card p-5" data-testid="boost-leaderboard">
+          <h2 className="font-heading text-xl font-semibold flex items-center gap-2">
+            <Trophy className="w-5 h-5 text-gold-dark" /> Eng faol boostlar
+          </h2>
+          <p className="text-xs text-muted-foreground mt-1">Hozir boost faol bo'lganlar orasida eng ko'p ko'rinish olganlar</p>
+          <div className="mt-3 space-y-2">
+            {leaderboard.map((u, i) => (
+              <div key={u.id} className="flex items-center gap-3 py-2 border-b border-border/30 last:border-0">
+                <span className={`text-xs font-semibold w-6 text-center ${i === 0 ? "text-gold-dark" : i === 1 ? "text-gray-500" : i === 2 ? "text-amber-700" : "text-muted-foreground"}`}>
+                  #{i + 1}
+                </span>
+                <div className="w-9 h-9 rounded-full bg-muted overflow-hidden">
+                  {u.photo_url && <img src={photoSrc(u.photo_url)} alt="" className="w-full h-full object-cover" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{u.name}, {u.age}</p>
+                  <p className="text-[11px] text-muted-foreground">{u.region}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-primary">{u.boost_impressions.toLocaleString()}</p>
+                  <p className="text-[10px] text-muted-foreground">ko'rinish</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatBox({ icon, label, value }) {
+  return (
+    <div className="rounded-xl bg-card border border-border/40 p-2 text-center">
+      <div className="text-muted-foreground flex items-center justify-center gap-1 text-[10px]">{icon}{label}</div>
+      <p className="text-lg font-heading font-semibold mt-0.5">{value}</p>
     </div>
   );
 }

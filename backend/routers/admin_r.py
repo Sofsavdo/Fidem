@@ -79,21 +79,44 @@ async def admin_payments(status: Optional[str] = None, _: str = Depends(get_curr
 
 
 @router.get("/verifications")
-async def admin_verifications(_: str = Depends(get_current_admin)):
-    rows = await db.verifications.find({"status": "pending"}, {"_id": 0}).to_list(200)
-    return rows
+async def admin_verifications(status: str = "pending", _: str = Depends(get_current_admin)):
+    q = {} if status == "all" else {"status": status}
+    rows = await db.verifications.find(q, {"_id": 0}).sort("created_at", -1).limit(200).to_list(200)
+    out = []
+    for r in rows:
+        u = await db.users.find_one({"id": r["user_id"]}, {"_id": 0, "name": 1, "email": 1, "photo_url": 1, "id": 1, "verified_financial": 1, "verified_identity": 1, "verified_selfie": 1})
+        r["user"] = u or {}
+        out.append(r)
+    return out
 
 
 @router.post("/verifications/{vid}/decide")
-async def admin_decide_verif(vid: str, approve: bool = Body(..., embed=True), _: str = Depends(get_current_admin)):
+async def admin_decide_verif(vid: str, approve: bool = Body(..., embed=True), reason: str = Body("", embed=True), _: str = Depends(get_current_admin)):
     v = await db.verifications.find_one({"id": vid})
     if not v:
         raise HTTPException(404, "Not found")
-    await db.verifications.update_one({"id": vid}, {"$set": {"status": "approved" if approve else "rejected"}})
+    await db.verifications.update_one(
+        {"id": vid},
+        {"$set": {
+            "status": "approved" if approve else "rejected",
+            "decided_at": iso(now_utc()),
+            "rejection_reason": reason if not approve else None,
+        }},
+    )
     if approve:
-        field = {"identity": "verified_identity", "selfie": "verified_selfie", "financial": "verified_financial"}[v["kind"]]
-        await db.users.update_one({"id": v["user_id"]}, {"$set": {field: True}})
-        await push_notif(v["user_id"], "verified", f"Verification tasdiqlandi: {v['kind']}")
+        field = {"identity": "verified_identity", "selfie": "verified_selfie", "financial": "verified_financial"}.get(v.get("kind"), None)
+        if field:
+            await db.users.update_one({"id": v["user_id"]}, {"$set": {field: True}})
+            # Auto-grant financial badge
+            if v.get("kind") == "financial":
+                await db.users.update_one(
+                    {"id": v["user_id"]},
+                    {"$addToSet": {"badges": "b_financial"}},
+                )
+        await push_notif(v["user_id"], "verified", f"✅ Verification tasdiqlandi: {v.get('kind')}")
+    else:
+        reason_txt = reason or "sabab ko'rsatilmagan"
+        await push_notif(v["user_id"], "verified", f"❌ Verification rad etildi: {reason_txt}")
     return {"ok": True}
 
 

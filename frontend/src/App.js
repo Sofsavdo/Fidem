@@ -26,6 +26,7 @@ import Withdrawals from "@/pages/Withdrawals";
 import Family from "@/pages/Family";
 import Concierge from "@/pages/Concierge";
 import Travel from "@/pages/Travel";
+import Verification from "@/pages/Verification";
 
 function Gate({ children }) {
   const { user, loading } = useApp();
@@ -70,6 +71,7 @@ function Inner() {
         <Route path="/family" element={<Family />} />
         <Route path="/concierge" element={<Concierge />} />
         <Route path="/travel" element={<Travel />} />
+        <Route path="/verification" element={<Verification />} />
         <Route path="/boost" element={<Boost />} />
         <Route path="/admin" element={<Admin />} />
       </Route>

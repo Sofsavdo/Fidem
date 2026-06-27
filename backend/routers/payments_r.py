@@ -42,6 +42,18 @@ async def request_verification(req: VerificationRequest, uid: str = Depends(get_
     return {"ok": True, "id": doc["id"]}
 
 
+@router.get("/verification/mine")
+async def my_verifications(uid: str = Depends(get_current_user_id)):
+    rows = await db.verifications.find({"user_id": uid}, {"_id": 0}).sort("created_at", -1).to_list(50)
+    me = await db.users.find_one({"id": uid}, {"_id": 0, "verified_identity": 1, "verified_selfie": 1, "verified_financial": 1})
+    return {
+        "items": rows,
+        "verified_identity": bool((me or {}).get("verified_identity")),
+        "verified_selfie": bool((me or {}).get("verified_selfie")),
+        "verified_financial": bool((me or {}).get("verified_financial")),
+    }
+
+
 # ---------- Payments ----------
 @router.post("/payments/create")
 async def create_payment(req: CreatePaymentRequest, uid: str = Depends(get_current_user_id)):

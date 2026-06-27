@@ -345,6 +345,10 @@ export default function Me() {
           <span className="flex items-center gap-3 text-sm"><Wallet className="w-4 h-4 text-primary" /> Pul yechish ({(user.withdrawable_balance || 0).toLocaleString()} so'm)</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
+        <Link to="/verification" data-testid="link-verification" className="flex items-center justify-between p-4">
+          <span className="flex items-center gap-3 text-sm"><ShieldCheck className="w-4 h-4 text-primary" /> Profil tasdiqlash</span>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </Link>
         <Link to="/settings" data-testid="link-settings" className="flex items-center justify-between p-4">
           <span className="flex items-center gap-3 text-sm"><SlidersHorizontal className="w-4 h-4" /> {t("who_can_message_me")}</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />

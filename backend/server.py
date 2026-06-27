@@ -43,6 +43,7 @@ from routers.withdrawals_r import router as withdrawals_router  # noqa: E402
 from routers.family_r import router as family_router  # noqa: E402
 from routers.concierge_r import router as concierge_router  # noqa: E402
 from routers.travel_r import router as travel_router  # noqa: E402
+from routers.boost_analytics_r import router as boost_analytics_router  # noqa: E402
 from services import compute_completeness  # noqa: E402
 from storage import init_storage  # noqa: E402
 
@@ -67,6 +68,7 @@ api.include_router(withdrawals_router)
 api.include_router(family_router)
 api.include_router(concierge_router)
 api.include_router(travel_router)
+api.include_router(boost_analytics_router)
 app.include_router(api)
 
 
