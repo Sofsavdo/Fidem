@@ -163,6 +163,34 @@ export default function Premium() {
         </button>
       </div>
 
+      {/* Roses bundles — Hinge-style attention currency */}
+      <div className="rounded-3xl bg-primary/5 border-2 border-primary/30 p-5" data-testid="roses-section">
+        <p className="font-heading text-xl font-semibold flex items-center gap-2">🌹 Atirgullar</p>
+        <p className="text-sm mt-1 text-muted-foreground">Maxsus e'tibor bilan murojaat. Premium foydalanuvchilar 3, VIP 7 ta bepul oladi (haftada).</p>
+        <div className="grid grid-cols-3 gap-2 mt-3">
+          {[["1", 1, 5000], ["5", 5, 20000], ["12", 12, 45000]].map(([k, count, price]) => (
+            <button
+              key={k}
+              data-testid={`roses-${k}`}
+              onClick={async () => {
+                setCreating(true);
+                try {
+                  const r = await api.post("/roses/purchase", { bundle: k });
+                  window.open(r.data.payment_link, "_blank");
+                  toast.success(`${count} atirgul to'lov sahifasi ochildi`);
+                } catch (e) { toast.error("Xato"); } finally { setCreating(false); }
+              }}
+              disabled={creating}
+              className="rounded-2xl bg-card border border-border hover:border-primary p-3 text-center transition"
+            >
+              <p className="text-2xl">🌹</p>
+              <p className="font-medium text-sm mt-1">{count} ta</p>
+              <p className="text-xs text-muted-foreground">{price.toLocaleString()} so'm</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Super-application one-time */}
       <div className="rounded-3xl bg-gold-light/40 border border-gold/40 p-5" data-testid="super-section">
         <p className="font-heading text-xl font-semibold flex items-center gap-2">✨ {t("super_application")}</p>

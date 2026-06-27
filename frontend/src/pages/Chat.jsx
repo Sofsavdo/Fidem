@@ -3,7 +3,8 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import GiftModal from "@/components/GiftModal";
-import { ArrowLeft, Send, Gift, Sparkles, MoreVertical, Ban, Flag } from "lucide-react";
+import RoseModal from "@/components/RoseModal";
+import { ArrowLeft, Send, Gift, Sparkles, MoreVertical, Ban, Flag, Wand2 } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
 import { toast } from "sonner";
 
@@ -19,7 +20,9 @@ export default function Chat() {
   const [cannotMessage, setCannotMessage] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
+  const [roseOpen, setRoseOpen] = useState(false);
   const [icebreakers, setIcebreakers] = useState([]);
+  const [aiLoading, setAiLoading] = useState(false);
   const endRef = useRef(null);
 
   const chatId = user && otherId ? [user.id, otherId].sort().join("_") : null;
@@ -83,6 +86,17 @@ export default function Chat() {
   const sendGift = (kind) => {
     setGiftOpen(true);
     // legacy quick-send kept for backward compat — not used now
+  };
+
+  const genAiIcebreakers = async () => {
+    setAiLoading(true);
+    try {
+      const r = await api.get(`/ai/icebreakers/${otherId}?lang=${lang || "uz"}`);
+      setIcebreakers(r.data.questions || []);
+      toast.success("AI savollar tayyor 🤖");
+    } catch (e) {
+      toast.error("AI hozir mavjud emas");
+    } finally { setAiLoading(false); }
   };
 
   const blockUser = async () => {
@@ -154,8 +168,9 @@ export default function Chat() {
               m.from_user_id === user?.id
                 ? "bg-primary text-white rounded-br-sm"
                 : "bg-card border border-border rounded-bl-sm"
-            } ${m.kind === "gift" ? "bg-gold-light text-yellow-900 border-gold/40" : ""} ${m.kind === "super" ? "ring-2 ring-gold" : ""}`}>
+            } ${m.kind === "gift" ? "bg-gold-light text-yellow-900 border-gold/40" : ""} ${m.kind === "super" ? "ring-2 ring-gold" : ""} ${m.kind === "rose" ? "ring-2 ring-primary bg-primary/10 text-primary" : ""}`}>
               {m.kind === "super" && <span className="text-[9px] uppercase tracking-wider opacity-70 block">Super</span>}
+              {m.kind === "rose" && <span className="text-[9px] uppercase tracking-wider opacity-70 block">🌹 Atirgul</span>}
               {m.text}
             </div>
           </div>
@@ -180,7 +195,12 @@ export default function Chat() {
 
       {messages.length > 0 && messages.length < 6 && icebreakers.length > 0 && (
         <div className="px-4 pb-2" data-testid="icebreaker-chips">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Suhbat boshlash uchun savol</p>
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Suhbat boshlash uchun savol</p>
+            <button data-testid="ai-icebreaker-btn" onClick={genAiIcebreakers} disabled={aiLoading} className="text-[10px] uppercase tracking-wider text-secondary hover:underline disabled:opacity-50 inline-flex items-center gap-1">
+              <Wand2 className="w-3 h-3" /> {aiLoading ? "AI…" : "AI yaratish"}
+            </button>
+          </div>
           <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
             {icebreakers.slice(0, 5).map((q, i) => (
               <button
@@ -193,6 +213,14 @@ export default function Chat() {
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {messages.length === 0 && (
+        <div className="px-4 pb-2">
+          <button data-testid="ai-icebreaker-empty-btn" onClick={genAiIcebreakers} disabled={aiLoading} className="w-full rounded-2xl border border-dashed border-secondary/40 bg-secondary/5 hover:bg-secondary/10 py-2.5 text-xs text-secondary font-medium inline-flex items-center justify-center gap-1.5 disabled:opacity-50">
+            <Wand2 className="w-3.5 h-3.5" /> {aiLoading ? "AI tayyorlamoqda…" : "AI shaxsiy savol tavsiya etsin"}
+          </button>
         </div>
       )}
 
@@ -211,6 +239,9 @@ export default function Chat() {
             </div>
           )}
           <div className="flex items-center gap-2">
+            <button data-testid="rose-open" onClick={() => setRoseOpen(true)} className="p-2.5 rounded-full bg-primary/10 hover:bg-primary/20" title="Atirgul yuborish">
+              🌹
+            </button>
             <button data-testid="gift-open" onClick={() => setGiftOpen(true)} className="p-2.5 rounded-full bg-muted hover:bg-border" title={t("send_gift")}>
               <Gift className="w-4 h-4" />
             </button>
@@ -234,6 +265,7 @@ export default function Chat() {
         </div>
       </div>
       {giftOpen && <GiftModal targetId={otherId} targetName={other.name} onClose={() => setGiftOpen(false)} onSent={load} />}
+      {roseOpen && <RoseModal targetId={otherId} targetName={other.name} onClose={() => setRoseOpen(false)} onSent={load} />}
     </div>
   );
 }

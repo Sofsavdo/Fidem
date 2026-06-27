@@ -1,6 +1,6 @@
 import React from "react";
 import { NavLink, Link } from "react-router-dom";
-import { Users, MessageCircle, Bookmark, User, Heart, Sparkles, Crown, Gift, ShieldCheck } from "lucide-react";
+import { Users, MessageCircle, Bookmark, User, Heart, Sparkles, Crown, Gift, ShieldCheck, Brain, UsersRound } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { PlanPill } from "@/components/Badges";
 import { photoSrc } from "@/lib/photo";
@@ -62,6 +62,14 @@ export default function Sidebar() {
         <Link to="/premium" data-testid="side-premium" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
           <Crown className="w-4 h-4 text-gold-dark" />
           <span>{t("premium")}</span>
+        </Link>
+        <Link to="/personality" data-testid="side-personality" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
+          <Brain className="w-4 h-4 text-secondary" />
+          <span>Shaxsiyat testi</span>
+        </Link>
+        <Link to="/chaperone" data-testid="side-chaperone" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
+          <UsersRound className="w-4 h-4 text-secondary" />
+          <span>Sovchi (Wali)</span>
         </Link>
         <Link to="/boost" data-testid="side-boost" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
           <Sparkles className="w-4 h-4 text-primary" />

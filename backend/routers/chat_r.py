@@ -6,6 +6,7 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Body, Depends, HTTPException, WebSocket, WebSocketDisconnect, Query
 
 from auth import decode_token, get_current_user_id
+from ai_service import quick_moderation
 from core import (
     PRICE_SUPER,
     chat_id_for,
@@ -107,6 +108,10 @@ async def chat_history(chat_id: str, uid: str = Depends(get_current_user_id)):
 async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_user_id)):
     if req.to_user_id == uid:
         raise HTTPException(400, "Cannot message self")
+    # AI moderation (fast check)
+    ok, reason = quick_moderation(req.text)
+    if not ok:
+        raise HTTPException(422, reason)
     sender = await get_user(uid)
     target = await get_user(req.to_user_id)
     cid = chat_id_for(uid, req.to_user_id)
@@ -172,6 +177,17 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
     # WebSocket push: deliver to BOTH parties (so sender's other tabs update too)
     ws_payload = {"type": "message", "data": {**msg, "created_at": iso(parse_dt(msg["created_at"]))}}
     await manager.broadcast_chat([uid, req.to_user_id], ws_payload)
+    # Also notify chaperones (read-only) of both sender and recipient
+    try:
+        chap_rows = await db.chaperones.find(
+            {"$or": [{"owner_id": uid}, {"owner_id": req.to_user_id}], "status": "active"},
+            {"_id": 0, "wali_id": 1},
+        ).to_list(50)
+        chaperone_ids = list({c["wali_id"] for c in chap_rows})
+        if chaperone_ids:
+            await manager.broadcast_chat(chaperone_ids, {"type": "chaperone_message", "data": ws_payload["data"]})
+    except Exception:
+        pass
 
     await push_notif(req.to_user_id, "message", f"Yangi xabar: {sender.get('name','')}")
     msg["created_at"] = parse_dt(msg["created_at"])

@@ -4,7 +4,7 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, PlanPill } from "@/components/Badges";
 import PhotoUpload from "@/components/PhotoUpload";
-import { ChevronRight, Crown, Gem, Wallet, Share2, Settings as SettingsIcon, LogOut, Copy, Trophy, ShieldCheck, Bell, Clock, SlidersHorizontal } from "lucide-react";
+import { ChevronRight, Crown, Gem, Wallet, Share2, Settings as SettingsIcon, LogOut, Copy, Trophy, ShieldCheck, Bell, Clock, SlidersHorizontal, Brain, UsersRound } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
 import { toast } from "sonner";
 
@@ -309,6 +309,14 @@ export default function Me() {
 
       {/* Admin & settings */}
       <div className="rounded-3xl bg-card border border-border divide-y">
+        <Link to="/personality" data-testid="link-personality" className="flex items-center justify-between p-4">
+          <span className="flex items-center gap-3 text-sm"><Brain className="w-4 h-4 text-secondary" /> Shaxsiyat testi (Big 5)</span>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </Link>
+        <Link to="/chaperone" data-testid="link-chaperone" className="flex items-center justify-between p-4">
+          <span className="flex items-center gap-3 text-sm"><UsersRound className="w-4 h-4 text-secondary" /> Sovchi (Wali) tizimi</span>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </Link>
         <Link to="/settings" data-testid="link-settings" className="flex items-center justify-between p-4">
           <span className="flex items-center gap-3 text-sm"><SlidersHorizontal className="w-4 h-4" /> {t("who_can_message_me")}</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />

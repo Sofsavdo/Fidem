@@ -4,6 +4,8 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot } from "@/components/Badges";
 import GiftModal from "@/components/GiftModal";
+import RoseModal from "@/components/RoseModal";
+import CompatibilityCard from "@/components/CompatibilityCard";
 import { photoSrc } from "@/lib/photo";
 import { Bookmark, MessageCircle, Gift, ArrowLeft, Lock, Clock, Shield } from "lucide-react";
 import { toast } from "sonner";
@@ -17,6 +19,7 @@ export default function ProfileDetail() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
+  const [roseOpen, setRoseOpen] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -122,6 +125,9 @@ export default function ProfileDetail() {
           <p className="text-base mt-1">{c.profession || "—"}</p>
         </div>
 
+        {/* AI Compatibility */}
+        <CompatibilityCard targetId={c.id} lang="uz" />
+
         {/* match score with reasons */}
         <div className="rounded-2xl border-2 border-secondary/30 bg-secondary/5 p-4">
           <div className="flex items-center justify-between">
@@ -146,12 +152,16 @@ export default function ProfileDetail() {
           <Link data-testid="profile-write" to={`/chat/${c.id}`} className="flex-1 rounded-2xl py-3 inline-flex items-center justify-center gap-2 font-medium bg-secondary text-white">
             <MessageCircle className="w-4 h-4" /> {t("write")}
           </Link>
+          <button data-testid="profile-rose" onClick={() => setRoseOpen(true)} className="rounded-2xl py-3 px-4 bg-primary/10 text-primary font-medium text-xl">
+            🌹
+          </button>
           <button data-testid="profile-gift" onClick={sendGift} className="rounded-2xl py-3 px-4 bg-gold text-ink font-medium">
             <Gift className="w-4 h-4" />
           </button>
         </div>
       </div>
       {giftOpen && <GiftModal targetId={c.id} targetName={c.name} onClose={() => setGiftOpen(false)} />}
+      {roseOpen && <RoseModal targetId={c.id} targetName={c.name} onClose={() => setRoseOpen(false)} onSent={load} />}
     </div>
   );
 }
