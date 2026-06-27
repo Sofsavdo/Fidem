@@ -3,8 +3,9 @@ import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import CandidateCard from "@/components/CandidateCard";
 import { useApp } from "@/contexts/AppContext";
-import { Filter, X, SlidersHorizontal } from "lucide-react";
+import { X, SlidersHorizontal, MapPin } from "lucide-react";
 import { toast } from "sonner";
+import UZ_REGIONS from "@/lib/regions";
 
 export default function Candidates() {
   const { t, user } = useApp();
@@ -32,7 +33,7 @@ export default function Candidates() {
   useEffect(() => {
     load();
     // eslint-disable-next-line
-  }, [filters.sort, filters.verified_only, filters.financial_only]);
+  }, [filters.sort, filters.verified_only, filters.financial_only, filters.region, filters.district, filters.age_min, filters.age_max]);
 
   const onSave = async (c) => {
     try {
@@ -42,10 +43,10 @@ export default function Candidates() {
       } else {
         await api.post("/saved", { user_id: c.id });
         setSavedIds((s) => new Set(s).add(c.id));
-        toast.success("Saqlandi");
+        toast.success(t("saved_short"));
       }
     } catch (e) {
-      toast.error("Xato");
+      toast.error(t("error"));
     }
   };
 
@@ -78,7 +79,7 @@ export default function Candidates() {
       </div>
 
       {/* sort pills */}
-      <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar">
+      <div className="flex gap-2 mb-3 overflow-x-auto no-scrollbar">
         {["match", "active", "new"].map((s) => (
           <button
             key={s}
@@ -100,7 +101,7 @@ export default function Candidates() {
             filters.verified_only ? "bg-secondary text-white border-secondary" : "bg-card border-border"
           }`}
         >
-          ✓ Verified
+          ✓ {t("only_verified")}
         </button>
         <button
           data-testid="sort-financial"
@@ -109,9 +110,33 @@ export default function Candidates() {
             filters.financial_only ? "bg-gold text-ink border-gold" : "bg-card border-border"
           }`}
         >
-          💎 Financial
+          💎 {t("only_financial")}
         </button>
       </div>
+
+      {/* Active filter chips */}
+      {(filters.region || filters.district || filters.age_min || filters.age_max) && (
+        <div className="flex flex-wrap gap-1.5 mb-3" data-testid="active-filter-chips">
+          {filters.region && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2.5 py-1 text-[11px] font-medium">
+              <MapPin className="w-3 h-3" /> {filters.region}
+              <button onClick={() => setFilters((f) => ({ ...f, region: undefined }))} className="ml-0.5 hover:opacity-70" data-testid="chip-clear-region"><X className="w-3 h-3" /></button>
+            </span>
+          )}
+          {filters.district && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2.5 py-1 text-[11px] font-medium">
+              {filters.district}
+              <button onClick={() => setFilters((f) => ({ ...f, district: undefined }))} className="ml-0.5 hover:opacity-70" data-testid="chip-clear-district"><X className="w-3 h-3" /></button>
+            </span>
+          )}
+          {(filters.age_min || filters.age_max) && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2.5 py-1 text-[11px] font-medium">
+              {filters.age_min || 18}–{filters.age_max || 80} {t("age").toLowerCase()}
+              <button onClick={() => setFilters((f) => ({ ...f, age_min: undefined, age_max: undefined }))} className="ml-0.5 hover:opacity-70" data-testid="chip-clear-age"><X className="w-3 h-3" /></button>
+            </span>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -142,7 +167,7 @@ function FilterSheet({ filters, setFilters, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end" data-testid="filter-sheet">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-md mx-auto bg-card rounded-t-3xl p-6 max-h-[80vh] overflow-y-auto">
+      <div className="relative w-full max-w-md mx-auto bg-card rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-heading text-xl font-semibold">{t("filter")}</h3>
           <button data-testid="close-filter" onClick={onClose} className="p-2 rounded-full hover:bg-muted">
@@ -150,28 +175,45 @@ function FilterSheet({ filters, setFilters, onClose }) {
           </button>
         </div>
         <div className="space-y-4">
+          {/* Region — Travel Mode style select */}
           <label className="block">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground">{t("region")}</span>
-            <input
+            <span className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5" /> {t("region")}
+            </span>
+            <select
               data-testid="filter-region"
-              className="mt-1.5 w-full rounded-2xl border border-border bg-card px-4 py-3"
-              placeholder="Toshkent..."
               value={local.region || ""}
-              onChange={(e) => setLocal({ ...local, region: e.target.value })}
+              onChange={(e) => setLocal({ ...local, region: e.target.value || undefined })}
+              className="mt-1.5 w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm outline-none focus:border-primary"
+            >
+              <option value="">— {t("select_region")} —</option>
+              {UZ_REGIONS.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">{t("district")}</span>
+            <input
+              data-testid="filter-district"
+              className="mt-1.5 w-full rounded-2xl border border-border bg-card px-4 py-3 outline-none focus:border-primary"
+              placeholder={t("select_district")}
+              value={local.district || ""}
+              onChange={(e) => setLocal({ ...local, district: e.target.value || undefined })}
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="text-xs uppercase tracking-wider text-muted-foreground">{t("age")} min</span>
-              <input data-testid="filter-agemin" type="number" className="mt-1.5 w-full rounded-2xl border border-border bg-card px-4 py-3" value={local.age_min || ""} onChange={(e) => setLocal({ ...local, age_min: +e.target.value })} />
+              <span className="text-xs uppercase tracking-wider text-muted-foreground">{t("age_min")}</span>
+              <input data-testid="filter-agemin" type="number" min="18" max="80" className="mt-1.5 w-full rounded-2xl border border-border bg-card px-4 py-3 outline-none focus:border-primary" value={local.age_min || ""} onChange={(e) => setLocal({ ...local, age_min: e.target.value ? +e.target.value : undefined })} />
             </label>
             <label className="block">
-              <span className="text-xs uppercase tracking-wider text-muted-foreground">{t("age")} max</span>
-              <input data-testid="filter-agemax" type="number" className="mt-1.5 w-full rounded-2xl border border-border bg-card px-4 py-3" value={local.age_max || ""} onChange={(e) => setLocal({ ...local, age_max: +e.target.value })} />
+              <span className="text-xs uppercase tracking-wider text-muted-foreground">{t("age_max")}</span>
+              <input data-testid="filter-agemax" type="number" min="18" max="80" className="mt-1.5 w-full rounded-2xl border border-border bg-card px-4 py-3 outline-none focus:border-primary" value={local.age_max || ""} onChange={(e) => setLocal({ ...local, age_max: e.target.value ? +e.target.value : undefined })} />
             </label>
           </div>
           <div className="flex gap-3 pt-2">
-            <button data-testid="filter-reset" onClick={() => { setLocal({ sort: "match" }); setFilters({ sort: "match" }); onClose(); }} className="flex-1 rounded-2xl border border-border py-3 hover:bg-muted">{t("reset")}</button>
+            <button data-testid="filter-reset" onClick={() => { const reset = { sort: "match" }; setLocal(reset); setFilters(reset); onClose(); }} className="flex-1 rounded-2xl border border-border py-3 hover:bg-muted">{t("reset")}</button>
             <button data-testid="filter-apply" onClick={() => { setFilters(local); onClose(); }} className="flex-1 rounded-2xl bg-primary text-white py-3 font-medium">{t("apply")}</button>
           </div>
         </div>

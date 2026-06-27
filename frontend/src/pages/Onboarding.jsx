@@ -144,7 +144,7 @@ export default function Onboarding() {
                 <input data-testid="ob-region" type="hidden" value={data.region} readOnly />
               </Field>
               <Field label={t("district")}>
-                <input data-testid="ob-district" className="input" value={data.district} onChange={(e) => set({ district: e.target.value })} placeholder="Tuman/shahar (ixtiyoriy)" />
+                <input data-testid="ob-district" className="input" value={data.district} onChange={(e) => set({ district: e.target.value })} placeholder={t("select_district")} />
               </Field>
             </>
           )}

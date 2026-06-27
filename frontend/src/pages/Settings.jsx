@@ -41,7 +41,7 @@ export default function Settings() {
       toast.success(t("save"));
       await refresh();
     } catch (e) {
-      toast.error("Xato");
+      toast.error(t("error"));
     } finally {
       setSaving(false);
     }

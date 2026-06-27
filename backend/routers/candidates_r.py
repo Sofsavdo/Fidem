@@ -48,6 +48,7 @@ async def candidates(
     age_min: Optional[int] = None,
     age_max: Optional[int] = None,
     region: Optional[str] = None,
+    district: Optional[str] = None,
     marital_status: Optional[str] = None,
     has_children: Optional[bool] = None,
     height_min: Optional[int] = None,
@@ -79,6 +80,8 @@ async def candidates(
                 pass
     if region:
         query["region"] = region
+    if district:
+        query["district"] = district
     if marital_status:
         query["marital_status"] = marital_status
     if has_children is not None:

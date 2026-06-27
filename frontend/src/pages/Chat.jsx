@@ -23,6 +23,7 @@ export default function Chat() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
   const [roseOpen, setRoseOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [icebreakers, setIcebreakers] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
   const endRef = useRef(null);
@@ -112,7 +113,7 @@ export default function Chat() {
       setShowTemplates(false);
       load();
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Xato");
+      toast.error(e.response?.data?.detail || t("error"));
     } finally { setSending(false); }
   };
 
@@ -127,10 +128,10 @@ export default function Chat() {
         voice_duration,
       });
       setShowTemplates(false);
-      toast.success("Ovozli xabar yuborildi");
+      toast.success("✅");
       load();
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Yuborib bo'lmadi");
+      toast.error(e.response?.data?.detail || t("error"));
     } finally { setSending(false); }
   };
 
@@ -144,28 +145,28 @@ export default function Chat() {
     try {
       const r = await api.get(`/ai/icebreakers/${otherId}?lang=${lang || "uz"}`);
       setIcebreakers(r.data.questions || []);
-      toast.success("AI savollar tayyor 🤖");
+      toast.success("🤖 AI ✅");
     } catch (e) {
-      toast.error("AI hozir mavjud emas");
+      toast.error(t("error"));
     } finally { setAiLoading(false); }
   };
 
   const blockUser = async () => {
     try {
       await api.post("/messages/block", { user_id: otherId });
-      toast.success("Blokladingiz");
+      toast.success(t("block"));
       setMenuOpen(false);
       nav("/messages");
-    } catch (e) { toast.error("Xato"); }
+    } catch (e) { toast.error(t("error")); }
   };
-  const reportUser = async () => {
-    const reason = window.prompt(t("report_reason"), "Spam");
+  const reportUser = async (reason) => {
     if (!reason) return;
     try {
       await api.post("/messages/report", { user_id: otherId, reason });
       toast.success(t("reported"));
+      setReportOpen(false);
       setMenuOpen(false);
-    } catch (e) { toast.error("Xato"); }
+    } catch (e) { toast.error(t("error")); }
   };
 
   if (!other) return <div className="p-6 text-center text-muted-foreground">{t("loading")}</div>;
@@ -196,7 +197,7 @@ export default function Chat() {
               <button data-testid="chat-block" onClick={blockUser} className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted">
                 <Ban className="w-4 h-4 text-primary" /> {t("block")}
               </button>
-              <button data-testid="chat-report" onClick={reportUser} className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted">
+              <button data-testid="chat-report" onClick={() => { setReportOpen(true); setMenuOpen(false); }} className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted">
                 <Flag className="w-4 h-4 text-primary" /> {t("report")}
               </button>
             </div>
@@ -207,7 +208,7 @@ export default function Chat() {
       <div className="flex-1 px-4 py-4 space-y-2" data-testid="chat-history">
         {messages.length === 0 && (
           <div className="text-center py-12 text-muted-foreground text-sm">
-            Birinchi xabaringizni yuboring 👋
+            👋
           </div>
         )}
         {messages.map((m) => (
@@ -220,11 +221,11 @@ export default function Chat() {
                 ? "bg-primary text-white rounded-br-sm"
                 : "bg-card border border-border rounded-bl-sm"
             } ${m.kind === "gift" ? "bg-gold-light text-yellow-900 border-gold/40" : ""} ${m.kind === "super" ? "ring-2 ring-gold" : ""} ${m.kind === "rose" ? "ring-2 ring-primary bg-primary/10 text-primary" : ""}`}>
-              {m.kind === "super" && <span className="text-[9px] uppercase tracking-wider opacity-70 block">Super</span>}
-              {m.kind === "rose" && <span className="text-[9px] uppercase tracking-wider opacity-70 block">🌹 Atirgul</span>}
+              {m.kind === "super" && <span className="text-[9px] uppercase tracking-wider opacity-70 block">{t("super_application")}</span>}
+              {m.kind === "rose" && <span className="text-[9px] uppercase tracking-wider opacity-70 block">🌹</span>}
               {m.kind === "voice" && m.meta?.voice_url ? (
                 <div className="flex items-center gap-2 min-w-[200px]" data-testid={`voice-msg-${m.id}`}>
-                  <span className="text-[9px] uppercase tracking-wider opacity-70">🎙 Ovoz · {m.meta.voice_duration || 0}s</span>
+                  <span className="text-[9px] uppercase tracking-wider opacity-70">🎙 · {m.meta.voice_duration || 0}s</span>
                   <audio controls preload="none" src={m.meta.voice_url} className="h-8 max-w-full" />
                 </div>
               ) : (
@@ -254,9 +255,9 @@ export default function Chat() {
       {messages.length > 0 && messages.length < 6 && icebreakers.length > 0 && (
         <div className="px-4 pb-2" data-testid="icebreaker-chips">
           <div className="flex items-center justify-between mb-1.5">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Suhbat boshlash uchun savol</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("suggestion_chip")}</p>
             <button data-testid="ai-icebreaker-btn" onClick={genAiIcebreakers} disabled={aiLoading} className="text-[10px] uppercase tracking-wider text-secondary hover:underline disabled:opacity-50 inline-flex items-center gap-1">
-              <Wand2 className="w-3 h-3" /> {aiLoading ? "AI…" : "AI yaratish"}
+              <Wand2 className="w-3 h-3" /> {aiLoading ? t("ai_preparing") : t("ai_generate_short")}
             </button>
           </div>
           <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
@@ -277,14 +278,15 @@ export default function Chat() {
       {messages.length === 0 && (
         <div className="px-4 pb-2">
           <button data-testid="ai-icebreaker-empty-btn" onClick={genAiIcebreakers} disabled={aiLoading} className="w-full rounded-2xl border border-dashed border-secondary/40 bg-secondary/5 hover:bg-secondary/10 py-2.5 text-xs text-secondary font-medium inline-flex items-center justify-center gap-1.5 disabled:opacity-50">
-            <Wand2 className="w-3.5 h-3.5" /> {aiLoading ? "AI tayyorlamoqda…" : "AI shaxsiy savol tavsiya etsin"}
+            <Wand2 className="w-3.5 h-3.5" /> {aiLoading ? t("ai_preparing") : t("ai_suggest")}
           </button>
         </div>
       )}
 
       <div className="fixed bottom-0 inset-x-0 z-40 glass border-t border-border/60 max-w-2xl xl:max-w-3xl mx-auto md:left-64 lg:left-72 md:right-0">
-        <div className="p-3">
-          {access && access.requires_unlock ? (
+        <div className="p-3 space-y-2">
+          {/* Paywall banner (shown above the input — input remains visible & disabled) */}
+          {access && access.requires_unlock && (
             <div data-testid="chat-paywall" className="rounded-2xl bg-gold/10 border border-gold/40 p-3 space-y-2">
               <p className="text-sm font-medium">{t("chat_locked_title")}</p>
               <p className="text-xs text-muted-foreground">
@@ -303,7 +305,7 @@ export default function Chat() {
                 </button>
                 <button data-testid="unlock-coins" onClick={() => unlockChat("coins")} disabled={unlocking || access.coins < access.price_coins}
                   className="w-full rounded-xl bg-card border border-border text-sm py-2.5 font-medium disabled:opacity-50">
-                  🪙 {t("unlock_with_coins")} · {access.price_coins} coin ({access.coins})
+                  🪙 {t("unlock_with_coins")} · {access.price_coins} {t("coin")} ({access.coins})
                 </button>
                 <button data-testid="unlock-click" onClick={() => unlockChat("click")} disabled={unlocking}
                   className="w-full rounded-xl bg-muted text-sm py-2.5 font-medium disabled:opacity-50">
@@ -314,37 +316,98 @@ export default function Chat() {
                 </Link>
               </div>
             </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <button data-testid="rose-open" onClick={() => setRoseOpen(true)} className="p-2.5 rounded-full bg-primary/10 hover:bg-primary/20" title="Atirgul yuborish">
-                🌹
-              </button>
-              <button data-testid="gift-open" onClick={() => setGiftOpen(true)} className="p-2.5 rounded-full bg-muted hover:bg-border" title={t("send_gift")}>
-                <Gift className="w-4 h-4" />
-              </button>
-              <ChatVoiceRecorder onSend={sendVoice} />
-              <input
-                data-testid="chat-input"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && send()}
-                placeholder={t("type_message")}
-                className="flex-1 rounded-full border border-border bg-card px-4 py-2.5 outline-none focus:border-primary"
-              />
-              <button
-                data-testid="chat-send"
-                onClick={() => send()}
-                disabled={sending || !text.trim()}
-                className="p-2.5 rounded-full bg-primary text-white disabled:opacity-50"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </div>
           )}
+          {/* Always-visible message composer (disabled when locked) */}
+          <div className="flex items-center gap-2">
+            <button data-testid="rose-open" onClick={() => setRoseOpen(true)} disabled={access?.requires_unlock} className="p-2.5 rounded-full bg-primary/10 hover:bg-primary/20 disabled:opacity-40" title="🌹">
+              🌹
+            </button>
+            <button data-testid="gift-open" onClick={() => setGiftOpen(true)} disabled={access?.requires_unlock} className="p-2.5 rounded-full bg-muted hover:bg-border disabled:opacity-40" title={t("send_gift")}>
+              <Gift className="w-4 h-4" />
+            </button>
+            {!access?.requires_unlock && <ChatVoiceRecorder onSend={sendVoice} />}
+            <input
+              data-testid="chat-input"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !access?.requires_unlock && send()}
+              disabled={!!access?.requires_unlock}
+              placeholder={access?.requires_unlock ? t("chat_locked_inline") : t("type_message")}
+              className="flex-1 rounded-full border border-border bg-card px-4 py-2.5 outline-none focus:border-primary disabled:opacity-60 disabled:cursor-not-allowed"
+            />
+            <button
+              data-testid="chat-send"
+              onClick={() => send()}
+              disabled={sending || !text.trim() || !!access?.requires_unlock}
+              className="p-2.5 rounded-full bg-primary text-white disabled:opacity-50"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
       {giftOpen && <GiftModal targetId={otherId} targetName={other.name} onClose={() => setGiftOpen(false)} onSent={load} />}
       {roseOpen && <RoseModal targetId={otherId} targetName={other.name} onClose={() => setRoseOpen(false)} onSent={load} />}
+      {reportOpen && <ReportModal t={t} onClose={() => setReportOpen(false)} onSubmit={reportUser} />}
+    </div>
+  );
+}
+
+function ReportModal({ t, onClose, onSubmit }) {
+  const [reason, setReason] = useState("");
+  const [custom, setCustom] = useState("");
+  const reasons = [
+    { id: "spam", label: t("report_reason_spam") },
+    { id: "inappropriate", label: t("report_reason_inappropriate") },
+    { id: "fake", label: t("report_reason_fake") },
+    { id: "harassment", label: t("report_reason_harassment") },
+    { id: "other", label: t("report_reason_other") },
+  ];
+  const submit = () => {
+    const final = reason === "other" ? (custom || "").trim() : (reasons.find((r) => r.id === reason)?.label || "");
+    if (!final) return;
+    onSubmit(final);
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" data-testid="report-modal">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-card rounded-t-3xl sm:rounded-3xl p-6 mx-auto">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-heading text-lg font-semibold flex items-center gap-2"><Flag className="w-5 h-5 text-primary" /> {t("report_modal_title")}</h3>
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-muted" data-testid="report-close">✕</button>
+        </div>
+        <p className="text-xs text-muted-foreground mb-3">{t("report_modal_hint")}</p>
+        <div className="space-y-1.5 mb-3">
+          {reasons.map((r) => (
+            <button
+              key={r.id}
+              data-testid={`report-reason-${r.id}`}
+              onClick={() => setReason(r.id)}
+              className={`w-full text-left rounded-xl border px-3 py-2.5 text-sm transition ${reason === r.id ? "border-primary bg-primary/5 text-primary" : "border-border bg-card hover:bg-muted"}`}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+        {reason === "other" && (
+          <textarea
+            data-testid="report-custom"
+            value={custom}
+            onChange={(e) => setCustom(e.target.value)}
+            rows={3}
+            className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary mb-3"
+            placeholder="..."
+          />
+        )}
+        <button
+          data-testid="report-submit"
+          onClick={submit}
+          disabled={!reason || (reason === "other" && !custom.trim())}
+          className="w-full rounded-2xl bg-primary text-white font-medium py-3 disabled:opacity-50"
+        >
+          {t("report_send")}
+        </button>
+      </div>
     </div>
   );
 }

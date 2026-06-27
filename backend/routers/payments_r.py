@@ -219,7 +219,7 @@ async def mark_all_read(uid: str = Depends(get_current_user_id)):
     return {"ok": True}
 
 
-# ---------- Referral ----------
+# ---------- Referral (UNIFIED — replaces /invites/status too) ----------
 @router.get("/referral/mine")
 async def my_referral(uid: str = Depends(get_current_user_id)):
     me_doc = await get_user(uid)
@@ -231,12 +231,22 @@ async def my_referral(uid: str = Depends(get_current_user_id)):
     bonus_per_invite = 10000
     earned = count * bonus_per_invite
     link = f"https://t.me/{TELEGRAM_BOT_USERNAME}?start={code}"
+    # Free Premium week redemptions (3 invites = 1 week)
+    redeemed = me_doc.get("invite_premium_redeemed", 0)
+    eligible_redemptions = count // 3
+    available_weeks = max(0, eligible_redemptions - redeemed)
+    next_milestone = 3 - (count % 3) if count % 3 != 0 else 3
     return {
         "code": code,
         "link": link,
         "invited_count": count,
         "invites_count": count,  # alias
+        "invited": count,  # alias for legacy /invites/status
         "bonus_per_invite": bonus_per_invite,
         "earned": earned,
         "vip_bonus_threshold": 5,
+        "redeemed_weeks": redeemed,
+        "available_weeks": available_weeks,
+        "next_milestone": next_milestone,
+        "premium_per_milestone_days": 7,
     }

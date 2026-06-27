@@ -18,30 +18,20 @@ export default function Me() {
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {
-    api.get("/referral/mine").then((r) => setReferral(r.data));
+    api.get("/referral/mine").then((r) => setReferral(r.data)).catch(() => {});
     api.get("/notifications").then((r) => setUnread((r.data || []).filter((n) => !n.read).length));
-    api.get("/invites/status").then((r) => setInvites(r.data)).catch(() => {});
     api.get("/daily/status").then((r) => setDaily(r.data)).catch(() => {});
   }, []);
 
-  const [invites, setInvites] = useState(null);
   const [daily, setDaily] = useState(null);
-
-  const redeemInvite = async () => {
-    try {
-      await api.post("/invites/redeem");
-      toast.success("Premium 7 kun faollashtirildi 🎉");
-      const r = await api.get("/invites/status");
-      setInvites(r.data);
-      refresh();
-    } catch (e) { toast.error(e.response?.data?.detail || "Xato"); }
-  };
 
   const shareTelegram = (link) => {
     const text = encodeURIComponent("FIDEM — jiddiy tanishuv platformasi. Menga qo'shiling 👇");
     const url = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${text}`;
     window.open(url, "_blank");
   };
+  // keep helper available even if not used directly here
+  void shareTelegram;
 
   // Increment unread on WS notification
   useEffect(() => {
@@ -157,13 +147,13 @@ export default function Me() {
         </Link>
         <Link to="/premium?topup=1" data-testid="link-balance" className="rounded-3xl bg-card border border-border p-4 hover:-translate-y-0.5 transition-transform">
           <Wallet className="w-5 h-5 text-primary" />
-          <p className="font-heading text-lg mt-2">{(user.balance || 0).toLocaleString()} so'm</p>
+          <p className="font-heading text-lg mt-2">{(user.balance || 0).toLocaleString()} {t("sum")}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{t("balance")}</p>
         </Link>
         <Link to="/boost" data-testid="link-boost" className="rounded-3xl bg-gradient-to-br from-primary/10 to-card border border-primary/30 p-4 hover:-translate-y-0.5 transition-transform col-span-2 md:col-span-1">
           <Trophy className="w-5 h-5 text-primary" />
           <p className="font-heading text-lg mt-2">Boost & Spotlight</p>
-          <p className="text-xs text-muted-foreground mt-0.5">5x ko'rinish →</p>
+          <p className="text-xs text-muted-foreground mt-0.5">5x →</p>
         </Link>
       </div>
 
@@ -175,59 +165,45 @@ export default function Me() {
             <p className="font-heading text-2xl">{daily.streak} kun 🔥</p>
           </div>
           {daily.claimed_today ? (
-            <span className="text-xs text-secondary">✓ Bugun olindi</span>
+            <span className="text-xs text-secondary">✓ {t("daily")}</span>
           ) : (
             <button
               data-testid="daily-claim-inline"
               onClick={async () => {
                 try {
                   const r = await api.post("/daily/claim");
-                  toast.success(`+${r.data.bonus} so'm`);
+                  toast.success(`+${r.data.bonus} ${r.data.currency === "coins" ? t("coin") : t("sum")}`);
                   const s = await api.get("/daily/status");
                   setDaily(s.data);
                   refresh();
-                } catch (e) {}
+                } catch (e) { /* ignore */ }
               }}
               className="rounded-xl bg-gold text-ink px-4 py-2 text-sm font-medium"
             >
-              +{daily.next_bonus} so'm
+              +{daily.next_bonus} {daily.currency === "coins" ? t("coin") : t("sum")}
             </button>
           )}
         </div>
       )}
 
-      {/* Invite friends → free Premium */}
-      {invites && (
-        <div className="rounded-3xl bg-gradient-to-r from-secondary/10 to-card border border-secondary/30 p-4" data-testid="invite-card">
+      {/* Invite friends → unified single entrypoint */}
+      {referral && (
+        <Link to="/referral" data-testid="invite-card" className="block rounded-3xl bg-gradient-to-r from-secondary/10 to-card border border-secondary/30 p-4 hover:-translate-y-0.5 transition-transform">
           <div className="flex items-center justify-between">
-            <div>
+            <div className="min-w-0">
               <p className="font-heading text-lg flex items-center gap-2"><Share2 className="w-4 h-4 text-secondary" /> {t("invite_friends")}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">3 do'st → 1 hafta {t("premium")}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{t("invite_card_progress")}</p>
             </div>
-            <span className="text-xs">{invites.invited} / {invites.invited + invites.next_milestone}</span>
+            <span className="text-xs whitespace-nowrap ml-2">{referral.invited_count || 0} / 5</span>
           </div>
           <div className="h-2 rounded-full bg-border overflow-hidden mt-3">
-            <div className="h-full bg-secondary transition-all" style={{ width: `${Math.min(100, ((invites.invited % 3) / 3) * 100)}%` }} />
+            <div className="h-full bg-secondary transition-all" style={{ width: `${Math.min(100, ((referral.invited_count || 0) / 5) * 100)}%` }} />
           </div>
-          <div className="flex gap-2 mt-3">
-            <button
-              data-testid="invite-share"
-              onClick={() => shareTelegram(invites.link)}
-              className="flex-1 rounded-2xl bg-secondary text-white py-2.5 text-sm font-medium"
-            >
-              {t("share_telegram")}
-            </button>
-            {invites.available_weeks > 0 && (
-              <button
-                data-testid="invite-redeem"
-                onClick={redeemInvite}
-                className="rounded-2xl bg-gold text-ink px-4 py-2.5 text-sm font-medium"
-              >
-                Olish ({invites.available_weeks})
-              </button>
-            )}
+          <div className="mt-3 flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">{(referral.earned || 0).toLocaleString()} {t("sum")}</span>
+            <span className="text-secondary font-medium">{t("share")} →</span>
           </div>
-        </div>
+        </Link>
       )}
 
       {/* Verification actions */}
@@ -243,25 +219,6 @@ export default function Me() {
           right={user.verified_financial ? <span className="text-secondary text-xs">✓</span> : <button data-testid="req-verify-financial" onClick={() => requestVerification("financial")} className="text-xs text-primary font-medium">{t("request_verification")}</button>}
         />
       </div>
-
-      {/* Referral */}
-      {referral && (
-        <div className="rounded-3xl bg-card border border-border p-4" data-testid="referral-card">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Share2 className="w-4 h-4 text-secondary" />
-              <p className="font-heading text-lg">{t("referral")}</p>
-            </div>
-            <span className="text-xs text-muted-foreground">{referral.invited_count} invited</span>
-          </div>
-          <div className="mt-3 flex items-center gap-2">
-            <code className="flex-1 truncate text-xs bg-muted rounded-xl px-3 py-2">{referral.link}</code>
-            <button data-testid="copy-referral" onClick={() => copy(referral.link)} className="rounded-xl border border-border px-3 py-2">
-              <Copy className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Leaderboard */}
       <div className="rounded-3xl bg-card border border-border p-4" data-testid="leaderboard-card">
@@ -306,43 +263,39 @@ export default function Me() {
       {/* Admin & settings */}
       <div className="rounded-3xl bg-card border border-border divide-y">
         <Link to="/personality" data-testid="link-personality" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><Brain className="w-4 h-4 text-secondary" /> Shaxsiyat testi (Big 5)</span>
+          <span className="flex items-center gap-3 text-sm"><Brain className="w-4 h-4 text-secondary" /> {t("personality_test")}</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
         <Link to="/chaperone" data-testid="link-chaperone" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><UsersRound className="w-4 h-4 text-secondary" /> Sovchi (Wali) tizimi</span>
+          <span className="flex items-center gap-3 text-sm"><UsersRound className="w-4 h-4 text-secondary" /> {t("sovchi_wali_title")}</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
         <Link to="/prompts" data-testid="link-prompts" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><Pen className="w-4 h-4 text-secondary" /> Profil promptlari</span>
+          <span className="flex items-center gap-3 text-sm"><Pen className="w-4 h-4 text-secondary" /> {t("profile_prompts")}</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
         <Link to="/stories" data-testid="link-stories" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><BookOpen className="w-4 h-4 text-primary" /> Muvaffaqiyat hikoyalari</span>
+          <span className="flex items-center gap-3 text-sm"><BookOpen className="w-4 h-4 text-primary" /> {t("success_stories")}</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
         <Link to="/concierge" data-testid="link-concierge" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><Crown className="w-4 h-4 text-secondary" /> Sovchi Concierge (199,000 so'm)</span>
+          <span className="flex items-center gap-3 text-sm"><Crown className="w-4 h-4 text-secondary" /> {t("concierge_title")} (199,000 {t("sum")})</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
         <Link to="/travel" data-testid="link-travel" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><Plane className="w-4 h-4 text-secondary" /> Travel Mode</span>
+          <span className="flex items-center gap-3 text-sm"><Plane className="w-4 h-4 text-secondary" /> {t("travel_mode")}</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
         <Link to="/family" data-testid="link-family" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><Phone className="w-4 h-4 text-primary" /> Oilaviy aloqa (VIP)</span>
+          <span className="flex items-center gap-3 text-sm"><Phone className="w-4 h-4 text-primary" /> {t("family_contact")}</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
         <Link to="/withdrawals" data-testid="link-withdrawals" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><Wallet className="w-4 h-4 text-primary" /> Pul yechish ({(user.withdrawable_balance || 0).toLocaleString()} so'm)</span>
+          <span className="flex items-center gap-3 text-sm"><Wallet className="w-4 h-4 text-primary" /> {t("withdraw_money")} ({(user.withdrawable_balance || 0).toLocaleString()} {t("sum")})</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
         <Link to="/verification" data-testid="link-verification" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><ShieldCheck className="w-4 h-4 text-primary" /> Profil tasdiqlash</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
-        <Link to="/referral" data-testid="link-referral" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm">🎁 Do'st taklifi (+10K so'm)</span>
+          <span className="flex items-center gap-3 text-sm"><ShieldCheck className="w-4 h-4 text-primary" /> {t("profile_verification")}</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
         <Link to="/settings" data-testid="link-settings" className="flex items-center justify-between p-4">
