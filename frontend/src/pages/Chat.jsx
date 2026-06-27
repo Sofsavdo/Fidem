@@ -22,6 +22,7 @@ export default function Chat() {
   const endRef = useRef(null);
 
   const chatId = user && otherId ? [user.id, otherId].sort().join("_") : null;
+  const { wsEvent } = useApp();
 
   const load = async () => {
     try {
@@ -37,10 +38,24 @@ export default function Chat() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 5000);
-    return () => clearInterval(t);
     // eslint-disable-next-line
   }, [otherId, user]);
+
+  // Real-time: append incoming WS messages that belong to this chat
+  useEffect(() => {
+    if (!wsEvent || wsEvent.type !== "message" || !chatId) return;
+    const m = wsEvent.data;
+    if (!m || m.chat_id !== chatId) return;
+    setMessages((prev) => {
+      if (prev.some((x) => x.id === m.id)) return prev;
+      return [...prev, m];
+    });
+    // mark as read if I am the recipient
+    if (m.to_user_id === user?.id) {
+      api.get(`/messages/${chatId}`).catch(() => {}); // server-side mark-read happens on GET
+    }
+    // eslint-disable-next-line
+  }, [wsEvent, chatId, user]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });

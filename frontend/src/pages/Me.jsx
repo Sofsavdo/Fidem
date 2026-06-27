@@ -9,7 +9,7 @@ import { photoSrc } from "@/lib/photo";
 import { toast } from "sonner";
 
 export default function Me() {
-  const { user, t, logout, changeLang, lang, refresh } = useApp();
+  const { user, t, logout, changeLang, lang, refresh, wsEvent } = useApp();
   const [referral, setReferral] = useState(null);
   const [leaders, setLeaders] = useState([]);
   const [leadPeriod, setLeadPeriod] = useState("all");
@@ -19,6 +19,13 @@ export default function Me() {
     api.get("/referral/mine").then((r) => setReferral(r.data));
     api.get("/notifications").then((r) => setUnread((r.data || []).filter((n) => !n.read).length));
   }, []);
+
+  // Increment unread on WS notification
+  useEffect(() => {
+    if (wsEvent?.type === "notification") {
+      setUnread((u) => u + 1);
+    }
+  }, [wsEvent]);
   useEffect(() => {
     api.get(`/leaderboard?period=${leadPeriod}`).then((r) => setLeaders(r.data || []));
   }, [leadPeriod]);

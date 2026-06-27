@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import api from "@/lib/api";
+import { WS } from "@/lib/ws";
 import dict, { detectLang } from "@/lib/i18n";
 
 const AppCtx = createContext(null);
@@ -8,6 +9,8 @@ export function AppProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lang, setLang] = useState(detectLang());
+  const [wsEvent, setWsEvent] = useState(null);
+  const wsRef = useRef(null);
 
   const t = useCallback(
     (key) => (dict[lang] && dict[lang][key]) || dict.uz[key] || key,
@@ -85,14 +88,35 @@ export function AppProvider({ children }) {
   const logout = () => {
     localStorage.removeItem("fidem_token");
     setUser(null);
+    if (wsRef.current) { wsRef.current.stop(); wsRef.current = null; }
     window.location.href = "/auth";
   };
+
+  // WebSocket lifecycle — open once user is loaded, close on logout / token change
+  useEffect(() => {
+    const token = localStorage.getItem("fidem_token");
+    if (!user || !token) {
+      if (wsRef.current) { wsRef.current.stop(); wsRef.current = null; }
+      return;
+    }
+    if (wsRef.current) return; // already open
+    const ws = new WS({
+      onMessage: (m) => setWsEvent({ ...m, ts: Date.now() }),
+    });
+    ws.start(token);
+    wsRef.current = ws;
+    return () => {
+      ws.stop();
+      wsRef.current = null;
+    };
+  }, [user]);
 
   return (
     <AppCtx.Provider
       value={{
         user, loading, lang, t, changeLang,
         login, register, logout, refresh: loadMe,
+        wsEvent,
       }}
     >
       {children}
