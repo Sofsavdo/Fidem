@@ -4,6 +4,7 @@ import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ShieldCheck, Wallet, Users as UsersIcon, DollarSign } from "lucide-react";
+import { photoSrc } from "@/lib/photo";
 
 export default function Admin() {
   const { user, t } = useApp();
@@ -99,7 +100,7 @@ function AdminUsers() {
         <div key={u.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`admin-user-${u.id}`}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-muted overflow-hidden">
-              {u.photo_url && <img src={u.photo_url} alt="" className="w-full h-full object-cover" />}
+              {u.photo_url && <img src={photoSrc(u.photo_url)} alt="" className="w-full h-full object-cover" />}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{u.name} · {u.plan} {u.blocked ? "🚫" : ""}</p>

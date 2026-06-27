@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { Lock } from "lucide-react";
+import { photoSrc } from "@/lib/photo";
 
 const TABS = [
   { k: "mine", api: "/saved/mine", labelKey: "saved_by_me" },
@@ -64,7 +65,7 @@ export default function Saved() {
               className="block aspect-[4/5] rounded-3xl bg-card border border-border overflow-hidden relative hover:shadow-elevated transition-shadow"
             >
               <img
-                src={c.photo_url || "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=800"}
+                src={photoSrc(c.photo_url) || "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=800"}
                 alt=""
                 className="w-full h-full object-cover"
               />

@@ -1,13 +1,16 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Bookmark, MessageCircle, Gift, Lock } from "lucide-react";
 import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot } from "@/components/Badges";
+import GiftModal from "@/components/GiftModal";
 import { useApp } from "@/contexts/AppContext";
+import { photoSrc } from "@/lib/photo";
 
-export default function CandidateCard({ c, onSave, onGift, saved }) {
+export default function CandidateCard({ c, onSave, saved }) {
   const { t } = useApp();
+  const [giftOpen, setGiftOpen] = useState(false);
   const blurred = !c.photo_unlocked;
-  const photoUrl = c.photo_url || "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=800";
+  const photoUrl = photoSrc(c.photo_url) || "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=800";
 
   return (
     <div
@@ -85,7 +88,7 @@ export default function CandidateCard({ c, onSave, onGift, saved }) {
           </Link>
           <button
             data-testid={`candidate-gift-${c.id}`}
-            onClick={() => onGift?.(c)}
+            onClick={() => setGiftOpen(true)}
             className="p-2 rounded-full bg-gold text-ink hover:bg-gold-dark"
             title={t("send_gift")}
           >
@@ -93,6 +96,7 @@ export default function CandidateCard({ c, onSave, onGift, saved }) {
           </button>
         </div>
       </div>
+      {giftOpen && <GiftModal targetId={c.id} targetName={c.name} onClose={() => setGiftOpen(false)} />}
     </div>
   );
 }

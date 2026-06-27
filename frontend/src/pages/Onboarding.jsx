@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
+import PhotoUpload from "@/components/PhotoUpload";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 
 const STEPS = 7;
@@ -174,11 +175,8 @@ export default function Onboarding() {
           {step === 6 && (
             <>
               <Field label={t("photo")}>
-                <input data-testid="ob-photo" placeholder="https://..." className="input" value={data.photo_url} onChange={(e) => set({ photo_url: e.target.value })} />
+                <PhotoUpload value={data.photo_url} onChange={(url) => set({ photo_url: url })} testid="ob-photo" />
               </Field>
-              {data.photo_url && (
-                <img src={data.photo_url} alt="" className="w-32 h-32 rounded-2xl object-cover" />
-              )}
               <Field label={t("bio")}>
                 <textarea data-testid="ob-bio" rows="3" className="input" value={data.bio} onChange={(e) => set({ bio: e.target.value })} />
               </Field>

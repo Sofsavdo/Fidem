@@ -3,7 +3,9 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot } from "@/components/Badges";
-import { Bookmark, MessageCircle, Gift, ArrowLeft, Lock, Eye, Shield } from "lucide-react";
+import GiftModal from "@/components/GiftModal";
+import { photoSrc } from "@/lib/photo";
+import { Bookmark, MessageCircle, Gift, ArrowLeft, Lock, Clock, Shield } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ProfileDetail() {
@@ -14,6 +16,7 @@ export default function ProfileDetail() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [giftOpen, setGiftOpen] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -44,19 +47,14 @@ export default function ProfileDetail() {
       else { await api.post("/saved", { user_id: id }); setSaved(true); toast.success("Saqlandi"); }
     } finally { setSaving(false); }
   };
-  const sendGift = async () => {
-    try {
-      await api.post("/gifts/send", { to_user_id: id, gift_kind: "rose" });
-      toast.success("🌹 yuborildi");
-    } catch (e) { toast.error(e.response?.data?.detail || "Balans yetmaydi"); }
-  };
+  const sendGift = () => setGiftOpen(true);
 
   if (loading || !c) {
     return <div className="p-6 text-center text-muted-foreground" data-testid="profile-loading">{t("loading")}</div>;
   }
 
   const blurred = !c.photo_unlocked;
-  const photoUrl = c.photo_url || "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=900";
+  const photoUrl = photoSrc(c.photo_url) || "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=900";
   const matchLabel = c.match_score >= 80 ? t("match_label_80") : c.match_score >= 60 ? t("match_label_60") : c.match_score >= 40 ? t("match_label_40") : t("match_label_0");
 
   return (
@@ -105,6 +103,15 @@ export default function ProfileDetail() {
           <Stat label={t("religion")} value={c.religion || "—"} />
         </div>
 
+        {c.avg_response_min != null && (
+          <div className="rounded-2xl bg-card border border-border p-3 flex items-center gap-2 text-sm" data-testid="response-speed">
+            <Clock className="w-4 h-4 text-secondary" />
+            <span>
+              {t("response_usually")} <strong>{c.avg_response_min < 60 ? `${c.avg_response_min} ${t("minutes")}` : `${Math.round(c.avg_response_min / 60)} ${t("hours")}`}</strong>
+            </span>
+          </div>
+        )}
+
         {c.bio && (
           <div className="rounded-2xl bg-card border border-border p-4">
             <p className="text-sm leading-relaxed">{c.bio}</p>
@@ -144,6 +151,7 @@ export default function ProfileDetail() {
           </button>
         </div>
       </div>
+      {giftOpen && <GiftModal targetId={c.id} targetName={c.name} onClose={() => setGiftOpen(false)} />}
     </div>
   );
 }

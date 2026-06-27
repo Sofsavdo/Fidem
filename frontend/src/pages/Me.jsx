@@ -3,7 +3,9 @@ import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, PlanPill } from "@/components/Badges";
-import { ChevronRight, Crown, Gem, Wallet, Share2, Settings, LogOut, Copy, Trophy, ShieldCheck } from "lucide-react";
+import PhotoUpload from "@/components/PhotoUpload";
+import { ChevronRight, Crown, Gem, Wallet, Share2, Settings as SettingsIcon, LogOut, Copy, Trophy, ShieldCheck, Bell, Clock, SlidersHorizontal } from "lucide-react";
+import { photoSrc } from "@/lib/photo";
 import { toast } from "sonner";
 
 export default function Me() {
@@ -11,9 +13,11 @@ export default function Me() {
   const [referral, setReferral] = useState(null);
   const [leaders, setLeaders] = useState([]);
   const [leadPeriod, setLeadPeriod] = useState("all");
+  const [unread, setUnread] = useState(0);
 
   useEffect(() => {
     api.get("/referral/mine").then((r) => setReferral(r.data));
+    api.get("/notifications").then((r) => setUnread((r.data || []).filter((n) => !n.read).length));
   }, []);
   useEffect(() => {
     api.get(`/leaderboard?period=${leadPeriod}`).then((r) => setLeaders(r.data || []));
@@ -38,42 +42,71 @@ export default function Me() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-3xl font-semibold tracking-tight">{t("me")}</h1>
-        <select
-          data-testid="me-lang"
-          value={lang}
-          onChange={(e) => changeLang(e.target.value)}
-          className="text-xs bg-transparent border border-border rounded-full px-2.5 py-1"
-        >
-          <option value="uz">UZ</option>
-          <option value="ru">RU</option>
-          <option value="en">EN</option>
-        </select>
+        <div className="flex items-center gap-2">
+          <Link to="/notifications" data-testid="link-notifications" className="relative p-2 rounded-full hover:bg-muted">
+            <Bell className="w-4 h-4" />
+            {unread > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-primary text-white text-[9px] font-medium grid place-items-center">
+                {unread > 9 ? "9+" : unread}
+              </span>
+            )}
+          </Link>
+          <select
+            data-testid="me-lang"
+            value={lang}
+            onChange={(e) => changeLang(e.target.value)}
+            className="text-xs bg-transparent border border-border rounded-full px-2.5 py-1"
+          >
+            <option value="uz">UZ</option>
+            <option value="ru">RU</option>
+            <option value="en">EN</option>
+          </select>
+        </div>
       </div>
 
       {/* Profile card */}
-      <div className="rounded-3xl bg-card border border-border p-4 flex items-center gap-4 shadow-soft" data-testid="me-profile-card">
-        <div className="relative w-16 h-16 rounded-2xl bg-muted overflow-hidden flex-shrink-0">
-          {user.photo_url ? (
-            <img src={user.photo_url} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full grid place-items-center text-muted-foreground text-xl font-heading">{user.name?.[0]}</div>
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-medium text-lg truncate">{user.name}, {user.age}</p>
-            <PlanPill plan={user.plan} />
-          </div>
-          <p className="text-xs text-muted-foreground truncate">{user.region} · {user.profession || "—"}</p>
-          <div className="flex gap-1 mt-1.5 flex-wrap">
-            <VerifiedBadge verified={user.verified_selfie} />
-            <FinancialBadge verified={user.verified_financial} />
-            {user.verified_identity && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 text-[10px]">
-                <ShieldCheck className="w-3 h-3" /> Identity
-              </span>
+      <div className="rounded-3xl bg-card border border-border p-4 shadow-soft" data-testid="me-profile-card">
+        <div className="flex items-center gap-4">
+          <div className="relative w-16 h-16 rounded-2xl bg-muted overflow-hidden flex-shrink-0">
+            {user.photo_url ? (
+              <img src={photoSrc(user.photo_url)} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full grid place-items-center text-muted-foreground text-xl font-heading">{user.name?.[0]}</div>
             )}
           </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-medium text-lg truncate">{user.name}, {user.age}</p>
+              <PlanPill plan={user.plan} />
+            </div>
+            <p className="text-xs text-muted-foreground truncate">{user.region} · {user.profession || "—"}</p>
+            <div className="flex gap-1 mt-1.5 flex-wrap">
+              <VerifiedBadge verified={user.verified_selfie} />
+              <FinancialBadge verified={user.verified_financial} />
+              {user.verified_identity && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 text-[10px]">
+                  <ShieldCheck className="w-3 h-3" /> Identity
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-border">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">{t("photo")}</p>
+          <PhotoUpload
+            value={user.photo_url}
+            onChange={async (url) => {
+              await api.patch("/profile", { photo_url: url });
+              await refresh();
+            }}
+            testid="me-photo-upload"
+          />
+          {user.avg_response_min != null && (
+            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground" data-testid="me-response-speed">
+              <Clock className="w-3.5 h-3.5" />
+              {t("response_usually")} <strong className="text-foreground">{user.avg_response_min < 60 ? `${user.avg_response_min} ${t("minutes")}` : `${Math.round(user.avg_response_min / 60)} ${t("hours")}`}</strong>
+            </div>
+          )}
         </div>
       </div>
 
@@ -169,7 +202,7 @@ export default function Me() {
             <div key={row.user.id} className="flex items-center gap-3 text-sm">
               <span className="w-5 text-center font-medium text-muted-foreground">{i + 1}</span>
               <div className="w-7 h-7 rounded-full bg-muted overflow-hidden">
-                {row.user.photo_url && <img src={row.user.photo_url} alt="" className="w-full h-full object-cover" />}
+                {row.user.photo_url && <img src={photoSrc(row.user.photo_url)} alt="" className="w-full h-full object-cover" />}
               </div>
               <span className="flex-1 truncate">{row.user.name}</span>
               <span className="text-gold-dark font-medium">{row.total.toLocaleString()}</span>
@@ -180,9 +213,13 @@ export default function Me() {
 
       {/* Admin & settings */}
       <div className="rounded-3xl bg-card border border-border divide-y">
+        <Link to="/settings" data-testid="link-settings" className="flex items-center justify-between p-4">
+          <span className="flex items-center gap-3 text-sm"><SlidersHorizontal className="w-4 h-4" /> {t("who_can_message_me")}</span>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </Link>
         {user.is_admin && (
           <Link to="/admin" data-testid="link-admin" className="flex items-center justify-between p-4">
-            <span className="flex items-center gap-3 text-sm"><Settings className="w-4 h-4" /> {t("admin_panel")}</span>
+            <span className="flex items-center gap-3 text-sm"><SettingsIcon className="w-4 h-4" /> {t("admin_panel")}</span>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </Link>
         )}

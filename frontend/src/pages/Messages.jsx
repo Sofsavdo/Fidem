@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
+import { photoSrc } from "@/lib/photo";
 
 export default function Messages() {
   const { t } = useApp();
@@ -118,7 +119,7 @@ function Avatar({ user }) {
   return (
     <div className="relative w-12 h-12 rounded-full overflow-hidden bg-muted flex-shrink-0">
       {user.photo_url ? (
-        <img src={user.photo_url} alt="" className={`w-full h-full object-cover ${!user.photo_unlocked ? "blur-md" : ""}`} />
+        <img src={photoSrc(user.photo_url)} alt="" className={`w-full h-full object-cover ${!user.photo_unlocked ? "blur-md" : ""}`} />
       ) : (
         <div className="w-full h-full grid place-items-center text-muted-foreground text-sm">
           {user.name?.[0]}

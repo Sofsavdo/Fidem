@@ -11,10 +11,11 @@ from typing import Any, List, Optional
 
 import bcrypt
 from dotenv import load_dotenv
-from fastapi import Body, Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile, APIRouter
+from fastapi import Body, Depends, FastAPI, File, Form, HTTPException, Header, Query, Request, UploadFile, APIRouter
 from fastapi.responses import JSONResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 from starlette.middleware.cors import CORSMiddleware
+from starlette.responses import Response
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -26,6 +27,7 @@ from auth import (
     optional_user_id,
     validate_telegram_init_data,
 )
+from storage import init_storage, put_object, get_object, MIME
 from models import (
     AdminUpdateUserRequest,
     AuthResponse,
@@ -126,6 +128,20 @@ async def get_user(uid: str) -> dict:
     user = await db.users.find_one({"id": uid}, {"_id": 0})
     if not user:
         raise HTTPException(404, "User not found")
+    # Subscription expiry check
+    plan_until = user.get("plan_until")
+    if plan_until and user.get("plan") in ("premium", "vip"):
+        try:
+            until_dt = parse_dt(plan_until)
+            if until_dt < now_utc():
+                await db.users.update_one(
+                    {"id": uid},
+                    {"$set": {"plan": "free", "plan_expired_at": iso(now_utc())}},
+                )
+                user["plan"] = "free"
+                user["plan_until"] = None
+        except Exception:
+            pass
     return user
 
 
@@ -176,18 +192,30 @@ async def notify_telegram(uid: str, text: str) -> None:
             log.warning(f"telegram notify failed: {e}")
 
 
-async def push_notif(uid: str, kind: str, text: str, link: Optional[str] = None) -> None:
+async def push_notif(uid: str, kind: str, text: str, link: Optional[str] = None, marketing: bool = False) -> bool:
+    """Persist + Telegram-DM a notification. If marketing=True, enforce daily cap of 2."""
+    if marketing:
+        from datetime import timedelta as _td
+        cutoff = iso(now_utc() - _td(hours=24))
+        today_count = await db.notifications.count_documents(
+            {"user_id": uid, "marketing": True, "created_at": {"$gte": cutoff}}
+        )
+        if today_count >= 2:
+            return False
     notif = {
         "id": new_id(),
         "user_id": uid,
         "kind": kind,
         "text": text,
         "link": link,
+        "marketing": marketing,
         "created_at": iso(now_utc()),
         "read": False,
     }
     await db.notifications.insert_one(notif)
+    notif.pop("_id", None)
     asyncio.create_task(notify_telegram(uid, text))
+    return True
 
 
 # ---------- Health ----------
@@ -744,6 +772,27 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
             }},
             upsert=True,
         )
+    # ---- Response time tracking: if this message is a reply, record delta ----
+    if not is_first:
+        last_incoming = await db.messages.find_one(
+            {"chat_id": cid, "to_user_id": uid},
+            sort=[("created_at", -1)],
+            projection={"_id": 0, "created_at": 1, "from_user_id": 1},
+        )
+        if last_incoming and last_incoming.get("from_user_id") == req.to_user_id:
+            try:
+                delta_min = (now_utc() - parse_dt(last_incoming["created_at"])).total_seconds() / 60.0
+                if 0 < delta_min < 7 * 24 * 60:  # cap at 1 week
+                    samples = sender.get("response_samples", []) or []
+                    samples.append(round(delta_min, 1))
+                    samples = samples[-20:]
+                    avg = round(sum(samples) / len(samples))
+                    await db.users.update_one(
+                        {"id": uid},
+                        {"$set": {"response_samples": samples, "avg_response_min": avg}},
+                    )
+            except Exception:
+                pass
     await push_notif(req.to_user_id, "message", f"Yangi xabar: {sender.get('name','')}")
     msg["created_at"] = parse_dt(msg["created_at"])
     return msg
@@ -1091,9 +1140,154 @@ async def admin_reports(_: str = Depends(get_current_admin)):
     return rows
 
 
+@api.post("/admin/notification/broadcast")
+async def admin_broadcast(text: str = Body(..., embed=True), _: str = Depends(get_current_admin)):
+    """Send a marketing notification to all onboarded users (daily-cap 2 enforced)."""
+    users = await db.users.find({"onboarded": True, "blocked": {"$ne": True}}, {"_id": 0, "id": 1}).to_list(10000)
+    sent, skipped = 0, 0
+    for u in users:
+        ok = await push_notif(u["id"], "marketing", text, marketing=True)
+        if ok:
+            sent += 1
+        else:
+            skipped += 1
+    return {"sent": sent, "skipped_daily_cap": skipped}
+
+
+# ---------- Object Storage (photo upload) ----------
+@api.post("/files/upload")
+async def upload_file(file: UploadFile = File(...), uid: str = Depends(get_current_user_id)):
+    ext = (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else "bin"
+    if ext not in MIME:
+        raise HTTPException(400, "Only image files (jpg/png/gif/webp) are allowed")
+    data = await file.read()
+    if len(data) > 8 * 1024 * 1024:
+        raise HTTPException(413, "Max file size 8MB")
+    storage_path = f"{os.environ.get('APP_NAME','fidem')}/uploads/{uid}/{new_id()}.{ext}"
+    try:
+        result = await put_object(storage_path, data, MIME[ext])
+    except Exception as e:
+        log.error(f"upload failed: {e}")
+        raise HTTPException(500, "Upload failed")
+    await db.files.insert_one({
+        "id": new_id(),
+        "owner_id": uid,
+        "storage_path": result["path"],
+        "content_type": MIME[ext],
+        "size": result.get("size", len(data)),
+        "is_deleted": False,
+        "created_at": iso(now_utc()),
+    })
+    # Path-only (frontend will append viewer's own JWT when rendering)
+    return {"path": result["path"], "url": f"/api/files/{result['path']}"}
+
+
+@api.get("/files/{path:path}")
+async def serve_file(path: str, auth: Optional[str] = Query(None), authorization: Optional[str] = Header(default=None)):
+    """Serve a stored file. Auth via Authorization header or ?auth= query param."""
+    from auth import decode_token
+    token = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+    elif auth:
+        token = auth
+    if not token:
+        raise HTTPException(401, "Auth required")
+    try:
+        decode_token(token)
+    except HTTPException:
+        raise
+    rec = await db.files.find_one({"storage_path": path, "is_deleted": False}, {"_id": 0})
+    if not rec:
+        raise HTTPException(404, "File not found")
+    try:
+        data, content_type = await get_object(path)
+    except Exception:
+        raise HTTPException(500, "Storage read failed")
+    return Response(content=data, media_type=rec.get("content_type", content_type))
+
+
+# ---------- Telegram bot webhook ----------
+TELEGRAM_WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "fidem-tg")
+
+
+async def setup_telegram_webhook():
+    if not TELEGRAM_BOT_TOKEN:
+        return
+    public_base = os.environ.get("CLICK_RETURN_URL", "").split("/payment/return")[0]
+    if not public_base:
+        return
+    webhook_url = f"{public_base}/api/telegram/webhook?secret={TELEGRAM_WEBHOOK_SECRET}"
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=15.0) as cl:
+            r = await cl.post(
+                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setWebhook",
+                json={"url": webhook_url, "allowed_updates": ["message"]},
+            )
+            log.info(f"Telegram webhook set: {r.status_code} {r.text[:200]}")
+    except Exception as e:
+        log.warning(f"setWebhook failed: {e}")
+
+
+@api.post("/telegram/webhook")
+async def telegram_webhook(request: Request, secret: Optional[str] = Query(None)):
+    if secret != TELEGRAM_WEBHOOK_SECRET:
+        raise HTTPException(403, "bad secret")
+    body = await request.json()
+    msg = body.get("message")
+    if not msg:
+        return {"ok": True}
+    text = (msg.get("text") or "").strip()
+    chat_id = msg["chat"]["id"]
+    tg_user_id = str(msg["from"]["id"])
+
+    if text.startswith("/start"):
+        parts = text.split(maxsplit=1)
+        ref_code = parts[1].strip() if len(parts) > 1 else None
+        # Attach referral if user is new
+        existing = await db.users.find_one({"telegram_id": tg_user_id}, {"_id": 0, "id": 1, "referred_by": 1})
+        if ref_code and (not existing or not existing.get("referred_by")):
+            ref_owner = await db.users.find_one({"referral_code": ref_code}, {"_id": 0, "id": 1})
+            if ref_owner and (not existing or existing["id"] != ref_owner["id"]):
+                if existing:
+                    await db.users.update_one({"id": existing["id"]}, {"$set": {"referred_by": ref_code}})
+                else:
+                    # store pending referral until first auth
+                    await db.pending_refs.update_one(
+                        {"telegram_id": tg_user_id},
+                        {"$set": {"telegram_id": tg_user_id, "ref_code": ref_code, "at": iso(now_utc())}},
+                        upsert=True,
+                    )
+                # Reward referrer
+                await db.users.update_one({"id": ref_owner["id"]}, {"$inc": {"balance": 1000, "ref_count": 1}})
+                await push_notif(ref_owner["id"], "referral", "Yangi taklif bonus +1000 so'm")
+
+        bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "Fidem_Appbot")
+        webapp_url = os.environ.get("CLICK_RETURN_URL", "").split("/payment/return")[0]
+        reply = (
+            "Assalomu alaykum! FIDEM — Sizga mos insonni xavfsiz topishga yordam beramiz.\n\n"
+            f"@{bot_username} ilovasini ochish uchun pastdagi tugmani bosing 👇"
+        )
+        keyboard = {
+            "inline_keyboard": [[{"text": "FIDEM'ni ochish", "web_app": {"url": webapp_url}}]]
+        } if webapp_url else None
+        await send_telegram_message(chat_id, reply, reply_markup=keyboard)
+    return {"ok": True}
+
+
 # ---------- Seed admin + indexes ----------
 @app.on_event("startup")
 async def startup():
+    # Object storage init (non-fatal if fails)
+    try:
+        init_storage()
+    except Exception as e:
+        log.warning(f"Storage startup warning: {e}")
+
+    # Set Telegram webhook (non-fatal)
+    asyncio.create_task(setup_telegram_webhook())
+
     # Indexes
     await db.users.create_index("id", unique=True)
     await db.users.create_index("email", sparse=True)

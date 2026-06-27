@@ -1,19 +1,24 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
-import { ArrowLeft, Send, Gift, Sparkles } from "lucide-react";
+import GiftModal from "@/components/GiftModal";
+import { ArrowLeft, Send, Gift, Sparkles, MoreVertical, Ban, Flag } from "lucide-react";
+import { photoSrc } from "@/lib/photo";
 import { toast } from "sonner";
 
 export default function Chat() {
   const { otherId } = useParams();
   const { user, t } = useApp();
+  const nav = useNavigate();
   const [other, setOther] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [showTemplates, setShowTemplates] = useState(true);
   const [cannotMessage, setCannotMessage] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [giftOpen, setGiftOpen] = useState(false);
   const endRef = useRef(null);
 
   const chatId = user && otherId ? [user.id, otherId].sort().join("_") : null;
@@ -55,14 +60,27 @@ export default function Chat() {
     } finally { setSending(false); }
   };
 
-  const sendGift = async (kind) => {
+  const sendGift = (kind) => {
+    setGiftOpen(true);
+    // legacy quick-send kept for backward compat — not used now
+  };
+
+  const blockUser = async () => {
     try {
-      await api.post("/gifts/send", { to_user_id: otherId, gift_kind: kind });
-      toast.success("Sovg'a yuborildi");
-      load();
-    } catch (e) {
-      toast.error(e.response?.data?.detail || "Balans yetmaydi");
-    }
+      await api.post("/messages/block", { user_id: otherId });
+      toast.success("Blokladingiz");
+      setMenuOpen(false);
+      nav("/messages");
+    } catch (e) { toast.error("Xato"); }
+  };
+  const reportUser = async () => {
+    const reason = window.prompt(t("report_reason"), "Spam");
+    if (!reason) return;
+    try {
+      await api.post("/messages/report", { user_id: otherId, reason });
+      toast.success(t("reported"));
+      setMenuOpen(false);
+    } catch (e) { toast.error("Xato"); }
   };
 
   if (!other) return <div className="p-6 text-center text-muted-foreground">{t("loading")}</div>;
@@ -76,7 +94,7 @@ export default function Chat() {
         <Link to={`/candidate/${other.id}`} className="flex items-center gap-3 flex-1 min-w-0">
           <div className="w-10 h-10 rounded-full overflow-hidden bg-muted flex-shrink-0">
             {other.photo_url && (
-              <img src={other.photo_url} alt="" className={`w-full h-full object-cover ${!other.photo_unlocked ? "blur-md" : ""}`} />
+              <img src={photoSrc(other.photo_url)} alt="" className={`w-full h-full object-cover ${!other.photo_unlocked ? "blur-md" : ""}`} />
             )}
           </div>
           <div className="min-w-0">
@@ -140,7 +158,7 @@ export default function Chat() {
             </div>
           )}
           <div className="flex items-center gap-2">
-            <button data-testid="gift-rose" onClick={() => sendGift("rose")} className="p-2.5 rounded-full bg-muted hover:bg-border" title="🌹">
+            <button data-testid="gift-open" onClick={() => setGiftOpen(true)} className="p-2.5 rounded-full bg-muted hover:bg-border" title={t("send_gift")}>
               <Gift className="w-4 h-4" />
             </button>
             <input
@@ -162,6 +180,7 @@ export default function Chat() {
           </div>
         </div>
       </div>
+      {giftOpen && <GiftModal targetId={otherId} targetName={other.name} onClose={() => setGiftOpen(false)} onSent={load} />}
     </div>
   );
 }

@@ -13,6 +13,8 @@ import Saved from "@/pages/Saved";
 import Me from "@/pages/Me";
 import Premium from "@/pages/Premium";
 import Admin from "@/pages/Admin";
+import Settings from "@/pages/Settings";
+import Notifications from "@/pages/Notifications";
 
 function Gate({ children }) {
   const { user, loading } = useApp();
@@ -45,6 +47,8 @@ function Inner() {
         <Route path="/saved" element={<Saved />} />
         <Route path="/me" element={<Me />} />
         <Route path="/premium" element={<Premium />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/notifications" element={<Notifications />} />
         <Route path="/admin" element={<Admin />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

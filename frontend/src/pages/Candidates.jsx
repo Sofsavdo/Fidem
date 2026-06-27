@@ -48,16 +48,6 @@ export default function Candidates() {
     }
   };
 
-  const onGift = async (c) => {
-    // open quick gift menu - for simplicity send rose if balance >= 50
-    try {
-      await api.post("/gifts/send", { to_user_id: c.id, gift_kind: "rose" });
-      toast.success("🌹 sovg'a yuborildi");
-    } catch (e) {
-      toast.error(e.response?.data?.detail || "Balansingiz yetarli emas");
-    }
-  };
-
   return (
     <div className="px-4 pt-6 pb-4">
       <div className="flex items-center justify-between mb-4">
@@ -125,7 +115,7 @@ export default function Candidates() {
       ) : (
         <div className="grid grid-cols-2 gap-3 stagger" data-testid="candidates-grid">
           {items.map((c) => (
-            <CandidateCard key={c.id} c={c} onSave={onSave} onGift={onGift} saved={savedIds.has(c.id)} />
+            <CandidateCard key={c.id} c={c} onSave={onSave} saved={savedIds.has(c.id)} />
           ))}
         </div>
       )}
