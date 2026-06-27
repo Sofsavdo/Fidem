@@ -57,6 +57,19 @@ function Gate({ children }) {
   return children;
 }
 
+// Root "/" — guests see the public Landing, logged-in users see the candidates feed.
+function RootRoute() {
+  const { user, loading } = useApp();
+  if (loading) return <PageSpinner />;
+  if (!user) return <Welcome />;
+  if (!user.onboarded) return <Navigate to="/onboarding" replace />;
+  return (
+    <Layout>
+      <Candidates />
+    </Layout>
+  );
+}
+
 function Inner() {
   // Inject Telegram WebApp script at runtime; init expand & viewport
   useEffect(() => {
@@ -87,8 +100,8 @@ function Inner() {
         <Route path="/faq" element={<FAQ />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/onboarding" element={<Gate><Onboarding /></Gate>} />
+        <Route path="/" element={<RootRoute />} />
         <Route element={<Gate><Layout /></Gate>}>
-          <Route index element={<Candidates />} />
           <Route path="/candidate/:id" element={<ProfileDetail />} />
           <Route path="/messages" element={<Messages />} />
           <Route path="/chat/:otherId" element={<Chat />} />

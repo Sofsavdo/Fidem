@@ -81,17 +81,25 @@ export default function Welcome() {
               { icon: Crown, title: "Sovchi Concierge", desc: "Premium foydalanuvchilarga 5 ta professional sovchi tanlangan moslar (199K so'm).", color: "primary" },
               { icon: Gift, title: "Halal Sovg'a tizimi", desc: "E'tibor ko'rsatish uchun bepul atirgul yoki maxsus sovg'alar. Olgan kishi cashout qila oladi.", color: "secondary" },
               { icon: MessageCircle, title: "Xavfsiz muloqot", desc: "AI yomon so'z + telefon ulashish blokirovkasi. Family Share — nikoh bosqichida ota-ona telefonlari almashinadi.", color: "gold" },
-            ].map((f, i) => (
-              <div key={i} className={`rounded-2xl border border-border bg-card p-4 flex gap-3`}>
-                <div className={`w-10 h-10 rounded-xl bg-${f.color}/10 grid place-items-center shrink-0`}>
-                  <f.icon className={`w-5 h-5 text-${f.color}`} />
+            ].map((f, i) => {
+              const colorMap = {
+                primary: { bg: "bg-primary/10", text: "text-primary" },
+                secondary: { bg: "bg-secondary/10", text: "text-secondary" },
+                gold: { bg: "bg-gold/10", text: "text-gold-dark" },
+              };
+              const c = colorMap[f.color] || colorMap.primary;
+              return (
+                <div key={i} className="rounded-2xl border border-border bg-card p-4 flex gap-3">
+                  <div className={`w-10 h-10 rounded-xl ${c.bg} grid place-items-center shrink-0`}>
+                    <f.icon className={`w-5 h-5 ${c.text}`} />
+                  </div>
+                  <div>
+                    <p className="font-semibold">{f.title}</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">{f.desc}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-semibold">{f.title}</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">{f.desc}</p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 

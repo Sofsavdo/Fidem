@@ -6,7 +6,7 @@ import MobileTopBar from "@/components/MobileTopBar";
 import OfflineBanner from "@/components/OfflineBanner";
 import { Outlet, useLocation } from "react-router-dom";
 
-export default function Layout() {
+export default function Layout({ children }) {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin");
   // Mobile-first: sidebar only shown on admin pages
@@ -17,7 +17,7 @@ export default function Layout() {
       {!isAdmin && <MobileTopBar />}
       <main className={isAdmin ? "md:pl-64 lg:pl-72" : ""}>
         <div className="max-w-2xl xl:max-w-3xl mx-auto pb-24 md:pb-10 min-h-screen relative">
-          <Outlet />
+          {children || <Outlet />}
         </div>
       </main>
       <BottomNav />
