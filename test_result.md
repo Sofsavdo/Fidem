@@ -637,6 +637,18 @@ backend:
         comment: "✅ PASSED. All 4 new sidebar links verified on desktop view (1920x900): data-testid='side-concierge' (Sovchi Concierge), data-testid='side-travel' (Travel Mode), data-testid='side-family' (Oilaviy aloqa), data-testid='side-withdrawals' (Pul yechish). All links visible, properly labeled, and clickable."
 
 frontend:
+  - task: "Phase 1-4 UI — profile LangSwitch, region dropdown filter, chat paywall, coins UI, Standard tariff, onboarding extra fields"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/pages/Me.jsx, Settings.jsx, Chat.jsx, Premium.jsx, Onboarding.jsx, ProfileDetail.jsx, components/MobileTopBar.jsx, components/DailyCheckIn.jsx, components/LangSwitch.jsx, lib/regions.js, lib/i18n.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Phase1: Me.jsx profile language switch now uses LangSwitch (UZ|RU|EN segmented) instead of <select me-lang>; Settings.jsx region filter is now a dropdown (data-testid set-region) using shared lib/regions.js (13 UZ regions) instead of free-text. Phase2 chat paywall: Chat.jsx loads GET /api/chat/access/{id}; when requires_unlock it shows data-testid='chat-paywall' with buttons unlock-balance (9900), unlock-coins (100), unlock-credit (if free_credits>0), unlock-click (CLICK), and unlock-upgrade (link to /premium) INSTEAD of the input; when can_message it shows the normal chat-input. Phase3: DailyCheckIn.jsx shows '🪙 coin' instead of so'm; MobileTopBar shows topbar-coins pill; Premium.jsx added Standard tariff (19900, purpose='standard') with chat_unlimited feature. Phase4: Onboarding.jsx step 4 adds smoking/alcohol/relocation (RadioGroup, testids ob-smoking/ob-alcohol/ob-relocation); ProfileDetail shows smoking/alcohol/relocation stats. NEEDS FRONTEND TESTING (with user permission)."
+
   - task: "Landing-first routing + i18n landing + LangSwitch + landing images"
     implemented: true
     working: true
