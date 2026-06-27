@@ -102,6 +102,21 @@ export default function Chat() {
             <p className="text-xs text-muted-foreground truncate">{other.last_active_label}</p>
           </div>
         </Link>
+        <div className="relative">
+          <button data-testid="chat-menu" onClick={() => setMenuOpen((v) => !v)} className="p-2 rounded-full hover:bg-muted" aria-label="menu">
+            <MoreVertical className="w-4 h-4" />
+          </button>
+          {menuOpen && (
+            <div data-testid="chat-menu-dropdown" className="absolute right-0 top-10 z-40 bg-card border border-border rounded-2xl shadow-elevated w-44 py-1">
+              <button data-testid="chat-block" onClick={blockUser} className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted">
+                <Ban className="w-4 h-4 text-primary" /> {t("block")}
+              </button>
+              <button data-testid="chat-report" onClick={reportUser} className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted">
+                <Flag className="w-4 h-4 text-primary" /> {t("report")}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 px-4 py-4 space-y-2" data-testid="chat-history">
