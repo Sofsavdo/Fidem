@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import CandidateCard from "@/components/CandidateCard";
 import { useApp } from "@/contexts/AppContext";
@@ -57,13 +58,23 @@ export default function Candidates() {
             {items.length} {t("candidates").toLowerCase()}
           </p>
         </div>
-        <button
-          data-testid="open-filter"
-          onClick={() => setShowFilter(true)}
-          className="rounded-full bg-card border border-border p-3 hover:bg-muted transition"
-        >
-          <SlidersHorizontal className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/swipe"
+            data-testid="open-swipe"
+            className="rounded-full bg-gradient-to-br from-primary to-secondary text-white px-3 py-2 text-xs font-medium inline-flex items-center gap-1.5 hover:scale-105 transition shadow"
+            title="Swipe rejimi"
+          >
+            ❤️ Swipe
+          </Link>
+          <button
+            data-testid="open-filter"
+            onClick={() => setShowFilter(true)}
+            className="rounded-full bg-card border border-border p-3 hover:bg-muted transition"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* sort pills */}

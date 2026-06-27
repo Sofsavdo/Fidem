@@ -143,6 +143,9 @@ class SendMessageRequest(BaseModel):
     to_user_id: str
     text: str
     is_super: bool = False
+    kind: Literal["text", "voice"] = "text"
+    voice_url: Optional[str] = None
+    voice_duration: Optional[int] = None  # seconds
 
 
 class MessageOut(BaseModel):
@@ -152,7 +155,7 @@ class MessageOut(BaseModel):
     to_user_id: str
     text: str
     created_at: datetime
-    kind: Literal["text", "gift", "photo_request", "photo_grant", "super"] = "text"
+    kind: Literal["text", "gift", "photo_request", "photo_grant", "super", "rose", "voice"] = "text"
     meta: dict = {}
 
 

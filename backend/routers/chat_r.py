@@ -111,17 +111,28 @@ async def chat_history(chat_id: str, uid: str = Depends(get_current_user_id)):
 async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_user_id)):
     if req.to_user_id == uid:
         raise HTTPException(400, "Cannot message self")
-    # AI moderation (fast check)
-    ok, reason = quick_moderation(req.text)
-    if not ok:
-        raise HTTPException(422, reason)
+    is_voice = req.kind == "voice"
+    if is_voice:
+        if not req.voice_url:
+            raise HTTPException(400, "voice_url required for voice message")
+        # No moderation on voice (binary content); just length sanity
+        if req.voice_duration and req.voice_duration > 60:
+            raise HTTPException(400, "Voice message too long (max 60s)")
+    else:
+        # AI moderation (fast check) — text only
+        ok, reason = quick_moderation(req.text)
+        if not ok:
+            raise HTTPException(422, reason)
     sender = await get_user(uid)
     target = await get_user(req.to_user_id)
     cid = chat_id_for(uid, req.to_user_id)
     existing_msgs = await db.messages.count_documents({"chat_id": cid})
     can_msg = candidate_can_message(target, sender)
     is_first = existing_msgs == 0
-    kind = "super" if req.is_super else "text"
+    if is_voice:
+        kind = "voice"
+    else:
+        kind = "super" if req.is_super else "text"
     status = "chat"
 
     if req.is_super:
@@ -139,12 +150,14 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
         "chat_id": cid,
         "from_user_id": uid,
         "to_user_id": req.to_user_id,
-        "text": req.text,
+        "text": req.text or ("[voice]" if is_voice else ""),
         "kind": kind,
         "created_at": iso(now_utc()),
         "read": False,
         "status": status,
     }
+    if is_voice:
+        msg["meta"] = {"voice_url": req.voice_url, "voice_duration": req.voice_duration or 0}
     await db.messages.insert_one(msg)
     msg.pop("_id", None)
     if is_first or req.is_super:

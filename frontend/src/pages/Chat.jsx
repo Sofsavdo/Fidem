@@ -4,7 +4,8 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import GiftModal from "@/components/GiftModal";
 import RoseModal from "@/components/RoseModal";
-import { ArrowLeft, Send, Gift, Sparkles, MoreVertical, Ban, Flag, Wand2 } from "lucide-react";
+import ChatVoiceRecorder from "@/components/ChatVoiceRecorder";
+import { ArrowLeft, Send, Gift, Sparkles, MoreVertical, Ban, Flag, Wand2, Play } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
 import { toast } from "sonner";
 
@@ -41,7 +42,7 @@ export default function Chat() {
         const m = await api.get(`/messages/${chatId}`);
         setMessages(m.data || []);
       }
-    } catch (e) {}
+    } catch (e) { /* ignore */ }
   };
 
   useEffect(() => {
@@ -80,6 +81,24 @@ export default function Chat() {
       load();
     } catch (e) {
       toast.error(e.response?.data?.detail || "Xato");
+    } finally { setSending(false); }
+  };
+
+  const sendVoice = async ({ voice_url, voice_duration }) => {
+    setSending(true);
+    try {
+      await api.post("/messages/send", {
+        to_user_id: otherId,
+        text: "",
+        kind: "voice",
+        voice_url,
+        voice_duration,
+      });
+      setShowTemplates(false);
+      toast.success("Ovozli xabar yuborildi");
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Yuborib bo'lmadi");
     } finally { setSending(false); }
   };
 
@@ -171,7 +190,14 @@ export default function Chat() {
             } ${m.kind === "gift" ? "bg-gold-light text-yellow-900 border-gold/40" : ""} ${m.kind === "super" ? "ring-2 ring-gold" : ""} ${m.kind === "rose" ? "ring-2 ring-primary bg-primary/10 text-primary" : ""}`}>
               {m.kind === "super" && <span className="text-[9px] uppercase tracking-wider opacity-70 block">Super</span>}
               {m.kind === "rose" && <span className="text-[9px] uppercase tracking-wider opacity-70 block">🌹 Atirgul</span>}
-              {m.text}
+              {m.kind === "voice" && m.meta?.voice_url ? (
+                <div className="flex items-center gap-2 min-w-[200px]" data-testid={`voice-msg-${m.id}`}>
+                  <span className="text-[9px] uppercase tracking-wider opacity-70">🎙 Ovoz · {m.meta.voice_duration || 0}s</span>
+                  <audio controls preload="none" src={m.meta.voice_url} className="h-8 max-w-full" />
+                </div>
+              ) : (
+                m.text
+              )}
             </div>
           </div>
         ))}
@@ -245,6 +271,7 @@ export default function Chat() {
             <button data-testid="gift-open" onClick={() => setGiftOpen(true)} className="p-2.5 rounded-full bg-muted hover:bg-border" title={t("send_gift")}>
               <Gift className="w-4 h-4" />
             </button>
+            <ChatVoiceRecorder onSend={sendVoice} />
             <input
               data-testid="chat-input"
               value={text}

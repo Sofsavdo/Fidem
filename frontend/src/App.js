@@ -34,6 +34,7 @@ const Welcome = lazy(() => import("@/pages/Welcome"));
 const About = lazy(() => import("@/pages/About"));
 const FAQ = lazy(() => import("@/pages/FAQ"));
 const Referral = lazy(() => import("@/pages/Referral"));
+const Swipe = lazy(() => import("@/pages/Swipe"));
 
 function PageSpinner() {
   return (
@@ -108,6 +109,7 @@ function Inner() {
           <Route path="/verification" element={<Verification />} />
           <Route path="/boost" element={<Boost />} />
           <Route path="/referral" element={<Referral />} />
+          <Route path="/swipe" element={<Swipe />} />
           <Route path="/admin" element={<Admin />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

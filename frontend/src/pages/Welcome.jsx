@@ -46,10 +46,10 @@ export default function Welcome() {
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
             <Link to="/auth" data-testid="land-cta-primary" className="px-6 py-3.5 rounded-2xl bg-primary text-white font-medium text-base shadow-lg">
-              Bepul ro'yxatdan o'tish →
+              {t("welcome_cta_primary")} →
             </Link>
             <a href="#features" className="px-6 py-3.5 rounded-2xl border-2 border-border text-base font-medium">
-              Imkoniyatlar
+              {t("welcome_features")}
             </a>
           </div>
           <p className="text-xs text-muted-foreground pt-4">✨ Hozir 1000+ ishtirokchi • 12+ to'y bo'lib o'tdi</p>
