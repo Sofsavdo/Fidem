@@ -205,6 +205,24 @@ export default function Premium() {
         </button>
       </div>
 
+      {/* Sovchi Concierge — premium manual matching */}
+      <div className="rounded-3xl bg-gradient-to-br from-secondary/10 via-primary/5 to-gold-light/30 border-2 border-secondary/40 p-5" data-testid="concierge-section">
+        <p className="font-heading text-xl font-semibold flex items-center gap-2">👑 Sovchi Concierge</p>
+        <p className="text-sm mt-1 text-muted-foreground">Professional sovchi sizga 5 ta eng mos nomzodni qo'lda topib beradi (30 kun).</p>
+        <ul className="text-xs mt-3 space-y-1 text-foreground/80">
+          <li>✓ Inson nazoratidan o'tgan sifatli moslar</li>
+          <li>✓ Har bir mos uchun sovchi izohi</li>
+          <li>✓ Tezroq va aniqroq natija</li>
+        </ul>
+        <a
+          href="/concierge"
+          data-testid="concierge-link"
+          className="mt-3 block w-full text-center rounded-2xl bg-secondary text-white py-3 font-medium"
+        >
+          Concierge sahifasiga o'tish · 199,000 so'm
+        </a>
+      </div>
+
       {/* Payments history */}
       <div>
         <p className="font-heading text-lg font-semibold mb-2">{t("payments")}</p>

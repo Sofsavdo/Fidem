@@ -39,6 +39,10 @@ from routers.ai_r import router as ai_router  # noqa: E402
 from routers.prompts_r import router as prompts_router  # noqa: E402
 from routers.stories_r import router as stories_router  # noqa: E402
 from routers.gamification_r import router as gamification_router  # noqa: E402
+from routers.withdrawals_r import router as withdrawals_router  # noqa: E402
+from routers.family_r import router as family_router  # noqa: E402
+from routers.concierge_r import router as concierge_router  # noqa: E402
+from routers.travel_r import router as travel_router  # noqa: E402
 from services import compute_completeness  # noqa: E402
 from storage import init_storage  # noqa: E402
 
@@ -59,6 +63,10 @@ api.include_router(ai_router)
 api.include_router(prompts_router)
 api.include_router(stories_router)
 api.include_router(gamification_router)
+api.include_router(withdrawals_router)
+api.include_router(family_router)
+api.include_router(concierge_router)
+api.include_router(travel_router)
 app.include_router(api)
 
 
@@ -88,6 +96,11 @@ async def startup() -> None:
     await db.compat_unlocks.create_index([("user_id", 1), ("target_id", 1)], unique=True)
     await db.success_stories.create_index("created_at")
     await db.files.create_index("path")
+    await db.withdrawals.create_index([("user_id", 1), ("created_at", -1)])
+    await db.withdrawals.create_index("status")
+    await db.family_requests.create_index([("from_user_id", 1), ("to_user_id", 1)])
+    await db.family_requests.create_index([("to_user_id", 1), ("status", 1)])
+    await db.concierge_orders.create_index([("user_id", 1), ("status", 1)])
 
     # Seed admin
     admin = await db.users.find_one({"email": ADMIN_EMAIL.lower()})

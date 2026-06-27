@@ -4,7 +4,7 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, PlanPill } from "@/components/Badges";
 import PhotoUpload from "@/components/PhotoUpload";
-import { ChevronRight, Crown, Gem, Wallet, Share2, Settings as SettingsIcon, LogOut, Copy, Trophy, ShieldCheck, Bell, Clock, SlidersHorizontal, Brain, UsersRound, Pen, BookOpen } from "lucide-react";
+import { ChevronRight, Crown, Gem, Wallet, Share2, Settings as SettingsIcon, LogOut, Copy, Trophy, ShieldCheck, Bell, Clock, SlidersHorizontal, Brain, UsersRound, Pen, BookOpen, Phone, Plane } from "lucide-react";
 import ProgressCard from "@/components/ProgressCard";
 import { photoSrc } from "@/lib/photo";
 import { toast } from "sonner";
@@ -327,6 +327,22 @@ export default function Me() {
         </Link>
         <Link to="/stories" data-testid="link-stories" className="flex items-center justify-between p-4">
           <span className="flex items-center gap-3 text-sm"><BookOpen className="w-4 h-4 text-primary" /> Muvaffaqiyat hikoyalari</span>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </Link>
+        <Link to="/concierge" data-testid="link-concierge" className="flex items-center justify-between p-4">
+          <span className="flex items-center gap-3 text-sm"><Crown className="w-4 h-4 text-secondary" /> Sovchi Concierge (199,000 so'm)</span>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </Link>
+        <Link to="/travel" data-testid="link-travel" className="flex items-center justify-between p-4">
+          <span className="flex items-center gap-3 text-sm"><Plane className="w-4 h-4 text-secondary" /> Travel Mode</span>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </Link>
+        <Link to="/family" data-testid="link-family" className="flex items-center justify-between p-4">
+          <span className="flex items-center gap-3 text-sm"><Phone className="w-4 h-4 text-primary" /> Oilaviy aloqa (VIP)</span>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </Link>
+        <Link to="/withdrawals" data-testid="link-withdrawals" className="flex items-center justify-between p-4">
+          <span className="flex items-center gap-3 text-sm"><Wallet className="w-4 h-4 text-primary" /> Pul yechish ({(user.withdrawable_balance || 0).toLocaleString()} so'm)</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
         <Link to="/settings" data-testid="link-settings" className="flex items-center justify-between p-4">

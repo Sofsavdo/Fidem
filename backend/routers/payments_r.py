@@ -134,6 +134,19 @@ async def apply_payment_success(payment: dict) -> None:
         await push_notif(uid, "balance", "Super murojaat sotib olindi")
     elif purpose == "gift":
         await db.users.update_one({"id": uid}, {"$inc": {"balance": amount}})
+    elif purpose == "concierge":
+        order_id = payment.get("order_id")
+        if order_id:
+            from datetime import timedelta as _td
+            await db.concierge_orders.update_one(
+                {"id": order_id},
+                {"$set": {
+                    "status": "in_progress",
+                    "paid_at": iso(now_utc()),
+                    "expires_at": iso(now_utc() + _td(days=30)),
+                }},
+            )
+            await push_notif(uid, "concierge", "💎 Sovchi Concierge buyurtmangiz qabul qilindi. Admin sizga 5 ta mosni qo'lda topadi!")
 
 
 @router.post("/payments/admin-confirm/{payment_id}")

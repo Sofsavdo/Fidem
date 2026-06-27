@@ -66,6 +66,17 @@ async def candidates(
     query: dict = {"id": {"$ne": uid}, "onboarded": True, "blocked": {"$ne": True}}
     if me_doc.get("search_gender"):
         query["gender"] = me_doc["search_gender"]
+    # Travel Mode: if user has active travel_region, use it as filter unless explicit region passed
+    if not region:
+        travel_region = me_doc.get("travel_region")
+        travel_until = me_doc.get("travel_until")
+        if travel_region and travel_until:
+            try:
+                from core import parse_dt as _pdt
+                if _pdt(travel_until) > now_utc():
+                    region = travel_region
+            except Exception:
+                pass
     if region:
         query["region"] = region
     if marital_status:

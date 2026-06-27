@@ -1,6 +1,6 @@
 import React from "react";
 import { NavLink, Link } from "react-router-dom";
-import { Users, MessageCircle, Bookmark, User, Heart, Sparkles, Crown, Gift, ShieldCheck, Brain, UsersRound, Pen, BookOpen } from "lucide-react";
+import { Users, MessageCircle, Bookmark, User, Heart, Sparkles, Crown, Gift, ShieldCheck, Brain, UsersRound, Pen, BookOpen, Wallet, Phone, Plane } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { PlanPill } from "@/components/Badges";
 import { photoSrc } from "@/lib/photo";
@@ -82,6 +82,22 @@ export default function Sidebar() {
         <Link to="/boost" data-testid="side-boost" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
           <Sparkles className="w-4 h-4 text-primary" />
           <span>Boost & Spotlight</span>
+        </Link>
+        <Link to="/concierge" data-testid="side-concierge" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
+          <Crown className="w-4 h-4 text-secondary" />
+          <span>Sovchi Concierge</span>
+        </Link>
+        <Link to="/travel" data-testid="side-travel" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
+          <Plane className="w-4 h-4 text-secondary" />
+          <span>Travel Mode</span>
+        </Link>
+        <Link to="/family" data-testid="side-family" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
+          <Phone className="w-4 h-4 text-primary" />
+          <span>Oilaviy aloqa</span>
+        </Link>
+        <Link to="/withdrawals" data-testid="side-withdrawals" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
+          <Wallet className="w-4 h-4 text-primary" />
+          <span>Pul yechish</span>
         </Link>
         <Link to="/notifications" data-testid="side-notif" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
           <Gift className="w-4 h-4" />

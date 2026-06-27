@@ -22,6 +22,10 @@ import Chaperone from "@/pages/Chaperone";
 import ChaperoneWard from "@/pages/ChaperoneWard";
 import Prompts from "@/pages/Prompts";
 import Stories from "@/pages/Stories";
+import Withdrawals from "@/pages/Withdrawals";
+import Family from "@/pages/Family";
+import Concierge from "@/pages/Concierge";
+import Travel from "@/pages/Travel";
 
 function Gate({ children }) {
   const { user, loading } = useApp();
@@ -62,6 +66,10 @@ function Inner() {
         <Route path="/chaperone/ward/:wardId" element={<ChaperoneWard />} />
         <Route path="/prompts" element={<Prompts />} />
         <Route path="/stories" element={<Stories />} />
+        <Route path="/withdrawals" element={<Withdrawals />} />
+        <Route path="/family" element={<Family />} />
+        <Route path="/concierge" element={<Concierge />} />
+        <Route path="/travel" element={<Travel />} />
         <Route path="/boost" element={<Boost />} />
         <Route path="/admin" element={<Admin />} />
       </Route>

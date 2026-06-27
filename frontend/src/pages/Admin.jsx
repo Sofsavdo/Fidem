@@ -36,6 +36,8 @@ export default function Admin() {
           ["users", t("users")],
           ["payments", t("payments")],
           ["verifications", t("verifications")],
+          ["withdrawals", "Yechishlar"],
+          ["concierge", "Concierge"],
           ["reports", t("reports")],
         ].map(([k, l]) => (
           <button
@@ -69,6 +71,8 @@ export default function Admin() {
       {tab === "users" && <AdminUsers />}
       {tab === "payments" && <AdminPayments />}
       {tab === "verifications" && <AdminVerifications />}
+      {tab === "withdrawals" && <AdminWithdrawals />}
+      {tab === "concierge" && <AdminConcierge />}
       {tab === "reports" && <AdminReports />}
     </div>
   );
@@ -184,6 +188,96 @@ function AdminReports() {
         <div key={r.id} className="rounded-2xl bg-card border border-border p-3">
           <p className="text-sm">{r.reason}</p>
           <p className="text-xs text-muted-foreground">From {r.reporter_id?.slice(0, 8)} → {r.target_id?.slice(0, 8)}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AdminWithdrawals() {
+  const [list, setList] = useState([]);
+  const [filter, setFilter] = useState("pending");
+  const load = () => api.get("/admin/withdrawals", { params: { status: filter || undefined } }).then((r) => setList(r.data || []));
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter]);
+  const approve = async (id) => { await api.post(`/admin/withdrawals/${id}/approve`); toast.success("Tasdiqlandi"); load(); };
+  const reject = async (id) => {
+    const reason = prompt("Rad etish sababi:") || "";
+    await api.post(`/admin/withdrawals/${id}/reject`, { reason });
+    toast.success("Rad etildi"); load();
+  };
+  return (
+    <div className="space-y-2" data-testid="admin-withdrawals">
+      <div className="flex gap-1">
+        {["pending", "approved", "rejected", ""].map((f) => (
+          <button key={f || "all"} onClick={() => setFilter(f)} className={`text-xs rounded-full px-3 py-1.5 border ${filter === f ? "bg-foreground text-background" : "bg-card"}`}>{f || "Hammasi"}</button>
+        ))}
+      </div>
+      {list.length === 0 && <p className="text-sm text-muted-foreground">Yo'q</p>}
+      {list.map((w) => (
+        <div key={w.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`adm-wd-${w.id}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">{w.user?.name || w.user_id?.slice(0, 8)} · <span className="text-primary">{w.amount?.toLocaleString()} so'm</span></p>
+              <p className="text-xs text-muted-foreground font-mono">{w.card_number} · {w.holder_name}</p>
+              <p className="text-[10px] text-muted-foreground">{new Date(w.created_at).toLocaleString("uz-UZ")} · {w.status}</p>
+            </div>
+            {w.status === "pending" && (
+              <div className="flex gap-1">
+                <button onClick={() => approve(w.id)} className="text-xs rounded-full bg-emerald-600 text-white px-3 py-1.5">✓ Tasdiqlash</button>
+                <button onClick={() => reject(w.id)} className="text-xs rounded-full border border-border px-3 py-1.5">✕ Rad</button>
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AdminConcierge() {
+  const [list, setList] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [search, setSearch] = useState("");
+  const load = () => api.get("/admin/concierge").then((r) => setList(r.data || []));
+  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (search.length >= 2) api.get("/admin/users", { params: { q: search } }).then((r) => setUsers(r.data || []));
+  }, [search]);
+  const addMatch = async (orderId, matchUserId) => {
+    const note = prompt("Bu mos haqida sovchi izohi (ixtiyoriy):") || "";
+    try {
+      await api.post(`/admin/concierge/${orderId}/match`, { match_user_id: matchUserId, note });
+      toast.success("Mos qo'shildi");
+      load();
+    } catch (e) { toast.error(e.response?.data?.detail || "Xato"); }
+  };
+  return (
+    <div className="space-y-3" data-testid="admin-concierge">
+      <input placeholder="Foydalanuvchi qidirish (mos qo'shish uchun)..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm" />
+      {list.length === 0 && <p className="text-sm text-muted-foreground">Buyurtma yo'q</p>}
+      {list.map((o) => (
+        <div key={o.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`adm-con-${o.id}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">{o.user?.name || o.user_id?.slice(0, 8)} · {(o.amount || 0).toLocaleString()} so'm</p>
+              <p className="text-xs text-muted-foreground">Status: {o.status} · {(o.matches || []).length}/5 mos</p>
+            </div>
+            <span className={`text-[10px] px-2 py-1 rounded-full ${o.status === "in_progress" ? "bg-amber-100 text-amber-700" : o.status === "completed" ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"}`}>{o.status}</span>
+          </div>
+          {o.status === "in_progress" && search.length >= 2 && users.length > 0 && (
+            <div className="mt-2 max-h-40 overflow-y-auto border-t border-border/40 pt-2 space-y-1">
+              <p className="text-[10px] text-muted-foreground">Qidiruv natijasi:</p>
+              {users.slice(0, 5).map((u) => (
+                <button key={u.id} onClick={() => addMatch(o.id, u.id)} className="w-full text-left text-xs flex items-center gap-2 p-2 rounded-lg hover:bg-muted">
+                  <div className="w-6 h-6 rounded-full bg-muted overflow-hidden">
+                    {u.photo_url && <img src={photoSrc(u.photo_url)} alt="" className="w-full h-full object-cover" />}
+                  </div>
+                  <span className="flex-1 truncate">{u.name} · {u.age} · {u.region}</span>
+                  <span className="text-primary">+ Qo'shish</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       ))}
     </div>

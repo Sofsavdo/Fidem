@@ -125,6 +125,7 @@ def user_public(u: dict) -> dict:
         "avg_response_min": u.get("avg_response_min"),
         "plan": u.get("plan", "free"),
         "balance": u.get("balance", 0),
+        "withdrawable_balance": int(u.get("withdrawable_balance", 0) or 0),
         "blocked": u.get("blocked", False),
         "prompts": u.get("prompts") or [],
         "big5_scores": u.get("big5_scores") or {},

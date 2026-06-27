@@ -12,7 +12,7 @@ import { toast } from "sonner";
 
 export default function ProfileDetail() {
   const { id } = useParams();
-  const { t } = useApp();
+  const { t, user } = useApp();
   const nav = useNavigate();
   const [c, setC] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -20,6 +20,22 @@ export default function ProfileDetail() {
   const [saved, setSaved] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
   const [roseOpen, setRoseOpen] = useState(false);
+  const [famSending, setFamSending] = useState(false);
+
+  const requestFamily = async () => {
+    if (user?.plan !== "vip") {
+      toast.error("Oilaviy aloqa funksiyasi faqat VIP foydalanuvchilar uchun");
+      nav("/premium");
+      return;
+    }
+    setFamSending(true);
+    try {
+      await api.post("/family/request", { target_user_id: id, note: "" });
+      toast.success("So'rov yuborildi. Ikkala tomon ham qabul qilgach, oilaviy telefonlar ko'rinadi.");
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Xato");
+    } finally { setFamSending(false); }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -175,6 +191,15 @@ export default function ProfileDetail() {
             <Gift className="w-4 h-4" />
           </button>
         </div>
+        {/* Family Share (VIP only) */}
+        <button
+          data-testid="profile-family"
+          onClick={requestFamily}
+          disabled={famSending}
+          className="w-full rounded-2xl py-2.5 mt-2 text-sm font-medium border border-secondary/40 bg-secondary/10 text-secondary hover:bg-secondary/20 inline-flex items-center justify-center gap-2"
+        >
+          📞 Oilaviy aloqa so'rash (VIP)
+        </button>
       </div>
       {giftOpen && <GiftModal targetId={c.id} targetName={c.name} onClose={() => setGiftOpen(false)} />}
       {roseOpen && <RoseModal targetId={c.id} targetName={c.name} onClose={() => setRoseOpen(false)} onSent={load} />}

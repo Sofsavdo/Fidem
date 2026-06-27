@@ -227,8 +227,13 @@ async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id
     if sender.get("balance", 0) < price:
         raise HTTPException(402, "Insufficient balance")
     await get_user(req.to_user_id)  # validates exists
+    # 50% of gift price converts to recipient's withdrawable balance (Bigo model)
+    recipient_share = price // 2
     await db.users.update_one({"id": uid}, {"$inc": {"balance": -price, "gifts_sent_total": price}})
-    await db.users.update_one({"id": req.to_user_id}, {"$inc": {"gifts_received_total": price}})
+    await db.users.update_one(
+        {"id": req.to_user_id},
+        {"$inc": {"gifts_received_total": price, "withdrawable_balance": recipient_share}},
+    )
     gift = {
         "id": new_id(),
         "from_user_id": uid,
