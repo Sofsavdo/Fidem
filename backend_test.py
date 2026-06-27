@@ -13,7 +13,7 @@ from datetime import datetime
 import httpx
 
 # Base URL from frontend/.env
-BASE_URL = "https://design-station-2.preview.emergentagent.com/api"
+BASE_URL = "https://clone-preview-32.preview.emergentagent.com/api"
 TIMEOUT = 20.0  # AI endpoints may take longer
 
 # Test credentials

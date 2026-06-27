@@ -9,7 +9,7 @@ import json
 from datetime import datetime
 
 # Backend URL from frontend/.env
-BASE_URL = "https://63c8c64c-0c9b-4c2f-85b2-9d295775a926.preview.emergentagent.com/api"
+BASE_URL = "https://clone-preview-32.preview.emergentagent.com/api"
 
 # Test credentials
 ADMIN_EMAIL = "admin@fidem.uz"
