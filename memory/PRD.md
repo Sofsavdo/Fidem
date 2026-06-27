@@ -67,11 +67,14 @@ Gift modal, settings filters, notifications page+bell, file upload via Object St
 ## Test Credentials
 See `/app/memory/test_credentials.md`
 
-## Status (Faza 3 — Monetization Sprint 1 COMPLETE)
+## Status (Faza 3.5 — Monetization Optimization + Analytics + PWA COMPLETE)
 - ✅ Withdrawals (gift conversion, Bigo model, CLICK cash-out)
 - ✅ Family Contact Share (VIP only, two-sided accept)
 - ✅ Sovchi Concierge (199K UZS / 30d / 5 hand-picked matches)
 - ✅ Travel Mode (Premium+ only)
 - ✅ Admin panel: Withdrawals + Concierge tabs
-- ❌ Pending: Financial Verification upload UI expansion (basic exists)
-- ❌ Pending: Payme integration (next sprint)
+- ✅ Boost & Spotlight Analytics (impressions/views/likes/leaderboard)
+- ✅ Financial Verification UI (file upload + PDF + admin moderation + auto-badge)
+- ✅ Telegram inline-link push notifications
+- ✅ PWA setup (manifest + service worker + offline fallback)
+- ❌ Pending: Payme integration (next sprint, user said CLICK enough)
