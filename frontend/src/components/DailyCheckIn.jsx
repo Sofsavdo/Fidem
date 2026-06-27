@@ -28,7 +28,7 @@ export default function DailyCheckIn() {
     setClaiming(true);
     try {
       const r = await api.post("/daily/claim");
-      toast.success(`+${r.data.bonus.toLocaleString()} so'm · ${r.data.streak} kun ketma-ket`);
+      toast.success(`+${r.data.bonus} 🪙 coin · ${r.data.streak} kun ketma-ket`);
       await refresh();
       setOpen(false);
     } catch (e) {
@@ -51,7 +51,7 @@ export default function DailyCheckIn() {
         <h2 className="font-heading text-2xl font-semibold mt-3">Kunlik bonus</h2>
         <p className="text-sm text-muted-foreground mt-1">
           {status.streak} kun ketma-ket · bugun{" "}
-          <span className="text-foreground font-semibold">+{status.next_bonus.toLocaleString()} so'm</span>
+          <span className="text-foreground font-semibold">+{status.next_bonus} 🪙 coin</span>
         </p>
         <div className="flex justify-center gap-1.5 mt-4">
           {Array.from({ length: 7 }).map((_, i) => {
@@ -70,7 +70,7 @@ export default function DailyCheckIn() {
             );
           })}
         </div>
-        <p className="text-[11px] text-muted-foreground mt-3">7-kun streak'da +500 so'm bonus 🎁</p>
+        <p className="text-[11px] text-muted-foreground mt-3">7-kun streak'da +100 🪙 coin bonus 🎁</p>
         <button
           data-testid="daily-claim"
           onClick={claim}

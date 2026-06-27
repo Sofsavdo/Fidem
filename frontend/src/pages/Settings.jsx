@@ -4,6 +4,7 @@ import { useApp } from "@/contexts/AppContext";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+import UZ_REGIONS from "@/lib/regions";
 
 export default function Settings() {
   const { t, user, refresh } = useApp();
@@ -64,7 +65,9 @@ export default function Settings() {
           <NumField label={`${t("age")} min`} value={f.age_min} onChange={(v) => setF({ ...f, age_min: v })} testid="set-agemin" />
           <NumField label={`${t("age")} max`} value={f.age_max} onChange={(v) => setF({ ...f, age_max: v })} testid="set-agemax" />
         </div>
-        <TextField label={t("region")} value={f.region || ""} onChange={(v) => setF({ ...f, region: v })} testid="set-region" />
+        <SelectField label={t("region")} value={f.region || ""} onChange={(v) => setF({ ...f, region: v })} testid="set-region"
+          options={[{ value: "", label: "—" }, ...UZ_REGIONS.map((r) => ({ value: r, label: r }))]}
+        />
         <SelectField label={t("marital_status")} value={f.marital_status || ""} onChange={(v) => setF({ ...f, marital_status: v })} testid="set-marital"
           options={[
             { value: "", label: "—" },
@@ -110,19 +113,6 @@ function NumField({ label, value, onChange, testid }) {
         type="number"
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value ? +e.target.value : null)}
-        className="mt-1.5 w-full rounded-2xl border border-border bg-card px-4 py-3 outline-none focus:border-primary"
-      />
-    </label>
-  );
-}
-function TextField({ label, value, onChange, testid }) {
-  return (
-    <label className="block">
-      <span className="text-xs uppercase tracking-wider text-muted-foreground">{label}</span>
-      <input
-        data-testid={testid}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
         className="mt-1.5 w-full rounded-2xl border border-border bg-card px-4 py-3 outline-none focus:border-primary"
       />
     </label>

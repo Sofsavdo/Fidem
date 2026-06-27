@@ -6,11 +6,12 @@ import { VerifiedBadge, FinancialBadge, PlanPill } from "@/components/Badges";
 import PhotoUpload from "@/components/PhotoUpload";
 import { ChevronRight, Crown, Gem, Wallet, Share2, Settings as SettingsIcon, LogOut, Copy, Trophy, ShieldCheck, Bell, Clock, SlidersHorizontal, Brain, UsersRound, Pen, BookOpen, Phone, Plane } from "lucide-react";
 import ProgressCard from "@/components/ProgressCard";
+import LangSwitch from "@/components/LangSwitch";
 import { photoSrc } from "@/lib/photo";
 import { toast } from "sonner";
 
 export default function Me() {
-  const { user, t, logout, changeLang, lang, refresh, wsEvent } = useApp();
+  const { user, t, logout, refresh, wsEvent } = useApp();
   const [referral, setReferral] = useState(null);
   const [leaders, setLeaders] = useState([]);
   const [leadPeriod, setLeadPeriod] = useState("all");
@@ -80,16 +81,7 @@ export default function Me() {
               </span>
             )}
           </Link>
-          <select
-            data-testid="me-lang"
-            value={lang}
-            onChange={(e) => changeLang(e.target.value)}
-            className="text-xs bg-transparent border border-border rounded-full px-2.5 py-1"
-          >
-            <option value="uz">UZ</option>
-            <option value="ru">RU</option>
-            <option value="en">EN</option>
-          </select>
+          <LangSwitch />
         </div>
       </div>
 

@@ -24,6 +24,14 @@ export default function MobileTopBar() {
           <Wallet className="w-3.5 h-3.5 text-primary" />
           {(user.balance || 0).toLocaleString()}
         </button>
+        <button
+          data-testid="topbar-coins"
+          onClick={() => nav("/premium")}
+          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-gold-light/50 text-gold-dark text-xs font-medium"
+          title="Coin"
+        >
+          🪙 {(user.coins || 0).toLocaleString()}
+        </button>
         {user.plan === "vip" && (
           <span className="inline-flex items-center gap-0.5 px-2 py-1 rounded-full bg-gold-light/60 text-gold-dark text-[10px] font-medium">
             <Crown className="w-3 h-3" /> VIP

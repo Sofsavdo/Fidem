@@ -5,7 +5,7 @@ import { useApp } from "@/contexts/AppContext";
 import GiftModal from "@/components/GiftModal";
 import RoseModal from "@/components/RoseModal";
 import ChatVoiceRecorder from "@/components/ChatVoiceRecorder";
-import { ArrowLeft, Send, Gift, Sparkles, MoreVertical, Ban, Flag, Wand2, Play } from "lucide-react";
+import { ArrowLeft, Send, Gift, MoreVertical, Ban, Flag, Wand2, Play } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
 import { toast } from "sonner";
 
@@ -18,7 +18,8 @@ export default function Chat() {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [showTemplates, setShowTemplates] = useState(true);
-  const [cannotMessage, setCannotMessage] = useState(false);
+  const [access, setAccess] = useState(null);
+  const [unlocking, setUnlocking] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
   const [roseOpen, setRoseOpen] = useState(false);
@@ -37,12 +38,43 @@ export default function Chat() {
     try {
       const c = await api.get(`/candidates/${otherId}`);
       setOther(c.data);
-      setCannotMessage(!c.data.can_message);
+      try {
+        const a = await api.get(`/chat/access/${otherId}`);
+        setAccess(a.data);
+      } catch {
+        /* keep access null → input shown by default */
+      }
       if (chatId) {
         const m = await api.get(`/messages/${chatId}`);
         setMessages(m.data || []);
       }
     } catch (e) { /* ignore */ }
+  };
+
+  const refreshAccess = async () => {
+    try {
+      const a = await api.get(`/chat/access/${otherId}`);
+      setAccess(a.data);
+    } catch { /* ignore */ }
+  };
+
+  const unlockChat = async (method) => {
+    setUnlocking(true);
+    try {
+      if (method === "click") {
+        const r = await api.post("/payments/create", { purpose: "chat_unlock", target_user_id: otherId });
+        if (r.data?.payment_link) window.open(r.data.payment_link, "_blank");
+        toast.info(t("redirecting_payment") || "To'lov sahifasiga o'tilmoqda...");
+      } else {
+        await api.post("/chat/unlock", { target_id: otherId, method });
+        toast.success(t("chat_unlocked") || "Suhbat ochildi ✅");
+        await refreshAccess();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Error");
+    } finally {
+      setUnlocking(false);
+    }
   };
 
   useEffect(() => {
@@ -252,43 +284,63 @@ export default function Chat() {
 
       <div className="fixed bottom-0 inset-x-0 z-40 glass border-t border-border/60 max-w-2xl xl:max-w-3xl mx-auto md:left-64 lg:left-72 md:right-0">
         <div className="p-3">
-          {cannotMessage && (
-            <div className="mb-2 rounded-2xl bg-gold/10 border border-gold/40 p-3">
-              <p className="text-xs">{t("you_dont_pass_filters")}</p>
+          {access && access.requires_unlock ? (
+            <div data-testid="chat-paywall" className="rounded-2xl bg-gold/10 border border-gold/40 p-3 space-y-2">
+              <p className="text-sm font-medium">{t("chat_locked_title")}</p>
+              <p className="text-xs text-muted-foreground">
+                {t("chat_locked_desc")} · 🛡 {access.guarantee_hours}h {t("guarantee")}
+              </p>
+              <div className="grid grid-cols-1 gap-2 pt-1">
+                {access.free_credits > 0 && (
+                  <button data-testid="unlock-credit" onClick={() => unlockChat("credit")} disabled={unlocking}
+                    className="w-full rounded-xl bg-secondary text-white text-sm py-2.5 font-medium disabled:opacity-50">
+                    🎁 {t("use_free_credit")} ({access.free_credits})
+                  </button>
+                )}
+                <button data-testid="unlock-balance" onClick={() => unlockChat("balance")} disabled={unlocking || access.balance < access.price_uzs}
+                  className="w-full rounded-xl bg-primary text-white text-sm py-2.5 font-medium disabled:opacity-50">
+                  💳 {t("unlock_one_time")} · {access.price_uzs.toLocaleString()} {t("sum")}
+                </button>
+                <button data-testid="unlock-coins" onClick={() => unlockChat("coins")} disabled={unlocking || access.coins < access.price_coins}
+                  className="w-full rounded-xl bg-card border border-border text-sm py-2.5 font-medium disabled:opacity-50">
+                  🪙 {t("unlock_with_coins")} · {access.price_coins} coin ({access.coins})
+                </button>
+                <button data-testid="unlock-click" onClick={() => unlockChat("click")} disabled={unlocking}
+                  className="w-full rounded-xl bg-muted text-sm py-2.5 font-medium disabled:opacity-50">
+                  {t("pay_with_click")} · {access.price_uzs.toLocaleString()} {t("sum")}
+                </button>
+                <Link to="/premium" data-testid="unlock-upgrade" className="w-full text-center rounded-xl border border-primary/40 text-primary text-sm py-2.5 font-medium">
+                  ⭐ {t("or_subscribe")}
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button data-testid="rose-open" onClick={() => setRoseOpen(true)} className="p-2.5 rounded-full bg-primary/10 hover:bg-primary/20" title="Atirgul yuborish">
+                🌹
+              </button>
+              <button data-testid="gift-open" onClick={() => setGiftOpen(true)} className="p-2.5 rounded-full bg-muted hover:bg-border" title={t("send_gift")}>
+                <Gift className="w-4 h-4" />
+              </button>
+              <ChatVoiceRecorder onSend={sendVoice} />
+              <input
+                data-testid="chat-input"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && send()}
+                placeholder={t("type_message")}
+                className="flex-1 rounded-full border border-border bg-card px-4 py-2.5 outline-none focus:border-primary"
+              />
               <button
-                data-testid="send-super"
-                onClick={() => send(text || t("greeting_1"), true)}
-                className="mt-2 w-full rounded-xl bg-gradient-to-r from-gold to-gold-dark text-white text-sm py-2 font-medium"
+                data-testid="chat-send"
+                onClick={() => send()}
+                disabled={sending || !text.trim()}
+                className="p-2.5 rounded-full bg-primary text-white disabled:opacity-50"
               >
-                <Sparkles className="w-3 h-3 inline mr-1" /> {t("send_super")}
+                <Send className="w-4 h-4" />
               </button>
             </div>
           )}
-          <div className="flex items-center gap-2">
-            <button data-testid="rose-open" onClick={() => setRoseOpen(true)} className="p-2.5 rounded-full bg-primary/10 hover:bg-primary/20" title="Atirgul yuborish">
-              🌹
-            </button>
-            <button data-testid="gift-open" onClick={() => setGiftOpen(true)} className="p-2.5 rounded-full bg-muted hover:bg-border" title={t("send_gift")}>
-              <Gift className="w-4 h-4" />
-            </button>
-            <ChatVoiceRecorder onSend={sendVoice} />
-            <input
-              data-testid="chat-input"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && send()}
-              placeholder={t("type_message")}
-              className="flex-1 rounded-full border border-border bg-card px-4 py-2.5 outline-none focus:border-primary"
-            />
-            <button
-              data-testid="chat-send"
-              onClick={() => send()}
-              disabled={sending || !text.trim()}
-              className="p-2.5 rounded-full bg-primary text-white disabled:opacity-50"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          </div>
         </div>
       </div>
       {giftOpen && <GiftModal targetId={otherId} targetName={other.name} onClose={() => setGiftOpen(false)} onSent={load} />}

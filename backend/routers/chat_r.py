@@ -8,6 +8,10 @@ from fastapi import APIRouter, Body, Depends, HTTPException, WebSocket, WebSocke
 from auth import decode_token, get_current_user_id
 from ai_service import quick_moderation
 from core import (
+    CHAT_GUARANTEE_HOURS,
+    CHAT_UNLOCK_COINS,
+    PAID_PLANS,
+    PRICE_CHAT_UNLOCK,
     PRICE_SUPER,
     chat_id_for,
     db,
@@ -32,9 +36,128 @@ from models import (
     SendMessageRequest,
     new_id,
 )
-from routers.candidates_r import candidate_can_message
 
 router = APIRouter(tags=["chat"])
+
+
+# ---------- Chat access / monetization ----------
+def _plan_active(user: dict) -> bool:
+    return user.get("plan", "free") in PAID_PLANS
+
+
+async def _incoming_count(uid: str, target_id: str) -> int:
+    cid = chat_id_for(uid, target_id)
+    return await db.messages.count_documents({"chat_id": cid, "from_user_id": target_id})
+
+
+async def _unlock_doc(uid: str, target_id: str):
+    return await db.chat_unlocks.find_one({"user_id": uid, "target_id": target_id}, {"_id": 0})
+
+
+async def _maybe_refund_guarantee(uid: str, target_id: str) -> bool:
+    """48h no-reply guarantee: if a one-time paid unlock got no reply within the
+    guarantee window, grant the user a free chat credit (once)."""
+    unlock = await db.chat_unlocks.find_one({"user_id": uid, "target_id": target_id})
+    if not unlock or unlock.get("source") != "one_time" or unlock.get("guarantee_refunded"):
+        return False
+    gu = unlock.get("guarantee_until")
+    if not gu or parse_dt(gu) > now_utc():
+        return False
+    if await _incoming_count(uid, target_id) > 0:
+        # got a reply — guarantee not triggered, close it out
+        await db.chat_unlocks.update_one({"_id": unlock["_id"]}, {"$set": {"guarantee_refunded": True}})
+        return False
+    # No reply within window → grant a free chat credit
+    await db.chat_unlocks.update_one({"_id": unlock["_id"]}, {"$set": {"guarantee_refunded": True}})
+    await db.users.update_one({"id": uid}, {"$inc": {"free_chat_credits": 1}})
+    await push_notif(uid, "balance", "48 soat ichida javob bo'lmadi — sizga 1 ta bepul suhbat krediti qaytarildi 🎁")
+    return True
+
+
+async def can_initiate_chat(sender: dict, target_id: str) -> bool:
+    if _plan_active(sender):
+        return True
+    if await _incoming_count(sender["id"], target_id) > 0:
+        return True
+    if await _unlock_doc(sender["id"], target_id):
+        return True
+    return False
+
+
+@router.get("/chat/access/{target_id}")
+async def chat_access(target_id: str, uid: str = Depends(get_current_user_id)):
+    if target_id == uid:
+        raise HTTPException(400, "self")
+    await _maybe_refund_guarantee(uid, target_id)
+    me = await get_user(uid)
+    is_reply = (await _incoming_count(uid, target_id)) > 0
+    unlocked = bool(await _unlock_doc(uid, target_id))
+    plan_ok = _plan_active(me)
+    can = plan_ok or is_reply or unlocked
+    return {
+        "can_message": can,
+        "is_reply": is_reply,
+        "unlocked": unlocked,
+        "plan": me.get("plan", "free"),
+        "plan_active": plan_ok,
+        "requires_unlock": not can,
+        "price_uzs": PRICE_CHAT_UNLOCK,
+        "price_coins": CHAT_UNLOCK_COINS,
+        "balance": int(me.get("balance", 0) or 0),
+        "coins": int(me.get("coins", 0) or 0),
+        "free_credits": int(me.get("free_chat_credits", 0) or 0),
+        "guarantee_hours": CHAT_GUARANTEE_HOURS,
+    }
+
+
+async def _create_unlock(uid: str, target_id: str, source: str, guarantee: bool) -> None:
+    cid = chat_id_for(uid, target_id)
+    doc = {
+        "id": new_id(), "user_id": uid, "target_id": target_id, "chat_id": cid,
+        "source": source, "created_at": iso(now_utc()),
+        "guarantee_refunded": not guarantee,
+    }
+    if guarantee:
+        doc["guarantee_until"] = iso(now_utc() + timedelta(hours=CHAT_GUARANTEE_HOURS))
+    await db.chat_unlocks.update_one(
+        {"user_id": uid, "target_id": target_id}, {"$setOnInsert": doc}, upsert=True
+    )
+
+
+@router.post("/chat/unlock")
+async def chat_unlock(
+    target_id: str = Body(..., embed=True),
+    method: str = Body("balance", embed=True),
+    uid: str = Depends(get_current_user_id),
+):
+    if target_id == uid:
+        raise HTTPException(400, "Cannot unlock self")
+    me = await get_user(uid)
+    if _plan_active(me):
+        return {"ok": True, "can_message": True, "note": "plan_active"}
+    if await _unlock_doc(uid, target_id):
+        return {"ok": True, "can_message": True, "note": "already"}
+    await get_user(target_id)  # ensure target exists (404 otherwise)
+
+    if method == "balance":
+        if int(me.get("balance", 0) or 0) < PRICE_CHAT_UNLOCK:
+            raise HTTPException(402, "Insufficient balance")
+        await db.users.update_one({"id": uid}, {"$inc": {"balance": -PRICE_CHAT_UNLOCK}})
+        await _create_unlock(uid, target_id, "one_time", guarantee=True)
+        return {"ok": True, "can_message": True, "method": "balance"}
+    if method == "coins":
+        if int(me.get("coins", 0) or 0) < CHAT_UNLOCK_COINS:
+            raise HTTPException(402, "Insufficient coins")
+        await db.users.update_one({"id": uid}, {"$inc": {"coins": -CHAT_UNLOCK_COINS}})
+        await _create_unlock(uid, target_id, "coins", guarantee=False)
+        return {"ok": True, "can_message": True, "method": "coins"}
+    if method == "credit":
+        if int(me.get("free_chat_credits", 0) or 0) < 1:
+            raise HTTPException(402, "No free credits")
+        await db.users.update_one({"id": uid}, {"$inc": {"free_chat_credits": -1}})
+        await _create_unlock(uid, target_id, "credit", guarantee=False)
+        return {"ok": True, "can_message": True, "method": "credit"}
+    raise HTTPException(400, "Unknown method (use balance|coins|credit, or /payments/create for CLICK)")
 
 
 # ---------- Messages ----------
@@ -124,11 +247,11 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
         if not ok:
             raise HTTPException(422, reason)
     sender = await get_user(uid)
-    target = await get_user(req.to_user_id)
+    await get_user(req.to_user_id)  # ensure target exists
     cid = chat_id_for(uid, req.to_user_id)
     existing_msgs = await db.messages.count_documents({"chat_id": cid})
-    can_msg = candidate_can_message(target, sender)
     is_first = existing_msgs == 0
+    is_reply = (await _incoming_count(uid, req.to_user_id)) > 0
     if is_voice:
         kind = "voice"
     else:
@@ -140,10 +263,15 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
             raise HTTPException(402, "Insufficient balance for super application")
         await db.users.update_one({"id": uid}, {"$inc": {"balance": -PRICE_SUPER}})
         status = "application"
-    elif not can_msg:
-        raise HTTPException(403, "You don't pass recipient's filters. Use super application.")
-    elif is_first:
-        status = "application"
+    elif is_reply:
+        # Replying to someone who already wrote to you is always free.
+        pass
+    else:
+        # Initiating a new conversation requires an active paid plan or a chat unlock.
+        if not (_plan_active(sender) or await _unlock_doc(uid, req.to_user_id)):
+            raise HTTPException(402, "chat_locked")
+        if is_first:
+            status = "application"
 
     msg = {
         "id": new_id(),

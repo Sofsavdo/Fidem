@@ -12,8 +12,14 @@ const PLANS = [
     style: "bg-card border border-border",
   },
   {
+    key: "standard", title: "Standard", price: 19900,
+    features: ["chat_unlimited", "candidates", "saved", "more_filters"],
+    style: "bg-card border-2 border-secondary",
+    badge: "✅",
+  },
+  {
     key: "premium", title: "Premium", price: 79000,
-    features: ["more_apps", "who_viewed", "who_saved", "who_interested", "more_filters"],
+    features: ["chat_unlimited", "more_apps", "who_viewed", "who_saved", "who_interested", "more_filters"],
     style: "bg-card border-2 border-gold shadow-premium",
     badge: "💎",
   },
@@ -28,16 +34,19 @@ const PLANS = [
 const FEATURE_LABELS = {
   uz: {
     profile: "Profil", candidates: "Nomzodlar", saved: "Saqlash", limited_apps: "Cheklangan murojaat",
+    chat_unlimited: "Cheksiz yozishish",
     more_apps: "Ko'proq murojaat", who_viewed: "Kim ko'rdi", who_saved: "Kim saqladi", who_interested: "Kim qiziqdi", more_filters: "Ko'proq filtrlar",
     max_visibility: "Maksimal ko'rinish", stealth_view: "Maxfiy ko'rish", priority: "Priority", vip_badge: "VIP badge",
   },
   ru: {
     profile: "Профиль", candidates: "Кандидаты", saved: "Сохранять", limited_apps: "Ограниченные заявки",
+    chat_unlimited: "Безлимитные сообщения",
     more_apps: "Больше заявок", who_viewed: "Кто видел", who_saved: "Кто сохранил", who_interested: "Кто интересуется", more_filters: "Больше фильтров",
     max_visibility: "Максимум видимости", stealth_view: "Скрытый просмотр", priority: "Приоритет", vip_badge: "VIP badge",
   },
   en: {
     profile: "Profile", candidates: "Candidates", saved: "Save", limited_apps: "Limited applications",
+    chat_unlimited: "Unlimited messaging",
     more_apps: "More applications", who_viewed: "Who viewed", who_saved: "Who saved", who_interested: "Who interested", more_filters: "More filters",
     max_visibility: "Max visibility", stealth_view: "Stealth view", priority: "Priority", vip_badge: "VIP badge",
   },
@@ -101,7 +110,7 @@ export default function Premium() {
                     {p.title} {p.badge}
                   </p>
                   <p className="text-xs opacity-70 mt-0.5">
-                    {p.price === 0 ? t("plan_free_desc") : p.key === "premium" ? t("plan_premium_desc") : t("plan_vip_desc")}
+                    {p.price === 0 ? t("plan_free_desc") : t(`plan_${p.key}_desc`)}
                   </p>
                 </div>
                 <p className="font-heading text-xl">

@@ -8,10 +8,13 @@ from starlette.responses import JSONResponse
 
 from auth import get_current_admin, get_current_user_id
 from core import (
+    PRICE_CHAT_UNLOCK,
     PRICE_PREMIUM,
+    PRICE_STANDARD,
     PRICE_SUPER,
     PRICE_VIP,
     TELEGRAM_BOT_USERNAME,
+    chat_id_for,
     db,
     get_user,
     iso,
@@ -59,8 +62,14 @@ async def my_verifications(uid: str = Depends(get_current_user_id)):
 async def create_payment(req: CreatePaymentRequest, uid: str = Depends(get_current_user_id)):
     if req.purpose == "premium":
         amount = PRICE_PREMIUM
+    elif req.purpose == "standard":
+        amount = PRICE_STANDARD
     elif req.purpose == "vip":
         amount = PRICE_VIP
+    elif req.purpose == "chat_unlock":
+        amount = PRICE_CHAT_UNLOCK
+        if not req.target_user_id:
+            raise HTTPException(400, "target_user_id required for chat_unlock")
     elif req.purpose == "super_application":
         amount = PRICE_SUPER
     elif req.purpose == "balance_topup":
@@ -135,9 +144,28 @@ async def apply_payment_success(payment: dict) -> None:
     if purpose == "premium":
         await db.users.update_one({"id": uid}, {"$set": {"plan": "premium", "plan_until": expiry_iso}})
         await push_notif(uid, "premium", "Premium tarif faollashtirildi 💎")
+    elif purpose == "standard":
+        await db.users.update_one({"id": uid}, {"$set": {"plan": "standard", "plan_until": expiry_iso}})
+        await push_notif(uid, "premium", "Standard tarif faollashtirildi ✅")
     elif purpose == "vip":
         await db.users.update_one({"id": uid}, {"$set": {"plan": "vip", "plan_until": expiry_iso}})
         await push_notif(uid, "premium", "VIP tarif faollashtirildi 👑")
+    elif purpose == "chat_unlock":
+        target_id = payment.get("target_user_id")
+        if target_id:
+            cid = chat_id_for(uid, target_id)
+            await db.chat_unlocks.update_one(
+                {"user_id": uid, "target_id": target_id},
+                {"$setOnInsert": {
+                    "id": new_id(), "user_id": uid, "target_id": target_id,
+                    "chat_id": cid, "source": "one_time",
+                    "created_at": iso(now_utc()),
+                    "guarantee_until": iso(now_utc() + timedelta(hours=48)),
+                    "guarantee_refunded": False,
+                }},
+                upsert=True,
+            )
+            await push_notif(uid, "premium", "Suhbat ochildi — endi yozishingiz mumkin ✅", link=f"/chat/{target_id}")
     elif purpose == "balance_topup":
         await db.users.update_one({"id": uid}, {"$inc": {"balance": amount}})
         await push_notif(uid, "balance", f"Balansingiz {amount:,} so'mga to'ldirildi")

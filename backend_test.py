@@ -1,432 +1,444 @@
 #!/usr/bin/env python3
 """
-Pre-Launch Sprint Backend Smoke Tests
-Tests referral endpoint enhancement and gift catalog redesign
+Backend test for Chat monetization + coins economy + Standard tariff feature.
+Tests the NEW monetization system with chat unlocks, coins, and Standard plan.
 """
 import requests
-import json
-import os
-from datetime import datetime
+import time
+import sys
 
-# Backend URL from frontend/.env
-BACKEND_URL = "https://clone-test-4.preview.emergentagent.com"
-API_BASE = f"{BACKEND_URL}/api"
+# Base URL from frontend/.env
+BASE_URL = "https://clone-test-4.preview.emergentagent.com/api"
 
-# Test credentials
+# Admin credentials
 ADMIN_EMAIL = "admin@fidem.uz"
 ADMIN_PASSWORD = "Admin@123"
 
-def log_test(test_name, passed, details=""):
+# Test results
+results = []
+
+def log_test(name, passed, details=""):
     """Log test result"""
     status = "✅ PASS" if passed else "❌ FAIL"
-    print(f"\n{status} | {test_name}")
+    results.append({"name": name, "passed": passed, "details": details})
+    print(f"{status}: {name}")
     if details:
-        print(f"   {details}")
-    return passed
+        print(f"  Details: {details}")
 
-def get_admin_token():
-    """Login as admin and get Bearer token"""
+def test_chat_monetization():
+    """Test chat monetization + coins economy + Standard tariff"""
     print("\n" + "="*80)
-    print("AUTHENTICATING AS ADMIN")
-    print("="*80)
+    print("TESTING: Chat Monetization + Coins Economy + Standard Tariff")
+    print("="*80 + "\n")
     
-    response = requests.post(
-        f"{API_BASE}/auth/login",
-        json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
-        timeout=10
-    )
+    # ========== SETUP ==========
+    print("--- SETUP ---")
     
-    if response.status_code != 200:
-        print(f"❌ Login failed: {response.status_code} - {response.text}")
-        return None
+    # 1. Login admin (VIP user)
+    print("\n1. Login admin (VIP user)...")
+    resp = requests.post(f"{BASE_URL}/auth/login", json={
+        "email": ADMIN_EMAIL,
+        "password": ADMIN_PASSWORD
+    })
+    if resp.status_code != 200:
+        log_test("Admin login", False, f"Status {resp.status_code}: {resp.text}")
+        return
+    data = resp.json()
+    admin_token = data["token"]
+    admin_id = data["user_id"]
+    log_test("Admin login", True, f"Admin ID: {admin_id}, is_admin: {data.get('is_admin')}")
     
-    data = response.json()
-    token = data.get("token")
-    is_admin = data.get("is_admin", False)
+    # 2. Register a FRESH FREE user A
+    print("\n2. Register fresh FREE user A...")
+    timestamp = int(time.time())
+    user_a_email = f"test_free_user_{timestamp}@example.com"
+    resp = requests.post(f"{BASE_URL}/auth/register", json={
+        "email": user_a_email,
+        "password": "TestPass123",
+        "name": f"Test User A {timestamp}"
+    })
+    if resp.status_code != 200:
+        log_test("Register user A", False, f"Status {resp.status_code}: {resp.text}")
+        return
+    data = resp.json()
+    user_a_token = data["token"]
+    user_a_id = data["user_id"]
+    # Get full user details from /auth/me
+    resp_me = requests.get(f"{BASE_URL}/auth/me", headers={"Authorization": f"Bearer {user_a_token}"})
+    if resp_me.status_code == 200:
+        me_data = resp_me.json()
+        user_a_plan = me_data.get("plan", "free")
+        user_a_balance = me_data.get("balance", 0)
+        user_a_coins = me_data.get("coins", 0)
+    else:
+        user_a_plan = "free"
+        user_a_balance = 0
+        user_a_coins = 0
+    log_test("Register user A", True, 
+             f"User A ID: {user_a_id}, plan: {user_a_plan}, balance: {user_a_balance}, coins: {user_a_coins}")
     
-    print(f"✅ Login successful")
-    print(f"   is_admin: {is_admin}")
-    print(f"   token: {token[:20]}...")
+    # 3. Check if user A needs onboarding
+    print("\n3. Check user A onboarding status...")
+    resp = requests.get(f"{BASE_URL}/auth/me", headers={"Authorization": f"Bearer {user_a_token}"})
+    if resp.status_code != 200:
+        log_test("Check user A status", False, f"Status {resp.status_code}: {resp.text}")
+        return
+    user_a_onboarded = resp.json().get("onboarded", False)
+    log_test("Check user A status", True, f"Onboarded: {user_a_onboarded}")
     
-    return token
-
-def test_1_referral_endpoint(token):
-    """
-    Test 1: GET /api/referral/mine
-    Verify response contains all required keys with correct types
-    """
-    print("\n" + "="*80)
-    print("TEST 1: REFERRAL ENDPOINT ENHANCEMENT")
-    print("="*80)
+    # 4. Onboard user A if needed (minimal onboarding)
+    if not user_a_onboarded:
+        print("\n4. Onboard user A...")
+        resp = requests.post(f"{BASE_URL}/profile/onboard", 
+                           headers={"Authorization": f"Bearer {user_a_token}"},
+                           json={
+                               "gender": "male",
+                               "birth_date": "1995-01-01",
+                               "region": "Toshkent",
+                               "marital_status": "single",
+                               "has_children": False,
+                               "height_cm": 175,
+                               "weight_kg": 70,
+                               "education": "Oliy",
+                               "profession": "Dasturchi",
+                               "religion": "Islom",
+                               "bio": "Test user"
+                           })
+        if resp.status_code == 200:
+            log_test("Onboard user A", True, "User A onboarded successfully")
+        else:
+            log_test("Onboard user A", False, f"Status {resp.status_code}: {resp.text}")
+    else:
+        print("\n4. User A already onboarded, skipping...")
     
-    headers = {"Authorization": f"Bearer {token}"}
-    response = requests.get(f"{API_BASE}/referral/mine", headers=headers, timeout=10)
+    # 5. Get a demo candidate B's id
+    print("\n5. Get demo candidate B...")
+    resp = requests.get(f"{BASE_URL}/candidates", headers={"Authorization": f"Bearer {admin_token}"})
+    if resp.status_code != 200:
+        log_test("Get candidates", False, f"Status {resp.status_code}: {resp.text}")
+        return
+    candidates = resp.json()
+    if not candidates:
+        log_test("Get candidates", False, "No candidates found")
+        return
+    candidate_b_id = candidates[0]["id"]
+    candidate_b_name = candidates[0].get("name", "Unknown")
+    log_test("Get candidates", True, f"Candidate B ID: {candidate_b_id}, name: {candidate_b_name}")
     
-    if response.status_code != 200:
-        return log_test("GET /api/referral/mine", False, f"Status {response.status_code}: {response.text}")
+    # ========== TESTS ==========
+    print("\n--- TESTS ---")
     
-    data = response.json()
-    print(f"Response: {json.dumps(data, indent=2)}")
-    
-    # Verify all required keys
-    required_keys = {
-        "code": (str, 8),  # (type, expected_length)
-        "link": (str, None),
-        "invited_count": (int, None),
-        "invites_count": (int, None),
-        "bonus_per_invite": (int, 10000),
-        "earned": (int, None),
-        "vip_bonus_threshold": (int, 5),
-    }
-    
-    all_passed = True
-    for key, (expected_type, expected_value) in required_keys.items():
-        if key not in data:
-            log_test(f"  Key '{key}' present", False, f"Missing key")
-            all_passed = False
-            continue
+    # TEST 1: Chat access (free user) - expect requires_unlock=true
+    print("\n1. TEST: Chat access (free user)...")
+    resp = requests.get(f"{BASE_URL}/chat/access/{candidate_b_id}", 
+                       headers={"Authorization": f"Bearer {user_a_token}"})
+    if resp.status_code == 200:
+        data = resp.json()
+        expected_fields = {
+            "requires_unlock": True,
+            "can_message": False,
+            "price_uzs": 9900,
+            "price_coins": 100,
+            "plan": "free",
+            "plan_active": False,
+            "guarantee_hours": 48
+        }
+        all_match = True
+        mismatches = []
+        for key, expected_val in expected_fields.items():
+            actual_val = data.get(key)
+            if actual_val != expected_val:
+                all_match = False
+                mismatches.append(f"{key}: expected {expected_val}, got {actual_val}")
         
-        value = data[key]
-        
-        # Type check
-        if not isinstance(value, expected_type):
-            log_test(f"  Key '{key}' type", False, f"Expected {expected_type.__name__}, got {type(value).__name__}")
-            all_passed = False
-            continue
-        
-        # Value check
-        if expected_value is not None:
-            if isinstance(expected_value, int) and key in ["bonus_per_invite", "vip_bonus_threshold"]:
-                if value != expected_value:
-                    log_test(f"  Key '{key}' value", False, f"Expected {expected_value}, got {value}")
-                    all_passed = False
-                    continue
-            elif key == "code" and len(value) != expected_value:
-                log_test(f"  Key '{key}' length", False, f"Expected {expected_value} chars, got {len(value)}")
-                all_passed = False
-                continue
-        
-        log_test(f"  Key '{key}'", True, f"{expected_type.__name__} = {value}")
-    
-    # Verify link starts with https://t.me/
-    if "link" in data and not data["link"].startswith("https://t.me/"):
-        log_test("  Link format", False, f"Link should start with https://t.me/, got {data['link']}")
-        all_passed = False
+        if all_match:
+            log_test("Chat access (free user)", True, 
+                    f"All fields correct: requires_unlock=true, can_message=false, price_uzs=9900, price_coins=100, plan=free, plan_active=false, guarantee_hours=48, balance={data.get('balance')}, coins={data.get('coins')}, free_credits={data.get('free_credits')}")
+        else:
+            log_test("Chat access (free user)", False, f"Field mismatches: {', '.join(mismatches)}")
     else:
-        log_test("  Link format", True, f"Starts with https://t.me/")
+        log_test("Chat access (free user)", False, f"Status {resp.status_code}: {resp.text}")
     
-    # Verify earned = invited_count * bonus_per_invite
-    if "earned" in data and "invited_count" in data and "bonus_per_invite" in data:
-        expected_earned = data["invited_count"] * data["bonus_per_invite"]
-        if data["earned"] != expected_earned:
-            log_test("  Earned calculation", False, f"Expected {expected_earned}, got {data['earned']}")
-            all_passed = False
+    # TEST 2: Send blocked (free user) - expect 402 with "chat_locked"
+    print("\n2. TEST: Send message blocked (free user)...")
+    resp = requests.post(f"{BASE_URL}/messages/send",
+                        headers={"Authorization": f"Bearer {user_a_token}"},
+                        json={"to_user_id": candidate_b_id, "text": "Salom"})
+    if resp.status_code == 402:
+        detail = resp.json().get("detail", "")
+        if "chat_locked" in detail:
+            log_test("Send blocked (free user)", True, f"Correctly blocked with 402 and detail: {detail}")
         else:
-            log_test("  Earned calculation", True, f"{data['invited_count']} * {data['bonus_per_invite']} = {data['earned']}")
+            log_test("Send blocked (free user)", False, f"Got 402 but wrong detail: {detail}")
+    else:
+        log_test("Send blocked (free user)", False, f"Expected 402, got {resp.status_code}: {resp.text}")
     
-    # Verify invites_count is alias of invited_count
-    if "invited_count" in data and "invites_count" in data:
-        if data["invited_count"] != data["invites_count"]:
-            log_test("  invites_count alias", False, f"invited_count={data['invited_count']} != invites_count={data['invites_count']}")
-            all_passed = False
+    # TEST 3: Unlock insufficient balance - expect 402
+    print("\n3. TEST: Unlock with insufficient balance...")
+    resp = requests.post(f"{BASE_URL}/chat/unlock",
+                        headers={"Authorization": f"Bearer {user_a_token}"},
+                        json={"target_id": candidate_b_id, "method": "balance"})
+    if resp.status_code == 402:
+        log_test("Unlock insufficient balance", True, f"Correctly rejected with 402: {resp.json().get('detail')}")
+    else:
+        log_test("Unlock insufficient balance", False, f"Expected 402, got {resp.status_code}: {resp.text}")
+    
+    # TEST 4: Unlock insufficient coins - expect 402
+    print("\n4. TEST: Unlock with insufficient coins...")
+    resp = requests.post(f"{BASE_URL}/chat/unlock",
+                        headers={"Authorization": f"Bearer {user_a_token}"},
+                        json={"target_id": candidate_b_id, "method": "coins"})
+    if resp.status_code == 402:
+        log_test("Unlock insufficient coins", True, f"Correctly rejected with 402: {resp.json().get('detail')}")
+    else:
+        log_test("Unlock insufficient coins", False, f"Expected 402, got {resp.status_code}: {resp.text}")
+    
+    # TEST 5: Top up + unlock by balance
+    print("\n5. TEST: Top up balance + unlock by balance...")
+    # 5a. Admin tops up user A's balance
+    print("  5a. Admin tops up user A's balance to 20000...")
+    resp = requests.patch(f"{BASE_URL}/admin/users/{user_a_id}",
+                         headers={"Authorization": f"Bearer {admin_token}"},
+                         json={"add_balance": 20000})
+    if resp.status_code != 200:
+        log_test("Admin top up balance", False, f"Status {resp.status_code}: {resp.text}")
+        return
+    log_test("Admin top up balance", True, "Balance topped up to 20000")
+    
+    # 5b. Unlock by balance
+    print("  5b. Unlock chat by balance...")
+    resp = requests.post(f"{BASE_URL}/chat/unlock",
+                        headers={"Authorization": f"Bearer {user_a_token}"},
+                        json={"target_id": candidate_b_id, "method": "balance"})
+    if resp.status_code == 200:
+        data = resp.json()
+        if data.get("ok") and data.get("can_message"):
+            log_test("Unlock by balance", True, f"Unlock successful: {data}")
         else:
-            log_test("  invites_count alias", True, f"Both equal to {data['invited_count']}")
+            log_test("Unlock by balance", False, f"Unlock returned 200 but unexpected data: {data}")
+    else:
+        log_test("Unlock by balance", False, f"Status {resp.status_code}: {resp.text}")
     
-    return log_test("TEST 1: Referral endpoint", all_passed)
+    # 5c. Check chat access after unlock
+    print("  5c. Check chat access after unlock...")
+    resp = requests.get(f"{BASE_URL}/chat/access/{candidate_b_id}",
+                       headers={"Authorization": f"Bearer {user_a_token}"})
+    if resp.status_code == 200:
+        data = resp.json()
+        if data.get("can_message") and data.get("unlocked"):
+            log_test("Chat access after unlock", True, 
+                    f"can_message=true, unlocked=true, balance={data.get('balance')}")
+        else:
+            log_test("Chat access after unlock", False, 
+                    f"Expected can_message=true and unlocked=true, got: {data}")
+    else:
+        log_test("Chat access after unlock", False, f"Status {resp.status_code}: {resp.text}")
+    
+    # 5d. Send message after unlock
+    print("  5d. Send message after unlock...")
+    resp = requests.post(f"{BASE_URL}/messages/send",
+                        headers={"Authorization": f"Bearer {user_a_token}"},
+                        json={"to_user_id": candidate_b_id, "text": "Salom, qalaysiz?"})
+    if resp.status_code == 200:
+        log_test("Send message after unlock", True, f"Message sent successfully: {resp.json().get('id')}")
+    else:
+        log_test("Send message after unlock", False, f"Status {resp.status_code}: {resp.text}")
+    
+    # TEST 6: VIP can message freely
+    print("\n6. TEST: VIP can message freely...")
+    # 6a. Get another candidate for admin to message
+    if len(candidates) > 1:
+        candidate_c_id = candidates[1]["id"]
+    else:
+        candidate_c_id = candidate_b_id
+    
+    # 6a. Check chat access as admin (VIP)
+    print("  6a. Check chat access as admin (VIP)...")
+    resp = requests.get(f"{BASE_URL}/chat/access/{candidate_c_id}",
+                       headers={"Authorization": f"Bearer {admin_token}"})
+    if resp.status_code == 200:
+        data = resp.json()
+        if data.get("plan_active") and not data.get("requires_unlock") and data.get("can_message"):
+            log_test("VIP chat access", True, 
+                    f"plan_active=true, requires_unlock=false, can_message=true, plan={data.get('plan')}")
+        else:
+            log_test("VIP chat access", False, 
+                    f"Expected VIP to have free access, got: plan_active={data.get('plan_active')}, requires_unlock={data.get('requires_unlock')}, can_message={data.get('can_message')}")
+    else:
+        log_test("VIP chat access", False, f"Status {resp.status_code}: {resp.text}")
+    
+    # 6b. Send message as admin (VIP) without unlock
+    print("  6b. Send message as admin (VIP) without unlock...")
+    resp = requests.post(f"{BASE_URL}/messages/send",
+                        headers={"Authorization": f"Bearer {admin_token}"},
+                        json={"to_user_id": candidate_c_id, "text": "Salom, men admin"})
+    if resp.status_code == 200:
+        log_test("VIP send message", True, f"VIP sent message without unlock: {resp.json().get('id')}")
+    else:
+        log_test("VIP send message", False, f"Status {resp.status_code}: {resp.text}")
+    
+    # TEST 7: Daily coins
+    print("\n7. TEST: Daily coins...")
+    # 7a. Check daily status
+    print("  7a. Check daily status...")
+    resp = requests.get(f"{BASE_URL}/daily/status",
+                       headers={"Authorization": f"Bearer {user_a_token}"})
+    if resp.status_code == 200:
+        data = resp.json()
+        if data.get("currency") == "coins":
+            log_test("Daily status", True, 
+                    f"currency=coins, next_bonus={data.get('next_bonus')}, coins={data.get('coins')}, claimed_today={data.get('claimed_today')}")
+        else:
+            log_test("Daily status", False, f"Expected currency=coins, got: {data}")
+    else:
+        log_test("Daily status", False, f"Status {resp.status_code}: {resp.text}")
+    
+    # 7b. Claim daily coins
+    print("  7b. Claim daily coins...")
+    resp = requests.post(f"{BASE_URL}/daily/claim",
+                        headers={"Authorization": f"Bearer {user_a_token}"})
+    if resp.status_code == 200:
+        data = resp.json()
+        if data.get("currency") == "coins" and data.get("bonus") >= 20:
+            log_test("Daily claim", True, 
+                    f"Claimed {data.get('bonus')} coins (currency=coins), coins_after={data.get('coins_after')}, streak={data.get('streak')}")
+        else:
+            log_test("Daily claim", False, f"Expected coins bonus >= 20, got: {data}")
+    else:
+        log_test("Daily claim", False, f"Status {resp.status_code}: {resp.text}")
+    
+    # 7c. Verify coins increased (NOT balance)
+    print("  7c. Verify coins increased (NOT balance)...")
+    resp = requests.get(f"{BASE_URL}/auth/me",
+                       headers={"Authorization": f"Bearer {user_a_token}"})
+    if resp.status_code == 200:
+        data = resp.json()
+        new_coins = data.get("coins", 0)
+        new_balance = data.get("balance", 0)
+        # Balance should be 20000 - 9900 = 10100 (from unlock)
+        # Coins should be 0 + 20 = 20 (from daily claim)
+        if new_coins >= 20:
+            log_test("Coins increased", True, f"Coins increased to {new_coins} (balance={new_balance})")
+        else:
+            log_test("Coins increased", False, f"Expected coins >= 20, got coins={new_coins}, balance={new_balance}")
+    else:
+        log_test("Coins increased", False, f"Status {resp.status_code}: {resp.text}")
+    
+    # 7d. Second claim same day should fail
+    print("  7d. Second claim same day should fail...")
+    resp = requests.post(f"{BASE_URL}/daily/claim",
+                        headers={"Authorization": f"Bearer {user_a_token}"})
+    if resp.status_code == 400:
+        log_test("Second daily claim blocked", True, f"Correctly rejected with 400: {resp.json().get('detail')}")
+    else:
+        log_test("Second daily claim blocked", False, f"Expected 400, got {resp.status_code}: {resp.text}")
+    
+    # TEST 8: Payments purposes
+    print("\n8. TEST: Payments purposes...")
+    # 8a. Create payment for standard plan
+    print("  8a. Create payment for standard plan...")
+    resp = requests.post(f"{BASE_URL}/payments/create",
+                        headers={"Authorization": f"Bearer {user_a_token}"},
+                        json={"purpose": "standard"})
+    if resp.status_code == 200:
+        data = resp.json()
+        if data.get("amount") == 19900 and data.get("payment_link"):
+            log_test("Payment standard", True, f"amount=19900, payment_link={data.get('payment_link')[:50]}...")
+        else:
+            log_test("Payment standard", False, f"Expected amount=19900 with payment_link, got: {data}")
+    else:
+        log_test("Payment standard", False, f"Status {resp.status_code}: {resp.text}")
+    
+    # 8b. Create payment for chat_unlock WITHOUT target_user_id - expect 400
+    print("  8b. Create payment for chat_unlock WITHOUT target_user_id...")
+    resp = requests.post(f"{BASE_URL}/payments/create",
+                        headers={"Authorization": f"Bearer {user_a_token}"},
+                        json={"purpose": "chat_unlock"})
+    if resp.status_code == 400:
+        log_test("Payment chat_unlock without target", True, f"Correctly rejected with 400: {resp.json().get('detail')}")
+    else:
+        log_test("Payment chat_unlock without target", False, f"Expected 400, got {resp.status_code}: {resp.text}")
+    
+    # 8c. Create payment for chat_unlock WITH target_user_id
+    print("  8c. Create payment for chat_unlock WITH target_user_id...")
+    resp = requests.post(f"{BASE_URL}/payments/create",
+                        headers={"Authorization": f"Bearer {user_a_token}"},
+                        json={"purpose": "chat_unlock", "target_user_id": candidate_b_id})
+    if resp.status_code == 200:
+        data = resp.json()
+        if data.get("amount") == 9900 and data.get("payment_link"):
+            log_test("Payment chat_unlock with target", True, f"amount=9900, payment_link={data.get('payment_link')[:50]}...")
+        else:
+            log_test("Payment chat_unlock with target", False, f"Expected amount=9900 with payment_link, got: {data}")
+    else:
+        log_test("Payment chat_unlock with target", False, f"Status {resp.status_code}: {resp.text}")
+    
+    # TEST 9: Regression tests
+    print("\n9. TEST: Regression tests...")
+    # 9a. Health check
+    print("  9a. Health check...")
+    resp = requests.get(f"{BASE_URL}/")
+    if resp.status_code == 200 and resp.json().get("status") == "ok":
+        log_test("Health check", True, f"status=ok")
+    else:
+        log_test("Health check", False, f"Status {resp.status_code}: {resp.text}")
+    
+    # 9b. Get candidates as admin
+    print("  9b. Get candidates as admin...")
+    resp = requests.get(f"{BASE_URL}/candidates",
+                       headers={"Authorization": f"Bearer {admin_token}"})
+    if resp.status_code == 200 and isinstance(resp.json(), list):
+        log_test("Get candidates", True, f"Returned {len(resp.json())} candidates")
+    else:
+        log_test("Get candidates", False, f"Status {resp.status_code}: {resp.text}")
+    
+    # 9c. Get auth/me as user A - verify coins field
+    print("  9c. Get auth/me as user A - verify coins field...")
+    resp = requests.get(f"{BASE_URL}/auth/me",
+                       headers={"Authorization": f"Bearer {user_a_token}"})
+    if resp.status_code == 200:
+        data = resp.json()
+        if "coins" in data and data.get("plan") == "free":
+            log_test("Auth/me includes coins", True, f"coins={data.get('coins')}, plan={data.get('plan')}")
+        else:
+            log_test("Auth/me includes coins", False, f"Missing coins field or wrong plan: {data}")
+    else:
+        log_test("Auth/me includes coins", False, f"Status {resp.status_code}: {resp.text}")
 
-def test_2_gift_catalog(token):
-    """
-    Test 2: GET /api/gifts/catalog
-    Verify 12 items (2 free, 10 paid), structure, and quota
-    """
-    print("\n" + "="*80)
-    print("TEST 2: GIFT CATALOG (12 ITEMS)")
-    print("="*80)
-    
-    headers = {"Authorization": f"Bearer {token}"}
-    response = requests.get(f"{API_BASE}/gifts/catalog", headers=headers, timeout=10)
-    
-    if response.status_code != 200:
-        return log_test("GET /api/gifts/catalog", False, f"Status {response.status_code}: {response.text}")
-    
-    data = response.json()
-    print(f"Response keys: {list(data.keys())}")
-    
-    # Verify top-level structure
-    if "items" not in data:
-        return log_test("TEST 2: Gift catalog", False, "Missing 'items' array")
-    
-    items = data["items"]
-    print(f"Total items: {len(items)}")
-    
-    # Verify exactly 12 items
-    if len(items) != 12:
-        log_test("  Item count", False, f"Expected 12, got {len(items)}")
-        return False
-    else:
-        log_test("  Item count", True, "12 items")
-    
-    # Categorize items by tier
-    free_items = [item for item in items if item.get("tier") == "free"]
-    paid_items = [item for item in items if item.get("tier") in ["care", "love", "luxury"]]
-    
-    print(f"\nFree items: {len(free_items)}")
-    for item in free_items:
-        print(f"  - {item.get('kind')}: {item.get('emoji')} {item.get('label_uz')} (price={item.get('price')})")
-    
-    print(f"\nPaid items: {len(paid_items)}")
-    for item in paid_items:
-        print(f"  - {item.get('kind')}: {item.get('emoji')} {item.get('label_uz')} (price={item.get('price')}, tier={item.get('tier')})")
-    
-    all_passed = True
-    
-    # Verify 2 free items
-    if len(free_items) != 2:
-        log_test("  Free items count", False, f"Expected 2, got {len(free_items)}")
-        all_passed = False
-    else:
-        log_test("  Free items count", True, "2 free items")
-    
-    # Verify free items are rose_free and heart_free with price=0
-    free_kinds = {item.get("kind") for item in free_items}
-    if free_kinds != {"rose_free", "heart_free"}:
-        log_test("  Free item kinds", False, f"Expected {{rose_free, heart_free}}, got {free_kinds}")
-        all_passed = False
-    else:
-        log_test("  Free item kinds", True, "rose_free, heart_free")
-    
-    for item in free_items:
-        if item.get("price") != 0:
-            log_test(f"  {item.get('kind')} price", False, f"Expected 0, got {item.get('price')}")
-            all_passed = False
-    
-    # Verify 10 paid items
-    if len(paid_items) != 10:
-        log_test("  Paid items count", False, f"Expected 10, got {len(paid_items)}")
-        all_passed = False
-    else:
-        log_test("  Paid items count", True, "10 paid items")
-    
-    # Verify price range (2000 to 499000)
-    prices = [item.get("price", 0) for item in paid_items]
-    min_price = min(prices) if prices else 0
-    max_price = max(prices) if prices else 0
-    
-    if min_price != 2000:
-        log_test("  Min price", False, f"Expected 2000, got {min_price}")
-        all_passed = False
-    else:
-        log_test("  Min price", True, "2000 so'm")
-    
-    if max_price != 499000:
-        log_test("  Max price", False, f"Expected 499000, got {max_price}")
-        all_passed = False
-    else:
-        log_test("  Max price", True, "499000 so'm")
-    
-    # Verify each item has required fields
-    required_fields = ["kind", "emoji", "label_uz", "label_ru", "label_en", "price", "tier"]
-    for item in items:
-        for field in required_fields:
-            if field not in item:
-                log_test(f"  Item {item.get('kind', 'unknown')} field '{field}'", False, "Missing")
-                all_passed = False
-    
-    if all_passed:
-        log_test("  Item structure", True, "All items have required fields")
-    
-    # Verify top-level response has quota fields
-    if "free_remaining" not in data:
-        log_test("  free_remaining field", False, "Missing")
-        all_passed = False
-    else:
-        log_test("  free_remaining field", True, f"Value: {data['free_remaining']}")
-    
-    if "free_quota_per_week" not in data:
-        log_test("  free_quota_per_week field", False, "Missing")
-        all_passed = False
-    else:
-        quota = data["free_quota_per_week"]
-        plan = data.get("plan", "unknown")
-        log_test("  free_quota_per_week field", True, f"Value: {quota} (plan: {plan})")
-        
-        # Verify VIP gets 3 free gifts per week
-        if plan == "vip" and quota != 3:
-            log_test("  VIP quota", False, f"Expected 3, got {quota}")
-            all_passed = False
-        elif plan == "vip":
-            log_test("  VIP quota", True, "3 free gifts per week")
-    
-    return log_test("TEST 2: Gift catalog", all_passed)
-
-def test_3_legacy_gift_send(token):
-    """
-    Test 3: POST /api/gifts/send with legacy gift kind "rose"
-    Should map to "rose_free" via LEGACY_GIFT_MAP
-    """
-    print("\n" + "="*80)
-    print("TEST 3: LEGACY GIFT SEND (rose → rose_free)")
-    print("="*80)
-    
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    # First, get a candidate to send gift to
-    print("\nFetching candidates...")
-    candidates_response = requests.get(f"{API_BASE}/candidates", headers=headers, timeout=10)
-    
-    if candidates_response.status_code != 200:
-        return log_test("TEST 3: Legacy gift send", False, f"Failed to get candidates: {candidates_response.status_code}")
-    
-    candidates = candidates_response.json()
-    if not candidates or len(candidates) == 0:
-        print("⚠️  No candidates available, skipping gift send test")
-        return log_test("TEST 3: Legacy gift send", True, "SKIPPED - No candidates available")
-    
-    target_user_id = candidates[0]["id"]
-    target_name = candidates[0]["name"]
-    print(f"Target user: {target_name} ({target_user_id})")
-    
-    # Send legacy "rose" gift
-    print(f"\nSending legacy 'rose' gift to {target_name}...")
-    gift_response = requests.post(
-        f"{API_BASE}/gifts/send",
-        headers=headers,
-        json={"to_user_id": target_user_id, "gift_kind": "rose"},
-        timeout=10
-    )
-    
-    print(f"Status: {gift_response.status_code}")
-    print(f"Response: {gift_response.text}")
-    
-    # Accept both 200 (success) and 402 (quota exhausted)
-    if gift_response.status_code == 200:
-        data = gift_response.json()
-        log_test("  Gift send status", True, "200 OK - Gift sent successfully")
-        log_test("  Legacy mapping", True, "rose → rose_free mapping works")
-        return log_test("TEST 3: Legacy gift send", True, "Legacy gift kind 'rose' works via LEGACY_GIFT_MAP")
-    
-    elif gift_response.status_code == 402:
-        error_text = gift_response.text
-        if "kvota" in error_text.lower() or "quota" in error_text.lower():
-            log_test("  Gift send status", True, "402 - Quota exhausted (expected behavior)")
-            log_test("  Quota logic", True, "Free gift quota validation working")
-            return log_test("TEST 3: Legacy gift send", True, "Quota logic works (402 proves validation is active)")
-        else:
-            return log_test("TEST 3: Legacy gift send", False, f"402 but unexpected error: {error_text}")
-    
-    else:
-        return log_test("TEST 3: Legacy gift send", False, f"Unexpected status {gift_response.status_code}: {gift_response.text}")
-
-def test_4_regression_critical_endpoints(token):
-    """
-    Test 4: Regression tests for critical endpoints
-    """
-    print("\n" + "="*80)
-    print("TEST 4: REGRESSION - CRITICAL ENDPOINTS")
-    print("="*80)
-    
-    all_passed = True
-    
-    # Test 4.1: GET /api/
-    print("\n4.1: GET /api/")
-    response = requests.get(f"{API_BASE}/", timeout=10)
-    if response.status_code != 200:
-        log_test("  GET /api/", False, f"Status {response.status_code}")
-        all_passed = False
-    else:
-        data = response.json()
-        if data.get("status") == "ok":
-            log_test("  GET /api/", True, f"Status: {data.get('status')}")
-        else:
-            log_test("  GET /api/", False, f"Expected status=ok, got {data}")
-            all_passed = False
-    
-    # Test 4.2: POST /api/auth/login
-    print("\n4.2: POST /api/auth/login")
-    response = requests.post(
-        f"{API_BASE}/auth/login",
-        json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
-        timeout=10
-    )
-    if response.status_code != 200:
-        log_test("  POST /api/auth/login", False, f"Status {response.status_code}")
-        all_passed = False
-    else:
-        data = response.json()
-        if "token" in data:
-            log_test("  POST /api/auth/login", True, f"Token received, is_admin={data.get('is_admin')}")
-        else:
-            log_test("  POST /api/auth/login", False, "No token in response")
-            all_passed = False
-    
-    # Test 4.3: GET /api/auth/me
-    print("\n4.3: GET /api/auth/me")
-    headers = {"Authorization": f"Bearer {token}"}
-    response = requests.get(f"{API_BASE}/auth/me", headers=headers, timeout=10)
-    if response.status_code != 200:
-        log_test("  GET /api/auth/me", False, f"Status {response.status_code}")
-        all_passed = False
-    else:
-        data = response.json()
-        if data.get("email") == ADMIN_EMAIL:
-            log_test("  GET /api/auth/me", True, f"Email: {data.get('email')}")
-        else:
-            log_test("  GET /api/auth/me", False, f"Expected email={ADMIN_EMAIL}, got {data.get('email')}")
-            all_passed = False
-    
-    # Test 4.4: GET /api/candidates
-    print("\n4.4: GET /api/candidates")
-    response = requests.get(f"{API_BASE}/candidates", headers=headers, timeout=10)
-    if response.status_code != 200:
-        log_test("  GET /api/candidates", False, f"Status {response.status_code}")
-        all_passed = False
-    else:
-        data = response.json()
-        if isinstance(data, list):
-            log_test("  GET /api/candidates", True, f"Returned {len(data)} candidates (0-8 expected)")
-        else:
-            log_test("  GET /api/candidates", False, f"Expected list, got {type(data)}")
-            all_passed = False
-    
-    return log_test("TEST 4: Regression tests", all_passed)
-
-def main():
-    """Run all tests"""
-    print("\n" + "="*80)
-    print("PRE-LAUNCH SPRINT BACKEND SMOKE TESTS")
-    print("Testing: Referral endpoint + Gift catalog redesign")
-    print("="*80)
-    print(f"Backend URL: {BACKEND_URL}")
-    print(f"Test time: {datetime.now().isoformat()}")
-    
-    # Get admin token
-    token = get_admin_token()
-    if not token:
-        print("\n❌ FATAL: Cannot authenticate as admin")
-        return False
-    
-    # Run all tests
-    results = []
-    results.append(test_1_referral_endpoint(token))
-    results.append(test_2_gift_catalog(token))
-    results.append(test_3_legacy_gift_send(token))
-    results.append(test_4_regression_critical_endpoints(token))
-    
-    # Summary
+def print_summary():
+    """Print test summary"""
     print("\n" + "="*80)
     print("TEST SUMMARY")
     print("="*80)
-    passed = sum(results)
-    total = len(results)
-    print(f"\nPassed: {passed}/{total}")
     
-    if passed == total:
-        print("\n🎉 ALL TESTS PASSED")
-        return True
-    else:
-        print(f"\n⚠️  {total - passed} TEST(S) FAILED")
-        return False
+    passed = sum(1 for r in results if r["passed"])
+    failed = sum(1 for r in results if not r["passed"])
+    total = len(results)
+    
+    print(f"\nTotal: {total} tests")
+    print(f"Passed: {passed} ✅")
+    print(f"Failed: {failed} ❌")
+    print(f"Success rate: {passed/total*100:.1f}%\n")
+    
+    if failed > 0:
+        print("FAILED TESTS:")
+        for r in results:
+            if not r["passed"]:
+                print(f"  ❌ {r['name']}")
+                if r["details"]:
+                    print(f"     {r['details']}")
+    
+    print("\n" + "="*80)
+    
+    return failed == 0
 
 if __name__ == "__main__":
-    success = main()
-    exit(0 if success else 1)
+    try:
+        test_chat_monetization()
+        success = print_summary()
+        sys.exit(0 if success else 1)
+    except Exception as e:
+        print(f"\n❌ FATAL ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)

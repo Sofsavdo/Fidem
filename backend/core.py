@@ -36,6 +36,12 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Admin@123")
 PRICE_PREMIUM = int(os.environ.get("PRICE_PREMIUM_UZS", "79000"))
 PRICE_VIP = int(os.environ.get("PRICE_VIP_UZS", "199000"))
 PRICE_SUPER = int(os.environ.get("PRICE_SUPER_APPLICATION_UZS", "15000"))
+PRICE_STANDARD = int(os.environ.get("PRICE_STANDARD_UZS", "19900"))
+PRICE_CHAT_UNLOCK = int(os.environ.get("PRICE_CHAT_UNLOCK_UZS", "9900"))
+CHAT_UNLOCK_COINS = int(os.environ.get("CHAT_UNLOCK_COINS", "100"))
+CHAT_GUARANTEE_HOURS = int(os.environ.get("CHAT_GUARANTEE_HOURS", "48"))
+# Plans that can initiate chats without per-chat unlock
+PAID_PLANS = ("standard", "premium", "vip")
 
 
 # ---------- Helpers ----------
@@ -76,7 +82,7 @@ async def get_user(uid: str) -> dict:
     if not user:
         raise HTTPException(404, "User not found")
     plan_until = user.get("plan_until")
-    if plan_until and user.get("plan") in ("premium", "vip"):
+    if plan_until and user.get("plan") in ("standard", "premium", "vip"):
         try:
             until_dt = parse_dt(plan_until)
             if until_dt < now_utc():
@@ -125,6 +131,7 @@ def user_public(u: dict) -> dict:
         "avg_response_min": u.get("avg_response_min"),
         "plan": u.get("plan", "free"),
         "balance": u.get("balance", 0),
+        "coins": int(u.get("coins", 0) or 0),
         "withdrawable_balance": int(u.get("withdrawable_balance", 0) or 0),
         "blocked": u.get("blocked", False),
         "prompts": u.get("prompts") or [],

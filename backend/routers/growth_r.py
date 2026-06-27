@@ -15,8 +15,8 @@ router = APIRouter(tags=["growth"])
 # Pricing
 BOOST_PRICE = 5000        # 24h boost in UZS (deducts from balance or paid via CLICK)
 SPOTLIGHT_PRICE = 25000   # 7d spotlight
-DAILY_BONUS = 50          # +50 balance per daily check-in
-STREAK_7_BONUS = 500      # week-7 streak bonus
+DAILY_COINS = 20          # +20 coins (non-cashable) per daily check-in
+STREAK_7_COINS = 100      # week-7 streak bonus (coins)
 INVITE_REWARD_GIVES_PREMIUM_DAYS = 7  # 3 invites → 7 free Premium days
 
 
@@ -31,7 +31,9 @@ async def daily_status(uid: str = Depends(get_current_user_id)):
     return {
         "claimed_today": claimed_today,
         "streak": streak,
-        "next_bonus": DAILY_BONUS if not claimed_today else 0,
+        "next_bonus": DAILY_COINS if not claimed_today else 0,
+        "currency": "coins",
+        "coins": int(me.get("coins", 0) or 0),
         "streak_7_bonus_in": max(0, 7 - (streak % 7 or 0)) if not claimed_today else None,
     }
 
@@ -51,18 +53,23 @@ async def daily_claim(uid: str = Depends(get_current_user_id)):
         streak += 1
     else:
         streak = 1
-    bonus = DAILY_BONUS
+    bonus = DAILY_COINS
     if streak % 7 == 0:
-        bonus += STREAK_7_BONUS
+        bonus += STREAK_7_COINS
     await db.users.update_one(
         {"id": uid},
         {
             "$set": {"daily_last_at": iso(now_utc()), "daily_streak": streak},
-            "$inc": {"balance": bonus, "xp": 20 + (50 if streak % 7 == 0 else 0)},
+            "$inc": {"coins": bonus, "xp": 20 + (50 if streak % 7 == 0 else 0)},
         },
     )
-    await push_notif(uid, "balance", f"Daily bonus +{bonus:,} so'm (streak {streak})")
-    return {"streak": streak, "bonus": bonus, "balance_after": (me.get("balance", 0) + bonus)}
+    await push_notif(uid, "balance", f"Daily bonus +{bonus} coin (streak {streak})")
+    return {
+        "streak": streak,
+        "bonus": bonus,
+        "currency": "coins",
+        "coins_after": int(me.get("coins", 0) or 0) + bonus,
+    }
 
 
 # ---------- Profile Boost (24h 5x visibility) ----------
