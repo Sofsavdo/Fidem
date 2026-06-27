@@ -9,7 +9,7 @@ import os
 from datetime import datetime
 
 # Backend URL from frontend/.env
-BACKEND_URL = "https://56b9b915-627e-4119-b010-d3b5f4a2de1d.preview.emergentagent.com"
+BACKEND_URL = "https://clone-test-4.preview.emergentagent.com"
 API_BASE = f"{BACKEND_URL}/api"
 
 # Test credentials

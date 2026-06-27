@@ -12,7 +12,7 @@ from datetime import datetime
 import httpx
 
 # Base URL from frontend/.env
-BASE_URL = "https://clone-preview-32.preview.emergentagent.com/api"
+BASE_URL = "https://clone-test-4.preview.emergentagent.com/api"
 TIMEOUT = 15.0
 
 # Test credentials
