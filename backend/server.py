@@ -104,6 +104,28 @@ async def startup() -> None:
     await db.family_requests.create_index([("to_user_id", 1), ("status", 1)])
     await db.concierge_orders.create_index([("user_id", 1), ("status", 1)])
 
+    # PERF: Compound indexes for candidates query (scales to 100K+ users).
+    # The candidates endpoint filters by: onboarded, gender, region, birth_date range.
+    await db.users.create_index(
+        [("onboarded", 1), ("gender", 1), ("region", 1), ("birth_date", 1)],
+        name="ix_candidates_main"
+    )
+    # For sort by activity / new
+    await db.users.create_index([("last_active", -1)], name="ix_last_active")
+    # For boost/spotlight float-to-top
+    await db.users.create_index([("boost_until", -1)], name="ix_boost_until", sparse=True)
+    await db.users.create_index([("spotlight_until", -1)], name="ix_spotlight_until", sparse=True)
+    # For verification & financial filters
+    await db.users.create_index([("verified_selfie", 1)], name="ix_verified_selfie", sparse=True)
+    await db.users.create_index([("verified_financial", 1)], name="ix_verified_financial", sparse=True)
+    # Notifications: list by user_id newest first
+    await db.notifications.create_index([("user_id", 1), ("created_at", -1)], name="ix_notif_user_time")
+    # Messages: chat reads pagination
+    await db.messages.create_index([("from_user_id", 1), ("to_user_id", 1)], name="ix_msg_pair")
+    # Referral lookup
+    await db.users.create_index("referred_by", sparse=True, name="ix_referred_by")
+    await db.users.create_index("referral_code", sparse=True, unique=False, name="ix_referral_code")
+
     # Seed admin
     admin = await db.users.find_one({"email": ADMIN_EMAIL.lower()})
     if not admin:

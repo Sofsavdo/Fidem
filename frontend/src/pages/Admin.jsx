@@ -104,7 +104,7 @@ function AdminUsers() {
         <div key={u.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`admin-user-${u.id}`}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-muted overflow-hidden">
-              {u.photo_url && <img src={photoSrc(u.photo_url)} alt="" className="w-full h-full object-cover" />}
+              {u.photo_url && <img loading="lazy" decoding="async" src={photoSrc(u.photo_url)} alt="" className="w-full h-full object-cover" />}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{u.name} · {u.plan} {u.blocked ? "🚫" : ""}</p>
@@ -270,7 +270,7 @@ function AdminConcierge() {
               {users.slice(0, 5).map((u) => (
                 <button key={u.id} onClick={() => addMatch(o.id, u.id)} className="w-full text-left text-xs flex items-center gap-2 p-2 rounded-lg hover:bg-muted">
                   <div className="w-6 h-6 rounded-full bg-muted overflow-hidden">
-                    {u.photo_url && <img src={photoSrc(u.photo_url)} alt="" className="w-full h-full object-cover" />}
+                    {u.photo_url && <img loading="lazy" decoding="async" src={photoSrc(u.photo_url)} alt="" className="w-full h-full object-cover" />}
                   </div>
                   <span className="flex-1 truncate">{u.name} · {u.age} · {u.region}</span>
                   <span className="text-primary">+ Qo'shish</span>

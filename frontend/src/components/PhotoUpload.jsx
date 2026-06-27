@@ -32,7 +32,7 @@ export default function PhotoUpload({ value, onChange, testid = "photo-upload" }
   return (
     <div className="flex items-center gap-3">
       {value ? (
-        <img src={photoSrc(value)} alt="" className="w-20 h-20 rounded-2xl object-cover border border-border" data-testid={`${testid}-preview`} />
+        <img loading="lazy" decoding="async" src={photoSrc(value)} alt="" className="w-20 h-20 rounded-2xl object-cover border border-border" data-testid={`${testid}-preview`} />
       ) : (
         <div className="w-20 h-20 rounded-2xl bg-muted grid place-items-center text-muted-foreground">
           <Upload className="w-5 h-5" />

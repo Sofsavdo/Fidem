@@ -98,7 +98,7 @@ export default function Me() {
         <div className="flex items-center gap-4">
           <div className="relative w-16 h-16 rounded-2xl bg-muted overflow-hidden flex-shrink-0">
             {user.photo_url ? (
-              <img src={photoSrc(user.photo_url)} alt="" className="w-full h-full object-cover" />
+              <img loading="lazy" decoding="async" src={photoSrc(user.photo_url)} alt="" className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full grid place-items-center text-muted-foreground text-xl font-heading">{user.name?.[0]}</div>
             )}
@@ -302,7 +302,7 @@ export default function Me() {
             <div key={row.user.id} className="flex items-center gap-3 text-sm">
               <span className="w-5 text-center font-medium text-muted-foreground">{i + 1}</span>
               <div className="w-7 h-7 rounded-full bg-muted overflow-hidden">
-                {row.user.photo_url && <img src={photoSrc(row.user.photo_url)} alt="" className="w-full h-full object-cover" />}
+                {row.user.photo_url && <img loading="lazy" decoding="async" src={photoSrc(row.user.photo_url)} alt="" className="w-full h-full object-cover" />}
               </div>
               <span className="flex-1 truncate">{row.user.name}</span>
               <span className="text-gold-dark font-medium">{row.total.toLocaleString()}</span>

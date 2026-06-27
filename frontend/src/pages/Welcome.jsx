@@ -1,8 +1,10 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Heart, Shield, Users, Sparkles, Crown, Star, ChevronRight, Gift, MessageCircle, ScanFace } from "lucide-react";
+import { useApp } from "@/contexts/AppContext";
 
 export default function Welcome() {
+  const { t, lang, setLang } = useApp();
   return (
     <div className="min-h-screen bg-background bg-grain">
       {/* Top nav */}
@@ -13,9 +15,21 @@ export default function Welcome() {
           </div>
           <span className="font-heading font-bold text-xl">FIDEM</span>
         </div>
-        <Link to="/auth" data-testid="land-login" className="text-sm font-medium px-4 py-2 rounded-full bg-primary text-white">
-          Kirish
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            data-testid="welcome-lang"
+            onClick={() => {
+              const order = ["uz", "ru", "en"];
+              setLang(order[(order.indexOf(lang) + 1) % 3]);
+            }}
+            className="px-2.5 py-1.5 rounded-full bg-muted text-xs font-medium uppercase"
+          >
+            {lang}
+          </button>
+          <Link to="/auth" data-testid="land-login" className="text-sm font-medium px-4 py-2 rounded-full bg-primary text-white">
+            {t("login")}
+          </Link>
+        </div>
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-12">

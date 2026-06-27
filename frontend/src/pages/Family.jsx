@@ -114,7 +114,7 @@ export default function Family() {
             {requests.received.map((r) => (
               <div key={r.id} className="flex items-center gap-3 p-3 rounded-xl bg-muted/40">
                 <div className="w-10 h-10 rounded-full bg-muted overflow-hidden">
-                  {r.peer?.photo_url && <img src={photoSrc(r.peer.photo_url)} alt="" className="w-full h-full object-cover" />}
+                  {r.peer?.photo_url && <img loading="lazy" decoding="async" src={photoSrc(r.peer.photo_url)} alt="" className="w-full h-full object-cover" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium">{r.peer?.name}</p>
@@ -163,7 +163,7 @@ function FamilyRow({ request, statusBadge }) {
     <div className="p-3 rounded-xl bg-muted/40">
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-full bg-muted overflow-hidden">
-          {request.peer?.photo_url && <img src={photoSrc(request.peer.photo_url)} alt="" className="w-full h-full object-cover" />}
+          {request.peer?.photo_url && <img loading="lazy" decoding="async" src={photoSrc(request.peer.photo_url)} alt="" className="w-full h-full object-cover" />}
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium">{request.peer?.name}</p>

@@ -36,7 +36,7 @@ export default function Stories() {
           <article key={s.id} data-testid={`story-${s.id}`} className="rounded-3xl bg-card border border-border overflow-hidden hover:shadow-elevated transition">
             {s.photo_url && (
               <div className="aspect-[16/10] bg-muted overflow-hidden relative">
-                <img src={s.photo_url} alt={s.couple_names} className="w-full h-full object-cover" />
+                <img loading="lazy" decoding="async" src={s.photo_url} alt={s.couple_names} className="w-full h-full object-cover" />
                 {s.featured && (
                   <span className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-gold text-ink text-[10px] font-medium px-2 py-1">
                     <Star className="w-3 h-3" fill="currentColor" /> Tanlangan

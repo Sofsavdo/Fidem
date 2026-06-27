@@ -41,7 +41,7 @@ export default function ChaperoneWard() {
               className={`w-full rounded-2xl bg-card border p-3 text-left flex items-center gap-3 ${active === c.chat_id ? "border-primary" : "border-border"}`}
             >
               <div className="w-10 h-10 rounded-xl bg-muted overflow-hidden">
-                {c.other.photo_url && <img src={photoSrc(c.other.photo_url)} alt="" className="w-full h-full object-cover" />}
+                {c.other.photo_url && <img loading="lazy" decoding="async" src={photoSrc(c.other.photo_url)} alt="" className="w-full h-full object-cover" />}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{c.other.name}</p>

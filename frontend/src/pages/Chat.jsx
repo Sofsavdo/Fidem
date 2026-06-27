@@ -128,7 +128,7 @@ export default function Chat() {
         <Link to={`/candidate/${other.id}`} className="flex items-center gap-3 flex-1 min-w-0">
           <div className="w-10 h-10 rounded-full overflow-hidden bg-muted flex-shrink-0">
             {other.photo_url && (
-              <img src={photoSrc(other.photo_url)} alt="" className={`w-full h-full object-cover ${!other.photo_unlocked ? "blur-md" : ""}`} />
+              <img loading="lazy" decoding="async" src={photoSrc(other.photo_url)} alt="" className={`w-full h-full object-cover ${!other.photo_unlocked ? "blur-md" : ""}`} />
             )}
           </div>
           <div className="min-w-0">

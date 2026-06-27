@@ -95,7 +95,7 @@ export default function Concierge() {
                   {o.match_users.map((m) => (
                     <Link key={m.id} to={`/candidate/${m.id}`} className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 hover:bg-muted transition">
                       <div className="w-12 h-12 rounded-xl bg-muted overflow-hidden">
-                        {m.photo_url && <img src={photoSrc(m.photo_url)} alt="" className="w-full h-full object-cover" />}
+                        {m.photo_url && <img loading="lazy" decoding="async" src={photoSrc(m.photo_url)} alt="" className="w-full h-full object-cover" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium">{m.name}, {m.age}</p>

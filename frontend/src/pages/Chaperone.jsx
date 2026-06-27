@@ -116,7 +116,7 @@ export default function Chaperone() {
             ) : mine.map((m) => (
               <div key={m.id} className="rounded-2xl bg-card border border-border p-3 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-muted overflow-hidden">
-                  {m.wali.photo_url && <img src={photoSrc(m.wali.photo_url)} alt="" className="w-full h-full object-cover" />}
+                  {m.wali.photo_url && <img loading="lazy" decoding="async" src={photoSrc(m.wali.photo_url)} alt="" className="w-full h-full object-cover" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{m.wali.name}</p>
@@ -156,7 +156,7 @@ export default function Chaperone() {
             ) : wards.map((w) => (
               <div key={w.id} className="rounded-2xl bg-card border border-border p-3 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-muted overflow-hidden">
-                  {w.ward.photo_url && <img src={photoSrc(w.ward.photo_url)} alt="" className="w-full h-full object-cover" />}
+                  {w.ward.photo_url && <img loading="lazy" decoding="async" src={photoSrc(w.ward.photo_url)} alt="" className="w-full h-full object-cover" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{w.ward.name}</p>

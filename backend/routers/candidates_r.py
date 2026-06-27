@@ -88,11 +88,25 @@ async def candidates(
     if financial_only:
         query["verified_financial"] = True
 
-    cursor = db.users.find(query, {"_id": 0, "password_hash": 0}).limit(500)
-    docs = await cursor.to_list(length=500)
-
+    # Perf: pre-filter age range at DB level via birth_date ISO string comparison.
+    # birth_date is "YYYY-MM-DD"; age = today.year - bd.year (approx). Compute date bounds.
     a_lo = age_min or me_doc.get("search_age_min", 18)
     a_hi = age_max or me_doc.get("search_age_max", 60)
+    try:
+        today = now_utc().date()
+        # Oldest acceptable birth: today - (a_hi+1) years + 1 day  (inclusive lower bound)
+        bd_min = today.replace(year=today.year - (a_hi + 1)).isoformat()
+        # Youngest acceptable birth: today - a_lo years (inclusive upper bound)
+        bd_max = today.replace(year=today.year - a_lo).isoformat()
+        query["birth_date"] = {"$gte": bd_min, "$lte": bd_max}
+    except Exception:
+        pass
+
+    # Perf: reduced from 500 to 200 — sufficient because we return at most `limit` (default 30) after sorting.
+    # Use compound index (onboarded, gender, region, birth_date) for fast lookup.
+    cursor = db.users.find(query, {"_id": 0, "password_hash": 0}).limit(200)
+    docs = await cursor.to_list(length=200)
+
     photo_unlocks = await db.photo_unlocks.find(
         {"requester_id": uid, "approved": True}, {"_id": 0}
     ).to_list(2000)

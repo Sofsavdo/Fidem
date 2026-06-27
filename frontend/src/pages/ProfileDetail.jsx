@@ -79,7 +79,7 @@ export default function ProfileDetail() {
   return (
     <div data-testid="profile-detail" className="pb-8">
       <div className="relative aspect-square bg-muted">
-        <img src={photoUrl} alt={c.name} className={`w-full h-full object-cover ${blurred ? "blur-photo" : ""}`} />
+        <img loading="lazy" decoding="async" src={photoUrl} alt={c.name} className={`w-full h-full object-cover ${blurred ? "blur-photo" : ""}`} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/0 to-black/0" />
         <button data-testid="back-btn" onClick={() => nav(-1)} className="absolute top-4 left-4 glass rounded-full p-2.5">
           <ArrowLeft className="w-4 h-4" />

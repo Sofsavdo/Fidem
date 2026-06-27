@@ -3,6 +3,7 @@ import BottomNav from "@/components/BottomNav";
 import Sidebar from "@/components/Sidebar";
 import DailyCheckIn from "@/components/DailyCheckIn";
 import MobileTopBar from "@/components/MobileTopBar";
+import OfflineBanner from "@/components/OfflineBanner";
 import { Outlet, useLocation } from "react-router-dom";
 
 export default function Layout() {
@@ -11,6 +12,7 @@ export default function Layout() {
   // Mobile-first: sidebar only shown on admin pages
   return (
     <div className="min-h-screen bg-background bg-grain">
+      <OfflineBanner />
       {isAdmin && <Sidebar />}
       {!isAdmin && <MobileTopBar />}
       <main className={isAdmin ? "md:pl-64 lg:pl-72" : ""}>

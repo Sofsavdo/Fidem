@@ -193,7 +193,7 @@ export default function Boost() {
                   #{i + 1}
                 </span>
                 <div className="w-9 h-9 rounded-full bg-muted overflow-hidden">
-                  {u.photo_url && <img src={photoSrc(u.photo_url)} alt="" className="w-full h-full object-cover" />}
+                  {u.photo_url && <img loading="lazy" decoding="async" src={photoSrc(u.photo_url)} alt="" className="w-full h-full object-cover" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{u.name}, {u.age}</p>

@@ -28,7 +28,7 @@ export default function Sidebar() {
       <Link to="/me" className="mx-3 mb-4 rounded-2xl p-3 hover:bg-muted transition flex items-center gap-3" data-testid="sidebar-me">
         <div className="w-10 h-10 rounded-xl bg-muted overflow-hidden">
           {user.photo_url ? (
-            <img src={photoSrc(user.photo_url)} alt="" className="w-full h-full object-cover" />
+            <img loading="lazy" decoding="async" src={photoSrc(user.photo_url)} alt="" className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full grid place-items-center text-muted-foreground text-sm">{user.name?.[0]}</div>
           )}
