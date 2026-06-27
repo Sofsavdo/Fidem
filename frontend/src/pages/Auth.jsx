@@ -4,9 +4,10 @@ import { useApp } from "@/contexts/AppContext";
 import api from "@/lib/api";
 import { Heart, Send } from "lucide-react";
 import { toast } from "sonner";
+import LangSwitch from "@/components/LangSwitch";
 
 export default function Auth() {
-  const { user, login, register, refresh, t, lang, changeLang } = useApp();
+  const { user, login, register, refresh, t } = useApp();
   const nav = useNavigate();
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
@@ -61,16 +62,7 @@ export default function Auth() {
             </div>
             <span className="font-heading text-2xl font-semibold tracking-tight">FIDEM</span>
           </div>
-          <select
-            data-testid="lang-select"
-            value={lang}
-            onChange={(e) => changeLang(e.target.value)}
-            className="text-sm bg-transparent border border-border rounded-full px-3 py-1.5"
-          >
-            <option value="uz">UZ</option>
-            <option value="ru">RU</option>
-            <option value="en">EN</option>
-          </select>
+          <LangSwitch />
         </div>
 
         <h1 className="font-heading text-4xl sm:text-5xl tracking-tight font-semibold leading-[1.05]">

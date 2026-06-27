@@ -2,9 +2,45 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Heart, Shield, Users, Sparkles, Crown, Star, ChevronRight, Gift, MessageCircle, ScanFace } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
+import LangSwitch from "@/components/LangSwitch";
+
+const IMG = {
+  hero: "https://images.unsplash.com/photo-1519307212971-dd9561667ffb?w=1100&q=80&auto=format&fit=crop",
+  trust: "https://images.unsplash.com/photo-1500662434123-4d06b56a762f?w=1400&q=80&auto=format&fit=crop",
+  t1: "https://images.pexels.com/photos/26990489/pexels-photo-26990489.jpeg?auto=compress&cs=tinysrgb&w=200",
+  t2: "https://images.unsplash.com/photo-1574740637579-9ca0a610e491?w=200&q=80&auto=format&fit=crop",
+  t3: "https://images.unsplash.com/photo-1728368686380-acaca58a5e76?w=200&q=80&auto=format&fit=crop",
+};
 
 export default function Welcome() {
-  const { t, lang, setLang } = useApp();
+  const { t } = useApp();
+
+  const trustBadges = [
+    { icon: Shield, t: "land_trust1_t", s: "land_trust1_s" },
+    { icon: Users, t: "land_trust2_t", s: "land_trust2_s" },
+    { icon: Sparkles, t: "land_trust3_t", s: "land_trust3_s" },
+  ];
+
+  const features = [
+    { icon: ScanFace, t: "land_f1_t", d: "land_f1_d", color: "primary" },
+    { icon: Users, t: "land_f2_t", d: "land_f2_d", color: "secondary" },
+    { icon: Sparkles, t: "land_f3_t", d: "land_f3_d", color: "gold" },
+    { icon: Crown, t: "land_f4_t", d: "land_f4_d", color: "primary" },
+    { icon: Gift, t: "land_f5_t", d: "land_f5_d", color: "secondary" },
+    { icon: MessageCircle, t: "land_f6_t", d: "land_f6_d", color: "gold" },
+  ];
+  const colorMap = {
+    primary: { bg: "bg-primary/10", text: "text-primary" },
+    secondary: { bg: "bg-secondary/10", text: "text-secondary" },
+    gold: { bg: "bg-gold/10", text: "text-gold-dark" },
+  };
+
+  const testimonials = [
+    { key: "land_test1", name: "Aziza & Bobur", img: IMG.t1 },
+    { key: "land_test2", name: "Dilnoza & Sardor", img: IMG.t2 },
+    { key: "land_test3", name: "Madina & Diyor", img: IMG.t3 },
+  ];
+
   return (
     <div className="min-h-screen bg-background bg-grain">
       {/* Top nav */}
@@ -16,77 +52,72 @@ export default function Welcome() {
           <span className="font-heading font-bold text-xl">FIDEM</span>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            data-testid="welcome-lang"
-            onClick={() => {
-              const order = ["uz", "ru", "en"];
-              setLang(order[(order.indexOf(lang) + 1) % 3]);
-            }}
-            className="px-2.5 py-1.5 rounded-full bg-muted text-xs font-medium uppercase"
-          >
-            {lang}
-          </button>
+          <LangSwitch />
           <Link to="/auth" data-testid="land-login" className="text-sm font-medium px-4 py-2 rounded-full bg-primary text-white">
             {t("login")}
           </Link>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-8 space-y-12">
+      <main className="max-w-5xl mx-auto px-4 py-8 space-y-14">
         {/* Hero */}
-        <section className="text-center space-y-4">
-          <div className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/30">
-            <Sparkles className="w-3.5 h-3.5" /> Halal tanishuv platformasi #1
+        <section className="grid md:grid-cols-2 gap-8 items-center">
+          <div className="text-center md:text-left space-y-4 order-2 md:order-1">
+            <div className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/30">
+              <Sparkles className="w-3.5 h-3.5" /> {t("land_badge")}
+            </div>
+            <h1 className="text-4xl sm:text-5xl font-heading font-bold leading-tight">
+              {t("land_hero_a")}<span className="text-primary">{t("land_hero_em")}</span>{t("land_hero_b")}
+            </h1>
+            <p className="text-lg text-muted-foreground max-w-md mx-auto md:mx-0">
+              {t("land_subtitle")}
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center md:justify-start pt-2">
+              <Link to="/auth" data-testid="land-cta-primary" className="px-6 py-3.5 rounded-2xl bg-primary text-white font-medium text-base shadow-lg">
+                {t("welcome_cta_primary")} →
+              </Link>
+              <a href="#features" className="px-6 py-3.5 rounded-2xl border-2 border-border text-base font-medium">
+                {t("welcome_features")}
+              </a>
+            </div>
+            <p className="text-xs text-muted-foreground pt-4">{t("land_social_proof")}</p>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-heading font-bold leading-tight">
-            Hayotingizning <span className="text-primary">to'g'ri yarmini</span> xavfsiz toping
-          </h1>
-          <p className="text-lg text-muted-foreground max-w-md mx-auto">
-            FIDEM — oilaviy qadriyatlar bilan, Wali (sovchi) kuzatuvi ostida, AI bilan moslashtirilgan musulmon tanishuv platformasi.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-            <Link to="/auth" data-testid="land-cta-primary" className="px-6 py-3.5 rounded-2xl bg-primary text-white font-medium text-base shadow-lg">
-              {t("welcome_cta_primary")} →
-            </Link>
-            <a href="#features" className="px-6 py-3.5 rounded-2xl border-2 border-border text-base font-medium">
-              {t("welcome_features")}
-            </a>
+          <div className="order-1 md:order-2 relative">
+            <div className="relative rounded-[2rem] overflow-hidden shadow-2xl aspect-[4/5] sm:aspect-[3/4] md:aspect-[4/5]">
+              <img
+                src={IMG.hero}
+                alt="FIDEM couple"
+                loading="eager"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-foreground/30 via-transparent to-transparent" />
+            </div>
+            <div className="absolute -bottom-4 -left-2 sm:left-4 glass rounded-2xl px-4 py-2.5 border border-border/60 shadow-lg flex items-center gap-2">
+              <Heart className="w-5 h-5 text-primary" fill="currentColor" />
+              <div className="leading-tight">
+                <p className="text-sm font-semibold">12+</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">FIDEM</p>
+              </div>
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground pt-4">✨ Hozir 1000+ ishtirokchi • 12+ to'y bo'lib o'tdi</p>
         </section>
 
         {/* Trust badges */}
         <section className="grid grid-cols-3 gap-3 text-center">
-          {[
-            { icon: Shield, title: "3 darajali", sub: "Verification" },
-            { icon: Users, title: "Wali rejim", sub: "Oilaviy kuzatuv" },
-            { icon: Sparkles, title: "AI moslashtiruv", sub: "Big 5 + 30 mezon" },
-          ].map((b, i) => (
+          {trustBadges.map((b, i) => (
             <div key={i} className="rounded-2xl border border-border bg-card p-3">
               <b.icon className="w-6 h-6 mx-auto text-primary" />
-              <p className="text-sm font-medium mt-2">{b.title}</p>
-              <p className="text-[11px] text-muted-foreground">{b.sub}</p>
+              <p className="text-sm font-medium mt-2">{t(b.t)}</p>
+              <p className="text-[11px] text-muted-foreground">{t(b.s)}</p>
             </div>
           ))}
         </section>
 
         {/* Features */}
         <section id="features" className="space-y-4">
-          <h2 className="text-2xl font-heading font-semibold text-center">Nima uchun FIDEM?</h2>
-          <div className="space-y-3">
-            {[
-              { icon: ScanFace, title: "Privacy-first rasm", desc: "Profilingiz rasmlari blurli, faqat ishonganlarga ochiladi.", color: "primary" },
-              { icon: Users, title: "Wali/Sovchi tizimi", desc: "Ota-ona yoki yaqin qarindosh chatlaringizni kuzatib turishi mumkin (read-only).", color: "secondary" },
-              { icon: Sparkles, title: "Big 5 shaxsiyat testi", desc: "AI yordamida sizga xarakter, qiziqish, hayotiy maqsad bo'yicha eng mos kishini topadi.", color: "gold" },
-              { icon: Crown, title: "Sovchi Concierge", desc: "Premium foydalanuvchilarga 5 ta professional sovchi tanlangan moslar (199K so'm).", color: "primary" },
-              { icon: Gift, title: "Halal Sovg'a tizimi", desc: "E'tibor ko'rsatish uchun bepul atirgul yoki maxsus sovg'alar. Olgan kishi cashout qila oladi.", color: "secondary" },
-              { icon: MessageCircle, title: "Xavfsiz muloqot", desc: "AI yomon so'z + telefon ulashish blokirovkasi. Family Share — nikoh bosqichida ota-ona telefonlari almashinadi.", color: "gold" },
-            ].map((f, i) => {
-              const colorMap = {
-                primary: { bg: "bg-primary/10", text: "text-primary" },
-                secondary: { bg: "bg-secondary/10", text: "text-secondary" },
-                gold: { bg: "bg-gold/10", text: "text-gold-dark" },
-              };
+          <h2 className="text-2xl font-heading font-semibold text-center">{t("welcome_why")}</h2>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {features.map((f, i) => {
               const c = colorMap[f.color] || colorMap.primary;
               return (
                 <div key={i} className="rounded-2xl border border-border bg-card p-4 flex gap-3">
@@ -94,8 +125,8 @@ export default function Welcome() {
                     <f.icon className={`w-5 h-5 ${c.text}`} />
                   </div>
                   <div>
-                    <p className="font-semibold">{f.title}</p>
-                    <p className="text-sm text-muted-foreground mt-0.5">{f.desc}</p>
+                    <p className="font-semibold">{t(f.t)}</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">{t(f.d)}</p>
                   </div>
                 </div>
               );
@@ -103,14 +134,25 @@ export default function Welcome() {
           </div>
         </section>
 
+        {/* Trust / safety visual band */}
+        <section className="relative rounded-3xl overflow-hidden min-h-[260px] flex items-center">
+          <img src={IMG.trust} alt="Trust" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-r from-foreground/80 via-foreground/55 to-foreground/20" />
+          <div className="relative p-7 sm:p-10 max-w-md text-background space-y-3">
+            <Shield className="w-8 h-8" />
+            <h2 className="text-2xl font-heading font-semibold">{t("land_trust2_t")} · {t("land_trust1_t")}</h2>
+            <p className="text-sm opacity-90">{t("land_f2_d")}</p>
+          </div>
+        </section>
+
         {/* Pricing teaser */}
         <section className="rounded-3xl bg-gradient-to-br from-primary/10 via-secondary/5 to-gold-light/30 border border-border p-5 text-center space-y-3">
-          <h2 className="text-2xl font-heading font-semibold">Access bepul, Acceleration pulli</h2>
-          <p className="text-sm text-muted-foreground max-w-md mx-auto">Asosiy funksiyalar har doim bepul. To'lov faqat tezroq topish, ko'proq e'tibor olish yoki maxsus xizmat uchun.</p>
-          <div className="grid grid-cols-3 gap-2 pt-2">
+          <h2 className="text-2xl font-heading font-semibold">{t("welcome_pricing")}</h2>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">{t("land_pricing_sub")}</p>
+          <div className="grid grid-cols-3 gap-2 pt-2 max-w-md mx-auto">
             <div className="rounded-2xl border border-border bg-card p-3">
               <p className="text-xs text-muted-foreground">FREE</p>
-              <p className="font-heading font-semibold mt-1">0 so'm</p>
+              <p className="font-heading font-semibold mt-1">0 {t("sum")}</p>
             </div>
             <div className="rounded-2xl border-2 border-primary bg-card p-3 relative">
               <p className="text-xs text-primary">PREMIUM</p>
@@ -125,37 +167,41 @@ export default function Welcome() {
 
         {/* Testimonials */}
         <section className="space-y-3">
-          <h2 className="text-xl font-heading font-semibold text-center">Muvaffaqiyat hikoyalari</h2>
-          {[
-            { name: "Aziza & Bobur", text: "3 oy ichida tanishdik, to'y qildik. AI moslashtiruv haqiqatan ishlaydi!" },
-            { name: "Dilnoza & Sardor", text: "Wali tizimi otamga ko'rsatib bordim, hammasi shaffof. Rahmat FIDEM!" },
-            { name: "Madina & Diyor", text: "Big 5 test natijasi bizni juda yaqinlashtirdi." },
-          ].map((s, i) => (
-            <div key={i} className="rounded-2xl border border-border bg-card p-4">
-              <p className="text-sm italic">“{s.text}”</p>
-              <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-                <Star className="w-3 h-3 text-gold-dark fill-gold-dark" /><Star className="w-3 h-3 text-gold-dark fill-gold-dark" /><Star className="w-3 h-3 text-gold-dark fill-gold-dark" /><Star className="w-3 h-3 text-gold-dark fill-gold-dark" /><Star className="w-3 h-3 text-gold-dark fill-gold-dark" /> — {s.name}
-              </p>
-            </div>
-          ))}
+          <h2 className="text-xl font-heading font-semibold text-center">{t("welcome_stories")}</h2>
+          <div className="grid sm:grid-cols-3 gap-3">
+            {testimonials.map((s, i) => (
+              <div key={i} className="rounded-2xl border border-border bg-card p-4 space-y-3">
+                <div className="flex items-center gap-1 text-gold-dark">
+                  {[0, 1, 2, 3, 4].map((n) => (
+                    <Star key={n} className="w-3.5 h-3.5 fill-current" />
+                  ))}
+                </div>
+                <p className="text-sm italic">“{t(s.key)}”</p>
+                <div className="flex items-center gap-2 pt-1">
+                  <img src={s.img} alt={s.name} loading="lazy" className="w-8 h-8 rounded-full object-cover" />
+                  <span className="text-xs font-medium text-muted-foreground">{s.name}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
 
         {/* Final CTA */}
-        <section className="rounded-3xl bg-foreground text-background p-6 text-center space-y-3">
-          <h2 className="text-2xl font-heading font-semibold">Bugun boshlang</h2>
-          <p className="text-sm opacity-80">Profil yaratish bepul • 3 daqiqada tayyor</p>
+        <section className="rounded-3xl bg-foreground text-background p-6 sm:p-8 text-center space-y-3">
+          <h2 className="text-2xl font-heading font-semibold">{t("welcome_today")}</h2>
+          <p className="text-sm opacity-80">{t("land_final_sub")}</p>
           <Link to="/auth" data-testid="land-cta-final" className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-primary text-white font-medium">
-            Ro'yxatdan o'tish <ChevronRight className="w-4 h-4" />
+            {t("land_register")} <ChevronRight className="w-4 h-4" />
           </Link>
         </section>
 
-        <footer className="text-center text-xs text-muted-foreground pt-8 pb-4 space-y-1">
+        <footer className="text-center text-xs text-muted-foreground pt-4 pb-8 space-y-1">
           <p>© 2025 FIDEM — Halal Matchmaking</p>
-          <p>✨ Sizga mos insonni xavfsiz topishga yordam beramiz</p>
+          <p>✨ {t("land_footer_tag")}</p>
           <div className="flex justify-center gap-4 pt-3">
-            <Link to="/about" data-testid="footer-about" className="hover:text-foreground">Biz haqimizda</Link>
-            <Link to="/faq" data-testid="footer-faq" className="hover:text-foreground">FAQ</Link>
-            <Link to="/auth" className="hover:text-foreground">Kirish</Link>
+            <Link to="/about" data-testid="footer-about" className="hover:text-foreground">{t("land_about")}</Link>
+            <Link to="/faq" data-testid="footer-faq" className="hover:text-foreground">{t("land_faq")}</Link>
+            <Link to="/auth" className="hover:text-foreground">{t("land_signin")}</Link>
           </div>
         </footer>
       </main>

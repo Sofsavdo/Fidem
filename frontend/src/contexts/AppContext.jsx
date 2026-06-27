@@ -13,7 +13,12 @@ export function AppProvider({ children }) {
   const wsRef = useRef(null);
 
   const t = useCallback(
-    (key) => (dict[lang] && dict[lang][key]) || dict.uz[key] || key,
+    (key) => {
+      const d = dict[lang];
+      if (d && Object.prototype.hasOwnProperty.call(d, key)) return d[key];
+      if (Object.prototype.hasOwnProperty.call(dict.uz, key)) return dict.uz[key];
+      return key;
+    },
     [lang]
   );
 

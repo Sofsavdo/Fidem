@@ -59,6 +59,8 @@
 ## agent_communication:
 ##     -agent: "main"  # or "testing" or "user"
 ##     -message: "Communication message between agents"
+##
+## IMPORTANT: When updating test_result.md, ALWAYS update all related sections (task status, status_history, agent_communication) in a SINGLE operation for efficiency.
 
 # Protocol Guidelines for Main agent
 #
@@ -602,6 +604,24 @@ backend:
         comment: "✅ PASSED. All 4 new sidebar links verified on desktop view (1920x900): data-testid='side-concierge' (Sovchi Concierge), data-testid='side-travel' (Travel Mode), data-testid='side-family' (Oilaviy aloqa), data-testid='side-withdrawals' (Pul yechish). All links visible, properly labeled, and clickable."
 
 frontend:
+  - task: "Landing-first routing + i18n landing + LangSwitch + landing images"
+    implemented: true
+    working: true
+    file: "frontend/src/App.js, frontend/src/components/Layout.jsx, frontend/src/pages/Welcome.jsx, frontend/src/pages/Auth.jsx, frontend/src/components/LangSwitch.jsx, frontend/src/lib/i18n.js, frontend/src/contexts/AppContext.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "user"
+        comment: "Reported: (1) Loyiha ochilganda login emas, balki LANDING birinchi ochilishi kerak; mehmon (login qilmagan) ham landingni ko'ra olishi kerak. (2) Landingdagi matnlar asosan o'zbekcha — TIL ALMASHMAYAPTI. (3) Login (Auth) sahifasidagi til almashtirgich qo'pol katta <select> oynada — landingdagidek chiroyli tugma bo'lsin. (4) Landingda faqat matn emas, rasmlardan ham foydalanilsin."
+      - working: "NA"
+        agent: "main"
+        comment: "Fixes: (1) ROUTING — App.js: index route '/' endi <RootRoute/>: mehmon → <Welcome/> (landing, auth talab qilinmaydi), login bo'lgan & onboarded → <Layout><Candidates/></Layout> (feed), onboard qilmagan → /onboarding. Layout.jsx endi {children || <Outlet/>} qabul qiladi. (2) i18n — Welcome.jsx dagi BARCHA hardcoded matnlar t() ga ko'chirildi; i18n.js ga land_* kalitlar uz/ru/en uchun qo'shildi (badge, hero_a/em/b, subtitle, social_proof, 3 trust badge, 6 feature t/d, pricing_sub, 3 testimonial, final_sub, register, footer_tag, about/faq/signin). AppContext t() fallback FIXED: avval (a||b||key) bo'lgani uchun BO'SH satr tarjimasi (masalan en land_hero_b='') uz'ga qaytib tushardi — endi hasOwnProperty bilan tekshiradi, bo'sh tarjimani hurmat qiladi. (3) LangSwitch.jsx — yangi segmented UZ|RU|EN tugma; Welcome header va Auth header'da ishlatiladi; Auth.jsx dagi eski <select data-testid=lang-select> olib tashlandi. (4) RASMLAR — Welcome.jsx ga hero rasmi (couple), trust/safety band rasmi, 3 ta testimonial avatar rasmi qo'shildi (Unsplash/Pexels URL). data-testid: lang-switch, lang-uz, lang-ru, lang-en, land-login, land-cta-primary, land-cta-final, footer-about, footer-faq. TEST: (a) mehmon '/' ga kirsa landing chiqsin, /auth ga otmasin. (b) LangSwitch'da UZ/RU/EN bosilganda landing matnlari mos tilga o'zgarsin (hero, features, footer). (c) Auth sahifasida ham LangSwitch ishlasin, eski select bo'lmasin. (d) landingda rasmlar yuklanib ko'rinsin. (e) admin login (admin@fidem.uz/Admin@123) → '/' da feed (bottom-nav) ko'rinsin, landing emas."
+      - working: true
+        agent: "testing"
+        comment: "✅ ALL 5 SCENARIOS PASSED (5/5). Comprehensive testing completed with admin@fidem.uz/Admin@123. SCENARIO 1 - Guest landing routing: ✓ Guest navigates to '/' and sees landing page (not redirected to /auth). ✓ Landing element [data-testid='land-login'] exists. ✓ Hero headline visible. URL stays at root. SCENARIO 2 - Language switch on landing (CRITICAL BUG FIX): ✓ LangSwitch component [data-testid='lang-switch'] with UZ|RU|EN buttons exists. ✓ ENGLISH: Hero shows 'Safely find your perfect match' with NO leftover Uzbek text (verified no 'xavfsiz toping' or 'to'g'ri yarmini'). ✓ UZBEK: Hero shows 'Hayotingizning to'g'ri yarmini xavfsiz toping'. ✓ RUSSIAN: Hero shows 'Безопасно найдите свою половинку'. ✓ Footer text changes correctly: 'About us' (EN) / 'Biz haqimizda' (UZ) / 'О нас' (RU). ✓ Feature cards also translate properly. Language switching works perfectly - the main reported bug is RESOLVED. SCENARIO 3 - Auth page language switcher: ✓ OLD dropdown [data-testid='lang-select'] does NOT exist (correctly removed). ✓ NEW LangSwitch [data-testid='lang-switch'] exists in Auth header. ✓ All three language buttons (UZ|RU|EN) present. ✓ Language switching works: 'Welcome' (EN) / 'Xush kelibsiz' (UZ). Auth page now has the new segmented switcher matching landing design - second reported bug RESOLVED. SCENARIO 4 - Landing images: ✓ Hero couple image loaded successfully (naturalWidth=1100, src: images.unsplash.com/photo-1519307212971-dd9561667ffb). ✓ Trust/safety band image loaded (width=1400). ✓ All 3 testimonial avatar images loaded (Aziza & Bobur, Dilnoza & Sardor, Madina & Diyor, width=200 each). ✓ Total: 4 images, 0 broken. All images render correctly. SCENARIO 5 - Logged-in root = feed: ✓ Admin login successful with admin@fidem.uz/Admin@123. ✓ After login, navigating to '/' shows the FEED (Candidates page with 8 candidates). ✓ Bottom navigation [data-testid='bottom-nav'] exists. ✓ Landing element [data-testid='land-login'] does NOT exist. ✓ 'Nomzodlar' (Candidates) content detected. Logged-in users correctly see feed at root, not landing. Console: No error messages found. Only harmless Telegram WebApp 6.0 warnings (expected). Screenshots: 02_landing_english.png, 03_landing_uzbek.png, 04_landing_russian.png, 10_guest_landing_routing.png, 11_auth_langswitch.png, 12_landing_images.png, 13_logged_in_feed.png. BOTH USER-REPORTED BUGS FULLY RESOLVED: (1) Landing language now changes correctly across all three languages. (2) Auth page language switcher is now a beautiful segmented switch, not an ugly dropdown. All routing, i18n, images, and UX improvements working as expected."
+
   - task: "Faza 2 — Profile Prompts (Hinge-style text/voice)"
     implemented: true
     working: true
@@ -757,13 +777,13 @@ frontend:
 
 metadata:
   created_by: "main_agent"
-  version: "1.8"
-  test_sequence: 9
+  version: "1.9"
+  test_sequence: 10
   run_ui: false
 
 test_plan:
   current_focus:
-    - "Pre-Launch Performance — code-split routes, lazy images, DB compound indexes, candidates query speedup"
+    - "Landing-first routing + i18n landing + LangSwitch + landing images"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -802,3 +822,9 @@ agent_communication:
 
   - agent: "testing"
     message: "🎉 VOICE MESSAGES BACKEND TESTING COMPLETE - ALL 5 TEST SUITES PASSED (5/5). Comprehensive end-to-end testing of new kind='voice' message type:\n\n**TEST 1: SEND VOICE MESSAGE ✅**\n- POST /api/messages/send with {kind:'voice', to_user_id, text:'', voice_url:'https://example.com/test-voice.webm', voice_duration:12} → 200 OK\n- Response includes message_id, kind='voice', chat_id\n- Voice message sent successfully to candidate Nigora (id: b9d17b81-4b34-4145-95c2-df547f64fef6)\n- No text moderation runs on voice messages (as expected)\n\n**TEST 2: VOICE MESSAGE PERSISTED WITH META ✅**\n- GET /api/messages/{chat_id} returns voice message in chat history\n- Verified: kind='voice', meta.voice_url='https://example.com/test-voice.webm', meta.voice_duration=12\n- All metadata fields correctly stored and retrieved\n\n**TEST 3: VALIDATION (3/3 passed) ✅**\n- Missing voice_url: POST with voice_url='' → 400 'voice_url required for voice message' ✅\n- Duration too long: POST with voice_duration=90 → 400 'Voice message too long (max 60s)' ✅\n- Valid duration: POST with voice_duration=10 → 200 OK ✅\n- All validation rules working correctly\n\n**TEST 4: TEXT MODERATION STILL WORKS ✅**\n- POST /api/messages/send with {kind:'text', text:'+998901234567 telefon raqamim'} → 422\n- Error: 'Telefon raqamlarni almashish chatda ruxsat etilmagan. Avval tanishing.'\n- Phone number moderation working correctly for text messages\n- Voice messages bypass text moderation (as designed)\n\n**TEST 5: REGRESSION - EXISTING ENDPOINTS (5/5 passed) ✅**\n- GET /api/ → 200 {status:ok, service:fidem}\n- POST /api/auth/login → 200 (login successful)\n- GET /api/candidates → 200 (8 candidates returned)\n- GET /api/gifts/catalog → 200 (12 items)\n- GET /api/referral/mine → 200 (all 7 required keys present)\n\n**IMPLEMENTATION VERIFIED:**\n✅ Voice messages use kind='voice' (distinct from 'text', 'gift', 'rose', etc.)\n✅ Voice metadata stored in meta.voice_url and meta.voice_duration\n✅ No text moderation runs on voice messages (binary content)\n✅ Duration validation enforced (max 60 seconds)\n✅ Empty voice_url correctly rejected\n✅ Text moderation still works for kind='text' messages\n✅ All existing endpoints remain functional\n\n**NO CRITICAL ISSUES FOUND.** Voice messages backend implementation fully functional. Test file: /app/test_voice_messages.py. READY FOR PRODUCTION."
+
+  - agent: "main"
+    message: "FRONTEND CHANGE — Landing-first + i18n + LangSwitch + images. Please run FRONTEND UI testing for the task 'Landing-first routing + i18n landing + LangSwitch + landing images'. Use REACT_APP_BACKEND_URL. Test credentials: admin@fidem.uz / Admin@123. Verify these scenarios: (1) ROUTING: open '/' as a GUEST (no token / clear localStorage) → must show the LANDING (data-testid='land-login' and hero visible), must NOT redirect to /auth. (2) LANGUAGE SWITCH (the reported bug): on landing there is a segmented switch data-testid='lang-switch' with buttons data-testid='lang-uz' / 'lang-ru' / 'lang-en'. Click each and confirm the landing TEXT actually changes language — e.g. EN hero contains 'Safely find your perfect match' (and NO leftover Uzbek like 'xavfsiz toping'), UZ hero contains 'to'g'ri yarmini', RU hero contains 'свою половинку'. Also confirm feature section + footer change language. (3) AUTH PAGE: go to /auth — the old <select data-testid='lang-select'> must be GONE and replaced by data-testid='lang-switch' (UZ|RU|EN buttons); clicking them changes the Auth page text too. (4) IMAGES: landing shows real images (hero couple image + testimonial avatars) that load (img tags with valid src, not broken). (5) LOGGED-IN ROOT: login as admin (admin@fidem.uz/Admin@123) then go to '/' → must show the CANDIDATES FEED with bottom navigation (data-testid='bottom-nav'), NOT the landing. Report any console errors."
+
+  - agent: "testing"
+    message: "✅ LANDING & LANGUAGE SWITCH TESTING COMPLETE — ALL 5 SCENARIOS PASSED. Both user-reported bugs are FULLY RESOLVED: (1) Landing language switching now works perfectly across UZ/RU/EN with no leftover text. (2) Auth page language switcher is now a beautiful segmented switch (old dropdown removed). Additional verifications: Guest routing works (landing shows at root for guests, feed for logged-in users), all 4 landing images load successfully (hero couple + trust band + 3 testimonial avatars), no console errors. The implementation is production-ready. Next focus: Test the Swipe UX feature (Tinder-style cards) which is marked as needs_retesting."
