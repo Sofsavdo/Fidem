@@ -14,7 +14,7 @@ import time
 from datetime import datetime
 
 # Configuration
-BASE_URL = "https://clone-test-4.preview.emergentagent.com/api"
+BASE_URL = "https://loyihani-clone.preview.emergentagent.com/api"
 ADMIN_EMAIL = "admin@fidem.uz"
 ADMIN_PASSWORD = "Admin@123"
 
