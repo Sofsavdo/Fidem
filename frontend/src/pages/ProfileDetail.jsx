@@ -3,11 +3,10 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot } from "@/components/Badges";
-import GiftModal from "@/components/GiftModal";
 import RoseModal from "@/components/RoseModal";
 import CompatibilityCard from "@/components/CompatibilityCard";
 import { photoSrc } from "@/lib/photo";
-import { Bookmark, MessageCircle, Gift, ArrowLeft, Lock, Clock, Shield } from "lucide-react";
+import { Bookmark, MessageCircle, ArrowLeft, Lock, Clock, Shield } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ProfileDetail() {
@@ -18,7 +17,6 @@ export default function ProfileDetail() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [giftOpen, setGiftOpen] = useState(false);
   const [roseOpen, setRoseOpen] = useState(false);
   const [famSending, setFamSending] = useState(false);
 
@@ -66,7 +64,6 @@ export default function ProfileDetail() {
       else { await api.post("/saved", { user_id: id }); setSaved(true); toast.success("Saqlandi"); }
     } finally { setSaving(false); }
   };
-  const sendGift = () => setGiftOpen(true);
 
   if (loading || !c) {
     return <div className="p-6 text-center text-muted-foreground" data-testid="profile-loading">{t("loading")}</div>;
@@ -102,29 +99,39 @@ export default function ProfileDetail() {
         </div>
       </div>
 
-      <div className="px-5 pt-5 space-y-5">
-        <div className="flex gap-2 flex-wrap">
-          <VerifiedBadge verified={c.verified_selfie} />
-          <FinancialBadge verified={c.verified_financial} />
-          {c.verified_identity && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 text-[10px]">
-              <Shield className="w-3 h-3" /> Identity
-            </span>
-          )}
-        </div>
+      <div className="px-5 pt-5 space-y-4">
+        {/* Verification badges row */}
+        {(c.verified_selfie || c.verified_financial || c.verified_identity) && (
+          <div className="flex gap-2 flex-wrap" data-testid="profile-badges">
+            <VerifiedBadge verified={c.verified_selfie} />
+            <FinancialBadge verified={c.verified_financial} />
+            {c.verified_identity && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 px-2 py-1 text-[11px] font-medium">
+                <Shield className="w-3 h-3" /> Identity
+              </span>
+            )}
+          </div>
+        )}
 
-        <div className="grid grid-cols-3 gap-2 text-sm">
+        {/* Key stats — 2 columns on mobile, 3 on larger */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2" data-testid="profile-stats">
           <Stat label={t("height")} value={`${c.height_cm} sm`} />
           <Stat label={t("weight")} value={`${c.weight_kg} kg`} />
           <Stat label={t("marital_status")} value={t(c.marital_status)} />
-          <Stat label={t("has_children")} value={c.has_children ? `${t("yes")} ${c.children_count ? "(" + c.children_count + ")" : ""}` : t("no")} />
+          <Stat label={t("has_children")} value={c.has_children ? `${t("yes")}${c.children_count ? ` · ${c.children_count}` : ""}` : t("no")} />
           <Stat label={t("education")} value={c.education || "—"} />
           <Stat label={t("religion")} value={c.religion || "—"} />
         </div>
 
+        {/* Profession card — separate row for clarity */}
+        <div className="rounded-2xl bg-card border border-border p-4">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">{t("profession")}</p>
+          <p className="text-base mt-1 font-medium">{c.profession || "—"}</p>
+        </div>
+
         {c.avg_response_min != null && (
-          <div className="rounded-2xl bg-card border border-border p-3 flex items-center gap-2 text-sm" data-testid="response-speed">
-            <Clock className="w-4 h-4 text-secondary" />
+          <div className="rounded-2xl bg-secondary/5 border border-secondary/20 p-3 flex items-center gap-2 text-sm" data-testid="response-speed">
+            <Clock className="w-4 h-4 text-secondary shrink-0" />
             <span>
               {t("response_usually")} <strong>{c.avg_response_min < 60 ? `${c.avg_response_min} ${t("minutes")}` : `${Math.round(c.avg_response_min / 60)} ${t("hours")}`}</strong>
             </span>
@@ -133,13 +140,10 @@ export default function ProfileDetail() {
 
         {c.bio && (
           <div className="rounded-2xl bg-card border border-border p-4">
-            <p className="text-sm leading-relaxed">{c.bio}</p>
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-2">{t("bio")}</p>
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">{c.bio}</p>
           </div>
         )}
-        <div className="rounded-2xl bg-card border border-border p-4">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("profession")}</p>
-          <p className="text-base mt-1">{c.profession || "—"}</p>
-        </div>
 
         {/* AI Compatibility */}
         <CompatibilityCard targetId={c.id} lang="uz" />
@@ -177,7 +181,7 @@ export default function ProfileDetail() {
         </div>
 
         {/* actions */}
-        <div className="flex gap-2 sticky bottom-24 pt-3">
+        <div className="flex gap-2 pt-3">
           <button data-testid="profile-save" onClick={toggleSave} disabled={saving} className={`flex-1 rounded-2xl py-3 inline-flex items-center justify-center gap-2 font-medium border transition ${saved ? "bg-primary text-white border-primary" : "bg-card border-border hover:bg-muted"}`}>
             <Bookmark className="w-4 h-4" fill={saved ? "currentColor" : "none"} /> {t("save")}
           </button>
@@ -186,9 +190,6 @@ export default function ProfileDetail() {
           </Link>
           <button data-testid="profile-rose" onClick={() => setRoseOpen(true)} className="rounded-2xl py-3 px-4 bg-primary/10 text-primary font-medium text-xl">
             🌹
-          </button>
-          <button data-testid="profile-gift" onClick={sendGift} className="rounded-2xl py-3 px-4 bg-gold text-ink font-medium">
-            <Gift className="w-4 h-4" />
           </button>
         </div>
         {/* Family Share (VIP only) */}
@@ -201,7 +202,6 @@ export default function ProfileDetail() {
           📞 Oilaviy aloqa so'rash (VIP)
         </button>
       </div>
-      {giftOpen && <GiftModal targetId={c.id} targetName={c.name} onClose={() => setGiftOpen(false)} />}
       {roseOpen && <RoseModal targetId={c.id} targetName={c.name} onClose={() => setRoseOpen(false)} onSent={load} />}
     </div>
   );
@@ -209,9 +209,9 @@ export default function ProfileDetail() {
 
 function Stat({ label, value }) {
   return (
-    <div className="rounded-2xl bg-card border border-border p-3">
-      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className="text-sm font-medium mt-0.5 truncate">{value}</p>
+    <div className="rounded-2xl bg-card border border-border p-3 min-w-0">
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
+      <p className="text-sm font-semibold mt-1 leading-tight break-words">{value}</p>
     </div>
   );
 }

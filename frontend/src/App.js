@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 import { AppProvider, useApp } from "@/contexts/AppContext";
 import Layout from "@/components/Layout";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import ScrollToTop from "@/components/ScrollToTop";
 
 // PERF: code-split every route into its own chunk (loaded on demand).
 const Auth = lazy(() => import("@/pages/Auth"));
@@ -123,6 +124,7 @@ export default function App() {
     <ErrorBoundary>
       <AppProvider>
         <BrowserRouter>
+          <ScrollToTop />
           <Toaster position="top-center" richColors />
           <Inner />
         </BrowserRouter>

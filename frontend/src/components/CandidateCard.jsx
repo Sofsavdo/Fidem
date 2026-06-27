@@ -1,14 +1,12 @@
-import React, { useState } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
-import { Bookmark, MessageCircle, Gift, Lock } from "lucide-react";
+import { Bookmark, MessageCircle, Lock } from "lucide-react";
 import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot } from "@/components/Badges";
-import GiftModal from "@/components/GiftModal";
 import { useApp } from "@/contexts/AppContext";
 import { photoSrc } from "@/lib/photo";
 
 export default function CandidateCard({ c, onSave, saved }) {
   const { t } = useApp();
-  const [giftOpen, setGiftOpen] = useState(false);
   const blurred = !c.photo_unlocked;
   const photoUrl = photoSrc(c.photo_url) || "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=800";
 
@@ -100,17 +98,8 @@ export default function CandidateCard({ c, onSave, saved }) {
           >
             <MessageCircle className="w-4 h-4" />
           </Link>
-          <button
-            data-testid={`candidate-gift-${c.id}`}
-            onClick={() => setGiftOpen(true)}
-            className="p-2 rounded-full bg-gold text-ink hover:bg-gold-dark"
-            title={t("send_gift")}
-          >
-            <Gift className="w-4 h-4" />
-          </button>
         </div>
       </div>
-      {giftOpen && <GiftModal targetId={c.id} targetName={c.name} onClose={() => setGiftOpen(false)} />}
     </div>
   );
 }
