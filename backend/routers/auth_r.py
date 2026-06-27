@@ -199,14 +199,14 @@ async def set_filters(req: MessageFilters, uid: str = Depends(get_current_user_i
 
 # ---------- File upload / serve ----------
 @router.post("/files/upload")
-async def upload_file(file: UploadFile = File(...), uid: str = Depends(get_current_user_id)):
+async def upload_file(request: Request, file: UploadFile = File(...), uid: str = Depends(get_current_user_id)):
+    # Pre-check overall Content-Length to fail fast on large uploads
+    cl = request.headers.get("content-length")
+    if cl and cl.isdigit() and int(cl) > 9 * 1024 * 1024:
+        raise HTTPException(413, "Max file size 8MB")
     ext = (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else "bin"
     if ext not in MIME:
         raise HTTPException(400, "Only image files (jpg/png/gif/webp) are allowed")
-    # Pre-check Content-Length when available
-    cl = file.headers.get("content-length")
-    if cl and cl.isdigit() and int(cl) > 8 * 1024 * 1024:
-        raise HTTPException(413, "Max file size 8MB")
     data = await file.read()
     if len(data) > 8 * 1024 * 1024:
         raise HTTPException(413, "Max file size 8MB")
