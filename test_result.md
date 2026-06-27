@@ -217,6 +217,63 @@ backend:
         comment: "AI moderation tested via POST /api/messages/send (3 scenarios, all passed). ✅ Message with phone number '+998901234567' correctly blocked with 422 and Uzbek error message about phone numbers. ✅ Message with '@username' correctly blocked with 422 and error about external links. ✅ Normal message 'Salom! Yaxshimisiz? Qanday kunlar o'tmoqda?' passes moderation and returns 200 with message created. Fast-path moderation (regex-based) working correctly for phone numbers and @usernames. Profanity list in place."
 
 frontend:
+  - task: "Faza 2 — Profile Prompts (Hinge-style text/voice)"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/Prompts.jsx, backend/routers/prompts_r.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "16 curated prompts (uz/ru/en) across categories: family, values, future, partner, lifestyle, faith, achievement, fun, self. Users pick up to 3 and answer with text (500 char max) or voice (audio recording 60s max, uploaded to Emergent Object Storage). Backend: GET /api/prompts/library, GET /api/prompts/mine, POST /api/prompts/save, POST /api/prompts/voice-upload (multipart). user_public now returns prompts so they show on ProfileDetail. Awards +50 XP first time. Browser verified: added 2 prompts, library shows remaining 14, save button present."
+      - working: true
+        agent: "testing"
+        comment: "Backend testing completed successfully (9 test scenarios, all passed). ✅ GET /api/prompts/library?lang=uz returns 16 items with proper structure (id, category, text). ✅ Localization works for uz/ru/en. ✅ GET /api/prompts/mine returns empty list initially. ✅ POST /api/prompts/save with 2 valid items returns 200 with ok:true and prompts list. ✅ POST /api/prompts/save with 4 items correctly rejected with 400 (max 3). ✅ POST /api/prompts/save with invalid id silently filters invalid items and saves only valid ones. ✅ GET /api/prompts/mine returns saved prompts. ✅ XP awarded only first time (verified no double-award on second save). All validation and error handling working correctly."
+
+  - task: "Faza 2 — Success Stories (social proof marketing)"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/Stories.jsx, backend/routers/stories_r.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "3 seed stories created on startup (Aziza&Bobur, Dilnoza&Sardor, Madina&Diyor). Backend endpoints: GET /api/stories?featured_only=&limit=, GET /api/stories/{id} (views++), POST /api/stories/submit (user pending review), POST/PATCH/DELETE /api/admin/stories (admin only). Browser screenshot confirms gallery layout with featured badges, story text, view counts."
+      - working: true
+        agent: "testing"
+        comment: "Backend testing completed successfully (11 test scenarios, all passed). ✅ GET /api/stories returns 3 seeded stories with proper structure (couple_names, region, year, story_text, published). ✅ GET /api/stories?featured_only=true returns 2 featured stories (Aziza & Bobur, Dilnoza & Sardor). ✅ GET /api/stories/{id} returns 200 and views increment correctly (verified from 67 to 69). ✅ GET /api/stories/{bogus-id} correctly returns 404. ✅ POST /api/stories/submit with valid data (story_text > 30 chars) returns 200 with id and status:pending_review. ✅ POST /api/stories/submit with short text correctly rejected with 400. ✅ POST /api/admin/stories as admin creates story successfully. ✅ PATCH /api/admin/stories/{id} as admin updates featured flag. ✅ GET /api/admin/stories as admin returns all stories including unpublished (5 total). ✅ GET /api/admin/stories as non-admin correctly rejected with 403. ✅ DELETE /api/admin/stories/{id} as admin successfully removes story. All validation and admin authorization working correctly."
+
+  - task: "Faza 2 — Gamification (XP, Levels, Badges)"
+    implemented: true
+    working: true
+    file: "frontend/src/components/ProgressCard.jsx, backend/routers/gamification_r.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Level formula: floor(sqrt(xp/100)) — squared scaling. XP sources hooked: daily check-in +20 (+50 if streak%7==0), Big5 +200, rose sent +10, prompts +50. 12 badges defined (profile_complete, big5_done, streak_7/30, verified, financial, premium, vip, first_rose, rose_giver, prompts, inviter). 5 level titles (uz/ru/en). XP backfill on first /me/progress call. Browser confirms admin shows: Yangi a'zo, Level 0, 10 XP, 5/12 badges (Shaxsiyat aniqlangan, Tasdiqlangan, Moliyaviy tasdiq, VIP, Birinchi atirgul). Endpoint: GET /api/me/progress?lang=uz."
+      - working: true
+        agent: "testing"
+        comment: "Backend testing completed successfully (5 test scenarios, all passed). ✅ GET /api/me/progress?lang=uz returns complete structure with xp, level, title, xp_in_level, xp_to_next, progress_pct, badges (12 total), badges_earned, badges_total. ✅ Admin has 5/12 badges achieved (b_big5_done, b_verified, b_financial, b_vip, b_first_rose). ✅ Localization works for uz/ru/en (verified title in Uzbek 'Yangi a'zo', Russian 'Новичок', English 'Newcomer'). ✅ XP formula verified: level = floor(sqrt(xp/100)), for xp=60: level=0, xp_in_level=60, xp_to_next=40 (next level at 100 XP). ✅ POST /api/daily/claim increases XP by 20-70 (tested with new user, gained 20 XP). All calculations and badge logic working correctly."
+
+  - task: "Faza 2 — Voice Recording UI"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/pages/Prompts.jsx (VoiceRecorder)"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "MediaRecorder API used to capture audio/webm, max 60s, uploaded as multipart to /api/prompts/voice-upload. Storage extended to support mp3/wav/ogg/webm/m4a + mp4/mov. Plays back via HTML5 <audio>. Cannot test in automation (mic permission)."
+
   - task: "Big 5 Personality test UI"
     implemented: true
     working: true
@@ -309,18 +366,12 @@ frontend:
 
 metadata:
   created_by: "main_agent"
-  version: "1.3"
-  test_sequence: 4
+  version: "1.4"
+  test_sequence: 5
   run_ui: false
 
 test_plan:
-  current_focus:
-    - "Big 5 / OCEAN personality test"
-    - "Wali/Chaperone (read-only family observer in chats)"
-    - "Hinge-style Roses (priority attention currency)"
-    - "AI Icebreakers (personalized per candidate)"
-    - "AI Compatibility Report (Big 5-based)"
-    - "AI Moderation (chat message filter)"
+  current_focus: []
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -331,8 +382,10 @@ agent_communication:
   - agent: "testing"
     message: "Backend auth testing completed successfully. Created /app/backend_test.py and executed all 7 auth test scenarios. Results: ALL PASSED (7/7). Health check, admin login, wrong password rejection, new user registration, duplicate registration prevention, authenticated /auth/me endpoint, and unauthenticated /auth/me rejection all working correctly. Backend auth is fully functional after env restoration. No issues found."
   - agent: "main"
-    message: "MAJOR FEATURE EXPANSION based on deep market analysis (Sovchi.app, Muzz, Hinge, Salams). Added 6 new backend modules + 5 new frontend pages/components targeting unicorn-tier dating app strategy: (1) Big 5 OCEAN personality test (20 questions, 5 traits, Likert 1-5, multilingual UZ/RU/EN) — endpoint /api/personality/*; (2) Wali/Chaperone system (read-only family observer) — endpoint /api/chaperone/*; (3) Hinge-style Roses currency (weekly free + paid bundles 5K/20K/45K UZS) — endpoint /api/roses/*; (4) AI personalized icebreakers via Emergent LLM (gpt-4o) — endpoint /api/ai/icebreakers/{id}; (5) AI Big5 compatibility report (locked for free users with 20K UZS unlock, free for Premium/VIP) — endpoint /api/personality/compatibility/{id}; (6) Quick AI moderation on chat (blocks phone, @username, profanity) — integrated into /api/messages/send.\n\nNEW INDEXES: chaperones (owner+wali unique), chaperone_invites (code unique), roses, compat_unlocks.\nNEW ENV: EMERGENT_LLM_KEY=sk-emergent-3155a295b608b72979 added to /app/backend/.env.\nMANUAL VERIFICATION DONE (curl): all endpoints respond correctly; AI Uzbek output looks natural; moderation blocks phone+@username.\nBROWSER VERIFICATION DONE: /personality renders results with admin's scores, /chaperone generates invite code with Telegram link, /candidate/:id shows AI compatibility card with strengths+watch-outs+conversation starters.\n\nPlease test ALL the new backend endpoints listed in test_plan.current_focus. Auth credentials: admin@fidem.uz / Admin@123 (already in /app/memory/test_credentials.md). Demo users are seeded — first call GET /api/candidates to discover a target_id, then exercise the personality/compatibility/roses/chaperone/ai endpoints. Note: AI calls (icebreakers, compatibility report) may take 3-8 seconds due to LLM latency — set appropriate timeouts."
+    message: "PHASE 2 ADDITIONS based on user approval: (1) Profile Prompts — Hinge-style 16-question library with text+voice answers (uses Emergent Object Storage for audio); endpoint /api/prompts/*. (2) Success Stories — 3 seed stories on startup, admin CRUD + user submission, public gallery at /api/stories. (3) Gamification — XP/Level/Badges system, 12 badges, 5 level titles, formula floor(sqrt(xp/100)); endpoint /api/me/progress. XP hooks added to existing actions (daily +20/+50, big5 +200, rose +10, prompts +50). New routes: /prompts, /stories, plus ProgressCard widget on /me. Browser-verified all 3 pages render correctly with seed data.\n\nPlease test the new backend endpoints. Skip voice-upload multipart (cannot test mic in CI). Focus: GET /prompts/library (16 items), POST /prompts/save (validation: max 3, only valid IDs, awards XP first time), GET /stories (3 items), GET /stories/{id} (view++), POST /admin/stories (403 if not admin), POST /stories/submit (validation: text>=30 chars), GET /me/progress (returns xp/level/title/badges with achievement booleans). Auth: admin@fidem.uz / Admin@123."
   - agent: "testing"
     message: "🎉 ALL NEW BACKEND FEATURES TESTED SUCCESSFULLY (27/27 tests passed). Comprehensive testing completed for all 6 new feature modules:\n\n1. Big 5 Personality Test (8 tests): Questions endpoint with multilingual support (uz/ru/en), submit with scoring (0-100 per trait) + 200 balance bonus, mine endpoint, compatibility with locking/unlocking for free vs VIP users, AI-generated compatibility reports.\n\n2. Wali/Chaperone (8 tests): Invite generation with 8-char codes + Telegram links, accept flow with validation (bogus code → 404, self-accept → 400), mine/wards lists, ward chat viewing, delete relationship.\n\n3. Roses (6 tests): Status endpoint showing free/paid/total/weekly_quota by plan (VIP gets 7), send with note (decrements roses, creates kind='rose' message), purchase returning CLICK payment links, purchase-balance (skipped due to insufficient balance but endpoint validated).\n\n4. AI Icebreakers (2 tests): Personalized question generation via Emergent LLM gpt-4o (3 questions in Uzbek, ~2-3s latency), self-request validation.\n\n5. AI Compatibility Report (tested via personality endpoint): Full AI report for VIP users with summary/strengths/watch_outs/conversation_starters, locked state for free users with 20K unlock price.\n\n6. AI Moderation (3 tests): Phone number blocking (+998...), @username blocking, normal message passing. All Uzbek error messages correct.\n\nNO CRITICAL ISSUES FOUND. All endpoints return correct status codes, proper error messages, and expected data structures. AI integrations (Emergent LLM) working correctly with appropriate fallbacks. Test file: /app/backend_test.py"
   - agent: "testing"
     message: "✅ FRONTEND TESTING COMPLETE - ALL 6 NEW FEATURES WORKING (6/6 passed). Comprehensive UI testing via Playwright covering flows A-H:\n\n**PASSED:**\n✅ A) Login flow - Admin login successful, redirected to home, VIP badge visible\n✅ B) Big 5 Personality Test - Result mode working (admin has scores), all 5 traits displayed with gradient bars\n✅ C) Chaperone UI - Both tabs functional, invite code generation (8-char), Telegram link, accept code UI present\n✅ D) AI Compatibility Card - Full report visible for VIP with score/100, summary, strengths (✓), watch-outs (⚠), conversation starters (💬), all 4 action buttons working\n✅ E) Rose Modal - Modal opens, displays VIP quota (7 free), note input works, rose sent successfully with toast confirmation\n✅ F) AI Icebreaker - Existing chat mode verified with 'AI yaratish' button, gift/rose buttons in chat header present\n\n**MINOR NOTES:**\n- Premium page roses section not directly tested due to auth session handling in direct navigation, but code review confirms all 3 bundles (data-testid='roses-1/5/12') exist with correct prices\n- Me page shortcuts (data-testid='link-personality', 'link-chaperone') confirmed in code review (lines 312, 316)\n- All data-testid attributes properly implemented across components\n- AI features (compatibility, icebreakers) working with 3-8 second load times as expected\n- Uzbek language UI rendering correctly throughout\n\n**NO CRITICAL ISSUES FOUND.** All core functionality working. UI is polished, responsive, and follows design system. Ready for production."
+  - agent: "testing"
+    message: "🎉 FAZA 2 BACKEND TESTING COMPLETE - ALL 25 TESTS PASSED (25/25). Comprehensive testing completed for all 3 new FAZA 2 feature modules:\n\n**1. PROFILE PROMPTS (9 tests passed):**\n✅ GET /api/prompts/library?lang=uz returns 16 items with proper structure (id, category, text)\n✅ Localization works for uz/ru/en\n✅ GET /api/prompts/mine returns empty list initially, then saved prompts after save\n✅ POST /api/prompts/save with 2 valid items returns 200 with ok:true and prompts list\n✅ POST /api/prompts/save with 4 items correctly rejected with 400 (max 3 validation)\n✅ POST /api/prompts/save with invalid id silently filters invalid items\n✅ XP awarded only first time (no double-award on subsequent saves)\n\n**2. SUCCESS STORIES (11 tests passed):**\n✅ GET /api/stories returns 3 seeded stories (Aziza & Bobur, Dilnoza & Sardor, Madina & Diyor)\n✅ GET /api/stories?featured_only=true returns 2 featured stories\n✅ GET /api/stories/{id} returns 200 and views increment correctly (67→69)\n✅ GET /api/stories/{bogus-id} correctly returns 404\n✅ POST /api/stories/submit with valid data (text>30 chars) returns 200 with status:pending_review\n✅ POST /api/stories/submit with short text correctly rejected with 400\n✅ POST /api/admin/stories as admin creates story successfully\n✅ PATCH /api/admin/stories/{id} as admin updates featured flag\n✅ GET /api/admin/stories as admin returns all stories (5 total, including unpublished)\n✅ GET /api/admin/stories as non-admin correctly rejected with 403\n✅ DELETE /api/admin/stories/{id} as admin successfully removes story\n\n**3. GAMIFICATION (5 tests passed):**\n✅ GET /api/me/progress?lang=uz returns complete structure (xp, level, title, xp_in_level, xp_to_next, progress_pct, badges[12], badges_earned, badges_total)\n✅ Admin has 5/12 badges achieved (b_big5_done, b_verified, b_financial, b_vip, b_first_rose)\n✅ Localization works for uz/ru/en (titles: 'Yangi a'zo', 'Новичок', 'Newcomer')\n✅ XP formula verified: level=floor(sqrt(xp/100)), for xp=60: level=0, xp_in_level=60, xp_to_next=40\n✅ POST /api/daily/claim increases XP by 20-70 (tested with new user, gained 20 XP)\n\n**NO CRITICAL ISSUES FOUND.** All endpoints return correct status codes, proper error messages, and expected data structures. All validation rules working correctly (max 3 prompts, min 30 chars for stories, admin-only endpoints). XP system and badge logic functioning as designed. Test file: /app/backend_test_faza2.py"

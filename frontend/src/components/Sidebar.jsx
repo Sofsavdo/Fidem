@@ -1,6 +1,6 @@
 import React from "react";
 import { NavLink, Link } from "react-router-dom";
-import { Users, MessageCircle, Bookmark, User, Heart, Sparkles, Crown, Gift, ShieldCheck, Brain, UsersRound } from "lucide-react";
+import { Users, MessageCircle, Bookmark, User, Heart, Sparkles, Crown, Gift, ShieldCheck, Brain, UsersRound, Pen, BookOpen } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { PlanPill } from "@/components/Badges";
 import { photoSrc } from "@/lib/photo";
@@ -70,6 +70,14 @@ export default function Sidebar() {
         <Link to="/chaperone" data-testid="side-chaperone" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
           <UsersRound className="w-4 h-4 text-secondary" />
           <span>Sovchi (Wali)</span>
+        </Link>
+        <Link to="/prompts" data-testid="side-prompts" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
+          <Pen className="w-4 h-4 text-secondary" />
+          <span>Profil promptlari</span>
+        </Link>
+        <Link to="/stories" data-testid="side-stories" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
+          <BookOpen className="w-4 h-4 text-primary" />
+          <span>Hikoyalar</span>
         </Link>
         <Link to="/boost" data-testid="side-boost" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
           <Sparkles className="w-4 h-4 text-primary" />

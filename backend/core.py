@@ -126,6 +126,8 @@ def user_public(u: dict) -> dict:
         "plan": u.get("plan", "free"),
         "balance": u.get("balance", 0),
         "blocked": u.get("blocked", False),
+        "prompts": u.get("prompts") or [],
+        "big5_scores": u.get("big5_scores") or {},
     }
 
 

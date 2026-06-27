@@ -128,6 +128,22 @@ export default function ProfileDetail() {
         {/* AI Compatibility */}
         <CompatibilityCard targetId={c.id} lang="uz" />
 
+        {/* Prompts */}
+        {c.prompts && c.prompts.length > 0 && (
+          <div className="space-y-2" data-testid="profile-prompts">
+            {c.prompts.map((p, i) => (
+              <div key={i} className="rounded-2xl bg-card border border-border p-4">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">{p.text || p.id?.replace("p_", "")}</p>
+                {p.kind === "voice" && p.voice_url ? (
+                  <audio controls src={p.voice_url} className="w-full mt-2" />
+                ) : (
+                  <p className="text-base mt-1 leading-relaxed">{p.answer || "—"}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* match score with reasons */}
         <div className="rounded-2xl border-2 border-secondary/30 bg-secondary/5 p-4">
           <div className="flex items-center justify-between">

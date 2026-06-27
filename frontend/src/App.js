@@ -20,6 +20,8 @@ import Boost from "@/pages/Boost";
 import Personality from "@/pages/Personality";
 import Chaperone from "@/pages/Chaperone";
 import ChaperoneWard from "@/pages/ChaperoneWard";
+import Prompts from "@/pages/Prompts";
+import Stories from "@/pages/Stories";
 
 function Gate({ children }) {
   const { user, loading } = useApp();
@@ -58,6 +60,8 @@ function Inner() {
         <Route path="/personality" element={<Personality />} />
         <Route path="/chaperone" element={<Chaperone />} />
         <Route path="/chaperone/ward/:wardId" element={<ChaperoneWard />} />
+        <Route path="/prompts" element={<Prompts />} />
+        <Route path="/stories" element={<Stories />} />
         <Route path="/boost" element={<Boost />} />
         <Route path="/admin" element={<Admin />} />
       </Route>

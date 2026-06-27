@@ -80,4 +80,7 @@ async def get_object(path: str) -> tuple[bytes, str]:
 MIME = {
     "jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
     "gif": "image/gif", "webp": "image/webp",
+    "mp3": "audio/mpeg", "wav": "audio/wav", "ogg": "audio/ogg",
+    "webm": "audio/webm", "m4a": "audio/mp4",
+    "mp4": "video/mp4", "mov": "video/quicktime",
 }

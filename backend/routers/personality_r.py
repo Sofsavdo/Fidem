@@ -41,7 +41,7 @@ async def personality_submit(
             "big5_answers": {k: int(v) for k, v in answers.items() if isinstance(v, (int, str))},
             "big5_scores": scores,
             "big5_completed_at": iso(now_utc()),
-        }, "$inc": {"balance": 200}},
+        }, "$inc": {"balance": 200, "xp": 200}},
     )
     return {"ok": True, "scores": scores, "bonus": 200}
 

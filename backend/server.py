@@ -36,6 +36,9 @@ from routers.personality_r import router as personality_router  # noqa: E402
 from routers.chaperone_r import router as chaperone_router  # noqa: E402
 from routers.roses_r import router as roses_router  # noqa: E402
 from routers.ai_r import router as ai_router  # noqa: E402
+from routers.prompts_r import router as prompts_router  # noqa: E402
+from routers.stories_r import router as stories_router  # noqa: E402
+from routers.gamification_r import router as gamification_router  # noqa: E402
 from services import compute_completeness  # noqa: E402
 from storage import init_storage  # noqa: E402
 
@@ -53,6 +56,9 @@ api.include_router(personality_router)
 api.include_router(chaperone_router)
 api.include_router(roses_router)
 api.include_router(ai_router)
+api.include_router(prompts_router)
+api.include_router(stories_router)
+api.include_router(gamification_router)
 app.include_router(api)
 
 
@@ -80,6 +86,8 @@ async def startup() -> None:
     await db.chaperone_invites.create_index("code", unique=True)
     await db.roses.create_index([("from_user_id", 1), ("created_at", -1)])
     await db.compat_unlocks.create_index([("user_id", 1), ("target_id", 1)], unique=True)
+    await db.success_stories.create_index("created_at")
+    await db.files.create_index("path")
 
     # Seed admin
     admin = await db.users.find_one({"email": ADMIN_EMAIL.lower()})
@@ -123,6 +131,10 @@ async def startup() -> None:
     onboarded = await db.users.count_documents({"onboarded": True, "is_admin": {"$ne": True}})
     if onboarded < 12:
         await seed_demo_users()
+    # Seed success stories if none exist (independent of users)
+    stories_count = await db.success_stories.count_documents({})
+    if stories_count == 0:
+        await seed_success_stories()
 
 
 async def seed_demo_users() -> None:
@@ -188,6 +200,40 @@ async def seed_demo_users() -> None:
         doc["completeness"] = compute_completeness(doc)
         await db.users.insert_one(doc)
     log.info("Seeded demo users")
+
+
+async def seed_success_stories() -> None:
+    stories = [
+        {
+            "couple_names": "Aziza & Bobur",
+            "region": "Toshkent",
+            "year": 2025,
+            "story_text": "FIDEM orqali Bobur bilan tanishganimga 8 oy bo'ldi. Birinchi xabarni u atirgul yuborib boshladi — bu menga juda samimiy tuyuldi. Suhbatlarimizda halol va ochiq edik, oilalarimiz ham bir-birini yoqtirdi. Hozir nikohimizning birinchi yili.",
+            "photo_url": "https://images.unsplash.com/photo-1519741497674-611481863552?w=800",
+            "published": True, "featured": True, "views": 142,
+        },
+        {
+            "couple_names": "Dilnoza & Sardor",
+            "region": "Samarqand",
+            "year": 2024,
+            "story_text": "Onam menga FIDEM'ni tavsiya qildi. Sovchi tizimi ajoyib edi — onam suhbatlarimizni xolisona kuzata oldi va Sardorning oilasini yaxshi deb topdi. AI hisobot bizga moslik 91% ekanini ko'rsatdi. To'yimiz bahorda bo'ldi.",
+            "photo_url": "https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=800",
+            "published": True, "featured": True, "views": 89,
+        },
+        {
+            "couple_names": "Madina & Diyor",
+            "region": "Toshkent · Chilonzor",
+            "year": 2025,
+            "story_text": "Diyor menga shaxsiyat testi orqali yo'l ko'rsatdi — biz ikkalamiz ham yuqori mas'uliyatli va xushmuomalalik darajasiga ega edik. Tanishganimizning 4 oyida nikohlashga qaror qildik. Alloh duosi bilan.",
+            "photo_url": "https://images.unsplash.com/photo-1551027395-99f23ce0a8b1?w=800",
+            "published": True, "featured": False, "views": 67,
+        },
+    ]
+    for s in stories:
+        s["id"] = new_id()
+        s["created_at"] = iso(now_utc())
+        await db.success_stories.insert_one(s)
+    log.info(f"Seeded {len(stories)} success stories")
 
 
 @app.on_event("shutdown")

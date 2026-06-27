@@ -4,7 +4,8 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, PlanPill } from "@/components/Badges";
 import PhotoUpload from "@/components/PhotoUpload";
-import { ChevronRight, Crown, Gem, Wallet, Share2, Settings as SettingsIcon, LogOut, Copy, Trophy, ShieldCheck, Bell, Clock, SlidersHorizontal, Brain, UsersRound } from "lucide-react";
+import { ChevronRight, Crown, Gem, Wallet, Share2, Settings as SettingsIcon, LogOut, Copy, Trophy, ShieldCheck, Bell, Clock, SlidersHorizontal, Brain, UsersRound, Pen, BookOpen } from "lucide-react";
+import ProgressCard from "@/components/ProgressCard";
 import { photoSrc } from "@/lib/photo";
 import { toast } from "sonner";
 
@@ -151,6 +152,9 @@ export default function Me() {
           />
         </div>
       </div>
+
+      {/* Gamification — level + XP + badges */}
+      <ProgressCard />
 
       {/* Premium/balance row */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -315,6 +319,14 @@ export default function Me() {
         </Link>
         <Link to="/chaperone" data-testid="link-chaperone" className="flex items-center justify-between p-4">
           <span className="flex items-center gap-3 text-sm"><UsersRound className="w-4 h-4 text-secondary" /> Sovchi (Wali) tizimi</span>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </Link>
+        <Link to="/prompts" data-testid="link-prompts" className="flex items-center justify-between p-4">
+          <span className="flex items-center gap-3 text-sm"><Pen className="w-4 h-4 text-secondary" /> Profil promptlari</span>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </Link>
+        <Link to="/stories" data-testid="link-stories" className="flex items-center justify-between p-4">
+          <span className="flex items-center gap-3 text-sm"><BookOpen className="w-4 h-4 text-primary" /> Muvaffaqiyat hikoyalari</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
         <Link to="/settings" data-testid="link-settings" className="flex items-center justify-between p-4">

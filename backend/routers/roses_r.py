@@ -86,6 +86,7 @@ async def send_rose(
     # Prefer using free first
     inc = {"roses_free": -1} if free > 0 else {"roses_paid": -1}
     inc["roses_sent_total"] = 1
+    inc["xp"] = 10
     await db.users.update_one({"id": uid}, {"$inc": inc})
 
     target = await get_user(to_user_id)

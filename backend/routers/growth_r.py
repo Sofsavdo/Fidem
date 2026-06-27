@@ -58,7 +58,7 @@ async def daily_claim(uid: str = Depends(get_current_user_id)):
         {"id": uid},
         {
             "$set": {"daily_last_at": iso(now_utc()), "daily_streak": streak},
-            "$inc": {"balance": bonus},
+            "$inc": {"balance": bonus, "xp": 20 + (50 if streak % 7 == 0 else 0)},
         },
     )
     await push_notif(uid, "balance", f"Daily bonus +{bonus:,} so'm (streak {streak})")
