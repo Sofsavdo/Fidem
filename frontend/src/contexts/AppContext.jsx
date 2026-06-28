@@ -56,28 +56,62 @@ export function AppProvider({ children }) {
     loadMe();
   }, [loadMe]);
 
-  // Try Telegram WebApp auto-auth on mount
-  useEffect(() => {
-    if (user) return;
-    const tg = window.Telegram?.WebApp;
-    if (!tg) return;
-    try {
-      tg.ready();
-      tg.expand();
-    } catch {}
-    const initData = tg?.initData;
-    const token = localStorage.getItem("fidem_token");
-    if (initData && !token) {
-      api
-        .post("/auth/telegram", { init_data: initData })
-        .then(async (r) => {
-          localStorage.setItem("fidem_token", r.data.token);
-          await loadMe();
-        })
-        .catch(() => {});
-    }
-  }, [user, loadMe]);
+  // Telegram WebApp auto-auth
+useEffect(() => {
+  if (user) return;
 
+  let cancelled = false;
+
+  const tryTelegramAuth = async () => {
+    const token = localStorage.getItem("fidem_token");
+    if (token) return;
+
+    const tg = window.Telegram?.WebApp;
+    const initData = tg?.initData;
+
+    if (!initData) return false;
+
+    try {
+      tg.ready?.();
+      tg.expand?.();
+
+      const r = await api.post("/auth/telegram", {
+        init_data: initData,
+      });
+
+      if (cancelled) return true;
+
+      localStorage.setItem("fidem_token", r.data.token);
+      await loadMe();
+
+      if (r.data.onboarded) {
+        window.history.replaceState(null, "", "/");
+      } else {
+        window.history.replaceState(null, "", "/onboarding");
+      }
+
+      return true;
+    } catch (e) {
+      console.warn("Telegram auto-auth failed:", e);
+      return true;
+    }
+  };
+
+  const run = async () => {
+    for (let i = 0; i < 20; i++) {
+      if (cancelled) return;
+      const ok = await tryTelegramAuth();
+      if (ok) return;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  };
+
+  run();
+
+  return () => {
+    cancelled = true;
+  };
+}, [user, loadMe]);
   const login = async (email, password) => {
     const r = await api.post("/auth/login", { email, password });
     localStorage.setItem("fidem_token", r.data.token);
