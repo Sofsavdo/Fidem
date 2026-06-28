@@ -1,81 +1,19 @@
-"""Emergent Object Storage helper."""
+"""Cloudinary Object Storage helper for FIDEM."""
 from __future__ import annotations
+
+import base64
 import logging
 import os
-import threading
+import uuid
 
 import httpx
 
-STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
-EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
-APP_NAME = os.environ.get("APP_NAME", "fidem")
-
 log = logging.getLogger(__name__)
-_storage_key: str | None = None
-_lock = threading.Lock()
 
-
-def init_storage(force: bool = False) -> str | None:
-    """Initialize storage session once. Returns storage_key or None on failure."""
-    global _storage_key
-    if _storage_key and not force:
-        return _storage_key
-    if not EMERGENT_KEY:
-        log.warning("EMERGENT_LLM_KEY not set; object storage disabled")
-        return None
-    with _lock:
-        if _storage_key and not force:
-            return _storage_key
-        try:
-            r = httpx.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_KEY}, timeout=30)
-            r.raise_for_status()
-            _storage_key = r.json()["storage_key"]
-            log.info("Object storage initialized")
-            return _storage_key
-        except Exception as e:
-            log.error(f"Storage init failed: {e}")
-            return None
-
-
-async def put_object(path: str, data: bytes, content_type: str) -> dict:
-    key = init_storage()
-    if not key:
-        raise RuntimeError("Storage not available")
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        r = await client.put(
-            f"{STORAGE_URL}/objects/{path}",
-            headers={"X-Storage-Key": key, "Content-Type": content_type},
-            content=data,
-        )
-        if r.status_code == 403:
-            init_storage(force=True)
-            r = await client.put(
-                f"{STORAGE_URL}/objects/{path}",
-                headers={"X-Storage-Key": init_storage(), "Content-Type": content_type},
-                content=data,
-            )
-        r.raise_for_status()
-        return r.json()
-
-
-async def get_object(path: str) -> tuple[bytes, str]:
-    key = init_storage()
-    if not key:
-        raise RuntimeError("Storage not available")
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        r = await client.get(
-            f"{STORAGE_URL}/objects/{path}",
-            headers={"X-Storage-Key": key},
-        )
-        if r.status_code == 403:
-            init_storage(force=True)
-            r = await client.get(
-                f"{STORAGE_URL}/objects/{path}",
-                headers={"X-Storage-Key": init_storage()},
-            )
-        r.raise_for_status()
-        return r.content, r.headers.get("Content-Type", "application/octet-stream")
-
+CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME", "")
+CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY", "")
+CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET", "")
+APP_NAME = os.environ.get("APP_NAME", "fidem")
 
 MIME = {
     "jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
@@ -85,3 +23,47 @@ MIME = {
     "mp4": "video/mp4", "mov": "video/quicktime",
     "pdf": "application/pdf",
 }
+
+
+def init_storage(force: bool = False) -> str | None:
+    if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
+        return "cloudinary"
+    log.warning("Cloudinary env not set; object storage disabled")
+    return None
+
+
+async def put_object(path: str, data: bytes, content_type: str) -> dict:
+    if not init_storage():
+        raise RuntimeError("Storage not available")
+
+    ext = path.split(".")[-1].lower() if "." in path else "jpg"
+    public_id = f"{APP_NAME}/{path.rsplit('.', 1)[0]}-{uuid.uuid4().hex[:8]}"
+
+    data_uri = f"data:{content_type};base64,{base64.b64encode(data).decode('utf-8')}"
+
+    url = f"https://api.cloudinary.com/v1_1/{CLOUDINARY_CLOUD_NAME}/auto/upload"
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        r = await client.post(
+            url,
+            data={
+                "file": data_uri,
+                "public_id": public_id,
+                "overwrite": "true",
+            },
+            auth=(CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET),
+        )
+        r.raise_for_status()
+        res = r.json()
+
+    return {
+        "url": res.get("secure_url") or res.get("url"),
+        "path": res.get("public_id"),
+        "content_type": content_type,
+        "size": len(data),
+        "provider": "cloudinary",
+    }
+
+
+async def get_object(path: str) -> tuple[bytes, str]:
+    raise RuntimeError("Direct get_object is not supported for Cloudinary. Use returned secure_url.")
