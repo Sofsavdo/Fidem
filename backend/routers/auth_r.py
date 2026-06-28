@@ -146,6 +146,7 @@ async def me(uid: str = Depends(get_current_user_id)):
     pub["message_filters"] = user.get("message_filters", {})
     pub["birth_date"] = user.get("birth_date")
     pub["country"] = user.get("country")
+    pub["search_country"] = user.get("search_country")
     pub["search_region"] = user.get("search_region")
     pub["search_age_min"] = user.get("search_age_min", 18)
     pub["search_age_max"] = user.get("search_age_max", 60)

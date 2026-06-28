@@ -5,12 +5,9 @@ import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import PhotoUpload from "@/components/PhotoUpload";
 import WheelDatePicker from "@/components/WheelDatePicker";
+import CountrySelect from "@/components/CountrySelect";
+import RegionSelect from "@/components/RegionSelect";
 import { ChevronLeft, ChevronRight, Check, Sparkles } from "lucide-react";
-
-const UZ_REGIONS = [
-  "Toshkent", "Samarqand", "Buxoro", "Andijon", "Farg'ona", "Namangan",
-  "Qashqadaryo", "Surxondaryo", "Sirdaryo", "Jizzax", "Navoiy", "Xorazm", "Qoraqalpog'iston",
-];
 
 const STEPS = 7;
 
@@ -30,22 +27,23 @@ export default function Onboarding() {
     name: user?.name || "",
     gender: "male",
     birth_date: "2000-01-01",
-    country: "Uzbekistan",
-    region: "Toshkent",
+    country: "",
+    region: "",
     district: "",
     marital_status: "single",
     has_children: false,
     children_count: 0,
     height_cm: 170,
     weight_kg: 70,
-    education: "Oliy",
+    education: "",
     profession: "",
-    religion: "Islom",
+    religion: "",
     looking_for: "",
     search_gender: "female",
     search_age_min: 20,
     search_age_max: 35,
-    search_region: "Toshkent",
+    search_country: "",
+    search_region: "",
     photo_url: "",
     bio: "",
     smoking: "no",
@@ -80,6 +78,14 @@ export default function Onboarding() {
     try {
       const payload = { ...data };
       if (!payload.search_gender) payload.search_gender = payload.gender === "male" ? "female" : "male";
+      if (!payload.search_country) payload.search_country = payload.country;
+      // backend OnboardingProfile requires non-empty string for region / education / religion / search_region
+      payload.region = payload.region || "";
+      payload.search_region = payload.search_region || "";
+      payload.education = payload.education || "";
+      payload.religion = payload.religion || "";
+      payload.profession = payload.profession || "";
+      payload.looking_for = payload.looking_for || "";
       await api.post("/profile/onboard", payload);
       toast.success(t("onboard_complete"));
       await refresh();
@@ -105,6 +111,18 @@ export default function Onboarding() {
   };
 
   const next = () => {
+    // Step validation
+    if (step === 0) {
+      if (!data.name?.trim()) { toast.error(t("name_required") || t("name")); return; }
+    }
+    if (step === 1) {
+      if (!data.country) { toast.error(t("country_required") || (t("select_country") || "Select country")); return; }
+      // region is only required if the country has a regions list (free-text countries allow blank)
+      // We do not strictly enforce here — onboard endpoint accepts empty region for free-text countries.
+    }
+    if (step === 5) {
+      if (!data.search_country) { toast.error(t("country_required") || (t("select_country") || "Select country")); return; }
+    }
     if (step === STEPS - 1) {
       if (!data.photo_url) { toast.error(t("photo_required")); return; }
       if (photoStatus.state === "verifying") return;
@@ -123,7 +141,7 @@ export default function Onboarding() {
       <div className="orb orb-1" style={{ opacity: 0.35 }} />
       <div className="orb orb-2" style={{ opacity: 0.3 }} />
 
-      <div className="relative z-10 max-w-md mx-auto w-full min-h-screen flex flex-col px-5 pt-8 pb-32 sm:px-6">
+      <div className="relative z-10 max-w-md md:max-w-2xl lg:max-w-3xl mx-auto w-full min-h-screen flex flex-col px-5 pt-8 pb-32 sm:px-6 md:px-8">
         {/* Progress */}
         <div className="flex items-center gap-1.5 mb-6">
           {Array.from({ length: STEPS }).map((_, i) => (
@@ -137,15 +155,15 @@ export default function Onboarding() {
             <div className="inline-flex items-center gap-1.5 text-[10px] tracking-wider uppercase font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-full">
               <Sparkles className="w-3 h-3" /> {`${step + 1} / ${STEPS}`}
             </div>
-            <h2 className="mt-3 font-heading text-2xl sm:text-3xl font-semibold tracking-tight leading-tight">
+            <h2 className="mt-3 font-heading text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight leading-tight">
               {t("onboarding_title")}
             </h2>
-            <p className="text-sm text-muted-foreground mt-1">{stepTitle}</p>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">{stepTitle}</p>
           </div>
         </div>
 
         {/* Step card */}
-        <div className="mt-6 card-premium p-5 sm:p-6 step-fade" key={step} data-testid={`onboarding-step-${step}`}>
+        <div className="mt-6 card-premium p-5 sm:p-6 md:p-8 step-fade" key={step} data-testid={`onboarding-step-${step}`}>
           <div className="space-y-5">
             {step === 0 && (
               <>
@@ -180,24 +198,23 @@ export default function Onboarding() {
 
             {step === 1 && (
               <>
-                <Field label={t("country")}>
-                  <input data-testid="ob-country" className="input" value={data.country} onChange={(e) => set({ country: e.target.value })} />
+                <Field as="div" label={t("country")}>
+                  <CountrySelect
+                    testid="ob-country"
+                    lang={lang}
+                    value={data.country}
+                    onChange={(name) => set({ country: name, region: "", search_country: data.search_country || name, search_region: data.search_country ? data.search_region : "" })}
+                    placeholder={t("select_country") || "Select country"}
+                  />
                 </Field>
-                <Field label={t("region")}>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2" data-testid="ob-region-grid">
-                    {UZ_REGIONS.map((r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        data-testid={`ob-region-${r}`}
-                        onClick={() => set({ region: r, search_region: r })}
-                        className={`tile-option ${data.region === r ? "active" : ""}`}
-                      >
-                        {r}
-                      </button>
-                    ))}
-                  </div>
-                  <input data-testid="ob-region" type="hidden" value={data.region} readOnly />
+                <Field as="div" label={t("region")}>
+                  <RegionSelect
+                    testid="ob-region"
+                    country={data.country}
+                    value={data.region}
+                    onChange={(r) => set({ region: r, search_region: data.search_country && data.search_country !== data.country ? data.search_region : r })}
+                    placeholder={t("select_region") || "Select region"}
+                  />
                 </Field>
                 <Field label={t("district")}>
                   <input data-testid="ob-district" className="input" value={data.district} onChange={(e) => set({ district: e.target.value })} placeholder={t("select_district")} />
@@ -241,14 +258,30 @@ export default function Onboarding() {
                   <Field label={t("height")}><input data-testid="ob-height" type="number" min="140" max="220" className="input" value={data.height_cm} onChange={(e) => set({ height_cm: +e.target.value })} /></Field>
                   <Field label={t("weight")}><input data-testid="ob-weight" type="number" min="35" max="200" className="input" value={data.weight_kg} onChange={(e) => set({ weight_kg: +e.target.value })} /></Field>
                 </div>
-                <Field label={t("education")}><input data-testid="ob-education" className="input" value={data.education} onChange={(e) => set({ education: e.target.value })} /></Field>
+                <Field label={t("education")}><input data-testid="ob-education" className="input" value={data.education} onChange={(e) => set({ education: e.target.value })} placeholder={t("education")} /></Field>
               </>
             )}
 
             {step === 4 && (
               <>
-                <Field label={t("profession")}><input data-testid="ob-profession" className="input" value={data.profession} onChange={(e) => set({ profession: e.target.value })} /></Field>
-                <Field label={t("religion")}><input data-testid="ob-religion" className="input" value={data.religion} onChange={(e) => set({ religion: e.target.value })} /></Field>
+                <Field label={t("profession")}><input data-testid="ob-profession" className="input" value={data.profession} onChange={(e) => set({ profession: e.target.value })} placeholder={t("profession")} /></Field>
+                <Field label={`${t("religion")} (${t("optional") || "optional"})`}>
+                  <RadioGroup
+                    testid="ob-religion"
+                    value={data.religion || "prefer_not_to_say"}
+                    onChange={(v) => set({ religion: v === "prefer_not_to_say" ? "" : v })}
+                    options={[
+                      { value: "prefer_not_to_say", label: t("prefer_not_to_say") || "Prefer not to say" },
+                      { value: "Islam", label: t("rel_islam") || "Islam" },
+                      { value: "Christianity", label: t("rel_christianity") || "Christianity" },
+                      { value: "Judaism", label: t("rel_judaism") || "Judaism" },
+                      { value: "Buddhism", label: t("rel_buddhism") || "Buddhism" },
+                      { value: "Hinduism", label: t("rel_hinduism") || "Hinduism" },
+                      { value: "Other", label: t("rel_other") || "Other" },
+                      { value: "None", label: t("rel_none") || "Non-religious" },
+                    ]}
+                  />
+                </Field>
                 <Field label={t("smoking")}>
                   <RadioGroup testid="ob-smoking" value={data.smoking} onChange={(v) => set({ smoking: v })}
                     options={[{ value: "no", label: t("no") }, { value: "sometimes", label: t("sometimes") }, { value: "yes", label: t("yes") }]} />
@@ -269,21 +302,23 @@ export default function Onboarding() {
                 <Field label={t("looking_for")}>
                   <textarea data-testid="ob-lookingfor" rows="3" className="input" value={data.looking_for} onChange={(e) => set({ looking_for: e.target.value })} />
                 </Field>
-                <Field label={t("search_area")}>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {UZ_REGIONS.map((r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        data-testid={`ob-searchregion-${r}`}
-                        onClick={() => set({ search_region: r })}
-                        className={`tile-option ${data.search_region === r ? "active" : ""}`}
-                      >
-                        {r}
-                      </button>
-                    ))}
+                <Field as="div" label={t("search_area")}>
+                  <div className="space-y-2">
+                    <CountrySelect
+                      testid="ob-searchcountry"
+                      lang={lang}
+                      value={data.search_country}
+                      onChange={(name) => set({ search_country: name, search_region: "" })}
+                      placeholder={t("select_country") || "Select country"}
+                    />
+                    <RegionSelect
+                      testid="ob-searchregion"
+                      country={data.search_country}
+                      value={data.search_region}
+                      onChange={(r) => set({ search_region: r })}
+                      placeholder={t("select_region") || "Select region"}
+                    />
                   </div>
-                  <input data-testid="ob-searchregion" type="hidden" value={data.search_region} readOnly />
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label={`${t("age")} min`}><input data-testid="ob-agemin" type="number" min="18" max="80" className="input" value={data.search_age_min} onChange={(e) => set({ search_age_min: +e.target.value })} /></Field>
@@ -328,7 +363,7 @@ export default function Onboarding() {
 
         {/* Sticky bottom nav */}
         <div className="fixed bottom-0 left-0 right-0 pointer-events-none" style={{ zIndex: 10000 }}>
-          <div className="max-w-md mx-auto px-5 sm:px-6 pb-5 pt-3 pointer-events-auto">
+          <div className="max-w-md md:max-w-2xl lg:max-w-3xl mx-auto px-5 sm:px-6 md:px-8 pb-5 pt-3 pointer-events-auto">
             <div className="flex gap-3 bg-background/85 backdrop-blur-xl rounded-2xl p-2 border border-border shadow-lg" style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}>
               {step > 0 && (
                 <button
@@ -365,12 +400,12 @@ export default function Onboarding() {
   );
 }
 
-function Field({ label, children }) {
+function Field({ label, children, as: As = "label" }) {
   return (
-    <label className="block">
+    <As className="block">
       <span className="field-label">{label}</span>
       <div className="mt-1.5">{children}</div>
-    </label>
+    </As>
   );
 }
 

@@ -1,514 +1,529 @@
 #!/usr/bin/env python3
 """
-FIDEM Backend Test - Onboarding Extra Fields (smoking, alcohol, relocation)
+Backend test for: Global country/region + religion optional — OnboardingProfile model relaxed
 Test scenarios:
-1. Register a fresh user
-2. Onboard with smoking="yes", alcohol="sometimes", relocation=true
-3. GET /api/auth/me - verify fields
-4. Admin GET /api/candidates/{user_id} - verify fields
-5. PATCH /api/profile - update fields and verify
+1. Admin login regression
+2. Health regression
+3. Register fresh user A
+4. Minimal Kyrgyzstan onboard (religion="")
+5. GET /api/auth/me for user A (verify country, region, religion)
+6. Religion optional regression (PATCH religion="")
+7. PATCH search_country
+8. Existing demos still loadable (GET /api/candidates)
+9. Reject onboard without country
+10. Reject onboard without name
 """
 
 import requests
-import time
+import random
+import sys
 from datetime import datetime
 
-# Configuration
-BASE_URL = "https://sharp-raman-6.preview.emergentagent.com/api"
+# Base URL from frontend/.env
+BASE_URL = "https://a4ce9824-c731-4cee-aea8-08b0ccd714e3.preview.emergentagent.com/api"
+
+# Admin credentials
 ADMIN_EMAIL = "admin@fidem.uz"
 ADMIN_PASSWORD = "Admin@123"
 
-# Test state
-test_results = []
-admin_token = None
-test_user_email = None
-test_user_token = None
-test_user_id = None
+# Test results
+results = []
 
-
-def log_test(name, passed, details=""):
+def log_test(test_num, description, passed, details=""):
     """Log test result"""
     status = "✅ PASS" if passed else "❌ FAIL"
-    result = f"{status} - {name}"
+    results.append({
+        "test": test_num,
+        "description": description,
+        "passed": passed,
+        "details": details
+    })
+    print(f"\n{'='*80}")
+    print(f"Test {test_num}: {description}")
+    print(f"Status: {status}")
     if details:
-        result += f"\n    {details}"
-    test_results.append(result)
-    print(result)
-
+        print(f"Details: {details}")
+    print(f"{'='*80}")
 
 def test_1_admin_login():
-    """Test 1: Admin login to get token for later candidate verification"""
-    global admin_token
-    print("\n=== Test 1: Admin Login ===")
-    
+    """Test 1: Admin login regression"""
     try:
-        response = requests.post(
-            f"{BASE_URL}/auth/login",
-            json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
-            timeout=10
-        )
+        resp = requests.post(f"{BASE_URL}/auth/login", json={
+            "email": ADMIN_EMAIL,
+            "password": ADMIN_PASSWORD
+        }, timeout=10)
         
-        if response.status_code == 200:
-            data = response.json()
-            admin_token = data.get("token")
-            is_admin = data.get("is_admin", False)
-            
-            if admin_token and is_admin:
-                log_test(
-                    "Admin login",
-                    True,
-                    f"Admin token obtained, is_admin={is_admin}"
-                )
-                return True
-            else:
-                log_test(
-                    "Admin login",
-                    False,
-                    f"Missing token or is_admin flag. Response: {data}"
-                )
+        if resp.status_code != 200:
+            log_test(1, "Admin login regression", False, f"Expected 200, got {resp.status_code}: {resp.text}")
+            return None
+        
+        data = resp.json()
+        if not data.get("token"):
+            log_test(1, "Admin login regression", False, "No token in response")
+            return None
+        
+        if not data.get("is_admin"):
+            log_test(1, "Admin login regression", False, "is_admin is not true")
+            return None
+        
+        log_test(1, "Admin login regression", True, f"Token received, is_admin={data.get('is_admin')}")
+        return data["token"]
+    except Exception as e:
+        log_test(1, "Admin login regression", False, f"Exception: {str(e)}")
+        return None
+
+def test_2_health():
+    """Test 2: Health regression"""
+    try:
+        resp = requests.get(f"{BASE_URL}/", timeout=10)
+        
+        if resp.status_code != 200:
+            log_test(2, "Health regression", False, f"Expected 200, got {resp.status_code}")
+            return False
+        
+        data = resp.json()
+        if data.get("status") != "ok":
+            log_test(2, "Health regression", False, f"Expected status=ok, got {data}")
+            return False
+        
+        log_test(2, "Health regression", True, f"Response: {data}")
+        return True
+    except Exception as e:
+        log_test(2, "Health regression", False, f"Exception: {str(e)}")
+        return False
+
+def test_3_register_user_a():
+    """Test 3: Register fresh user A"""
+    try:
+        # Generate unique email with real TLD
+        timestamp = int(datetime.now().timestamp())
+        email = f"test_kg_{timestamp}@gmail.com"
+        
+        resp = requests.post(f"{BASE_URL}/auth/register", json={
+            "name": "Test KG",
+            "email": email,
+            "password": "Test@1234"
+        }, timeout=10)
+        
+        if resp.status_code != 200:
+            log_test(3, "Register fresh user A", False, f"Expected 200, got {resp.status_code}: {resp.text}")
+            return None, None
+        
+        data = resp.json()
+        if not data.get("token"):
+            log_test(3, "Register fresh user A", False, "No token in response")
+            return None, None
+        
+        if data.get("onboarded") != False:
+            log_test(3, "Register fresh user A", False, f"Expected onboarded=false, got {data.get('onboarded')}")
+            return None, None
+        
+        log_test(3, "Register fresh user A", True, f"User registered: {email}, token received, onboarded=false")
+        return data["token"], email
+    except Exception as e:
+        log_test(3, "Register fresh user A", False, f"Exception: {str(e)}")
+        return None, None
+
+def test_4_minimal_kyrgyzstan_onboard(token):
+    """Test 4: Minimal Kyrgyzstan onboard with religion=''"""
+    try:
+        # Minimal payload - many optional fields omitted
+        payload = {
+            "gender": "male",
+            "birth_date": "1995-06-15",
+            "country": "Kyrgyzstan",
+            "region": "Bishkek",
+            "marital_status": "single",
+            "has_children": False,
+            "children_count": 0,
+            "height_cm": 178,
+            "weight_kg": 75,
+            "name": "Test KG",
+            "search_gender": "female",
+            "search_age_min": 22,
+            "search_age_max": 35,
+            "photo_url": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=600&q=80&auto=format&fit=crop",
+            "religion": ""
+        }
+        
+        resp = requests.post(f"{BASE_URL}/profile/onboard", 
+                           json=payload,
+                           headers={"Authorization": f"Bearer {token}"},
+                           timeout=15)
+        
+        # If photo verification fails with no_face, try alternative photo
+        if resp.status_code == 400 and "photo_invalid:no_face" in resp.text:
+            print("First photo rejected, trying alternative portrait...")
+            payload["photo_url"] = "https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=600&q=80&auto=format&fit=crop"
+            resp = requests.post(f"{BASE_URL}/profile/onboard", 
+                               json=payload,
+                               headers={"Authorization": f"Bearer {token}"},
+                               timeout=15)
+        
+        if resp.status_code != 200:
+            log_test(4, "Minimal Kyrgyzstan onboard", False, f"Expected 200, got {resp.status_code}: {resp.text}")
+            return False
+        
+        data = resp.json()
+        if not data.get("ok"):
+            log_test(4, "Minimal Kyrgyzstan onboard", False, f"Expected ok=true, got {data}")
+            return False
+        
+        if "completeness" not in data:
+            log_test(4, "Minimal Kyrgyzstan onboard", False, "No completeness in response")
+            return False
+        
+        log_test(4, "Minimal Kyrgyzstan onboard", True, f"Onboarding successful, completeness={data.get('completeness')}")
+        return True
+    except Exception as e:
+        log_test(4, "Minimal Kyrgyzstan onboard", False, f"Exception: {str(e)}")
+        return False
+
+def test_5_get_me_user_a(token):
+    """Test 5: GET /api/auth/me for user A - verify country, region, religion"""
+    try:
+        resp = requests.get(f"{BASE_URL}/auth/me",
+                          headers={"Authorization": f"Bearer {token}"},
+                          timeout=10)
+        
+        if resp.status_code != 200:
+            log_test(5, "GET /api/auth/me for user A", False, f"Expected 200, got {resp.status_code}: {resp.text}")
+            return False
+        
+        data = resp.json()
+        
+        # Verify required fields
+        checks = []
+        
+        if data.get("country") != "Kyrgyzstan":
+            checks.append(f"country={data.get('country')} (expected Kyrgyzstan)")
+        
+        if data.get("region") != "Bishkek":
+            checks.append(f"region={data.get('region')} (expected Bishkek)")
+        
+        # Religion should be empty string (not None, not missing)
+        if "religion" not in data:
+            checks.append("religion field missing")
+        elif data.get("religion") != "":
+            checks.append(f"religion={repr(data.get('religion'))} (expected empty string)")
+        
+        if data.get("onboarded") != True:
+            checks.append(f"onboarded={data.get('onboarded')} (expected true)")
+        
+        # search_country and search_region may be present (can be "" or have values)
+        if "search_country" not in data:
+            checks.append("search_country field missing")
+        
+        if checks:
+            log_test(5, "GET /api/auth/me for user A", False, f"Validation failed: {', '.join(checks)}")
+            return False
+        
+        log_test(5, "GET /api/auth/me for user A", True, 
+                f"country={data.get('country')}, region={data.get('region')}, religion={repr(data.get('religion'))}, "
+                f"onboarded={data.get('onboarded')}, search_country={repr(data.get('search_country'))}, "
+                f"search_region={repr(data.get('search_region'))}")
+        return True
+    except Exception as e:
+        log_test(5, "GET /api/auth/me for user A", False, f"Exception: {str(e)}")
+        return False
+
+def test_6_religion_optional_patch(token):
+    """Test 6: Religion optional regression - PATCH religion=''"""
+    try:
+        # PATCH with religion=""
+        resp = requests.patch(f"{BASE_URL}/profile",
+                            json={"religion": ""},
+                            headers={"Authorization": f"Bearer {token}"},
+                            timeout=10)
+        
+        if resp.status_code != 200:
+            log_test(6, "Religion optional PATCH", False, f"Expected 200, got {resp.status_code}: {resp.text}")
+            return False
+        
+        data = resp.json()
+        if not data.get("ok"):
+            log_test(6, "Religion optional PATCH", False, f"Expected ok=true, got {data}")
+            return False
+        
+        # Verify with GET /api/auth/me
+        resp2 = requests.get(f"{BASE_URL}/auth/me",
+                           headers={"Authorization": f"Bearer {token}"},
+                           timeout=10)
+        
+        if resp2.status_code != 200:
+            log_test(6, "Religion optional PATCH", False, f"GET /auth/me failed: {resp2.status_code}")
+            return False
+        
+        me_data = resp2.json()
+        if me_data.get("religion") != "":
+            log_test(6, "Religion optional PATCH", False, f"religion={repr(me_data.get('religion'))} (expected empty string)")
+            return False
+        
+        log_test(6, "Religion optional PATCH", True, "PATCH successful, religion remains empty string")
+        return True
+    except Exception as e:
+        log_test(6, "Religion optional PATCH", False, f"Exception: {str(e)}")
+        return False
+
+def test_7_patch_search_country(token):
+    """Test 7: PATCH search_country and country"""
+    try:
+        # PATCH with new country and search_country
+        resp = requests.patch(f"{BASE_URL}/profile",
+                            json={
+                                "country": "Turkey",
+                                "region": "Istanbul",
+                                "search_country": "Turkey",
+                                "search_region": "Istanbul"
+                            },
+                            headers={"Authorization": f"Bearer {token}"},
+                            timeout=10)
+        
+        if resp.status_code != 200:
+            log_test(7, "PATCH search_country", False, f"Expected 200, got {resp.status_code}: {resp.text}")
+            return False
+        
+        # Verify with GET /api/auth/me
+        resp2 = requests.get(f"{BASE_URL}/auth/me",
+                           headers={"Authorization": f"Bearer {token}"},
+                           timeout=10)
+        
+        if resp2.status_code != 200:
+            log_test(7, "PATCH search_country", False, f"GET /auth/me failed: {resp2.status_code}")
+            return False
+        
+        data = resp2.json()
+        checks = []
+        
+        if data.get("country") != "Turkey":
+            checks.append(f"country={data.get('country')} (expected Turkey)")
+        
+        if data.get("region") != "Istanbul":
+            checks.append(f"region={data.get('region')} (expected Istanbul)")
+        
+        if data.get("search_country") != "Turkey":
+            checks.append(f"search_country={data.get('search_country')} (expected Turkey)")
+        
+        if data.get("search_region") != "Istanbul":
+            checks.append(f"search_region={data.get('search_region')} (expected Istanbul)")
+        
+        if checks:
+            log_test(7, "PATCH search_country", False, f"Validation failed: {', '.join(checks)}")
+            return False
+        
+        log_test(7, "PATCH search_country", True, 
+                f"country={data.get('country')}, region={data.get('region')}, "
+                f"search_country={data.get('search_country')}, search_region={data.get('search_region')}")
+        return True
+    except Exception as e:
+        log_test(7, "PATCH search_country", False, f"Exception: {str(e)}")
+        return False
+
+def test_8_existing_demos_loadable(admin_token):
+    """Test 8: Existing demos still loadable - GET /api/candidates"""
+    try:
+        resp = requests.get(f"{BASE_URL}/candidates",
+                          headers={"Authorization": f"Bearer {admin_token}"},
+                          timeout=10)
+        
+        if resp.status_code != 200:
+            log_test(8, "Existing demos loadable", False, f"Expected 200, got {resp.status_code}: {resp.text}")
+            return False
+        
+        data = resp.json()
+        if not isinstance(data, list):
+            log_test(8, "Existing demos loadable", False, f"Expected list, got {type(data)}")
+            return False
+        
+        # Should have ~8 seeded Uzbek users
+        if len(data) < 5:
+            log_test(8, "Existing demos loadable", False, f"Expected ~8 candidates, got {len(data)}")
+            return False
+        
+        # Verify UserPublic doesn't crash on missing fields
+        for candidate in data:
+            if "id" not in candidate or "name" not in candidate:
+                log_test(8, "Existing demos loadable", False, f"Missing required fields in candidate: {candidate}")
                 return False
-        else:
-            log_test(
-                "Admin login",
-                False,
-                f"HTTP {response.status_code}: {response.text}"
-            )
-            return False
-            
-    except Exception as e:
-        log_test("Admin login", False, f"Exception: {str(e)}")
-        return False
-
-
-def test_2_register_fresh_user():
-    """Test 2: Register a fresh user with unique email"""
-    global test_user_email, test_user_token, test_user_id
-    print("\n=== Test 2: Register Fresh User ===")
-    
-    # Generate unique email with timestamp
-    timestamp = int(time.time())
-    test_user_email = f"test_onboarding_{timestamp}@example.com"
-    
-    try:
-        response = requests.post(
-            f"{BASE_URL}/auth/register",
-            json={
-                "email": test_user_email,
-                "password": "TestPass123!",
-                "name": "Test Onboarding User"
-            },
-            timeout=10
-        )
         
-        if response.status_code == 200:
-            data = response.json()
-            test_user_token = data.get("token")
-            test_user_id = data.get("user_id")
-            onboarded = data.get("onboarded", True)
-            
-            if test_user_token and test_user_id and not onboarded:
-                log_test(
-                    "Register fresh user",
-                    True,
-                    f"User registered: {test_user_email}, user_id={test_user_id}, onboarded={onboarded}"
-                )
-                return True
-            else:
-                log_test(
-                    "Register fresh user",
-                    False,
-                    f"Missing token/user_id or already onboarded. Response: {data}"
-                )
-                return False
-        else:
-            log_test(
-                "Register fresh user",
-                False,
-                f"HTTP {response.status_code}: {response.text}"
-            )
-            return False
-            
+        log_test(8, "Existing demos loadable", True, f"Loaded {len(data)} candidates successfully")
+        return True
     except Exception as e:
-        log_test("Register fresh user", False, f"Exception: {str(e)}")
+        log_test(8, "Existing demos loadable", False, f"Exception: {str(e)}")
         return False
 
-
-def test_3_onboard_with_new_fields():
-    """Test 3: Onboard user with smoking, alcohol, relocation fields"""
-    print("\n=== Test 3: Onboard with New Fields ===")
-    
-    if not test_user_token:
-        log_test("Onboard with new fields", False, "No test user token available")
-        return False
-    
-    # Full onboarding payload with all required fields + new fields
-    onboarding_data = {
-        "gender": "male",
-        "birth_date": "1995-06-15",
-        "country": "Uzbekistan",
-        "region": "Toshkent",
-        "district": "Yunusobod",
-        "marital_status": "single",
-        "has_children": False,
-        "children_count": 0,
-        "height_cm": 175,
-        "weight_kg": 70,
-        "education": "Oliy ma'lumot",
-        "profession": "Dasturchi",
-        "religion": "Islom",
-        "looking_for": "Hayotdagi sherigimni izlayapman",
-        "search_gender": "female",
-        "search_age_min": 22,
-        "search_age_max": 35,
-        "search_region": "Toshkent",
-        "name": "Test Onboarding User",
-        # NEW FIELDS - the focus of this test
-        "smoking": "yes",
-        "alcohol": "sometimes",
-        "relocation": True
-    }
-    
+def test_9_reject_onboard_without_country():
+    """Test 9: Reject onboard without country"""
     try:
-        response = requests.post(
-            f"{BASE_URL}/profile/onboard",
-            json=onboarding_data,
-            headers={"Authorization": f"Bearer {test_user_token}"},
-            timeout=10
-        )
+        # Register new user
+        timestamp = int(datetime.now().timestamp())
+        email = f"test_no_country_{timestamp}@gmail.com"
         
-        if response.status_code == 200:
-            data = response.json()
-            ok = data.get("ok", False)
-            completeness = data.get("completeness", 0)
-            
-            if ok:
-                log_test(
-                    "Onboard with new fields",
-                    True,
-                    f"Onboarding successful. Completeness: {completeness}%. Payload included smoking='yes', alcohol='sometimes', relocation=true"
-                )
-                return True
-            else:
-                log_test(
-                    "Onboard with new fields",
-                    False,
-                    f"Onboarding returned ok=false. Response: {data}"
-                )
-                return False
-        else:
-            log_test(
-                "Onboard with new fields",
-                False,
-                f"HTTP {response.status_code}: {response.text}"
-            )
+        resp = requests.post(f"{BASE_URL}/auth/register", json={
+            "name": "Test No Country",
+            "email": email,
+            "password": "Test@1234"
+        }, timeout=10)
+        
+        if resp.status_code != 200:
+            log_test(9, "Reject onboard without country", False, f"Registration failed: {resp.status_code}")
             return False
-            
+        
+        token = resp.json().get("token")
+        
+        # Try to onboard WITHOUT country field
+        payload = {
+            "gender": "female",
+            "birth_date": "1998-03-20",
+            # "country": "Kyrgyzstan",  # OMITTED
+            "region": "Bishkek",
+            "marital_status": "single",
+            "has_children": False,
+            "height_cm": 165,
+            "weight_kg": 55,
+            "name": "Test No Country",
+            "search_gender": "male",
+            "photo_url": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&q=80",
+            "religion": ""
+        }
+        
+        resp2 = requests.post(f"{BASE_URL}/profile/onboard",
+                            json=payload,
+                            headers={"Authorization": f"Bearer {token}"},
+                            timeout=10)
+        
+        # Should get 422 validation error
+        if resp2.status_code != 422:
+            log_test(9, "Reject onboard without country", False, 
+                    f"Expected 422, got {resp2.status_code}: {resp2.text}")
+            return False
+        
+        log_test(9, "Reject onboard without country", True, f"Correctly rejected with 422: {resp2.text}")
+        return True
     except Exception as e:
-        log_test("Onboard with new fields", False, f"Exception: {str(e)}")
+        log_test(9, "Reject onboard without country", False, f"Exception: {str(e)}")
         return False
 
-
-def test_4_verify_me_endpoint():
-    """Test 4: GET /api/auth/me - verify smoking, alcohol, relocation fields"""
-    print("\n=== Test 4: Verify /api/auth/me Returns New Fields ===")
-    
-    if not test_user_token:
-        log_test("Verify /api/auth/me", False, "No test user token available")
-        return False
-    
+def test_10_reject_onboard_without_name():
+    """Test 10: Reject onboard without name"""
     try:
-        response = requests.get(
-            f"{BASE_URL}/auth/me",
-            headers={"Authorization": f"Bearer {test_user_token}"},
-            timeout=10
-        )
+        # Register new user
+        timestamp = int(datetime.now().timestamp())
+        email = f"test_no_name_{timestamp}@gmail.com"
         
-        if response.status_code == 200:
-            data = response.json()
-            
-            # Check for new fields
-            smoking = data.get("smoking")
-            alcohol = data.get("alcohol")
-            relocation = data.get("relocation")
-            
-            # Verify values match what we sent
-            smoking_ok = smoking == "yes"
-            alcohol_ok = alcohol == "sometimes"
-            relocation_ok = relocation == True
-            
-            all_ok = smoking_ok and alcohol_ok and relocation_ok
-            
-            details = f"smoking={smoking} (expected 'yes', {'✓' if smoking_ok else '✗'}), "
-            details += f"alcohol={alcohol} (expected 'sometimes', {'✓' if alcohol_ok else '✗'}), "
-            details += f"relocation={relocation} (expected True, {'✓' if relocation_ok else '✗'})"
-            
-            log_test(
-                "Verify /api/auth/me returns new fields",
-                all_ok,
-                details
-            )
-            return all_ok
-        else:
-            log_test(
-                "Verify /api/auth/me",
-                False,
-                f"HTTP {response.status_code}: {response.text}"
-            )
-            return False
-            
-    except Exception as e:
-        log_test("Verify /api/auth/me", False, f"Exception: {str(e)}")
-        return False
-
-
-def test_5_admin_verify_candidate():
-    """Test 5: Admin GET /api/candidates/{user_id} - verify new fields"""
-    print("\n=== Test 5: Admin Verify Candidate Endpoint ===")
-    
-    if not admin_token:
-        log_test("Admin verify candidate", False, "No admin token available")
-        return False
-    
-    if not test_user_id:
-        log_test("Admin verify candidate", False, "No test user ID available")
-        return False
-    
-    try:
-        # First, try to get the candidate via the candidates list endpoint
-        # to see if the user appears there
-        response = requests.get(
-            f"{BASE_URL}/candidates",
-            headers={"Authorization": f"Bearer {admin_token}"},
-            params={"limit": 100},
-            timeout=10
-        )
+        resp = requests.post(f"{BASE_URL}/auth/register", json={
+            "name": "Test No Name",
+            "email": email,
+            "password": "Test@1234"
+        }, timeout=10)
         
-        if response.status_code == 200:
-            candidates = response.json()
-            
-            # Find our test user in the list
-            test_candidate = None
-            for candidate in candidates:
-                if candidate.get("id") == test_user_id:
-                    test_candidate = candidate
-                    break
-            
-            if test_candidate:
-                # Check for new fields
-                smoking = test_candidate.get("smoking")
-                alcohol = test_candidate.get("alcohol")
-                relocation = test_candidate.get("relocation")
-                
-                # Verify values
-                smoking_ok = smoking == "yes"
-                alcohol_ok = alcohol == "sometimes"
-                relocation_ok = relocation == True
-                
-                all_ok = smoking_ok and alcohol_ok and relocation_ok
-                
-                details = f"Found user in candidates list. "
-                details += f"smoking={smoking} (expected 'yes', {'✓' if smoking_ok else '✗'}), "
-                details += f"alcohol={alcohol} (expected 'sometimes', {'✓' if alcohol_ok else '✗'}), "
-                details += f"relocation={relocation} (expected True, {'✓' if relocation_ok else '✗'})"
-                
-                log_test(
-                    "Admin verify candidate via /api/candidates",
-                    all_ok,
-                    details
-                )
-                return all_ok
-            else:
-                # User not in candidates list (might be due to gender/region filters)
-                # This is expected behavior - admin (male) won't see male candidates
-                log_test(
-                    "Admin verify candidate",
-                    True,
-                    f"User {test_user_id} not in admin's candidates list (expected - gender filter). This is normal behavior."
-                )
-                return True
-        else:
-            log_test(
-                "Admin verify candidate",
-                False,
-                f"HTTP {response.status_code}: {response.text}"
-            )
+        if resp.status_code != 200:
+            log_test(10, "Reject onboard without name", False, f"Registration failed: {resp.status_code}")
             return False
-            
-    except Exception as e:
-        log_test("Admin verify candidate", False, f"Exception: {str(e)}")
-        return False
-
-
-def test_6_update_profile_fields():
-    """Test 6: PATCH /api/profile - update smoking, alcohol, relocation"""
-    print("\n=== Test 6: Update Profile Fields ===")
-    
-    if not test_user_token:
-        log_test("Update profile fields", False, "No test user token available")
-        return False
-    
-    # Update to different values
-    update_data = {
-        "smoking": "no",
-        "alcohol": "no",
-        "relocation": False
-    }
-    
-    try:
-        response = requests.patch(
-            f"{BASE_URL}/profile",
-            json=update_data,
-            headers={"Authorization": f"Bearer {test_user_token}"},
-            timeout=10
-        )
         
-        if response.status_code == 200:
-            data = response.json()
-            ok = data.get("ok", False)
-            
-            if ok:
-                log_test(
-                    "Update profile fields",
-                    True,
-                    f"Profile update successful. Updated smoking='no', alcohol='no', relocation=false"
-                )
-                return True
-            else:
-                log_test(
-                    "Update profile fields",
-                    False,
-                    f"Update returned ok=false. Response: {data}"
-                )
-                return False
-        else:
-            log_test(
-                "Update profile fields",
-                False,
-                f"HTTP {response.status_code}: {response.text}"
-            )
-            return False
-            
-    except Exception as e:
-        log_test("Update profile fields", False, f"Exception: {str(e)}")
-        return False
-
-
-def test_7_verify_updated_fields():
-    """Test 7: GET /api/auth/me - verify updated values"""
-    print("\n=== Test 7: Verify Updated Fields ===")
-    
-    if not test_user_token:
-        log_test("Verify updated fields", False, "No test user token available")
-        return False
-    
-    try:
-        response = requests.get(
-            f"{BASE_URL}/auth/me",
-            headers={"Authorization": f"Bearer {test_user_token}"},
-            timeout=10
-        )
+        token = resp.json().get("token")
         
-        if response.status_code == 200:
-            data = response.json()
-            
-            # Check for updated values
-            smoking = data.get("smoking")
-            alcohol = data.get("alcohol")
-            relocation = data.get("relocation")
-            
-            # Verify values match updated values
-            smoking_ok = smoking == "no"
-            alcohol_ok = alcohol == "no"
-            relocation_ok = relocation == False
-            
-            all_ok = smoking_ok and alcohol_ok and relocation_ok
-            
-            details = f"smoking={smoking} (expected 'no', {'✓' if smoking_ok else '✗'}), "
-            details += f"alcohol={alcohol} (expected 'no', {'✓' if alcohol_ok else '✗'}), "
-            details += f"relocation={relocation} (expected False, {'✓' if relocation_ok else '✗'})"
-            
-            log_test(
-                "Verify updated fields via /api/auth/me",
-                all_ok,
-                details
-            )
-            return all_ok
-        else:
-            log_test(
-                "Verify updated fields",
-                False,
-                f"HTTP {response.status_code}: {response.text}"
-            )
+        # Try to onboard WITHOUT name field
+        payload = {
+            "gender": "female",
+            "birth_date": "1998-03-20",
+            "country": "Kyrgyzstan",
+            "region": "Bishkek",
+            "marital_status": "single",
+            "has_children": False,
+            "height_cm": 165,
+            "weight_kg": 55,
+            # "name": "Test No Name",  # OMITTED
+            "search_gender": "male",
+            "photo_url": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&q=80",
+            "religion": ""
+        }
+        
+        resp2 = requests.post(f"{BASE_URL}/profile/onboard",
+                            json=payload,
+                            headers={"Authorization": f"Bearer {token}"},
+                            timeout=10)
+        
+        # Should get 422 validation error
+        if resp2.status_code != 422:
+            log_test(10, "Reject onboard without name", False, 
+                    f"Expected 422, got {resp2.status_code}: {resp2.text}")
             return False
-            
+        
+        log_test(10, "Reject onboard without name", True, f"Correctly rejected with 422: {resp2.text}")
+        return True
     except Exception as e:
-        log_test("Verify updated fields", False, f"Exception: {str(e)}")
+        log_test(10, "Reject onboard without name", False, f"Exception: {str(e)}")
         return False
-
 
 def main():
-    """Run all tests"""
-    print("=" * 80)
-    print("FIDEM BACKEND TEST - Onboarding Extra Fields")
-    print("Testing: smoking, alcohol, relocation fields")
-    print("=" * 80)
+    print("="*80)
+    print("BACKEND TEST: Global country/region + religion optional")
+    print("="*80)
     
-    # Run tests in sequence
-    tests = [
-        test_1_admin_login,
-        test_2_register_fresh_user,
-        test_3_onboard_with_new_fields,
-        test_4_verify_me_endpoint,
-        test_5_admin_verify_candidate,
-        test_6_update_profile_fields,
-        test_7_verify_updated_fields,
-    ]
+    # Test 1: Admin login
+    admin_token = test_1_admin_login()
+    if not admin_token:
+        print("\n❌ CRITICAL: Admin login failed, cannot continue")
+        sys.exit(1)
     
-    passed = 0
-    failed = 0
+    # Test 2: Health check
+    test_2_health()
     
-    for test_func in tests:
-        try:
-            result = test_func()
-            if result:
-                passed += 1
-            else:
-                failed += 1
-        except Exception as e:
-            print(f"❌ FAIL - {test_func.__name__}: Unexpected exception: {e}")
-            failed += 1
-        
-        # Small delay between tests
-        time.sleep(0.5)
+    # Test 3: Register user A
+    user_a_token, user_a_email = test_3_register_user_a()
+    if not user_a_token:
+        print("\n❌ CRITICAL: User registration failed, cannot continue")
+        sys.exit(1)
+    
+    # Test 4: Minimal Kyrgyzstan onboard
+    onboard_success = test_4_minimal_kyrgyzstan_onboard(user_a_token)
+    if not onboard_success:
+        print("\n⚠️ WARNING: Onboarding failed, some tests may be skipped")
+    
+    # Test 5: GET /api/auth/me for user A
+    if onboard_success:
+        test_5_get_me_user_a(user_a_token)
+    
+    # Test 6: Religion optional PATCH
+    if onboard_success:
+        test_6_religion_optional_patch(user_a_token)
+    
+    # Test 7: PATCH search_country
+    if onboard_success:
+        test_7_patch_search_country(user_a_token)
+    
+    # Test 8: Existing demos loadable
+    test_8_existing_demos_loadable(admin_token)
+    
+    # Test 9: Reject onboard without country
+    test_9_reject_onboard_without_country()
+    
+    # Test 10: Reject onboard without name
+    test_10_reject_onboard_without_name()
     
     # Summary
-    print("\n" + "=" * 80)
+    print("\n" + "="*80)
     print("TEST SUMMARY")
-    print("=" * 80)
-    for result in test_results:
-        print(result)
+    print("="*80)
     
-    print("\n" + "=" * 80)
-    print(f"TOTAL: {passed + failed} tests")
-    print(f"✅ PASSED: {passed}")
-    print(f"❌ FAILED: {failed}")
-    print("=" * 80)
+    passed = sum(1 for r in results if r["passed"])
+    total = len(results)
     
-    # Endpoint paths used
-    print("\n" + "=" * 80)
-    print("ENDPOINT PATHS USED:")
-    print("=" * 80)
-    print(f"1. POST {BASE_URL}/auth/register")
-    print(f"2. POST {BASE_URL}/auth/login")
-    print(f"3. POST {BASE_URL}/profile/onboard")
-    print(f"4. GET  {BASE_URL}/auth/me")
-    print(f"5. GET  {BASE_URL}/candidates")
-    print(f"6. PATCH {BASE_URL}/profile")
-    print("=" * 80)
+    for r in results:
+        status = "✅" if r["passed"] else "❌"
+        print(f"{status} Test {r['test']}: {r['description']}")
     
-    return failed == 0
-
+    print(f"\n{'='*80}")
+    print(f"TOTAL: {passed}/{total} tests passed")
+    print(f"{'='*80}")
+    
+    if passed == total:
+        print("\n🎉 ALL TESTS PASSED!")
+        sys.exit(0)
+    else:
+        print(f"\n⚠️ {total - passed} test(s) failed")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    success = main()
-    exit(0 if success else 1)
+    main()

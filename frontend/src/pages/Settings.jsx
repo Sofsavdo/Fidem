@@ -4,13 +4,14 @@ import { useApp } from "@/contexts/AppContext";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import UZ_REGIONS from "@/lib/regions";
+import CountrySelect from "@/components/CountrySelect";
+import RegionSelect from "@/components/RegionSelect";
 
 export default function Settings() {
-  const { t, user, refresh } = useApp();
+  const { t, user, refresh, lang } = useApp();
   const [f, setF] = useState({
     age_min: 18, age_max: 60,
-    region: "", marital_status: "",
+    country: "", region: "", marital_status: "",
     has_children: null,
     height_min: null, height_max: null,
     weight_min: null, weight_max: null,
@@ -65,9 +66,6 @@ export default function Settings() {
           <NumField label={`${t("age")} min`} value={f.age_min} onChange={(v) => setF({ ...f, age_min: v })} testid="set-agemin" />
           <NumField label={`${t("age")} max`} value={f.age_max} onChange={(v) => setF({ ...f, age_max: v })} testid="set-agemax" />
         </div>
-        <SelectField label={t("region")} value={f.region || ""} onChange={(v) => setF({ ...f, region: v })} testid="set-region"
-          options={[{ value: "", label: "—" }, ...UZ_REGIONS.map((r) => ({ value: r, label: r }))]}
-        />
         <SelectField label={t("marital_status")} value={f.marital_status || ""} onChange={(v) => setF({ ...f, marital_status: v })} testid="set-marital"
           options={[
             { value: "", label: "—" },
@@ -76,6 +74,26 @@ export default function Settings() {
             { value: "widowed", label: t("widowed") },
           ]}
         />
+        <div>
+          <label className="block text-xs font-semibold text-muted-foreground mb-1.5">{t("country")}</label>
+          <CountrySelect
+            testid="set-country"
+            lang={lang}
+            value={f.country}
+            onChange={(name) => setF({ ...f, country: name, region: "" })}
+            placeholder={t("select_country") || "Select country"}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-muted-foreground mb-1.5">{t("region")}</label>
+          <RegionSelect
+            testid="set-region"
+            country={f.country}
+            value={f.region}
+            onChange={(r) => setF({ ...f, region: r })}
+            placeholder={t("select_region") || "Select region"}
+          />
+        </div>
         <SelectField label={t("has_children")} value={f.has_children === null ? "" : (f.has_children ? "yes" : "no")} onChange={(v) => setF({ ...f, has_children: v === "" ? null : v === "yes" })} testid="set-children"
           options={[
             { value: "", label: "—" },

@@ -95,7 +95,7 @@ export default function Welcome() {
             <div className="absolute -bottom-4 -left-2 sm:left-4 glass rounded-2xl px-4 py-2.5 border border-border/60 shadow-lg flex items-center gap-2">
               <Heart className="w-5 h-5 text-primary" fill="currentColor" />
               <div className="leading-tight">
-                <p className="text-sm font-semibold">12+</p>
+                <p className="text-sm font-semibold">{t("land_badge_users") || "Verified members"}</p>
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wide">FIDEM</p>
               </div>
             </div>

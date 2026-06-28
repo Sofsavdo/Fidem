@@ -5,7 +5,8 @@ import CandidateCard from "@/components/CandidateCard";
 import { useApp } from "@/contexts/AppContext";
 import { X, SlidersHorizontal, MapPin } from "lucide-react";
 import { toast } from "sonner";
-import UZ_REGIONS from "@/lib/regions";
+import CountrySelect from "@/components/CountrySelect";
+import RegionSelect from "@/components/RegionSelect";
 
 export default function Candidates() {
   const { t, user } = useApp();
@@ -33,7 +34,7 @@ export default function Candidates() {
   useEffect(() => {
     load();
     // eslint-disable-next-line
-  }, [filters.sort, filters.verified_only, filters.financial_only, filters.region, filters.district, filters.age_min, filters.age_max]);
+  }, [filters.sort, filters.verified_only, filters.financial_only, filters.country, filters.region, filters.district, filters.age_min, filters.age_max]);
 
   const onSave = async (c) => {
     try {
@@ -115,8 +116,14 @@ export default function Candidates() {
       </div>
 
       {/* Active filter chips */}
-      {(filters.region || filters.district || filters.age_min || filters.age_max) && (
+      {(filters.country || filters.region || filters.district || filters.age_min || filters.age_max) && (
         <div className="flex flex-wrap gap-1.5 mb-3" data-testid="active-filter-chips">
+          {filters.country && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2.5 py-1 text-[11px] font-medium">
+              <MapPin className="w-3 h-3" /> {filters.country}
+              <button onClick={() => setFilters((f) => ({ ...f, country: undefined, region: undefined }))} className="ml-0.5 hover:opacity-70" data-testid="chip-clear-country"><X className="w-3 h-3" /></button>
+            </span>
+          )}
           {filters.region && (
             <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2.5 py-1 text-[11px] font-medium">
               <MapPin className="w-3 h-3" /> {filters.region}
@@ -162,7 +169,7 @@ export default function Candidates() {
 }
 
 function FilterSheet({ filters, setFilters, onClose }) {
-  const { t } = useApp();
+  const { t, lang } = useApp();
   const [local, setLocal] = useState(filters);
   return (
     <div className="fixed inset-0 z-50 flex items-end" data-testid="filter-sheet">
@@ -175,22 +182,33 @@ function FilterSheet({ filters, setFilters, onClose }) {
           </button>
         </div>
         <div className="space-y-4">
-          {/* Region — Travel Mode style select */}
+          <label className="block">
+            <span className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5" /> {t("country")}
+            </span>
+            <div className="mt-1.5">
+              <CountrySelect
+                testid="filter-country"
+                lang={lang}
+                value={local.country || ""}
+                onChange={(name) => setLocal({ ...local, country: name || undefined, region: undefined })}
+                placeholder={t("select_country") || "Select country"}
+              />
+            </div>
+          </label>
           <label className="block">
             <span className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <MapPin className="w-3.5 h-3.5" /> {t("region")}
             </span>
-            <select
-              data-testid="filter-region"
-              value={local.region || ""}
-              onChange={(e) => setLocal({ ...local, region: e.target.value || undefined })}
-              className="mt-1.5 w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm outline-none focus:border-primary"
-            >
-              <option value="">— {t("select_region")} —</option>
-              {UZ_REGIONS.map((r) => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
+            <div className="mt-1.5">
+              <RegionSelect
+                testid="filter-region"
+                country={local.country}
+                value={local.region || ""}
+                onChange={(r) => setLocal({ ...local, region: r || undefined })}
+                placeholder={t("select_region") || "Select region"}
+              />
+            </div>
           </label>
           <label className="block">
             <span className="text-xs uppercase tracking-wider text-muted-foreground">{t("district")}</span>

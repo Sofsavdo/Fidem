@@ -46,21 +46,22 @@ class OnboardingProfile(BaseModel):
     gender: GenderType
     birth_date: str  # ISO YYYY-MM-DD
     country: str
-    region: str
-    district: str
+    region: str = ""
+    district: str = ""
     marital_status: MaritalType
     has_children: bool
     children_count: int = 0
     height_cm: int
     weight_kg: int
-    education: str
-    profession: str
-    religion: str
-    looking_for: str  # description text
+    education: str = ""
+    profession: str = ""
+    religion: str = ""
+    looking_for: str = ""  # description text
     search_gender: GenderType
     search_age_min: int = 18
     search_age_max: int = 60
-    search_region: str
+    search_country: str = ""
+    search_region: str = ""
     photo_url: Optional[str] = None
     bio: Optional[str] = ""
     name: str
@@ -74,16 +75,17 @@ class UserPublic(BaseModel):
     name: str
     gender: GenderType
     age: int
-    region: str
-    district: str
+    country: Optional[str] = ""
+    region: str = ""
+    district: str = ""
     marital_status: MaritalType
     has_children: bool
     children_count: int
     height_cm: int
     weight_kg: int
-    education: str
-    profession: str
-    religion: str
+    education: str = ""
+    profession: str = ""
+    religion: str = ""
     bio: str = ""
     photo_url: Optional[str] = None
     verified_identity: bool = False
@@ -110,9 +112,11 @@ class UpdateProfileRequest(BaseModel):
     education: Optional[str] = None
     profession: Optional[str] = None
     religion: Optional[str] = None
+    country: Optional[str] = None
     region: Optional[str] = None
     district: Optional[str] = None
     looking_for: Optional[str] = None
+    search_country: Optional[str] = None
     search_region: Optional[str] = None
     search_age_min: Optional[int] = None
     search_age_max: Optional[int] = None
