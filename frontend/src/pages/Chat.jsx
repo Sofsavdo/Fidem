@@ -284,7 +284,7 @@ export default function Chat() {
         </div>
       )}
 
-      <div className="fixed bottom-0 inset-x-0 z-40 glass border-t border-border/60 max-w-2xl xl:max-w-3xl mx-auto md:left-64 lg:left-72 md:right-0" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <div className="fixed bottom-0 inset-x-0 glass border-t border-border/60 max-w-2xl xl:max-w-3xl mx-auto md:left-64 lg:left-72 md:right-0" style={{ paddingBottom: "env(safe-area-inset-bottom)", zIndex: 10000 }}>
         <div className="p-3 space-y-2">
           {/* Paywall banner (shown above the input — input remains visible & disabled) */}
           {access && access.requires_unlock && (
@@ -319,14 +319,14 @@ export default function Chat() {
             </div>
           )}
           {/* Always-visible message composer (disabled when locked) */}
-          <div className="flex items-center gap-2">
-            <button data-testid="rose-open" onClick={() => setRoseOpen(true)} disabled={access?.requires_unlock} className="p-2.5 rounded-full bg-primary/10 hover:bg-primary/20 disabled:opacity-40" title="🌹">
+          <div className="flex items-end gap-1.5 min-w-0">
+            <button data-testid="rose-open" onClick={() => setRoseOpen(true)} disabled={access?.requires_unlock} className="shrink-0 w-10 h-10 grid place-items-center rounded-full bg-primary/10 hover:bg-primary/20 disabled:opacity-40 text-base" title="🌹">
               🌹
             </button>
-            <button data-testid="gift-open" onClick={() => setGiftOpen(true)} disabled={access?.requires_unlock} className="p-2.5 rounded-full bg-muted hover:bg-border disabled:opacity-40" title={t("send_gift")}>
+            <button data-testid="gift-open" onClick={() => setGiftOpen(true)} disabled={access?.requires_unlock} className="shrink-0 w-10 h-10 grid place-items-center rounded-full bg-muted hover:bg-border disabled:opacity-40" title={t("send_gift")}>
               <Gift className="w-4 h-4" />
             </button>
-            {!access?.requires_unlock && <ChatVoiceRecorder onSend={sendVoice} />}
+            {!access?.requires_unlock && <div className="shrink-0"><ChatVoiceRecorder onSend={sendVoice} /></div>}
             <input
               data-testid="chat-input"
               value={text}
@@ -334,13 +334,13 @@ export default function Chat() {
               onKeyDown={(e) => e.key === "Enter" && !access?.requires_unlock && send()}
               disabled={!!access?.requires_unlock}
               placeholder={access?.requires_unlock ? t("chat_locked_inline") : t("type_message")}
-              className="flex-1 rounded-full border border-border bg-card px-4 py-2.5 outline-none focus:border-primary disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex-1 min-w-0 rounded-full border border-border bg-card px-4 h-10 text-sm outline-none focus:border-primary disabled:opacity-60 disabled:cursor-not-allowed"
             />
             <button
               data-testid="chat-send"
               onClick={() => send()}
               disabled={sending || !text.trim() || !!access?.requires_unlock}
-              className="p-2.5 rounded-full bg-primary text-white disabled:opacity-50"
+              className="shrink-0 w-10 h-10 grid place-items-center rounded-full bg-primary text-white disabled:opacity-50"
             >
               <Send className="w-4 h-4" />
             </button>

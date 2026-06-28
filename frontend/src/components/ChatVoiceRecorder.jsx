@@ -150,8 +150,8 @@ export default function ChatVoiceRecorder({ onSend, maxSec = 60 }) {
     <button
       onClick={start}
       data-testid="voice-start"
-      className="p-2.5 rounded-full bg-muted hover:bg-border"
-      title="Ovozli xabar"
+      className="w-10 h-10 grid place-items-center rounded-full bg-muted hover:bg-border"
+      title="🎤"
     >
       <Mic className="w-4 h-4" />
     </button>

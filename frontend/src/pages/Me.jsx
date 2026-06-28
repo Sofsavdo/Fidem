@@ -26,7 +26,7 @@ export default function Me() {
   const [daily, setDaily] = useState(null);
 
   const shareTelegram = (link) => {
-    const text = encodeURIComponent("FIDEM — jiddiy tanishuv platformasi. Menga qo'shiling 👇");
+    const text = encodeURIComponent("FIDEM");
     const url = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${text}`;
     window.open(url, "_blank");
   };
@@ -52,9 +52,9 @@ export default function Me() {
   const requestVerification = async (kind) => {
     try {
       await api.post("/verification/request", { kind });
-      toast.success("So'rov yuborildi");
+      toast.success(t("submit_request") + " ✓");
       refresh();
-    } catch (e) { toast.error("Xato"); }
+    } catch (e) { toast.error(t("error_generic")); }
   };
 
   return (
@@ -96,7 +96,7 @@ export default function Me() {
               <FinancialBadge verified={user.verified_financial} />
               {user.verified_identity && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 text-[10px]">
-                  <ShieldCheck className="w-3 h-3" /> Identity
+                  <ShieldCheck className="w-3 h-3" /> ID
                 </span>
               )}
             </div>
@@ -143,7 +143,7 @@ export default function Me() {
         <Link to="/premium" data-testid="link-premium" className="rounded-3xl bg-gradient-to-br from-ink to-zinc-800 text-white p-4 hover:-translate-y-0.5 transition-transform">
           <Crown className="w-5 h-5 text-gold" />
           <p className="font-heading text-lg mt-2">{t("premium")}</p>
-          <p className="text-xs text-white/70 mt-0.5">Tariflar →</p>
+          <p className="text-xs text-white/70 mt-0.5">{t("premium_subtitle")} →</p>
         </Link>
         <Link to="/premium?topup=1" data-testid="link-balance" className="rounded-3xl bg-card border border-border p-4 hover:-translate-y-0.5 transition-transform">
           <Wallet className="w-5 h-5 text-primary" />
@@ -152,8 +152,8 @@ export default function Me() {
         </Link>
         <Link to="/boost" data-testid="link-boost" className="rounded-3xl bg-gradient-to-br from-primary/10 to-card border border-primary/30 p-4 hover:-translate-y-0.5 transition-transform col-span-2 md:col-span-1">
           <Trophy className="w-5 h-5 text-primary" />
-          <p className="font-heading text-lg mt-2">Boost & Spotlight</p>
-          <p className="text-xs text-muted-foreground mt-0.5">5x →</p>
+          <p className="font-heading text-lg mt-2">{t("boost_title")}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{t("boost_subtitle")} →</p>
         </Link>
       </div>
 
@@ -162,7 +162,7 @@ export default function Me() {
         <div className="rounded-3xl bg-gradient-to-r from-gold/15 to-card border border-gold/30 p-4 flex items-center justify-between" data-testid="daily-strip">
           <div>
             <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("daily_streak")}</p>
-            <p className="font-heading text-2xl">{daily.streak} kun 🔥</p>
+            <p className="font-heading text-2xl">{daily.streak} {t("day_word")} 🔥</p>
           </div>
           {daily.claimed_today ? (
             <span className="text-xs text-secondary">✓ {t("daily")}</span>
