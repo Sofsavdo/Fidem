@@ -22,11 +22,8 @@ root.render(
   </React.StrictMode>,
 );
 
-// PWA: register service worker (only in production, since CRA dev hot-reload conflicts)
-if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch((err) => {
-      console.warn("SW registration failed:", err);
-    });
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    registrations.forEach((registration) => registration.unregister());
   });
 }
