@@ -12,7 +12,7 @@ from datetime import datetime
 import httpx
 
 # Base URL from frontend/.env
-BASE_URL = "https://preview-loyihani.preview.emergentagent.com/api"
+BASE_URL = "https://sharp-raman-6.preview.emergentagent.com/api"
 TIMEOUT = 15.0
 
 # Test credentials

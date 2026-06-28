@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 
 # Backend URL from frontend/.env
-BACKEND_URL = "https://preview-loyihani.preview.emergentagent.com"
+BACKEND_URL = "https://sharp-raman-6.preview.emergentagent.com"
 API_BASE = f"{BACKEND_URL}/api"
 
 # Test credentials
