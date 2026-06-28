@@ -99,3 +99,156 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Outfit', system-ui, sans-serif; }
       radial-gradient(circle at 1px 1px, rgba(0,0,0,0.025) 1px, transparent 0);
     background-size: 28px 28px;
 }
+
+/* ===== PREMIUM REUSABLE COMPONENTS ===== */
+
+/* Premium input — used across Auth, Onboarding, Settings */
+.input {
+    width: 100%;
+    border-radius: 1rem;
+    border: 1px solid hsl(var(--border));
+    background-color: hsl(var(--card));
+    padding: 0.85rem 1rem;
+    font-size: 0.95rem;
+    color: hsl(var(--foreground));
+    outline: none;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+}
+.input::placeholder { color: hsl(var(--muted-foreground)); opacity: 0.7; }
+.input:hover { border-color: hsl(var(--foreground) / 0.25); }
+.input:focus {
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 4px hsl(var(--primary) / 0.12);
+    background-color: white;
+}
+.input[disabled], .input:disabled { opacity: 0.55; cursor: not-allowed; }
+
+textarea.input { resize: vertical; min-height: 92px; line-height: 1.45; }
+
+/* Premium buttons */
+.btn-primary {
+    width: 100%;
+    border-radius: 1rem;
+    background: linear-gradient(135deg, hsl(11 55% 46%) 0%, hsl(11 50% 38%) 100%);
+    color: white;
+    font-weight: 600;
+    padding: 0.95rem 1.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    box-shadow: 0 8px 24px hsl(11 50% 41% / 0.28), 0 1px 2px hsl(11 50% 30% / 0.2), inset 0 1px 0 rgba(255,255,255,0.15);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+    border: 0;
+    cursor: pointer;
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 30px hsl(11 50% 41% / 0.35), inset 0 1px 0 rgba(255,255,255,0.18); filter: brightness(1.04); }
+.btn-primary:active { transform: scale(0.985); }
+.btn-primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+.btn-secondary {
+    width: 100%;
+    border-radius: 1rem;
+    background: linear-gradient(135deg, hsl(164 38% 30%) 0%, hsl(164 35% 24%) 100%);
+    color: white;
+    font-weight: 600;
+    padding: 0.95rem 1.25rem;
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+    box-shadow: 0 8px 24px hsl(164 40% 25% / 0.28), inset 0 1px 0 rgba(255,255,255,0.15);
+    transition: transform 0.18s ease, filter 0.18s ease;
+    border: 0; cursor: pointer;
+}
+.btn-secondary:hover { transform: translateY(-1px); filter: brightness(1.05); }
+.btn-secondary:active { transform: scale(0.985); }
+.btn-secondary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Premium card with subtle elevation */
+.card-premium {
+    background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.86) 100%);
+    border: 1px solid hsl(var(--border));
+    border-radius: 1.5rem;
+    box-shadow: 0 1px 2px rgba(20, 14, 8, 0.04), 0 24px 60px -28px rgba(60, 30, 10, 0.18), 0 8px 24px -16px rgba(60, 30, 10, 0.08);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+
+/* Floating orb decorations (used on Auth / Welcome backgrounds) */
+.orb {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(60px);
+    opacity: 0.55;
+    pointer-events: none;
+    z-index: 0;
+}
+.orb-1 { width: 360px; height: 360px; background: radial-gradient(circle, hsl(11 80% 65%) 0%, transparent 70%); top: -120px; right: -90px; animation: float 14s ease-in-out infinite; }
+.orb-2 { width: 320px; height: 320px; background: radial-gradient(circle, hsl(45 80% 65%) 0%, transparent 70%); bottom: -120px; left: -90px; animation: float 18s ease-in-out infinite reverse; }
+.orb-3 { width: 240px; height: 240px; background: radial-gradient(circle, hsl(164 40% 50%) 0%, transparent 70%); top: 40%; left: 50%; transform: translateX(-50%); animation: float 22s ease-in-out infinite; opacity: 0.35; }
+
+@keyframes float {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(18px, -22px) scale(1.06); }
+}
+
+/* Field label uppercase */
+.field-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+}
+
+/* Pill-shaped option chip */
+.chip-option {
+    border-radius: 9999px;
+    padding: 0.55rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: 1px solid hsl(var(--border));
+    background-color: hsl(var(--card));
+    transition: all 0.18s ease;
+    cursor: pointer;
+    color: hsl(var(--foreground));
+}
+.chip-option:hover { border-color: hsl(var(--foreground) / 0.3); transform: translateY(-1px); }
+.chip-option.active {
+    background: linear-gradient(135deg, hsl(11 55% 46%) 0%, hsl(11 50% 38%) 100%);
+    color: white;
+    border-color: hsl(11 50% 38%);
+    box-shadow: 0 6px 16px hsl(11 50% 41% / 0.25);
+}
+
+.tile-option {
+    border-radius: 0.85rem;
+    padding: 0.7rem 0.8rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: 1px solid hsl(var(--border));
+    background-color: hsl(var(--card));
+    transition: all 0.18s ease;
+    cursor: pointer;
+    text-align: center;
+    color: hsl(var(--foreground));
+}
+.tile-option:hover { border-color: hsl(var(--foreground) / 0.3); }
+.tile-option.active {
+    background: linear-gradient(135deg, hsl(11 55% 46%) 0%, hsl(11 50% 38%) 100%);
+    color: white;
+    border-color: hsl(11 50% 38%);
+    box-shadow: 0 6px 16px hsl(11 50% 41% / 0.22);
+}
+
+/* Step indicator with shimmer */
+.step-bar { height: 0.3rem; border-radius: 9999px; background-color: hsl(var(--border)); flex: 1; overflow: hidden; }
+.step-bar.active { background: linear-gradient(90deg, hsl(11 55% 46%), hsl(11 50% 38%)); box-shadow: 0 0 14px hsl(11 50% 41% / 0.35); }
+
+/* Smooth content fade-in on step change */
+.step-fade { animation: stepFade 0.42s cubic-bezier(0.2,0.8,0.2,1); }
+@keyframes stepFade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Soft divider with label */
+.divider-with-label { display: flex; align-items: center; gap: 0.75rem; }
+.divider-with-label::before, .divider-with-label::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, hsl(var(--border)), transparent); }
+.divider-with-label > span { font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: hsl(var(--muted-foreground)); font-weight: 500; }
