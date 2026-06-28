@@ -1,18 +1,16 @@
-"""Cloudinary Object Storage helper for FIDEM."""
+"""MongoDB GridFS storage helper for FIDEM."""
 from __future__ import annotations
 
-import base64
 import logging
 import os
-import uuid
+from typing import Tuple
 
-import httpx
+from bson import ObjectId
+from motor.motor_asyncio import AsyncIOMotorGridFSBucket
+
+from core import db
 
 log = logging.getLogger(__name__)
-
-CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME", "")
-CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY", "")
-CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET", "")
 APP_NAME = os.environ.get("APP_NAME", "fidem")
 
 MIME = {
@@ -26,44 +24,38 @@ MIME = {
 
 
 def init_storage(force: bool = False) -> str | None:
-    if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
-        return "cloudinary"
-    log.warning("Cloudinary env not set; object storage disabled")
-    return None
+    return "mongodb-gridfs"
 
 
 async def put_object(path: str, data: bytes, content_type: str) -> dict:
-    if not init_storage():
-        raise RuntimeError("Storage not available")
+    bucket = AsyncIOMotorGridFSBucket(db, bucket_name="uploads")
+    file_id = await bucket.upload_from_stream(
+        path,
+        data,
+        metadata={
+            "content_type": content_type,
+            "app": APP_NAME,
+        },
+    )
 
-    ext = path.split(".")[-1].lower() if "." in path else "jpg"
-    public_id = f"{APP_NAME}/{path.rsplit('.', 1)[0]}-{uuid.uuid4().hex[:8]}"
-
-    data_uri = f"data:{content_type};base64,{base64.b64encode(data).decode('utf-8')}"
-
-    url = f"https://api.cloudinary.com/v1_1/{CLOUDINARY_CLOUD_NAME}/auto/upload"
-
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        r = await client.post(
-            url,
-            data={
-                "file": data_uri,
-                "public_id": public_id,
-                "overwrite": "true",
-            },
-            auth=(CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET),
-        )
-        r.raise_for_status()
-        res = r.json()
+    storage_path = str(file_id)
 
     return {
-        "url": res.get("secure_url") or res.get("url"),
-        "path": res.get("public_id"),
+        "path": storage_path,
+        "filename": path,
         "content_type": content_type,
         "size": len(data),
-        "provider": "cloudinary",
+        "provider": "mongodb-gridfs",
     }
 
 
-async def get_object(path: str) -> tuple[bytes, str]:
-    raise RuntimeError("Direct get_object is not supported for Cloudinary. Use returned secure_url.")
+async def get_object(path: str) -> Tuple[bytes, str]:
+    bucket = AsyncIOMotorGridFSBucket(db, bucket_name="uploads")
+    grid_out = await bucket.open_download_stream(ObjectId(path))
+    data = await grid_out.read()
+    content_type = "application/octet-stream"
+
+    if grid_out.metadata and grid_out.metadata.get("content_type"):
+        content_type = grid_out.metadata["content_type"]
+
+    return data, content_type
