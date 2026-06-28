@@ -14,7 +14,7 @@ import os
 import sys
 
 # Base URL from frontend/.env
-BASE_URL = "https://loyihani-clone.preview.emergentagent.com/api"
+BASE_URL = "https://preview-loyihani.preview.emergentagent.com/api"
 
 # Test credentials
 ADMIN_EMAIL = "admin@fidem.uz"

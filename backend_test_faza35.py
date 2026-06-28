@@ -14,7 +14,7 @@ from io import BytesIO
 import httpx
 
 # Base URL from frontend/.env
-BASE_URL = "https://loyihani-clone.preview.emergentagent.com/api"
+BASE_URL = "https://preview-loyihani.preview.emergentagent.com/api"
 TIMEOUT = 20.0
 
 # Test credentials
