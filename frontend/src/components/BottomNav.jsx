@@ -16,7 +16,8 @@ export default function BottomNav() {
   return (
     <nav
       data-testid="bottom-nav"
-      className="md:hidden fixed bottom-0 inset-x-0 z-40 glass border-t border-border/60 pb-[env(safe-area-inset-bottom)]"
+      className="md:hidden fixed bottom-0 inset-x-0 glass border-t border-border/60 pb-[env(safe-area-inset-bottom)]"
+      style={{ zIndex: 10000 }}
     >
       <div className="max-w-md mx-auto grid grid-cols-5">
         {tabs.map((tab) => (

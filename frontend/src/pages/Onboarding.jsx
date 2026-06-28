@@ -327,7 +327,7 @@ export default function Onboarding() {
         </div>
 
         {/* Sticky bottom nav */}
-        <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
+        <div className="fixed bottom-0 left-0 right-0 pointer-events-none" style={{ zIndex: 10000 }}>
           <div className="max-w-md mx-auto px-5 sm:px-6 pb-5 pt-3 pointer-events-auto">
             <div className="flex gap-3 bg-background/85 backdrop-blur-xl rounded-2xl p-2 border border-border shadow-lg" style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}>
               {step > 0 && (
