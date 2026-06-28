@@ -24,7 +24,7 @@ export default function Boost() {
     setBusy(true);
     try {
       const r = await api.post(`/${kind}/activate`, { use_balance: true });
-      toast.success(kind === "boost" ? "Boost faollashtirildi 🚀" : "Spotlight faollashtirildi 🌟");
+      toast.success(kind === "boost" ? t("profile_boost_title") + " ✅" : t("spotlight_title") + " ✅");
       await refresh();
       load();
     } catch (e) {
@@ -56,8 +56,8 @@ export default function Boost() {
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div>
-          <h1 className="font-heading text-2xl md:text-3xl font-semibold tracking-tight">Boost & Spotlight</h1>
-          <p className="text-xs text-muted-foreground">Profilingizni ko'proq odamlar ko'rishi uchun</p>
+          <h1 className="font-heading text-2xl md:text-3xl font-semibold tracking-tight">{t("boost_title")}</h1>
+          <p className="text-xs text-muted-foreground">{t("boost_subtitle")}</p>
         </div>
       </div>
 
@@ -66,18 +66,18 @@ export default function Boost() {
         <div className="rounded-3xl border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-card p-5" data-testid="card-boost">
           <div className="flex items-center justify-between">
             <Rocket className="w-7 h-7 text-primary" />
-            <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary font-medium">24 SOAT</span>
+            <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary font-medium">24 {t("hour_word").toUpperCase()}</span>
           </div>
-          <h2 className="font-heading text-2xl font-semibold mt-3">Profile Boost</h2>
-          <p className="text-sm text-muted-foreground mt-1">24 soat davomida nomzodlar oqimida 5x ko'proq ko'rinasiz.</p>
+          <h2 className="font-heading text-2xl font-semibold mt-3">{t("profile_boost_title")}</h2>
+          <p className="text-sm text-muted-foreground mt-1">{t("profile_boost_desc")}</p>
           <ul className="text-sm mt-3 space-y-1">
-            <li>✓ Top of feed</li>
-            <li>✓ Profil ko'rishlar 3-5x oshadi</li>
-            <li>✓ Tezroq xabarlar oqimi</li>
+            <li>✓ {t("bullet_top_feed")}</li>
+            <li>✓ {t("bullet_views_3_5x")}</li>
+            <li>✓ {t("bullet_faster_messages")}</li>
           </ul>
-          <p className="font-heading text-xl mt-4">5,000 so'm</p>
+          <p className="font-heading text-xl mt-4">5,000 {t("sum_word")}</p>
           {status?.active && (
-            <p className="text-xs text-secondary mt-2">Faol — {new Date(status.until).toLocaleString()}</p>
+            <p className="text-xs text-secondary mt-2">{t("travel_active")} — {new Date(status.until).toLocaleString()}</p>
           )}
           <div className="flex flex-col sm:flex-row gap-2 mt-3">
             <button
@@ -86,7 +86,7 @@ export default function Boost() {
               disabled={busy || status?.active}
               className="flex-1 rounded-2xl bg-primary text-white py-3 font-medium disabled:opacity-50"
             >
-              Balans bilan ({(user?.balance || 0).toLocaleString()})
+              {t("activate_with_balance")} ({(user?.balance || 0).toLocaleString()})
             </button>
             <button
               data-testid="buy-boost-click"
@@ -102,16 +102,16 @@ export default function Boost() {
         <div className="rounded-3xl border-2 border-gold/40 bg-gradient-to-br from-gold-light/30 to-card p-5" data-testid="card-spotlight">
           <div className="flex items-center justify-between">
             <Star className="w-7 h-7 text-gold-dark" fill="currentColor" />
-            <span className="text-xs px-2 py-1 rounded-full bg-gold-light text-yellow-900 font-medium">7 KUN</span>
+            <span className="text-xs px-2 py-1 rounded-full bg-gold-light text-yellow-900 font-medium">7 {t("day_word").toUpperCase()}</span>
           </div>
-          <h2 className="font-heading text-2xl font-semibold mt-3">Spotlight</h2>
-          <p className="text-sm text-muted-foreground mt-1">1 hafta davomida o'z viloyatingiz feed'ida birinchi qatorda.</p>
+          <h2 className="font-heading text-2xl font-semibold mt-3">{t("spotlight_title")}</h2>
+          <p className="text-sm text-muted-foreground mt-1">{t("spotlight_desc")}</p>
           <ul className="text-sm mt-3 space-y-1">
-            <li>★ Region top placement</li>
-            <li>★ Spotlight badge</li>
-            <li>★ Doimiy visibility</li>
+            <li>★ {t("bullet_region_top")}</li>
+            <li>★ {t("bullet_spotlight_badge")}</li>
+            <li>★ {t("bullet_constant_visibility")}</li>
           </ul>
-          <p className="font-heading text-xl mt-4">25,000 so'm</p>
+          <p className="font-heading text-xl mt-4">25,000 {t("sum_word")}</p>
           <div className="flex flex-col sm:flex-row gap-2 mt-3">
             <button
               data-testid="buy-spotlight-balance"
@@ -119,7 +119,7 @@ export default function Boost() {
               disabled={busy}
               className="flex-1 rounded-2xl bg-gold text-ink py-3 font-medium disabled:opacity-50"
             >
-              Balans bilan
+              {t("activate_with_balance")}
             </button>
             <button
               data-testid="buy-spotlight-click"
@@ -133,7 +133,7 @@ export default function Boost() {
       </div>
 
       <p className="text-xs text-muted-foreground text-center pt-2">
-        💡 Maslahat: Spotlight + Premium birlashtirilsa, sizning profilingiz konversiyasi 10x oshadi
+        💡 Spotlight + Premium = 10x konversiya
       </p>
 
       {/* Analytics */}
@@ -145,10 +145,10 @@ export default function Boost() {
 
           {/* Boost session */}
           <div className="mt-3 rounded-2xl bg-primary/5 border border-primary/20 p-4">
-            <p className="text-xs font-medium text-primary mb-2">Joriy Boost sessiyasi {analytics.boost.active ? "(faol)" : "(faolsiz)"}</p>
+            <p className="text-xs font-medium text-primary mb-2">{t("profile_boost_title")} {analytics.boost.active ? `(${t("travel_active")})` : ""}</p>
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-              <StatBox icon={<Eye className="w-4 h-4" />} label="Ko'rinishlar" value={analytics.boost.impressions} />
-              <StatBox icon={<Activity className="w-4 h-4" />} label="Ko'rishlar" value={analytics.boost.views} />
+              <StatBox icon={<Eye className="w-4 h-4" />} label={t("views_word")} value={analytics.boost.impressions} />
+              <StatBox icon={<Activity className="w-4 h-4" />} label={t("views_word")} value={analytics.boost.views} />
               <StatBox icon={<Heart className="w-4 h-4" />} label="Likes" value={analytics.boost.likes} />
               <StatBox icon={<MessageSquare className="w-4 h-4" />} label="Roses" value={analytics.boost.roses} />
               <StatBox icon={<MessageSquare className="w-4 h-4" />} label="Msg" value={analytics.boost.messages} />
@@ -158,22 +158,22 @@ export default function Boost() {
           {/* Spotlight session */}
           {analytics.spotlight.active && (
             <div className="mt-3 rounded-2xl bg-gold-light/30 border border-gold/40 p-4">
-              <p className="text-xs font-medium text-gold-dark mb-2">Joriy Spotlight sessiyasi (faol)</p>
+              <p className="text-xs font-medium text-gold-dark mb-2">{t("current_session")}</p>
               <div className="grid grid-cols-2 gap-3">
-                <StatBox icon={<Eye className="w-4 h-4" />} label="Ko'rinishlar" value={analytics.spotlight.impressions} />
-                <StatBox icon={<Activity className="w-4 h-4" />} label="Ko'rishlar" value={analytics.spotlight.views} />
+                <StatBox icon={<Eye className="w-4 h-4" />} label={t("views_word")} value={analytics.spotlight.impressions} />
+                <StatBox icon={<Activity className="w-4 h-4" />} label={t("views_word")} value={analytics.spotlight.views} />
               </div>
             </div>
           )}
 
           {/* Lifetime */}
           <div className="mt-3">
-            <p className="text-xs font-medium text-muted-foreground mb-2">Umumiy statistika</p>
+            <p className="text-xs font-medium text-muted-foreground mb-2">Total</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <StatBox icon={<Eye className="w-4 h-4" />} label="Jami ko'rinish" value={analytics.lifetime.total_impressions} />
-              <StatBox icon={<Activity className="w-4 h-4" />} label="Jami ko'rish" value={analytics.lifetime.total_views} />
-              <StatBox icon={<Heart className="w-4 h-4" />} label="Jami likes" value={analytics.lifetime.total_likes} />
-              <StatBox icon={<Sparkles className="w-4 h-4" />} label="Gift olingan" value={(analytics.lifetime.gifts_received || 0).toLocaleString() + " so'm"} />
+              <StatBox icon={<Eye className="w-4 h-4" />} label={t("views_word")} value={analytics.lifetime.total_impressions} />
+              <StatBox icon={<Activity className="w-4 h-4" />} label={t("views_word")} value={analytics.lifetime.total_views} />
+              <StatBox icon={<Heart className="w-4 h-4" />} label="Likes" value={analytics.lifetime.total_likes} />
+              <StatBox icon={<Sparkles className="w-4 h-4" />} label="Gifts" value={(analytics.lifetime.gifts_received || 0).toLocaleString() + " " + t("sum_word")} />
             </div>
           </div>
         </div>
@@ -183,9 +183,9 @@ export default function Boost() {
       {leaderboard.length > 0 && (
         <div className="rounded-3xl border border-border bg-card p-5" data-testid="boost-leaderboard">
           <h2 className="font-heading text-xl font-semibold flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-gold-dark" /> Eng faol boostlar
+            <Trophy className="w-5 h-5 text-gold-dark" /> {t("leaderboard_title")}
           </h2>
-          <p className="text-xs text-muted-foreground mt-1">Hozir boost faol bo'lganlar orasida eng ko'p ko'rinish olganlar</p>
+          <p className="text-xs text-muted-foreground mt-1">{t("leaderboard_desc")}</p>
           <div className="mt-3 space-y-2">
             {leaderboard.map((u, i) => (
               <div key={u.id} className="flex items-center gap-3 py-2 border-b border-border/30 last:border-0">
@@ -201,7 +201,7 @@ export default function Boost() {
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-semibold text-primary">{u.boost_impressions.toLocaleString()}</p>
-                  <p className="text-[10px] text-muted-foreground">ko'rinish</p>
+                  <p className="text-[10px] text-muted-foreground">{t("views_word")}</p>
                 </div>
               </div>
             ))}

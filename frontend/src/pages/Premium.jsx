@@ -136,7 +136,7 @@ export default function Premium() {
                   {t("buy")} · {t("pay_with_click")}
                 </button>
               )}
-              {isCurrent && <p className="mt-3 text-sm font-medium text-secondary">— Faol —</p>}
+              {isCurrent && <p className="mt-3 text-sm font-medium text-secondary">— {t("current_plan")} —</p>}
             </div>
           );
         })}

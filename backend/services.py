@@ -205,27 +205,33 @@ def compute_completeness(user: dict) -> int:
 
 
 # ---- Last-active formatting ----
-def last_active_label(dt: Optional[datetime]) -> str:
+def last_active_minutes(dt: Optional[datetime]) -> int:
+    """Return total minutes since `dt`. -1 if unknown/null. 0 if < 1 min."""
     if not dt:
-        return "Yaqinda"
+        return -1
     if isinstance(dt, str):
         try:
             dt = datetime.fromisoformat(dt)
         except Exception:
-            return "Yaqinda"
-    now = datetime.now(timezone.utc)
+            return -1
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
-    diff = (now - dt).total_seconds()
-    if diff < 300:
+    diff = (datetime.now(timezone.utc) - dt).total_seconds()
+    return max(0, int(diff / 60))
+
+
+def last_active_label(dt: Optional[datetime]) -> str:
+    """Legacy label, retained for backward compatibility. Frontend should use last_active_minutes."""
+    mins = last_active_minutes(dt)
+    if mins < 0:
+        return "—"
+    if mins < 5:
         return "Online"
-    if diff < 3600:
-        return f"{int(diff / 60)} daqiqa oldin"
-    if diff < 86400:
-        return f"{int(diff / 3600)} soat oldin"
-    if diff < 172800:
-        return "Kecha"
-    return f"{int(diff / 86400)} kun oldin"
+    if mins < 60:
+        return f"{mins}m"
+    if mins < 1440:
+        return f"{mins // 60}h"
+    return f"{mins // 1440}d"
 
 
 def is_online(dt: Optional[datetime]) -> bool:

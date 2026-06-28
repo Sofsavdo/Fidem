@@ -4,6 +4,7 @@ import { Bookmark, MessageCircle, Lock } from "lucide-react";
 import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot } from "@/components/Badges";
 import { useApp } from "@/contexts/AppContext";
 import { photoSrc } from "@/lib/photo";
+import { formatLastActive } from "@/lib/time";
 
 export default function CandidateCard({ c, onSave, saved }) {
   const { t } = useApp();
@@ -65,7 +66,7 @@ export default function CandidateCard({ c, onSave, saved }) {
               <OnlineDot online={c.online} />
             </div>
             <p className="text-xs text-white/85 mt-0.5">
-              {c.region} · {c.last_active_label}
+              {c.region} · {formatLastActive(c.last_active_minutes, t, c.online)}
             </p>
           </div>
         </div>

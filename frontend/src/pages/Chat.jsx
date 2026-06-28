@@ -7,6 +7,7 @@ import RoseModal from "@/components/RoseModal";
 import ChatVoiceRecorder from "@/components/ChatVoiceRecorder";
 import { ArrowLeft, Send, Gift, MoreVertical, Ban, Flag, Wand2, Play } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
+import { formatLastActive } from "@/lib/time";
 import { toast } from "sonner";
 
 export default function Chat() {
@@ -185,7 +186,7 @@ export default function Chat() {
           </div>
           <div className="min-w-0">
             <p className="font-medium truncate">{other.name}, {other.age}</p>
-            <p className="text-xs text-muted-foreground truncate">{other.last_active_label}</p>
+            <p className="text-xs text-muted-foreground truncate">{formatLastActive(other.last_active_minutes, t, other.online)}</p>
           </div>
         </Link>
         <div className="relative">

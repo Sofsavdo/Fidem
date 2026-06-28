@@ -5,7 +5,7 @@ import { Sparkles, X, Gift } from "lucide-react";
 import { toast } from "sonner";
 
 export default function DailyCheckIn() {
-  const { user, refresh } = useApp();
+  const { user, refresh, t } = useApp();
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState(null);
   const [claiming, setClaiming] = useState(false);
@@ -28,11 +28,11 @@ export default function DailyCheckIn() {
     setClaiming(true);
     try {
       const r = await api.post("/daily/claim");
-      toast.success(`+${r.data.bonus} 🪙 coin · ${r.data.streak} kun ketma-ket`);
+      toast.success(`+${r.data.bonus} 🪙 · ${r.data.streak} ${t("day_word")}`);
       await refresh();
       setOpen(false);
     } catch (e) {
-      toast.error("Xato");
+      toast.error(t("error_generic"));
     } finally {
       setClaiming(false);
     }
@@ -48,14 +48,13 @@ export default function DailyCheckIn() {
         <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-gold to-gold-dark grid place-items-center text-white">
           <Sparkles className="w-7 h-7" />
         </div>
-        <h2 className="font-heading text-2xl font-semibold mt-3">Kunlik bonus</h2>
+        <h2 className="font-heading text-2xl font-semibold mt-3">{t("daily_bonus") || "Daily bonus"}</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          {status.streak} kun ketma-ket · bugun{" "}
-          <span className="text-foreground font-semibold">+{status.next_bonus} 🪙 coin</span>
+          {status.streak} {t("day_word")} ·{" "}
+          <span className="text-foreground font-semibold">+{status.next_bonus} 🪙</span>
         </p>
         <div className="flex justify-center gap-1.5 mt-4">
           {Array.from({ length: 7 }).map((_, i) => {
-            const pos = (status.streak % 7) + (i === (status.streak % 7) ? 0 : 0);
             const filled = i < (status.streak % 7);
             const isToday = i === (status.streak % 7);
             return (
@@ -70,7 +69,7 @@ export default function DailyCheckIn() {
             );
           })}
         </div>
-        <p className="text-[11px] text-muted-foreground mt-3">7-kun streak'da +100 🪙 coin bonus 🎁</p>
+        <p className="text-[11px] text-muted-foreground mt-3">7 {t("day_word")} · +100 🪙 🎁</p>
         <button
           data-testid="daily-claim"
           onClick={claim}
@@ -78,7 +77,7 @@ export default function DailyCheckIn() {
           className="mt-5 w-full rounded-2xl bg-primary text-white py-3 font-medium disabled:opacity-50"
         >
           <Gift className="w-4 h-4 inline mr-1.5" />
-          {claiming ? "..." : "Olish"}
+          {claiming ? "..." : (t("claim_weeks") || "Claim")}
         </button>
       </div>
     </div>

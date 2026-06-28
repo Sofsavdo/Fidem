@@ -19,6 +19,7 @@ from services import (
     compute_completeness,
     is_online,
     last_active_label,
+    last_active_minutes,
     send_telegram_message,
 )
 
@@ -131,6 +132,7 @@ def user_public(u: dict) -> dict:
         "verified_financial": u.get("verified_financial", False),
         "last_active": la,
         "last_active_label": last_active_label(la),
+        "last_active_minutes": last_active_minutes(la),
         "online": is_online(la),
         "completeness": u.get("completeness", compute_completeness(u)),
         "avg_response_min": u.get("avg_response_min"),

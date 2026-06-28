@@ -79,13 +79,13 @@ export default function Personality() {
           Nomzodlarga qaytish
         </button>
         <button onClick={() => { setResult(null); setAnswers({}); setStep(0); }} className="mt-2 w-full rounded-2xl border border-border py-2.5 text-sm text-muted-foreground">
-          Qayta topshirish
+          {t("retake_test")}
         </button>
       </div>
     );
   }
 
-  if (questions.length === 0) return <div className="p-6 text-center text-muted-foreground">Yuklanmoqda…</div>;
+  if (questions.length === 0) return <div className="p-6 text-center text-muted-foreground">{t("loading_word")}</div>;
 
   const q = questions[step];
   const progress = Math.round(((step + (answers[q.id] ? 1 : 0)) / questions.length) * 100);

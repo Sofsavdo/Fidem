@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
+import { useApp } from "@/contexts/AppContext";
 import { Heart, Eye, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export default function Stories() {
+  const { t } = useApp();
   const [stories, setStories] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -18,16 +20,16 @@ export default function Stories() {
           <Heart className="w-5 h-5" fill="currentColor" />
         </div>
         <div>
-          <h1 className="font-heading text-2xl font-semibold">Muvaffaqiyat hikoyalari</h1>
-          <p className="text-sm text-muted-foreground">FIDEM orqali nikohlangan oilalar o'z hikoyalarini ulashadi</p>
+          <h1 className="font-heading text-2xl font-semibold">{t("stories_title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("stories_subtitle")}</p>
         </div>
       </div>
 
-      {loading && <p className="text-center text-muted-foreground py-12">Yuklanmoqda…</p>}
+      {loading && <p className="text-center text-muted-foreground py-12">{t("loading_word")}</p>}
       {!loading && stories.length === 0 && (
         <div className="rounded-3xl bg-card border border-border p-8 text-center">
-          <p className="text-muted-foreground">Hozircha hikoyalar yo'q. Birinchi siz bo'ling!</p>
-          <Link to="/stories/submit" className="mt-4 inline-block rounded-xl bg-primary text-white px-4 py-2 text-sm font-medium">Hikoyamni yuborish</Link>
+          <p className="text-muted-foreground">{t("no_results")}</p>
+          <Link to="/stories/submit" className="mt-4 inline-block rounded-xl bg-primary text-white px-4 py-2 text-sm font-medium">{t("submit_story")}</Link>
         </div>
       )}
 
@@ -39,7 +41,7 @@ export default function Stories() {
                 <img loading="lazy" decoding="async" src={s.photo_url} alt={s.couple_names} className="w-full h-full object-cover" />
                 {s.featured && (
                   <span className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-gold text-ink text-[10px] font-medium px-2 py-1">
-                    <Star className="w-3 h-3" fill="currentColor" /> Tanlangan
+                    <Star className="w-3 h-3" fill="currentColor" /> ★
                   </span>
                 )}
               </div>
@@ -53,7 +55,7 @@ export default function Stories() {
               <p className="text-sm leading-relaxed text-foreground/90 line-clamp-5">{s.story_text}</p>
               <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between">
                 <span className="text-xs text-muted-foreground inline-flex items-center gap-1"><Eye className="w-3 h-3" /> {s.views || 0}</span>
-                <span className="text-[10px] uppercase tracking-wider text-primary">FIDEM nikoh hikoyasi</span>
+                <span className="text-[10px] uppercase tracking-wider text-primary">FIDEM</span>
               </div>
             </div>
           </article>

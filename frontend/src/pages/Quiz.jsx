@@ -40,10 +40,10 @@ export default function Quiz() {
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div>
-          <h1 className="font-heading text-2xl md:text-3xl font-semibold tracking-tight">Compatibility Quiz</h1>
+          <h1 className="font-heading text-2xl md:text-3xl font-semibold tracking-tight">{t("quiz_title")}</h1>
           <p className="text-xs text-muted-foreground">
             <Sparkles className="inline w-3 h-3 mr-1 text-gold-dark" />
-            Mosligingiz aniqligini oshiring · +100 so'm bonus
+            {t("quiz_subtitle")} · +100 {t("coins_word")}
           </p>
         </div>
       </div>
@@ -55,7 +55,7 @@ export default function Quiz() {
           const qText = q[`q_${lang}`] || q.q_uz;
           return (
             <div key={q.id} className="rounded-3xl bg-card border border-border p-4 md:p-5" data-testid={`quiz-q-${q.id}`}>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Savol {i + 1} / {qs.length}</p>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground">{i + 1} / {qs.length}</p>
               <p className="font-medium text-base mt-1">{qText}</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
                 {q.options.map((opt) => {

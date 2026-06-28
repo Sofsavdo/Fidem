@@ -40,28 +40,28 @@ export default function Withdrawals() {
     setLoading(true);
     try {
       await api.post("/withdrawals/request", { amount: amt, card_number: card, holder_name: holder });
-      toast.success("So'rov yuborildi! Admin tasdig'idan keyin kartaga o'tkaziladi.");
+      toast.success(t("submit_request") + " ✓");
       setAmount(""); setCard(""); setHolder("");
       load();
     } catch (e) {
-      toast.error("Xato yuz berdi");
+      toast.error(t("error_generic"));
     } finally { setLoading(false); }
   };
 
-  if (!status) return <div className="p-6 text-muted-foreground">Yuklanmoqda...</div>;
+  if (!status) return <div className="p-6 text-muted-foreground">{t("loading_word")}</div>;
 
   const statusBadge = (s) => {
-    if (s === "pending") return <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700"><Clock className="w-3 h-3" /> Kutilmoqda</span>;
-    if (s === "approved") return <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-700"><CheckCircle2 className="w-3 h-3" /> Tasdiqlandi</span>;
-    if (s === "rejected") return <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-rose-100 text-rose-700"><XCircle className="w-3 h-3" /> Rad etildi</span>;
+    if (s === "pending") return <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700"><Clock className="w-3 h-3" /> {t("status_pending_word")}</span>;
+    if (s === "approved") return <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-700"><CheckCircle2 className="w-3 h-3" /> {t("status_approved_word")}</span>;
+    if (s === "rejected") return <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-rose-100 text-rose-700"><XCircle className="w-3 h-3" /> {t("status_rejected_word")}</span>;
     return <span className="text-xs text-muted-foreground">{s}</span>;
   };
 
   return (
     <div className="max-w-2xl mx-auto p-4 md:p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-heading font-semibold">Pul yechib olish</h1>
-        <p className="text-sm text-muted-foreground mt-1">Olingan sovg'alarning {status.conversion_rate_pct}% mablag'i sizning yechib olish balansingizga aylantiriladi.</p>
+        <h1 className="text-2xl font-heading font-semibold">{t("withdraw_title")}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{t("withdraw_explainer")}</p>
       </div>
 
       {/* Balance card */}
@@ -69,18 +69,18 @@ export default function Withdrawals() {
         <div className="flex items-center gap-3 mb-3">
           <div className="w-10 h-10 rounded-2xl bg-primary text-white grid place-items-center"><Wallet className="w-5 h-5" /></div>
           <div>
-            <p className="text-xs text-muted-foreground">Yechib olish mumkin</p>
-            <p className="text-2xl font-heading font-semibold" data-testid="withdrawable-balance">{(status.withdrawable_balance || 0).toLocaleString()} so'm</p>
+            <p className="text-xs text-muted-foreground">{t("withdrawable_balance")}</p>
+            <p className="text-2xl font-heading font-semibold" data-testid="withdrawable-balance">{(status.withdrawable_balance || 0).toLocaleString()} {t("sum_word")}</p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3 text-xs">
           <div className="rounded-xl bg-card p-3">
-            <p className="text-muted-foreground">Jami qabul qilingan sovg'alar</p>
-            <p className="text-sm font-medium mt-1">{(status.gifts_received_total || 0).toLocaleString()} so'm</p>
+            <p className="text-muted-foreground">{t("total_gifts_received")}</p>
+            <p className="text-sm font-medium mt-1">{(status.gifts_received_total || 0).toLocaleString()} {t("sum_word")}</p>
           </div>
           <div className="rounded-xl bg-card p-3">
-            <p className="text-muted-foreground">Minimal yechish</p>
-            <p className="text-sm font-medium mt-1">{(status.min_payout || 100000).toLocaleString()} so'm</p>
+            <p className="text-muted-foreground">{t("min_payout_note")}</p>
+            <p className="text-sm font-medium mt-1">{(status.min_payout || 100000).toLocaleString()} {t("sum_word")}</p>
           </div>
         </div>
       </div>
@@ -89,17 +89,17 @@ export default function Withdrawals() {
       <div className="rounded-2xl border border-border bg-card p-4 flex gap-3 text-sm">
         <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
         <div className="text-muted-foreground">
-          <p>Sizga yuborilgan har bir sovg'aning 50% nominali yechib olish balansiga o'tadi. Yechish so'rovi admin tomonidan 1-3 ish kuni ichida CLICK orqali kartaga o'tkaziladi.</p>
+          <p>{t("withdraw_explainer")}</p>
         </div>
       </div>
 
       {/* Request form */}
       <div className="rounded-3xl border border-border bg-card p-5 space-y-3">
-        <h2 className="font-semibold">Yechib olish so'rovi</h2>
+        <h2 className="font-semibold">{t("request_withdraw")}</h2>
         <input
           data-testid="withdraw-amount"
           type="number"
-          placeholder={`Summa (min ${(status.min_payout || 100000).toLocaleString()} so'm)`}
+          placeholder={`${t("amount_uzs")} (min ${(status.min_payout || 100000).toLocaleString()})`}
           className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
@@ -107,7 +107,7 @@ export default function Withdrawals() {
         <input
           data-testid="withdraw-card"
           inputMode="numeric"
-          placeholder="Karta raqami (16 raqam)"
+          placeholder={t("card_number") + " (16)"}
           className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm font-mono"
           value={card}
           onChange={(e) => setCard(e.target.value.replace(/[^\d ]/g, ""))}
@@ -115,7 +115,7 @@ export default function Withdrawals() {
         />
         <input
           data-testid="withdraw-holder"
-          placeholder="Karta egasi (ism familiya)"
+          placeholder={t("name")}
           className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm"
           value={holder}
           onChange={(e) => setHolder(e.target.value)}
@@ -127,22 +127,22 @@ export default function Withdrawals() {
           className="w-full py-3 rounded-2xl bg-primary text-white font-medium disabled:opacity-50 flex items-center justify-center gap-2"
         >
           <ArrowDownToLine className="w-4 h-4" />
-          {loading ? "Yuborilmoqda..." : "So'rov yuborish"}
+          {loading ? "..." : t("submit_request")}
         </button>
       </div>
 
       {/* History */}
       <div className="rounded-3xl border border-border bg-card p-5">
-        <h2 className="font-semibold mb-3">So'rovlar tarixi</h2>
+        <h2 className="font-semibold mb-3">{t("payout_history")}</h2>
         {history.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Hozircha so'rov yo'q</p>
+          <p className="text-sm text-muted-foreground">{t("no_requests_yet")}</p>
         ) : (
           <div className="space-y-2">
             {history.map((w) => (
               <div key={w.id} className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
                 <div>
-                  <p className="text-sm font-medium">{(w.amount).toLocaleString()} so'm</p>
-                  <p className="text-[11px] text-muted-foreground">{new Date(w.created_at).toLocaleString("uz-UZ")}</p>
+                  <p className="text-sm font-medium">{(w.amount).toLocaleString()} {t("sum_word")}</p>
+                  <p className="text-[11px] text-muted-foreground">{new Date(w.created_at).toLocaleString()}</p>
                   <p className="text-[11px] text-muted-foreground font-mono">**** **** **** {(w.card_number || "").slice(-4)}</p>
                 </div>
                 {statusBadge(w.status)}

@@ -6,6 +6,7 @@ import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot } from "@/componen
 import RoseModal from "@/components/RoseModal";
 import CompatibilityCard from "@/components/CompatibilityCard";
 import { photoSrc } from "@/lib/photo";
+import { formatLastActive } from "@/lib/time";
 import { Bookmark, MessageCircle, ArrowLeft, Lock, Clock, Shield } from "lucide-react";
 import { toast } from "sonner";
 
@@ -94,7 +95,7 @@ export default function ProfileDetail() {
             <h1 className="font-heading text-3xl font-semibold flex items-center gap-2">
               {c.name}, {c.age} <OnlineDot online={c.online} />
             </h1>
-            <p className="text-sm text-white/85">{c.region} · {c.district} · {c.last_active_label}</p>
+            <p className="text-sm text-white/85">{c.region} · {c.district} · {formatLastActive(c.last_active_minutes, t, c.online)}</p>
           </div>
         </div>
       </div>
