@@ -6,7 +6,6 @@ import Layout from "@/components/Layout";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ScrollToTop from "@/components/ScrollToTop";
 
-// PERF: code-split every route into its own chunk (loaded on demand).
 const Auth = lazy(() => import("@/pages/Auth"));
 const Onboarding = lazy(() => import("@/pages/Onboarding"));
 const Candidates = lazy(() => import("@/pages/Candidates"));
@@ -22,9 +21,6 @@ const Notifications = lazy(() => import("@/pages/Notifications"));
 const Quiz = lazy(() => import("@/pages/Quiz"));
 const Boost = lazy(() => import("@/pages/Boost"));
 const Personality = lazy(() => import("@/pages/Personality"));
-const Chaperone = null; // removed
-const ChaperoneWard = null; // removed
-void Chaperone; void ChaperoneWard;
 const Prompts = lazy(() => import("@/pages/Prompts"));
 const Stories = lazy(() => import("@/pages/Stories"));
 const Withdrawals = lazy(() => import("@/pages/Withdrawals"));
@@ -37,6 +33,18 @@ const About = lazy(() => import("@/pages/About"));
 const FAQ = lazy(() => import("@/pages/FAQ"));
 const Referral = lazy(() => import("@/pages/Referral"));
 const Swipe = lazy(() => import("@/pages/Swipe"));
+
+function isTelegramWebApp() {
+  return Boolean(window.Telegram?.WebApp?.initData);
+}
+
+function TelegramLoading() {
+  return (
+    <div className="min-h-screen grid place-items-center text-muted-foreground">
+      Telegram orqali kirilmoqda...
+    </div>
+  );
+}
 
 function PageSpinner() {
   return (
@@ -52,18 +60,34 @@ function PageSpinner() {
 function Gate({ children }) {
   const { user, loading } = useApp();
   const location = useLocation();
-  if (loading) return <div className="min-h-screen grid place-items-center text-muted-foreground">Loading...</div>;
-  if (!user) return <Navigate to="/auth" replace state={{ from: location }} />;
-  if (!user.onboarded && location.pathname !== "/onboarding") return <Navigate to="/onboarding" replace />;
+
+  if (loading) return <PageSpinner />;
+
+  if (!user) {
+    if (isTelegramWebApp()) return <TelegramLoading />;
+    return <Navigate to="/auth" replace state={{ from: location }} />;
+  }
+
+  if (!user.onboarded && location.pathname !== "/onboarding") {
+    return <Navigate to="/onboarding" replace />;
+  }
+
   return children;
 }
 
-// Root "/" — guests see the public Landing, logged-in users see the candidates feed.
 function RootRoute() {
   const { user, loading } = useApp();
+
   if (loading) return <PageSpinner />;
+
+  if (!user && isTelegramWebApp()) {
+    return <TelegramLoading />;
+  }
+
   if (!user) return <Welcome />;
+
   if (!user.onboarded) return <Navigate to="/onboarding" replace />;
+
   return (
     <Layout>
       <Candidates />
@@ -72,7 +96,6 @@ function RootRoute() {
 }
 
 function Inner() {
-  // Inject Telegram WebApp script at runtime; init expand & viewport
   useEffect(() => {
     const init = () => {
       const tg = window.Telegram?.WebApp;
@@ -80,12 +103,17 @@ function Inner() {
       try {
         tg.ready();
         tg.expand();
-        if (tg.setHeaderColor) tg.setHeaderColor("#ffffff");
-        if (tg.setBackgroundColor) tg.setBackgroundColor("#ffffff");
-        if (tg.enableClosingConfirmation) tg.enableClosingConfirmation();
-      } catch (e) { /* ignore */ }
+        tg.setHeaderColor?.("#ffffff");
+        tg.setBackgroundColor?.("#ffffff");
+        tg.enableClosingConfirmation?.();
+      } catch {}
     };
-    if (window.Telegram?.WebApp) { init(); return; }
+
+    if (window.Telegram?.WebApp) {
+      init();
+      return;
+    }
+
     const s = document.createElement("script");
     s.src = "https://telegram.org/js/telegram-web-app.js";
     s.async = true;
@@ -96,10 +124,10 @@ function Inner() {
   return (
     <Suspense fallback={<PageSpinner />}>
       <Routes>
-        <Route path="/welcome" element={<Welcome />} />
+        <Route path="/welcome" element={isTelegramWebApp() ? <Navigate to="/" replace /> : <Welcome />} />
         <Route path="/about" element={<About />} />
         <Route path="/faq" element={<FAQ />} />
-        <Route path="/auth" element={<Auth />} />
+        <Route path="/auth" element={isTelegramWebApp() ? <Navigate to="/" replace /> : <Auth />} />
         <Route path="/onboarding" element={<Gate><Onboarding /></Gate>} />
         <Route path="/" element={<RootRoute />} />
         <Route element={<Gate><Layout /></Gate>}>
