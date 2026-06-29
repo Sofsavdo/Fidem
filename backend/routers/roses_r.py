@@ -91,7 +91,7 @@ async def send_rose(
 
     target = await get_user(to_user_id)
     cid = chat_id_for(uid, to_user_id)
-    msg_text = note or "🌹 Sizga alohida e'tibor bilan murojaat qildim — sovchi-app orqali."
+    msg_text = note or "🌹 Sizga alohida e'tibor bilan murojaat qildim — Fidem orqali."
 
     msg = {
         "id": new_id(),
