@@ -68,8 +68,16 @@ async def telegram_webhook(request: Request, secret: Optional[str] = Query(None)
     "https://fidem-frontend-production.up.railway.app"
 )
         reply = (
-            "Assalomu alaykum! FIDEM — Sizga mos insonni xavfsiz topishga yordam beramiz.\n\n"
-            f"@{TELEGRAM_BOT_USERNAME} ilovasini ochish uchun pastdagi tugmani bosing 👇"
+            "💖 FIDEM
+
+Jiddiy munosabat va oila qurish uchun platforma.
+
+✅ Mos nomzodlar
+✅ Xavfsiz chat
+✅ Premium imkoniyatlar
+✅ Telegram ichida ishlaydi
+
+👇 Ilovani ochish uchun tugmani bosing"
         )
         keyboard = {
             "inline_keyboard": [[{"text": "FIDEM'ni ochish", "web_app": {"url": webapp_url}}]]
