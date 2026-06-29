@@ -80,8 +80,7 @@ async def candidates(
         travel_until = me_doc.get("travel_until")
         if travel_region and travel_until:
             try:
-                from core import parse_dt as _pdt
-                if _pdt(travel_until) > now_utc():
+                if parse_dt(travel_until) > now_utc():
                     region = travel_region
             except Exception:
                 pass
