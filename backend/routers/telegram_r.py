@@ -47,6 +47,7 @@ async def setup_telegram_webhook() -> None:
         log.warning("BACKEND_URL not set; Telegram webhook skipped")
         return
 
+    webapp_url = get_webapp_url()
     webhook_url = f"{public_base}/api/telegram/webhook?secret={TELEGRAM_WEBHOOK_SECRET}"
 
     try:
@@ -59,8 +60,23 @@ async def setup_telegram_webhook() -> None:
                 },
             )
             log.info(f"Telegram webhook set: {r.status_code} {r.text[:200]}")
+
+            menu = await cl.post(
+                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setChatMenuButton",
+                json={
+                    "menu_button": {
+                        "type": "web_app",
+                        "text": "💖 FIDEM",
+                        "web_app": {
+                            "url": webapp_url,
+                        },
+                    }
+                },
+            )
+            log.info(f"Telegram menu button set: {menu.status_code} {menu.text[:200]}")
+
     except Exception as e:
-        log.warning(f"setWebhook failed: {e}")
+        log.warning(f"setWebhook/menu failed: {e}")
 
 
 @router.post("/telegram/webhook")
@@ -120,7 +136,8 @@ async def telegram_webhook(request: Request, secret: Optional[str] = Query(None)
                 await push_notif(
                     ref_owner["id"],
                     "referral",
-                    "Yangi taklif bonus +1000 so'm",
+                    "🎁 Yangi taklif bonusi\n\nSizning havolangiz orqali yangi foydalanuvchi qo‘shildi.\n\n+1000 so‘m bonus hisoblandi.",
+                    link="/referral",
                 )
 
         webapp_url = get_webapp_url()
