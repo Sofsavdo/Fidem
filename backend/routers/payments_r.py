@@ -1,7 +1,8 @@
 """Payments (CLICK), verification, notifications, referral."""
 from __future__ import annotations
 
-import os
+import random
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.responses import JSONResponse
@@ -22,14 +23,19 @@ from core import (
     now_utc,
     push_notif,
 )
-from datetime import datetime, timedelta
 from models import CreatePaymentRequest, VerificationRequest, new_id
 from services import CLICK_SECRET_KEY, click_pay_link, verify_click_sign
 
 router = APIRouter(tags=["payments"])
 
 
-# ---------- Verification ----------
+async def generate_payment_id() -> str:
+    while True:
+        pid = f"FD{datetime.now().strftime('%y%m%d')}{random.randint(1000, 9999)}"
+        if not await db.payments.find_one({"id": pid}):
+            return pid
+
+
 @router.post("/verification/request")
 async def request_verification(req: VerificationRequest, uid: str = Depends(get_current_user_id)):
     doc = {
@@ -48,7 +54,10 @@ async def request_verification(req: VerificationRequest, uid: str = Depends(get_
 @router.get("/verification/mine")
 async def my_verifications(uid: str = Depends(get_current_user_id)):
     rows = await db.verifications.find({"user_id": uid}, {"_id": 0}).sort("created_at", -1).to_list(50)
-    me = await db.users.find_one({"id": uid}, {"_id": 0, "verified_identity": 1, "verified_selfie": 1, "verified_financial": 1})
+    me = await db.users.find_one(
+        {"id": uid},
+        {"_id": 0, "verified_identity": 1, "verified_selfie": 1, "verified_financial": 1},
+    )
     return {
         "items": rows,
         "verified_identity": bool((me or {}).get("verified_identity")),
@@ -57,7 +66,6 @@ async def my_verifications(uid: str = Depends(get_current_user_id)):
     }
 
 
-# ---------- Payments ----------
 @router.post("/payments/create")
 async def create_payment(req: CreatePaymentRequest, uid: str = Depends(get_current_user_id)):
     if req.purpose == "premium":
@@ -82,31 +90,24 @@ async def create_payment(req: CreatePaymentRequest, uid: str = Depends(get_curre
             raise HTTPException(400, "Minimum 50")
     else:
         raise HTTPException(400, "Unknown purpose")
-   # Generate readable payment ID
-today = datetime.now().strftime("%y%m%d")
 
-count = await db.payments.count_documents({}) + 1
+    pid = await generate_payment_id()
 
-pid = f"FD{today}{count:05d}"
+    doc = {
+        "id": pid,
+        "user_id": uid,
+        "amount": amount,
+        "purpose": req.purpose,
+        "target_user_id": req.target_user_id,
+        "gift_kind": req.gift_kind,
+        "status": "pending",
+        "created_at": iso(now_utc()),
+    }
 
-# Safety check
-while await db.payments.find_one({"id": pid}):
-    count += 1
-    pid = f"FD{today}{count:05d}"
-
-doc = {
-    "id": pid,
-    "user_id": uid,
-    "amount": amount,
-    "purpose": req.purpose,
-    "target_user_id": req.target_user_id,
-    "gift_kind": req.gift_kind,
-    "status": "pending",
-    "created_at": iso(now_utc()),
-}
     link = click_pay_link(amount, pid)
     doc["payment_link"] = link
     await db.payments.insert_one(doc)
+
     return {"id": pid, "amount": amount, "payment_link": link, "status": "pending"}
 
 
@@ -128,20 +129,30 @@ async def click_callback(request: Request):
         return JSONResponse({"error": -5, "error_note": "Order not found"})
     if payment["status"] == "success":
         return JSONResponse({"error": -4, "error_note": "Already paid"})
+
     if action == "0":
-        await db.payments.update_one({"id": pid}, {"$set": {"status": "prepared", "click_trans_id": form.get("click_trans_id")}})
+        await db.payments.update_one(
+            {"id": pid},
+            {"$set": {"status": "prepared", "click_trans_id": form.get("click_trans_id")}},
+        )
         return JSONResponse({
-            "error": 0, "error_note": "Success",
+            "error": 0,
+            "error_note": "Success",
             "click_trans_id": form.get("click_trans_id"),
-            "merchant_trans_id": pid, "merchant_prepare_id": pid,
+            "merchant_trans_id": pid,
+            "merchant_prepare_id": pid,
         })
+
     if action == "1":
         await apply_payment_success(payment)
         return JSONResponse({
-            "error": 0, "error_note": "Success",
+            "error": 0,
+            "error_note": "Success",
             "click_trans_id": form.get("click_trans_id"),
-            "merchant_trans_id": pid, "merchant_confirm_id": pid,
+            "merchant_trans_id": pid,
+            "merchant_confirm_id": pid,
         })
+
     return JSONResponse({"error": -3, "error_note": "Action not found"})
 
 
@@ -152,6 +163,7 @@ async def apply_payment_success(payment: dict) -> None:
     purpose = payment["purpose"]
     amount = payment["amount"]
     expiry_iso = iso(now_utc() + timedelta(days=30))
+
     if purpose == "premium":
         await db.users.update_one({"id": uid}, {"$set": {"plan": "premium", "plan_until": expiry_iso}})
         await push_notif(uid, "premium", "Premium tarif faollashtirildi 💎")
@@ -168,8 +180,11 @@ async def apply_payment_success(payment: dict) -> None:
             await db.chat_unlocks.update_one(
                 {"user_id": uid, "target_id": target_id},
                 {"$setOnInsert": {
-                    "id": new_id(), "user_id": uid, "target_id": target_id,
-                    "chat_id": cid, "source": "one_time",
+                    "id": new_id(),
+                    "user_id": uid,
+                    "target_id": target_id,
+                    "chat_id": cid,
+                    "source": "one_time",
                     "created_at": iso(now_utc()),
                     "guarantee_until": iso(now_utc() + timedelta(hours=48)),
                     "guarantee_refunded": False,
@@ -188,13 +203,12 @@ async def apply_payment_success(payment: dict) -> None:
     elif purpose == "concierge":
         order_id = payment.get("order_id")
         if order_id:
-            from datetime import timedelta as _td
             await db.concierge_orders.update_one(
                 {"id": order_id},
                 {"$set": {
                     "status": "in_progress",
                     "paid_at": iso(now_utc()),
-                    "expires_at": iso(now_utc() + _td(days=30)),
+                    "expires_at": iso(now_utc() + timedelta(days=30)),
                 }},
             )
             await push_notif(uid, "concierge", "💎 Sovchi Concierge buyurtmangiz qabul qilindi. Admin sizga 5 ta mosni qo'lda topadi!")
@@ -217,7 +231,6 @@ async def my_payments(uid: str = Depends(get_current_user_id)):
     return rows
 
 
-# ---------- Notifications ----------
 @router.get("/notifications")
 async def list_notifications(uid: str = Depends(get_current_user_id)):
     rows = await db.notifications.find({"user_id": uid}, {"_id": 0}).sort("created_at", -1).to_list(100)
@@ -230,7 +243,6 @@ async def mark_all_read(uid: str = Depends(get_current_user_id)):
     return {"ok": True}
 
 
-# ---------- Referral (UNIFIED — replaces /invites/status too) ----------
 @router.get("/referral/mine")
 async def my_referral(uid: str = Depends(get_current_user_id)):
     me_doc = await get_user(uid)
@@ -238,21 +250,23 @@ async def my_referral(uid: str = Depends(get_current_user_id)):
     if not code:
         code = uid[:8]
         await db.users.update_one({"id": uid}, {"$set": {"referral_code": code}})
+
     count = await db.users.count_documents({"referred_by": code})
     bonus_per_invite = 10000
     earned = count * bonus_per_invite
     link = f"https://t.me/{TELEGRAM_BOT_USERNAME}?start={code}"
-    # Free Premium week redemptions (3 invites = 1 week)
+
     redeemed = me_doc.get("invite_premium_redeemed", 0)
     eligible_redemptions = count // 3
     available_weeks = max(0, eligible_redemptions - redeemed)
     next_milestone = 3 - (count % 3) if count % 3 != 0 else 3
+
     return {
         "code": code,
         "link": link,
         "invited_count": count,
-        "invites_count": count,  # alias
-        "invited": count,  # alias for legacy /invites/status
+        "invites_count": count,
+        "invited": count,
         "bonus_per_invite": bonus_per_invite,
         "earned": earned,
         "vip_bonus_threshold": 5,
