@@ -63,7 +63,10 @@ async def telegram_webhook(request: Request, secret: Optional[str] = Query(None)
                 await db.users.update_one({"id": ref_owner["id"]}, {"$inc": {"balance": 1000, "ref_count": 1}})
                 await push_notif(ref_owner["id"], "referral", "Yangi taklif bonus +1000 so'm")
 
-        webapp_url = os.environ.get("CLICK_RETURN_URL", "").split("/payment/return")[0]
+        webapp_url = os.environ.get(
+    "WEBAPP_URL",
+    "https://fidem-frontend-production.up.railway.app"
+)
         reply = (
             "Assalomu alaykum! FIDEM — Sizga mos insonni xavfsiz topishga yordam beramiz.\n\n"
             f"@{TELEGRAM_BOT_USERNAME} ilovasini ochish uchun pastdagi tugmani bosing 👇"
