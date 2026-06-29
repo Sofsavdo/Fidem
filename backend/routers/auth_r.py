@@ -42,6 +42,35 @@ from storage import MIME, get_object, put_object
 router = APIRouter(tags=["auth"])
 
 
+async def _may_access_file(uid: str, is_admin: bool, rec: dict) -> bool:
+    owner_id = rec.get("owner_id")
+    if not owner_id:
+        return bool(is_admin)
+    if is_admin or uid == owner_id:
+        return True
+    unlock = await db.photo_unlocks.find_one(
+        {"requester_id": uid, "target_id": owner_id, "approved": True},
+        {"_id": 1},
+    )
+    if unlock:
+        return True
+    path = rec.get("storage_path") or ""
+    if path:
+        shared = await db.messages.find_one(
+            {
+                "$or": [
+                    {"from_user_id": uid, "to_user_id": owner_id},
+                    {"from_user_id": owner_id, "to_user_id": uid},
+                ],
+                "meta.voice_url": {"$regex": path},
+            },
+            {"_id": 1},
+        )
+        if shared:
+            return True
+    return False
+
+
 def get_webapp_url() -> str:
     return os.environ.get(
         "WEBAPP_URL",
@@ -388,7 +417,10 @@ async def serve_file(
     if not token:
         raise HTTPException(401, "Auth required")
 
-    decode_token(token)
+    payload = decode_token(token)
+    uid = payload.get("sub")
+    if not uid:
+        raise HTTPException(401, "Invalid token")
 
     rec = await db.files.find_one(
         {"storage_path": path, "is_deleted": False},
@@ -397,6 +429,9 @@ async def serve_file(
 
     if not rec:
         raise HTTPException(404, "File not found")
+
+    if not await _may_access_file(uid, bool(payload.get("is_admin")), rec):
+        raise HTTPException(403, "Forbidden")
 
     try:
         data, content_type = await get_object(path)

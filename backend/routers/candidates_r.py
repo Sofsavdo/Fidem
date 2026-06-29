@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from auth import get_current_user_id
-from core import db, get_user, iso, log, manager, now_utc, push_notif, touch_active, user_public
+from core import db, get_user, iso, log, manager, now_utc, parse_dt, push_notif, strip_locked_photo, touch_active, user_public
 from models import PhotoUnlockDecision, PhotoUnlockRequest, SaveRequest, new_id
 from services import age_from_birth, compute_match
 
@@ -151,6 +152,7 @@ async def candidates(
         pub["match_reasons"] = reasons
         pub["photo_unlocked"] = d["id"] in unlocked_set
         pub["can_message"] = candidate_can_message(d, me_doc)
+        pub = strip_locked_photo(pub)
 
         now_iso2 = iso(now_utc())
         pub["boosted"] = bool(d.get("boost_until") and d["boost_until"] > now_iso2)
@@ -215,6 +217,18 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
     target = await get_user(target_id)
     me_doc = await get_user(uid)
 
+    existing_view = await db.profile_views.find_one(
+        {"viewer_id": uid, "target_id": target_id},
+        {"_id": 0, "at": 1},
+    )
+    should_notify_view = existing_view is None
+    if existing_view and existing_view.get("at"):
+        try:
+            if (now_utc() - parse_dt(existing_view["at"])) >= timedelta(hours=24):
+                should_notify_view = True
+        except Exception:
+            pass
+
     await db.profile_views.update_one(
         {"viewer_id": uid, "target_id": target_id},
         {"$set": {"viewer_id": uid, "target_id": target_id, "at": iso(now_utc())}},
@@ -251,17 +265,18 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
     except Exception:
         pass
 
-    asyncio.create_task(
-        push_notif(
-            target_id,
-            "view",
-            "👀 Profilingizni yangi foydalanuvchi ko‘rdi.\n\n"
-            "Kim qiziqqanini bilish uchun FIDEM’ni oching.",
-            link="/saved/viewers",
+    if should_notify_view:
+        asyncio.create_task(
+            push_notif(
+                target_id,
+                "view",
+                "👀 Profilingizni yangi foydalanuvchi ko‘rdi.\n\n"
+                "Kim qiziqqanini bilish uchun FIDEM’ni oching.",
+                link="/saved?tab=viewers",
+            )
         )
-    )
 
-    return pub
+    return strip_locked_photo(pub)
 
 
 # ---------- Photo unlock ----------
@@ -391,7 +406,7 @@ async def save_user(req: SaveRequest, uid: str = Depends(get_current_user_id)):
             "saved",
             "❤️ Sizda yangi qiziqish mavjud.\n\n"
             "Kim sizni yoqtirganini bilish uchun FIDEM’ni oching.",
-            link="/saved/by-others",
+            link="/saved?tab=by_others",
         )
 
     return {"ok": True}
@@ -407,6 +422,13 @@ async def unsave_user(target_id: str, uid: str = Depends(get_current_user_id)):
 async def saved_mine(uid: str = Depends(get_current_user_id)):
     rows = await db.saved.find({"owner_id": uid}, {"_id": 0}).sort("at", -1).to_list(500)
 
+    target_ids = [r["target_id"] for r in rows]
+    unlocks = await db.photo_unlocks.find(
+        {"requester_id": uid, "target_id": {"$in": target_ids}, "approved": True},
+        {"_id": 0, "target_id": 1},
+    ).to_list(500)
+    unlocked_set = {p["target_id"] for p in unlocks}
+
     result = []
 
     for r in rows:
@@ -416,7 +438,9 @@ async def saved_mine(uid: str = Depends(get_current_user_id)):
         )
 
         if u:
-            result.append(user_public(u))
+            pub = user_public(u)
+            pub["photo_unlocked"] = u["id"] in unlocked_set
+            result.append(strip_locked_photo(pub))
 
     return result
 

@@ -106,6 +106,16 @@ async def touch_active(uid: str) -> None:
     await db.users.update_one({"id": uid}, {"$set": {"last_active": iso(now_utc())}})
 
 
+def strip_locked_photo(pub: dict) -> dict:
+    """Remove photo_url from API payloads when the viewer has not unlocked the photo."""
+    if pub.get("photo_unlocked"):
+        return pub
+    out = dict(pub)
+    out["photo_url"] = None
+    out["photo_unlocked"] = False
+    return out
+
+
 def user_public(u: dict) -> dict:
     age = age_from_birth(u.get("birth_date", "2000-01-01"))
     la = parse_dt(u.get("last_active"))

@@ -22,6 +22,7 @@ from core import (
     now_utc,
     parse_dt,
     push_notif,
+    strip_locked_photo,
     user_public,
 )
 from models import (
@@ -171,7 +172,20 @@ async def list_chats(uid: str = Depends(get_current_user_id)):
     ]
     cursor = db.messages.aggregate(pipeline)
     items = []
+    rows_data = []
     async for row in cursor:
+        rows_data.append(row)
+    other_ids = []
+    for row in rows_data:
+        last = row["last"]
+        other_id = last["to_user_id"] if last["from_user_id"] == uid else last["from_user_id"]
+        other_ids.append(other_id)
+    unlocks = await db.photo_unlocks.find(
+        {"requester_id": uid, "target_id": {"$in": other_ids}, "approved": True},
+        {"_id": 0, "target_id": 1},
+    ).to_list(500) if other_ids else []
+    unlocked_set = {p["target_id"] for p in unlocks}
+    for row in rows_data:
         last = row["last"]
         other_id = last["to_user_id"] if last["from_user_id"] == uid else last["from_user_id"]
         u = await db.users.find_one({"id": other_id}, {"_id": 0, "password_hash": 0})
@@ -180,9 +194,11 @@ async def list_chats(uid: str = Depends(get_current_user_id)):
         unread = await db.messages.count_documents(
             {"chat_id": row["_id"], "to_user_id": uid, "read": {"$ne": True}}
         )
+        pub = user_public(u)
+        pub["photo_unlocked"] = other_id in unlocked_set
         items.append({
             "chat_id": row["_id"],
-            "other": user_public(u),
+            "other": strip_locked_photo(pub),
             "last_message": {
                 "id": last["id"], "text": last["text"],
                 "kind": last.get("kind", "text"),
@@ -459,7 +475,7 @@ async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id
     await db.messages.insert_one(gift_msg)
     gift_msg.pop("_id", None)
     await manager.broadcast_chat([uid, req.to_user_id], {"type": "message", "data": gift_msg})
-    await push_notif(req.to_user_id, "gift", f"Sizga {meta['emoji']} {meta['label_uz']} sovg'a yuborildi", link="/chat?id=" + cid)
+    await push_notif(req.to_user_id, "gift", f"Sizga {meta['emoji']} {meta['label_uz']} sovg'a yuborildi", link=f"/chat/{uid}")
     new_balance = sender.get("balance", 0) if is_free_gift else (sender.get("balance", 0) - price)
     return {"ok": True, "balance": new_balance, "gift": gift_msg["meta"]}
 
