@@ -49,14 +49,6 @@ export default function Me() {
     navigator.clipboard.writeText(txt).then(() => toast.success(t("copied")));
   };
 
-  const requestVerification = async (kind) => {
-    try {
-      await api.post("/verification/request", { kind });
-      toast.success(t("submit_request") + " ✓");
-      refresh();
-    } catch (e) { toast.error(t("error_generic")); }
-  };
-
   return (
     <div className="px-4 md:px-8 pt-6 pb-8 space-y-5">
       {/* Header */}
@@ -206,17 +198,21 @@ export default function Me() {
         </Link>
       )}
 
-      {/* Verification actions */}
+      {/* Verification actions — full upload flow on /verification */}
       <div className="rounded-3xl bg-card border border-border divide-y">
         <Row
           icon={<ShieldCheck className="w-4 h-4 text-secondary" />}
           label={t("request_selfie")}
-          right={user.verified_selfie ? <span className="text-secondary text-xs">✓</span> : <button data-testid="req-verify-selfie" onClick={() => requestVerification("selfie")} className="text-xs text-primary font-medium">{t("request_verification")}</button>}
+          right={user.verified_selfie ? <span className="text-secondary text-xs">✓</span> : (
+            <Link to="/verification" data-testid="req-verify-selfie" className="text-xs text-primary font-medium">{t("verify_go_page")}</Link>
+          )}
         />
         <Row
           icon={<Gem className="w-4 h-4 text-gold-dark" />}
           label={t("financial_verification")}
-          right={user.verified_financial ? <span className="text-secondary text-xs">✓</span> : <button data-testid="req-verify-financial" onClick={() => requestVerification("financial")} className="text-xs text-primary font-medium">{t("request_verification")}</button>}
+          right={user.verified_financial ? <span className="text-secondary text-xs">✓</span> : (
+            <Link to="/verification" data-testid="req-verify-financial" className="text-xs text-primary font-medium">{t("verify_go_page")}</Link>
+          )}
         />
       </div>
 

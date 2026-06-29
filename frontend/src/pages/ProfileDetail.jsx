@@ -23,16 +23,16 @@ export default function ProfileDetail() {
 
   const requestFamily = async () => {
     if (user?.plan !== "vip") {
-      toast.error("Oilaviy aloqa funksiyasi faqat VIP foydalanuvchilar uchun");
+      toast.error(t("family_vip_only"));
       nav("/premium");
       return;
     }
     setFamSending(true);
     try {
       await api.post("/family/request", { target_user_id: id, note: "" });
-      toast.success("So'rov yuborildi. Ikkala tomon ham qabul qilgach, oilaviy telefonlar ko'rinadi.");
+      toast.success(t("family_request_sent"));
     } catch (e) {
-      toast.error("Xato");
+      toast.error(t("error_generic"));
     } finally { setFamSending(false); }
   };
 
@@ -44,7 +44,7 @@ export default function ProfileDetail() {
       const my = await api.get("/saved/mine");
       setSaved((my.data || []).some((x) => x.id === id));
     } catch (e) {
-      toast.error("Xato");
+      toast.error(t("error_generic"));
     } finally {
       setLoading(false);
     }
@@ -54,15 +54,15 @@ export default function ProfileDetail() {
   const unlockPhoto = async () => {
     try {
       const r = await api.post("/photo-unlock/request", { target_user_id: id });
-      toast.success(r.data.status === "approved" ? "Rasm ochildi" : "So'rov yuborildi");
+      toast.success(r.data.status === "approved" ? t("photo_unlocked_toast") : t("photo_request_sent_toast"));
       load();
-    } catch (e) { toast.error("Xato"); }
+    } catch (e) { toast.error(t("error_generic")); }
   };
   const toggleSave = async () => {
     setSaving(true);
     try {
       if (saved) { await api.delete(`/saved/${id}`); setSaved(false); }
-      else { await api.post("/saved", { user_id: id }); setSaved(true); toast.success("Saqlandi"); }
+      else { await api.post("/saved", { user_id: id }); setSaved(true); toast.success(t("saved_successfully")); }
     } finally { setSaving(false); }
   };
 
@@ -108,7 +108,7 @@ export default function ProfileDetail() {
             <FinancialBadge verified={c.verified_financial} />
             {c.verified_identity && (
               <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 px-2 py-1 text-[11px] font-medium">
-                <Shield className="w-3 h-3" /> Identity
+                <Shield className="w-3 h-3" /> {t("identity_badge")}
               </span>
             )}
           </div>
@@ -150,7 +150,7 @@ export default function ProfileDetail() {
         )}
 
         {/* AI Compatibility */}
-        <CompatibilityCard targetId={c.id} lang="uz" />
+        <CompatibilityCard targetId={c.id} />
 
         {/* Prompts */}
         {c.prompts && c.prompts.length > 0 && (
@@ -203,7 +203,7 @@ export default function ProfileDetail() {
           disabled={famSending}
           className="w-full rounded-2xl py-2.5 mt-2 text-sm font-medium border border-secondary/40 bg-secondary/10 text-secondary hover:bg-secondary/20 inline-flex items-center justify-center gap-2"
         >
-          📞 Oilaviy aloqa so'rash (VIP)
+          📞 {t("family_request_btn")}
         </button>
       </div>
       {roseOpen && <RoseModal targetId={c.id} targetName={c.name} onClose={() => setRoseOpen(false)} onSent={load} />}

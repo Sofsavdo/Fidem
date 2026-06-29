@@ -42,12 +42,12 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
     try {
       const r = await api.post("/gifts/send", { to_user_id: targetId, gift_kind: item.kind });
       const isFree = r.data?.gift?.is_free;
-      toast.success(isFree ? `${item.emoji} ${item[labelKey]} bepul yuborildi!` : `${item.emoji} yuborildi ✓`);
+      toast.success(isFree ? t("gift_sent_free").replace("{emoji}", item.emoji).replace("{label}", item[labelKey]) : t("gift_sent_paid").replace("{emoji}", item.emoji));
       await refresh();
       onSent?.(item.kind);
       onClose();
     } catch (e) {
-      toast.error("Xato yuz berdi");
+      toast.error(t("error_generic"));
     } finally {
       setSending(null);
     }
@@ -64,7 +64,7 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
         <div className="flex items-center justify-between p-4 border-b border-border/40 shrink-0">
           <div>
             <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
-              <GiftIcon className="w-5 h-5 text-primary" /> Sovg'a yuborish
+              <GiftIcon className="w-5 h-5 text-primary" /> {t("gift_send_title")}
             </h3>
             {targetName && <p className="text-xs text-muted-foreground">→ {targetName}</p>}
           </div>
@@ -75,9 +75,9 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
 
         {/* Balance info */}
         <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-muted/40 text-xs">
-          <span className="text-muted-foreground">Balans: <b className="text-foreground">{balance.toLocaleString()} so'm</b></span>
+          <span className="text-muted-foreground">{t("gift_balance_label")}: <b className="text-foreground">{balance.toLocaleString()} {t("sum")}</b></span>
           <span className="inline-flex items-center gap-1 text-emerald-700">
-            <Sparkles className="w-3 h-3" /> Bepul qoldiq: {freeRemaining} / {catalog?.free_quota_per_week || 1}
+            <Sparkles className="w-3 h-3" /> {t("gift_free_remaining")}: {freeRemaining} / {catalog?.free_quota_per_week || 1}
           </span>
         </div>
 
@@ -103,7 +103,10 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
 
         {/* Gifts grid - scrollable */}
         <div className="overflow-y-auto p-4 grid grid-cols-3 gap-3" style={{ scrollbarWidth: "none" }}>
-          {!catalog && <p className="col-span-3 text-center text-sm text-muted-foreground py-6">Yuklanmoqda...</p>}
+          {!catalog && <p className="col-span-3 text-center text-sm text-muted-foreground py-6">{t("loading")}</p>}
+          {activeTier === "free" && catalog && (
+            <p className="col-span-3 text-[11px] text-muted-foreground text-center pb-1">{t("gift_rose_note")}</p>
+          )}
           {(groups[activeTier] || []).map((g) => {
             const isFreeKind = g.tier === "free";
             const cannotAfford = isFreeKind ? freeRemaining <= 0 : balance < g.price;
@@ -121,13 +124,13 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
                 <span className="text-4xl leading-none">{g.emoji}</span>
                 <span className="text-[11px] font-medium text-center leading-tight mt-1">{g[labelKey]}</span>
                 {isFreeKind ? (
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${tier.cls}`}>BEPUL</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${tier.cls}`}>{t("gift_free_badge")}</span>
                 ) : (
                   <span className="text-[10px] text-muted-foreground">
-                    {g.price >= 1000 ? `${(g.price / 1000).toFixed(g.price >= 10000 ? 0 : 1)}K` : g.price} so'm
+                    {g.price >= 1000 ? `${(g.price / 1000).toFixed(g.price >= 10000 ? 0 : 1)}K` : g.price} {t("sum")}
                   </span>
                 )}
-                {sending === g.kind && <span className="absolute inset-0 grid place-items-center bg-card/80 rounded-2xl text-primary text-xs">Yuborilmoqda...</span>}
+                {sending === g.kind && <span className="absolute inset-0 grid place-items-center bg-card/80 rounded-2xl text-primary text-xs">{t("gift_sending")}</span>}
               </button>
             );
           })}
@@ -135,7 +138,7 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
 
         {/* Bottom tip */}
         <div className="px-4 py-2.5 border-t border-border/40 text-center text-[11px] text-muted-foreground shrink-0">
-          💡 Sovg'a qabul qilgan kishi 50% nominal so'mga aylantirib yechishi mumkin
+          {t("gift_tip")}
         </div>
       </div>
     </div>

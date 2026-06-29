@@ -64,6 +64,9 @@ async def candidates(
     uid: str = Depends(get_current_user_id),
 ):
     me_doc = await get_user(uid)
+    match_lang = me_doc.get("language", "uz")
+    if match_lang not in ("uz", "ru", "en"):
+        match_lang = "uz"
     if not me_doc.get("onboarded"):
         return []
 
@@ -132,7 +135,7 @@ async def candidates(
         if height_max and d.get("height_cm", 999) > height_max:
             continue
 
-        score, reasons = compute_match(me_doc, d)
+        score, reasons = compute_match(me_doc, d, lang=match_lang)
 
         my_quiz = me_doc.get("quiz_answers") or {}
         their_quiz = d.get("quiz_answers") or {}
@@ -215,6 +218,9 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
 
     target = await get_user(target_id)
     me_doc = await get_user(uid)
+    match_lang = me_doc.get("language", "uz")
+    if match_lang not in ("uz", "ru", "en"):
+        match_lang = "uz"
 
     existing_view = await db.profile_views.find_one(
         {"viewer_id": uid, "target_id": target_id},
@@ -234,7 +240,7 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
         upsert=True,
     )
 
-    score, reasons = compute_match(me_doc, target)
+    score, reasons = compute_match(me_doc, target, lang=match_lang)
 
     pub = user_public(target)
     pub["match_score"] = score

@@ -77,23 +77,23 @@ export default function Sidebar() {
         </Link>
         <Link to="/boost" data-testid="side-boost" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
           <Sparkles className="w-4 h-4 text-primary" />
-          <span>Boost & Spotlight</span>
+          <span>{t("boost_title")}</span>
         </Link>
         <Link to="/concierge" data-testid="side-concierge" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
           <Crown className="w-4 h-4 text-secondary" />
-          <span>Concierge</span>
+          <span>{t("concierge_title")}</span>
         </Link>
         <Link to="/travel" data-testid="side-travel" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
           <Plane className="w-4 h-4 text-secondary" />
-          <span>Travel Mode</span>
+          <span>{t("travel_mode")}</span>
         </Link>
         <Link to="/family" data-testid="side-family" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
           <Phone className="w-4 h-4 text-primary" />
-          <span>Oilaviy aloqa</span>
+          <span>{t("family_contact")}</span>
         </Link>
         <Link to="/withdrawals" data-testid="side-withdrawals" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
           <Wallet className="w-4 h-4 text-primary" />
-          <span>Pul yechish</span>
+          <span>{t("withdraw_money")}</span>
         </Link>
         <Link to="/notifications" data-testid="side-notif" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
           <Gift className="w-4 h-4" />

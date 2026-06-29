@@ -4,6 +4,7 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { Lock } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
+import { toast } from "sonner";
 
 const TABS = [
   { k: "mine", api: "/saved/mine", labelKey: "saved_by_me" },
@@ -29,8 +30,11 @@ export default function Saved() {
   useEffect(() => {
     const cur = TABS.find((x) => x.k === tab);
     setLoading(true);
-    api.get(cur.api).then((r) => setData((d) => ({ ...d, [tab]: r.data || [] }))).finally(() => setLoading(false));
-  }, [tab]);
+    api.get(cur.api)
+      .then((r) => setData((d) => ({ ...d, [tab]: r.data || [] })))
+      .catch(() => toast.error(t("error_generic")))
+      .finally(() => setLoading(false));
+  }, [tab, t]);
 
   const selectTab = (k) => {
     setTab(k);

@@ -72,7 +72,7 @@ export default function Premium() {
       window.open(r.data.payment_link, "_blank");
       setPayments((p) => [{ ...r.data, purpose, user_id: user.id, created_at: new Date() }, ...p]);
     } catch (e) {
-      toast.error("Xato");
+      toast.error(t("error_generic"));
     } finally { setCreating(false); }
   };
   const topup = async () => {
@@ -82,7 +82,7 @@ export default function Premium() {
       window.open(r.data.payment_link, "_blank");
       setPayments((p) => [{ ...r.data, purpose: "balance_topup" }, ...p]);
     } catch (e) {
-      toast.error("Xato");
+      toast.error(t("error_generic"));
     } finally { setCreating(false); }
   };
 
@@ -95,6 +95,7 @@ export default function Premium() {
         <p className="text-sm text-muted-foreground mt-1">{t("tagline")}</p>
       </div>
 
+      <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">{t("premium_section_plans")}</p>
       <div className="space-y-3 stagger">
         {PLANS.map((p) => {
           const isCurrent = user?.plan === p.key;
@@ -114,7 +115,7 @@ export default function Premium() {
                   </p>
                 </div>
                 <p className="font-heading text-xl">
-                  {p.price === 0 ? "Free" : `${p.price.toLocaleString()} so'm`}
+                  {p.price === 0 ? t("plan_free_title") : `${p.price.toLocaleString()} ${t("sum")}`}
                 </p>
               </div>
               <ul className="mt-3 space-y-1.5">
@@ -148,6 +149,7 @@ export default function Premium() {
           <Wallet className="w-5 h-5 text-primary" />
           <p className="font-heading text-xl font-semibold">{t("topup_balance")}</p>
         </div>
+        <p className="text-xs text-muted-foreground mb-3">{t("premium_section_balance_hint")}</p>
         <div className="flex gap-2 mb-3">
           {[10000, 50000, 100000, 200000].map((v) => (
             <button
@@ -168,14 +170,14 @@ export default function Premium() {
           disabled={creating}
           className="w-full rounded-2xl bg-secondary text-white py-3 font-medium"
         >
-          {t("pay_with_click")} · {topupAmount.toLocaleString()} so'm
+          {t("pay_with_click")} · {topupAmount.toLocaleString()} {t("sum")}
         </button>
       </div>
 
       {/* Roses bundles — Hinge-style attention currency */}
       <div className="rounded-3xl bg-primary/5 border-2 border-primary/30 p-5" data-testid="roses-section">
-        <p className="font-heading text-xl font-semibold flex items-center gap-2">🌹 Atirgullar</p>
-        <p className="text-sm mt-1 text-muted-foreground">Maxsus e'tibor bilan murojaat. Premium foydalanuvchilar 3, VIP 7 ta bepul oladi (haftada).</p>
+        <p className="font-heading text-xl font-semibold flex items-center gap-2">🌹 {t("premium_section_roses")}</p>
+        <p className="text-sm mt-1 text-muted-foreground">{t("premium_section_roses_desc")}</p>
         <div className="grid grid-cols-3 gap-2 mt-3">
           {[["1", 1, 5000], ["5", 5, 20000], ["12", 12, 45000]].map(([k, count, price]) => (
             <button
@@ -186,7 +188,7 @@ export default function Premium() {
                 try {
                   const r = await api.post("/roses/purchase", { bundle: k });
                   window.open(r.data.payment_link, "_blank");
-                  toast.success(`${count} atirgul to'lov sahifasi ochildi`);
+                  toast.success(t("roses_payment_opened").replace("{count}", count));
                 } catch (e) { toast.error("Xato"); } finally { setCreating(false); }
               }}
               disabled={creating}
@@ -194,7 +196,7 @@ export default function Premium() {
             >
               <p className="text-2xl">🌹</p>
               <p className="font-medium text-sm mt-1">{count} ta</p>
-              <p className="text-xs text-muted-foreground">{price.toLocaleString()} so'm</p>
+              <p className="text-xs text-muted-foreground">{price.toLocaleString()} {t("sum")}</p>
             </button>
           ))}
         </div>
@@ -203,32 +205,32 @@ export default function Premium() {
       {/* Super-application one-time */}
       <div className="rounded-3xl bg-gold-light/40 border border-gold/40 p-5" data-testid="super-section">
         <p className="font-heading text-xl font-semibold flex items-center gap-2">✨ {t("super_application")}</p>
-        <p className="text-sm mt-1">Pullik — mos bo'lmagan profilga ham</p>
+        <p className="text-sm mt-1">{t("premium_section_super_desc")}</p>
         <button
           data-testid="buy-super"
           onClick={() => buy("super_application")}
           disabled={creating}
           className="mt-3 w-full rounded-2xl bg-gradient-to-r from-gold to-gold-dark text-white py-3 font-medium"
         >
-          {t("buy_super")} · 15,000 so'm
+          {t("buy_super")} · 15,000 {t("sum")}
         </button>
       </div>
 
       {/* Concierge — premium manual matching */}
       <div className="rounded-3xl bg-gradient-to-br from-secondary/10 via-primary/5 to-gold-light/30 border-2 border-secondary/40 p-5" data-testid="concierge-section">
-        <p className="font-heading text-xl font-semibold flex items-center gap-2">👑 Concierge</p>
-        <p className="text-sm mt-1 text-muted-foreground">Mutaxassis 30 kun ichida 5 ta qo'lda tanlangan mos profil taqdim etadi.</p>
+        <p className="font-heading text-xl font-semibold flex items-center gap-2">👑 {t("concierge_title")}</p>
+        <p className="text-sm mt-1 text-muted-foreground">{t("concierge_desc")}</p>
         <ul className="text-xs mt-3 space-y-1 text-foreground/80">
-          <li>✓ Inson nazoratidan o'tgan sifatli moslar</li>
-          <li>✓ Har bir mos uchun batafsil izoh</li>
-          <li>✓ Tezroq va aniqroq natija</li>
+          <li>✓ {t("premium_section_concierge_features_1")}</li>
+          <li>✓ {t("premium_section_concierge_features_2")}</li>
+          <li>✓ {t("premium_section_concierge_features_3")}</li>
         </ul>
         <a
           href="/concierge"
           data-testid="concierge-link"
           className="mt-3 block w-full text-center rounded-2xl bg-secondary text-white py-3 font-medium"
         >
-          Concierge · 199,000 so'm
+          {t("premium_section_concierge_btn").replace("{price}", "199,000").replace("{currency}", t("sum"))}
         </a>
       </div>
 
@@ -241,7 +243,7 @@ export default function Premium() {
             <div key={p.id} className="rounded-2xl bg-card border border-border p-3 flex items-center justify-between" data-testid={`payment-${p.id}`}>
               <div>
                 <p className="text-sm font-medium">{p.purpose}</p>
-                <p className="text-xs text-muted-foreground">{p.amount?.toLocaleString()} so'm</p>
+                <p className="text-xs text-muted-foreground">{p.amount?.toLocaleString()} {t("sum")}</p>
               </div>
               <span className={`text-xs px-2 py-1 rounded-full ${
                 p.status === "success" ? "bg-secondary/10 text-secondary" : p.status === "failed" ? "bg-red-50 text-red-700" : "bg-gold-light text-yellow-900"
