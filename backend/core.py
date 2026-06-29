@@ -25,7 +25,6 @@ from services import (
 
 log = logging.getLogger("fidem")
 
-# ---------- Env / DB ----------
 client = AsyncIOMotorClient(os.environ["MONGO_URL"])
 db = client[os.environ["DB_NAME"]]
 
@@ -41,11 +40,16 @@ PRICE_STANDARD = int(os.environ.get("PRICE_STANDARD_UZS", "19900"))
 PRICE_CHAT_UNLOCK = int(os.environ.get("PRICE_CHAT_UNLOCK_UZS", "9900"))
 CHAT_UNLOCK_COINS = int(os.environ.get("CHAT_UNLOCK_COINS", "100"))
 CHAT_GUARANTEE_HOURS = int(os.environ.get("CHAT_GUARANTEE_HOURS", "48"))
-# Plans that can initiate chats without per-chat unlock
 PAID_PLANS = ("standard", "premium", "vip")
 
 
-# ---------- Helpers ----------
+def get_webapp_url() -> str:
+    return os.environ.get(
+        "WEBAPP_URL",
+        "https://fidem-frontend-production.up.railway.app",
+    ).rstrip("/")
+
+
 def hash_pw(pw: str) -> str:
     return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
 
@@ -150,20 +154,40 @@ async def notify_telegram(uid: str, text: str, link: Optional[str] = None) -> No
     user = await db.users.find_one({"id": uid}, {"telegram_id": 1, "_id": 0})
     if user and user.get("telegram_id"):
         try:
-            reply_markup = None
+            base = get_webapp_url()
+            full = base
+
             if link:
-                base = os.environ.get("CLICK_RETURN_URL", "").split("/payment/return")[0] or ""
-                full = link if link.startswith("http") else f"{base}{link}" if base else None
-                if full:
-                    reply_markup = {"inline_keyboard": [[{"text": "🔗 Ochish", "url": full}]]}
-            await send_telegram_message(int(user["telegram_id"]), text, reply_markup=reply_markup)
+                full = link if link.startswith("http") else f"{base}{link}"
+
+            reply_markup = {
+                "inline_keyboard": [
+                    [
+                        {
+                            "text": "💖 FIDEM'ni ochish",
+                            "web_app": {"url": full},
+                        }
+                    ]
+                ]
+            }
+
+            await send_telegram_message(
+                int(user["telegram_id"]),
+                text,
+                reply_markup=reply_markup,
+            )
         except Exception as e:
             log.warning(f"telegram notify failed: {e}")
 
 
-async def push_notif(uid: str, kind: str, text: str, link: Optional[str] = None,
-                     marketing: bool = False, payload: Optional[dict] = None) -> bool:
-    """Persist + Telegram-DM a notification + push via WebSocket. Returns False if marketing cap hit."""
+async def push_notif(
+    uid: str,
+    kind: str,
+    text: str,
+    link: Optional[str] = None,
+    marketing: bool = False,
+    payload: Optional[dict] = None,
+) -> bool:
     if marketing:
         cutoff = iso(now_utc() - timedelta(hours=24))
         today_count = await db.notifications.count_documents(
@@ -171,6 +195,7 @@ async def push_notif(uid: str, kind: str, text: str, link: Optional[str] = None,
         )
         if today_count >= 2:
             return False
+
     notif = {
         "id": new_id(),
         "user_id": uid,
@@ -181,15 +206,16 @@ async def push_notif(uid: str, kind: str, text: str, link: Optional[str] = None,
         "created_at": iso(now_utc()),
         "read": False,
     }
+
     await db.notifications.insert_one(notif)
     notif.pop("_id", None)
+
     asyncio.create_task(notify_telegram(uid, text, link))
-    # WebSocket push (best-effort)
     asyncio.create_task(manager.send_to_user(uid, {"type": "notification", "data": notif, "payload": payload or {}}))
+
     return True
 
 
-# ---------- WebSocket Connection Manager ----------
 class ConnectionManager:
     def __init__(self) -> None:
         self.connections: dict[str, set[WebSocket]] = defaultdict(set)
@@ -212,7 +238,6 @@ class ConnectionManager:
             try:
                 await ws.send_json(message)
             except Exception:
-                # Best-effort; drop dead connections
                 async with self._lock:
                     self.connections[uid].discard(ws)
 
@@ -224,9 +249,7 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-# ---------- Rate Limiter ----------
 class RateLimiter:
-    """Sliding-window in-memory limiter. Not for multi-instance prod but fine for MVP."""
     def __init__(self, max_attempts: int = 10, window_sec: int = 300) -> None:
         self.max = max_attempts
         self.window = window_sec
@@ -235,7 +258,6 @@ class RateLimiter:
     def check(self, key: str) -> None:
         now = time.monotonic()
         bucket = self.hits[key]
-        # Drop old hits
         cutoff = now - self.window
         self.hits[key] = [t for t in bucket if t > cutoff]
         if len(self.hits[key]) >= self.max:
@@ -247,7 +269,6 @@ auth_limiter = RateLimiter(max_attempts=10, window_sec=300)
 
 
 def rate_limit_auth(request: Request) -> None:
-    """Apply rate limit per client IP for auth endpoints."""
     ip = request.client.host if request.client else "unknown"
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
