@@ -82,17 +82,28 @@ async def create_payment(req: CreatePaymentRequest, uid: str = Depends(get_curre
             raise HTTPException(400, "Minimum 50")
     else:
         raise HTTPException(400, "Unknown purpose")
-    pid = new_id()
-    doc = {
-        "id": pid,
-        "user_id": uid,
-        "amount": amount,
-        "purpose": req.purpose,
-        "target_user_id": req.target_user_id,
-        "gift_kind": req.gift_kind,
-        "status": "pending",
-        "created_at": iso(now_utc()),
-    }
+   # Generate readable payment ID
+today = datetime.now().strftime("%y%m%d")
+
+count = await db.payments.count_documents({}) + 1
+
+pid = f"FD{today}{count:05d}"
+
+# Safety check
+while await db.payments.find_one({"id": pid}):
+    count += 1
+    pid = f"FD{today}{count:05d}"
+
+doc = {
+    "id": pid,
+    "user_id": uid,
+    "amount": amount,
+    "purpose": req.purpose,
+    "target_user_id": req.target_user_id,
+    "gift_kind": req.gift_kind,
+    "status": "pending",
+    "created_at": iso(now_utc()),
+}
     link = click_pay_link(amount, pid)
     doc["payment_link"] = link
     await db.payments.insert_one(doc)
