@@ -1,17 +1,18 @@
 import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Bell, Eye, Heart, Gift, MessageCircle, ShieldCheck, Trophy, Sparkles } from "lucide-react";
 
 const ICONS = {
   view: Eye, saved: Heart, gift: Gift, message: MessageCircle, photo_request: ShieldCheck,
   photo_grant: ShieldCheck, match: Sparkles, premium: Trophy, balance: Trophy, marketing: Bell,
-  referral: Trophy, verified: ShieldCheck,
+  referral: Trophy, verified: ShieldCheck, rose: Heart,
 };
 
 export default function Notifications() {
   const { t } = useApp();
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,6 +25,20 @@ export default function Notifications() {
     } finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
+
+  const openLink = (link) => {
+    if (!link) return;
+    if (link.startsWith("http://") || link.startsWith("https://")) {
+      try {
+        const u = new URL(link);
+        navigate(u.pathname + u.search);
+      } catch {
+        window.location.href = link;
+      }
+      return;
+    }
+    navigate(link);
+  };
 
   return (
     <div className="px-4 pt-6 pb-8" data-testid="notifications-page">
@@ -40,8 +55,22 @@ export default function Notifications() {
       <div className="space-y-2">
         {items.map((n) => {
           const Icon = ICONS[n.kind] || Bell;
+          const clickable = Boolean(n.link);
           return (
-            <div key={n.id} data-testid={`notif-${n.id}`} className={`rounded-2xl border border-border p-3 flex items-start gap-3 ${n.read ? "bg-card" : "bg-muted/40"}`}>
+            <div
+              key={n.id}
+              data-testid={`notif-${n.id}`}
+              role={clickable ? "button" : undefined}
+              tabIndex={clickable ? 0 : undefined}
+              onClick={() => openLink(n.link)}
+              onKeyDown={(e) => {
+                if (clickable && (e.key === "Enter" || e.key === " ")) {
+                  e.preventDefault();
+                  openLink(n.link);
+                }
+              }}
+              className={`rounded-2xl border border-border p-3 flex items-start gap-3 ${n.read ? "bg-card" : "bg-muted/40"} ${clickable ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}`}
+            >
               <div className="w-9 h-9 rounded-full bg-muted grid place-items-center flex-shrink-0">
                 <Icon className="w-4 h-4 text-primary" />
               </div>
