@@ -22,7 +22,7 @@ from core import (
     now_utc,
     push_notif,
 )
-from datetime import timedelta
+from datetime import datetime, timedelta
 from models import CreatePaymentRequest, VerificationRequest, new_id
 from services import CLICK_SECRET_KEY, click_pay_link, verify_click_sign
 
