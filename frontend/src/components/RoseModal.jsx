@@ -2,8 +2,10 @@ import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { X, Send } from "lucide-react";
 import { toast } from "sonner";
+import { useApp } from "@/contexts/AppContext";
 
 export default function RoseModal({ targetId, targetName, onClose, onSent }) {
+  const { t } = useApp();
   const [status, setStatus] = useState(null);
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
@@ -16,22 +18,22 @@ export default function RoseModal({ targetId, targetName, onClose, onSent }) {
     setSending(true);
     try {
       await api.post("/roses/send", { to_user_id: targetId, note });
-      toast.success(`🌹 ${targetName}ga atirgul yuborildi`);
+      toast.success(t("rose_sent_to").replace("{name}", targetName));
       onSent && onSent();
       onClose();
     } catch (e) {
-      toast.error("Xato");
+      toast.error(t("error_generic"));
     } finally { setSending(false); }
   };
 
   const buyBundle = async (bundle) => {
     try {
       await api.post("/roses/purchase-balance", { bundle });
-      toast.success("Atirgullar qo'shildi");
+      toast.success(t("rose_added"));
       const r = await api.get("/roses/status");
       setStatus(r.data);
     } catch (e) {
-      toast.error("Balans yetarli emas — Balansga qo'shish kerak");
+      toast.error(t("rose_topup_hint"));
     }
   };
 
@@ -45,19 +47,19 @@ export default function RoseModal({ targetId, targetName, onClose, onSent }) {
         </button>
         <div className="text-center">
           <div className="text-5xl mb-2">🌹</div>
-          <h2 className="font-heading text-xl font-semibold">Atirgul yuborish</h2>
-          <p className="text-sm text-muted-foreground">{targetName}ga alohida e'tibor ko'rsating</p>
+          <h2 className="font-heading text-xl font-semibold">{t("rose_send_title")}</h2>
+          <p className="text-sm text-muted-foreground">{t("rose_send_subtitle").replace("{name}", targetName)}</p>
         </div>
         <div className="my-4 rounded-2xl bg-secondary/5 border border-secondary/30 p-3 text-sm">
-          <p>Mavjud: <strong>{status.total}</strong> ta atirgul ({status.free} bepul + {status.paid} pulli)</p>
-          <p className="text-xs text-muted-foreground mt-1">Hafta quota: {status.weekly_quota} ta bepul</p>
+          <p>{t("rose_available").replace("{total}", status.total).replace("{free}", status.free).replace("{paid}", status.paid)}</p>
+          <p className="text-xs text-muted-foreground mt-1">{t("rose_weekly_quota").replace("{quota}", status.weekly_quota)}</p>
         </div>
 
         <textarea
           data-testid="rose-note"
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="Maxsus xabar (ixtiyoriy)…"
+          placeholder={t("rose_note_placeholder")}
           rows={2}
           className="w-full rounded-2xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
         />
@@ -68,17 +70,17 @@ export default function RoseModal({ targetId, targetName, onClose, onSent }) {
           disabled={status.total === 0 || sending}
           className="mt-3 w-full rounded-2xl bg-primary text-white py-3 font-medium disabled:opacity-50 inline-flex items-center justify-center gap-2"
         >
-          <Send className="w-4 h-4" /> {sending ? "Yuborilmoqda…" : "Yuborish"}
+          <Send className="w-4 h-4" /> {sending ? t("rose_sending") : t("send")}
         </button>
 
         {status.total === 0 && (
           <div className="mt-4">
-            <p className="text-xs text-center text-muted-foreground mb-2">Atirgullar sotib olish (balansdan)</p>
+            <p className="text-xs text-center text-muted-foreground mb-2">{t("rose_buy_from_balance")}</p>
             <div className="grid grid-cols-3 gap-2">
               {Object.entries(status.bundles).map(([k, b]) => (
                 <button key={k} onClick={() => buyBundle(k)} className="rounded-2xl border border-border hover:bg-muted p-3 text-center">
                   <p className="text-xs text-muted-foreground">{b.count} ta</p>
-                  <p className="font-medium text-sm">{b.price.toLocaleString()} so'm</p>
+                  <p className="font-medium text-sm">{b.price.toLocaleString()} {t("sum")}</p>
                 </button>
               ))}
             </div>

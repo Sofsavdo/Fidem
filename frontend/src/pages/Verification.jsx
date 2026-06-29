@@ -4,37 +4,38 @@ import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { ShieldCheck, Upload, CheckCircle2, XCircle, Clock, FileText, IdCard, ScanFace, Banknote } from "lucide-react";
 
-const KINDS = [
-  {
-    key: "identity",
-    title: "Identity",
-    desc: "Pasport yoki ID kartangiz fotosi",
-    icon: <IdCard className="w-5 h-5" />,
-    color: "primary",
-    accept: "image/*",
-  },
-  {
-    key: "selfie",
-    title: "Selfie",
-    desc: "Hujjat bilan birga selfie suratingiz",
-    icon: <ScanFace className="w-5 h-5" />,
-    color: "secondary",
-    accept: "image/*",
-  },
-  {
-    key: "financial",
-    title: "Moliyaviy (Bank statement)",
-    desc: "Daromad bo'yicha bank ko'chirma yoki ish joyi tasdiqnomasi (PDF/foto). Tasdiqlangach +b_financial badge va profilingiz ko'rishlar 30% oshadi.",
-    icon: <Banknote className="w-5 h-5" />,
-    color: "gold",
-    accept: "image/*,application/pdf",
-  },
-];
-
 export default function Verification() {
   const { t } = useApp();
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);
+
+  const kinds = [
+    {
+      key: "identity",
+      title: t("verify_kind_identity_title"),
+      desc: t("verify_kind_identity_desc"),
+      icon: <IdCard className="w-5 h-5" />,
+      color: "primary",
+      accept: "image/*",
+    },
+    {
+      key: "selfie",
+      title: t("verify_kind_selfie_title"),
+      desc: t("verify_kind_selfie_desc"),
+      icon: <ScanFace className="w-5 h-5" />,
+      color: "secondary",
+      accept: "image/*",
+    },
+    {
+      key: "financial",
+      title: t("verify_kind_financial_title"),
+      desc: t("verify_kind_financial_desc"),
+      icon: <Banknote className="w-5 h-5" />,
+      color: "gold",
+      accept: "image/*,application/pdf",
+    },
+  ];
+
   const load = () => api.get("/verification/mine").then((r) => setData(r.data)).catch(() => {});
   useEffect(() => { load(); }, []);
 
@@ -73,7 +74,7 @@ export default function Verification() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {KINDS.map((k) => (
+        {kinds.map((k) => (
           <VerifyCard
             key={k.key}
             kind={k}
@@ -104,7 +105,7 @@ function VerifyCard({ kind, verified, last, onSubmit, busy }) {
   const onFile = (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    if (f.size > 8 * 1024 * 1024) { toast.error("Max 8MB"); return; }
+    if (f.size > 8 * 1024 * 1024) { toast.error(t("verify_max_file_size")); return; }
     onSubmit(kind.key, f, note);
   };
   const status = last?.status;
@@ -160,11 +161,11 @@ function VerifyCard({ kind, verified, last, onSubmit, busy }) {
             className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-white text-sm font-medium disabled:opacity-50"
           >
             <Upload className="w-4 h-4" />
-            {status === "pending" ? t("status_pending_word") : status === "rejected" ? t("retry_word") : t("submit_request")}
+            {status === "pending" ? t("status_pending_word") : status === "rejected" ? t("retry_word") : t("verify_upload_btn")}
           </button>
           {last?.proof_url && (
             <a href={last.proof_url} target="_blank" rel="noreferrer" className="text-[11px] text-primary inline-flex items-center gap-1">
-              <FileText className="w-3 h-3" /> {t("save_word")}
+              <FileText className="w-3 h-3" /> {t("verify_view_proof")}
             </a>
           )}
         </>

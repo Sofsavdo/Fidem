@@ -84,8 +84,67 @@ def age_from_birth(birth_date_iso: str) -> int:
         return 0
 
 
-def compute_match(viewer: dict, candidate: dict) -> tuple[int, list[str]]:
+def compute_match(viewer: dict, candidate: dict, lang: str = "uz") -> tuple[int, list[str]]:
     """Compute match% (0-100) and list of human-readable reasons."""
+    if lang not in ("uz", "ru", "en"):
+        lang = "uz"
+
+    def reason(key: str, **kwargs) -> str:
+        templates = {
+            "age_in_range": {
+                "uz": "Yosh oralig'i ({age})",
+                "ru": "Возраст в диапазоне ({age})",
+                "en": "Age in range ({age})",
+            },
+            "marital": {
+                "uz": "Oilaviy holat mos",
+                "ru": "Семейное положение совпадает",
+                "en": "Marital status matches",
+            },
+            "no_children": {
+                "uz": "Farzandsiz",
+                "ru": "Без детей",
+                "en": "No children",
+            },
+            "has_children": {
+                "uz": "Farzandli",
+                "ru": "С детьми",
+                "en": "Has children",
+            },
+            "height": {
+                "uz": "Bo'y mos",
+                "ru": "Рост подходит",
+                "en": "Height compatible",
+            },
+            "religion": {
+                "uz": "Din: {religion}",
+                "ru": "Религия: {religion}",
+                "en": "Religion: {religion}",
+            },
+            "goals_close": {
+                "uz": "Maqsadlar yaqin",
+                "ru": "Цели близки",
+                "en": "Goals align well",
+            },
+            "goals_partial": {
+                "uz": "Maqsadlar qisman mos",
+                "ru": "Цели частично совпадают",
+                "en": "Goals partially align",
+            },
+            "family_goal": {
+                "uz": "Oila qurish maqsadi",
+                "ru": "Цель — создание семьи",
+                "en": "Family-building goal",
+            },
+            "interests": {
+                "uz": "Qiziqishlar yaqin",
+                "ru": "Интересы близки",
+                "en": "Shared interests",
+            },
+        }
+        tmpl = templates.get(key, {}).get(lang) or templates.get(key, {}).get("uz", key)
+        return tmpl.format(**kwargs)
+
     score = 0
     reasons: list[str] = []
 
@@ -103,7 +162,7 @@ def compute_match(viewer: dict, candidate: dict) -> tuple[int, list[str]]:
     a_max = viewer.get("search_age_max", 60)
     if a_min <= c_age <= a_max:
         score += 20
-        reasons.append(f"Yosh oralig'i ({c_age})")
+        reasons.append(reason("age_in_range", age=c_age))
     elif abs(c_age - (a_min + a_max) / 2) <= 5:
         score += 10
 
@@ -118,29 +177,29 @@ def compute_match(viewer: dict, candidate: dict) -> tuple[int, list[str]]:
     # 4. Marital status alignment (10 pts)
     if viewer.get("marital_status") == candidate.get("marital_status"):
         score += 10
-        reasons.append("Oilaviy holat mos")
+        reasons.append(reason("marital"))
 
     # 5. Children alignment (10 pts)
     if viewer.get("has_children") == candidate.get("has_children"):
         score += 10
         if not candidate.get("has_children"):
-            reasons.append("Farzandsiz")
+            reasons.append(reason("no_children"))
         else:
-            reasons.append("Farzandli")
+            reasons.append(reason("has_children"))
 
     # 6. Height delta (10 pts) — prefer opposite-gender adult-typical
     vh = viewer.get("height_cm", 170)
     ch = candidate.get("height_cm", 170)
     if 5 <= abs(vh - ch) <= 30:
         score += 10
-        reasons.append("Bo'y mos")
+        reasons.append(reason("height"))
     elif abs(vh - ch) < 5:
         score += 5
 
     # 7. Religion (10 pts)
     if viewer.get("religion") and viewer.get("religion") == candidate.get("religion"):
         score += 10
-        reasons.append(f"Din: {candidate.get('religion')}")
+        reasons.append(reason("religion", religion=candidate.get("religion")))
 
     # 8. Goal text & looking_for similarity (10 pts) — token overlap
     a = (viewer.get("looking_for") or "").lower()
@@ -152,13 +211,13 @@ def compute_match(viewer: dict, candidate: dict) -> tuple[int, list[str]]:
             overlap = len(a_tokens & b_tokens) / max(1, len(a_tokens | b_tokens))
             if overlap >= 0.4:
                 score += 10
-                reasons.append("Maqsadlar yaqin")
+                reasons.append(reason("goals_close"))
             elif overlap > 0:
                 score += 5
-                reasons.append("Maqsadlar qisman mos")
+                reasons.append(reason("goals_partial"))
             else:
                 score += 2  # both have goal text — minor bonus
-                reasons.append("Oila qurish maqsadi")
+                reasons.append(reason("family_goal"))
         else:
             score += 3
     # Bio token overlap (5 pts)
@@ -171,7 +230,7 @@ def compute_match(viewer: dict, candidate: dict) -> tuple[int, list[str]]:
             o = len(ba_tokens & bb_tokens) / max(1, len(ba_tokens | bb_tokens))
             if o >= 0.2:
                 score += 5
-                reasons.append("Qiziqishlar yaqin")
+                reasons.append(reason("interests"))
 
     return min(100, score), reasons[:6]
 

@@ -49,7 +49,8 @@ export default function Travel() {
         <h1 className="text-2xl font-heading font-semibold flex items-center gap-2">
           <Plane className="w-6 h-6 text-secondary" /> {t("travel_mode")}
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">{t("ref_subtitle") /* general subtitle fallback */}</p>
+        <p className="text-sm text-muted-foreground mt-1">{t("travel_desc")}</p>
+        <p className="text-xs text-muted-foreground mt-2">{t("travel_uz_only_note")}</p>
       </div>
 
       {!status.allowed && (
@@ -57,7 +58,7 @@ export default function Travel() {
           <Crown className="w-5 h-5 text-amber-600 shrink-0" />
           <div className="text-sm">
             <p className="font-medium text-amber-900">{t("premium")} / {t("vip")}</p>
-            <p className="text-amber-800 mt-1"><a href="/premium" className="underline font-medium">{t("upgrade")}</a></p>
+            <p className="text-amber-800 mt-1">{t("travel_premium_gate")} <a href="/premium" className="underline font-medium">{t("upgrade")}</a></p>
           </div>
         </div>
       )}
@@ -85,7 +86,7 @@ export default function Travel() {
           {(status.regions || []).filter((r) => r !== status.home_region).map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
         <div>
-          <label className="text-xs text-muted-foreground">{days}</label>
+          <label className="text-xs text-muted-foreground">{t("travel_days")}: {days}</label>
           <input data-testid="travel-days" type="range" min="1" max="30" value={days} onChange={(e) => setDays(parseInt(e.target.value, 10))} className="w-full mt-1" />
           <div className="flex justify-between text-[10px] text-muted-foreground"><span>1</span><span>30</span></div>
         </div>
