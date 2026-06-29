@@ -128,7 +128,7 @@ async def startup() -> None:
     await db.saved.create_index([("target_id", 1), ("at", -1)], name="ix_saved_target_at")
     await db.profile_views.create_index([("target_id", 1), ("at", -1)], name="ix_profile_views_target_at")
     await db.messages.create_index([("to_user_id", 1), ("created_at", -1)], name="ix_msg_to_user_time")
-    await db.chat_unlocks.create_index([("user_id", 1), ("target_id", 1)], name="ix_chat_unlocks_user_target", unique=True)
+    await db.chat_unlocks.create_index([("user_id", 1), ("target_id", 1)], name="ix_chat_unlocks_user_target")
 
     # Seed admin
     admin = await db.users.find_one({"email": ADMIN_EMAIL.lower()})
