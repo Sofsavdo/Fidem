@@ -4,12 +4,32 @@ import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { Plane, MapPin, Crown, X, CheckCircle2 } from "lucide-react";
 
+const REGION_KEY_MAP = {
+  "Toshkent": "region_toshkent",
+  "Samarqand": "region_samarqand",
+  "Buxoro": "region_buxoro",
+  "Andijon": "region_andijon",
+  "Farg'ona": "region_fargona",
+  "Namangan": "region_namangan",
+  "Qashqadaryo": "region_qashqadaryo",
+  "Surxondaryo": "region_surxondaryo",
+  "Sirdaryo": "region_sirdaryo",
+  "Jizzax": "region_jizzax",
+  "Navoiy": "region_navoiy",
+  "Xorazm": "region_xorazm",
+  "Qoraqalpog'iston": "region_qoraqalpogiston",
+};
+
 export default function Travel() {
   const { t, refresh } = useApp();
   const [status, setStatus] = useState(null);
+  const [country, setCountry] = useState("UZ");  // Default to Uzbekistan
   const [region, setRegion] = useState("");
+  const [city, setCity] = useState("");
   const [days, setDays] = useState(7);
   const [loading, setLoading] = useState(false);
+
+  const translateRegion = (r) => t(REGION_KEY_MAP[r] || r);
 
   const load = async () => {
     try {
@@ -24,8 +44,8 @@ export default function Travel() {
     if (!region) { toast.error(t("select_region")); return; }
     setLoading(true);
     try {
-      await api.post("/travel/activate", { region, days });
-      toast.success(`✈️ ${t("travel_mode")} — ${region} (${days})`);
+      await api.post("/travel/activate", { country, region, city: region, days });
+      toast.success(`✈️ ${t("travel_mode")} — ${translateRegion(region)} (${days})`);
       load();
       refresh && refresh();
     } catch (e) {
@@ -69,9 +89,9 @@ export default function Travel() {
           <div className="flex items-start gap-3">
             <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
             <div className="flex-1">
-              <p className="font-medium text-emerald-900">{status.travel_region}</p>
+              <p className="font-medium text-emerald-900">{translateRegion(status.travel_region)}</p>
               <p className="text-xs text-emerald-800 mt-1">{new Date(status.travel_until).toLocaleString()}</p>
-              <p className="text-xs text-emerald-700 mt-1">{t("region")}: {status.home_region}</p>
+              <p className="text-xs text-emerald-700 mt-1">{t("region")}: {translateRegion(status.home_region)}</p>
             </div>
             <button data-testid="travel-deactivate" onClick={deactivate} className="text-emerald-700 hover:text-emerald-900"><X className="w-5 h-5" /></button>
           </div>
@@ -81,9 +101,26 @@ export default function Travel() {
       {/* Activate form */}
       <div className="rounded-3xl border border-border bg-card p-5 space-y-3">
         <h2 className="font-semibold flex items-center gap-2"><MapPin className="w-4 h-4" /> {t("select_region")}</h2>
+        
+        {/* Country field (currently only Uzbekistan) */}
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">{t("country")}</label>
+          <select 
+            data-testid="travel-country" 
+            className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm" 
+            value={country} 
+            onChange={(e) => setCountry(e.target.value)}
+            disabled={true}  // Disabled until global expansion
+          >
+            {(status.countries || []).map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+          </select>
+          <p className="text-xs text-secondary mt-1">🌍 Hozircha asosiy Travel Mode O'zbekiston viloyatlari bilan ishlaydi. Global shaharlar bosqichma-bosqich qo'shiladi.</p>
+        </div>
+
+        {/* Region/City field */}
         <select data-testid="travel-region" className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm" value={region} onChange={(e) => setRegion(e.target.value)}>
           <option value="">— {t("select_region")} —</option>
-          {(status.regions || []).filter((r) => r !== status.home_region).map((r) => <option key={r} value={r}>{r}</option>)}
+          {(status.regions || []).filter((r) => r !== status.home_region).map((r) => <option key={r} value={r}>{translateRegion(r)}</option>)}
         </select>
         <div>
           <label className="text-xs text-muted-foreground">{t("travel_days")}: {days}</label>

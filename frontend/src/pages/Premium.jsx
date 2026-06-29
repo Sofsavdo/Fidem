@@ -95,61 +95,69 @@ export default function Premium() {
         <p className="text-sm text-muted-foreground mt-1">{t("tagline")}</p>
       </div>
 
-      <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">{t("premium_section_plans")}</p>
-      <div className="space-y-3 stagger">
-        {PLANS.map((p) => {
-          const isCurrent = user?.plan === p.key;
-          return (
-            <div
-              key={p.key}
-              data-testid={`plan-${p.key}`}
-              className={`rounded-3xl p-5 ${p.style} ${isCurrent ? "ring-2 ring-primary" : ""}`}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-heading text-2xl font-semibold flex items-center gap-2">
-                    {p.title} {p.badge}
-                  </p>
-                  <p className="text-xs opacity-70 mt-0.5">
-                    {p.price === 0 ? t("plan_free_desc") : t(`plan_${p.key}_desc`)}
+      {/* Subscription Plans - Recurring Monthly Access */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <Crown className="w-5 h-5 text-gold" />
+          <p className="text-sm uppercase tracking-wider text-muted-foreground font-medium">{t("premium_section_plans")}</p>
+        </div>
+        <p className="text-xs text-muted-foreground mb-3">{t("premium_section_plans_desc")}</p>
+        <div className="space-y-3 stagger">
+          {PLANS.map((p) => {
+            const isCurrent = user?.plan === p.key;
+            return (
+              <div
+                key={p.key}
+                data-testid={`plan-${p.key}`}
+                className={`rounded-3xl p-5 ${p.style} ${isCurrent ? "ring-2 ring-primary" : ""}`}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-heading text-2xl font-semibold flex items-center gap-2">
+                      {p.title} {p.badge}
+                    </p>
+                    <p className="text-xs opacity-70 mt-0.5">
+                      {p.price === 0 ? t("plan_free_desc") : t(`plan_${p.key}_desc`)}
+                    </p>
+                  </div>
+                  <p className="font-heading text-xl">
+                    {p.price === 0 ? t("plan_free_title") : `${p.price.toLocaleString()} ${t("sum")}`}
                   </p>
                 </div>
-                <p className="font-heading text-xl">
-                  {p.price === 0 ? t("plan_free_title") : `${p.price.toLocaleString()} ${t("sum")}`}
-                </p>
+                <ul className="mt-3 space-y-1.5">
+                  {p.features.map((f) => (
+                    <li key={f} className="text-sm flex items-center gap-2">
+                      <Check className="w-3.5 h-3.5 opacity-70" /> {labels[f]}
+                    </li>
+                  ))}
+                </ul>
+                {p.key !== "free" && !isCurrent && (
+                  <button
+                    data-testid={`buy-${p.key}`}
+                    onClick={() => buy(p.key)}
+                    disabled={creating}
+                    className={`mt-4 w-full rounded-2xl py-3 font-medium ${
+                      p.key === "vip" ? "bg-ink text-gold border border-gold/30" : "bg-primary text-white"
+                    }`}
+                  >
+                    {t("buy")} · {t("pay_with_click")}
+                  </button>
+                )}
+                {isCurrent && <p className="mt-3 text-sm font-medium text-secondary">— {t("current_plan")} —</p>}
               </div>
-              <ul className="mt-3 space-y-1.5">
-                {p.features.map((f) => (
-                  <li key={f} className="text-sm flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 opacity-70" /> {labels[f]}
-                  </li>
-                ))}
-              </ul>
-              {p.key !== "free" && !isCurrent && (
-                <button
-                  data-testid={`buy-${p.key}`}
-                  onClick={() => buy(p.key)}
-                  disabled={creating}
-                  className={`mt-4 w-full rounded-2xl py-3 font-medium ${
-                    p.key === "vip" ? "bg-gold text-ink" : "bg-primary text-white"
-                  }`}
-                >
-                  {t("buy")} · {t("pay_with_click")}
-                </button>
-              )}
-              {isCurrent && <p className="mt-3 text-sm font-medium text-secondary">— {t("current_plan")} —</p>}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
-      {/* Topup */}
+      {/* Internal Balance - For Gifts, Boost, AI Features */}
       <div className="rounded-3xl bg-card border border-border p-5" data-testid="topup-section">
         <div className="flex items-center gap-2 mb-3">
           <Wallet className="w-5 h-5 text-primary" />
           <p className="font-heading text-xl font-semibold">{t("topup_balance")}</p>
         </div>
         <p className="text-xs text-muted-foreground mb-3">{t("premium_section_balance_hint")}</p>
+        <p className="text-xs text-secondary mb-3">{t("premium_section_balance_usage")}</p>
         <div className="flex gap-2 mb-3">
           {[10000, 50000, 100000, 200000].map((v) => (
             <button
@@ -174,10 +182,14 @@ export default function Premium() {
         </button>
       </div>
 
-      {/* Roses bundles — Hinge-style attention currency */}
+      {/* Roses - Quick Attention Currency */}
       <div className="rounded-3xl bg-primary/5 border-2 border-primary/30 p-5" data-testid="roses-section">
-        <p className="font-heading text-xl font-semibold flex items-center gap-2">🌹 {t("premium_section_roses")}</p>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xl">🌹</span>
+          <p className="font-heading text-xl font-semibold">{t("premium_section_roses")}</p>
+        </div>
         <p className="text-sm mt-1 text-muted-foreground">{t("premium_section_roses_desc")}</p>
+        <p className="text-xs text-secondary mt-1">{t("premium_section_roses_usage")}</p>
         <div className="grid grid-cols-3 gap-2 mt-3">
           {[["1", 1, 5000], ["5", 5, 20000], ["12", 12, 45000]].map(([k, count, price]) => (
             <button
@@ -202,10 +214,14 @@ export default function Premium() {
         </div>
       </div>
 
-      {/* Super-application one-time */}
+      {/* Super-Application - One-Time Filter Bypass */}
       <div className="rounded-3xl bg-gold-light/40 border border-gold/40 p-5" data-testid="super-section">
-        <p className="font-heading text-xl font-semibold flex items-center gap-2">✨ {t("super_application")}</p>
-        <p className="text-sm mt-1">{t("premium_section_super_desc")}</p>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xl">✨</span>
+          <p className="font-heading text-xl font-semibold">{t("super_application")}</p>
+        </div>
+        <p className="text-sm mt-1 text-muted-foreground">{t("premium_section_super_desc")}</p>
+        <p className="text-xs text-secondary mt-1">{t("premium_section_super_usage")}</p>
         <button
           data-testid="buy-super"
           onClick={() => buy("super_application")}

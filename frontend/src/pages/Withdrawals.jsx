@@ -26,15 +26,15 @@ export default function Withdrawals() {
   const submit = async () => {
     const amt = parseInt(amount, 10);
     if (!amt || amt < (status?.min_payout || 100000)) {
-      toast.error(`Minimal: ${(status?.min_payout || 100000).toLocaleString()} so'm`);
+      toast.error(`${t("withdraw_min_error")}: ${(status?.min_payout || 100000).toLocaleString()} ${t("sum")}`);
       return;
     }
     if (amt > (status?.withdrawable_balance || 0)) {
-      toast.error("Mavjud balansdan ko'p kiritdingiz");
+      toast.error(t("withdraw_exceed_balance"));
       return;
     }
     if (card.replace(/\D/g, "").length < 16) {
-      toast.error("Karta raqami 16 raqamli bo'lishi kerak");
+      toast.error(t("withdraw_card_length_error"));
       return;
     }
     setLoading(true);

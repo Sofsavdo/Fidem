@@ -170,7 +170,24 @@ export default function Chat() {
     } catch (e) { toast.error(t("error")); }
   };
 
-  if (!other) return <div className="p-6 text-center text-muted-foreground">{t("loading")}</div>;
+  if (!other) {
+    return (
+      <div className="flex flex-col min-h-screen pb-32">
+        <div className="sticky top-0 z-30 glass border-b border-border/60 px-4 py-3 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-muted animate-pulse" />
+          <div className="flex-1">
+            <div className="h-5 bg-muted rounded animate-pulse w-1/3 mb-2" />
+            <div className="h-4 bg-muted rounded animate-pulse w-1/4" />
+          </div>
+        </div>
+        <div className="flex-1 px-4 py-4 space-y-2">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className={`max-w-[75%] rounded-2xl px-3.5 py-2 h-12 ${i % 2 === 0 ? "ml-auto bg-muted animate-pulse" : "bg-muted animate-pulse"}`} />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen pb-32">
@@ -227,7 +244,7 @@ export default function Chat() {
               {m.kind === "voice" && m.meta?.voice_url ? (
                 <div className="flex items-center gap-2 min-w-[200px]" data-testid={`voice-msg-${m.id}`}>
                   <span className="text-[9px] uppercase tracking-wider opacity-70">🎙 · {m.meta.voice_duration || 0}s</span>
-                  <audio controls preload="none" src={m.meta.voice_url} className="h-8 max-w-full" />
+                  <audio controls preload="none" src={`/api/chat/voice/${m.id}?auth=${localStorage.getItem("fidem_token") || ""}`} className="h-8 max-w-full" />
                 </div>
               ) : (
                 m.text

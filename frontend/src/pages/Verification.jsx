@@ -54,7 +54,19 @@ export default function Verification() {
     } finally { setBusy(false); }
   };
 
-  if (!data) return <div className="p-6 text-muted-foreground">{t("loading_word")}</div>;
+  if (!data) {
+    return (
+      <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-6">
+        <div className="h-8 bg-muted rounded animate-pulse w-1/3" />
+        <div className="h-5 bg-muted rounded animate-pulse w-1/2" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-48 bg-muted rounded-2xl animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   const verifiedMap = {
     identity: data.verified_identity,
@@ -71,6 +83,7 @@ export default function Verification() {
           <ShieldCheck className="w-6 h-6 text-primary" /> {t("verification_title")}
         </h1>
         <p className="text-sm text-muted-foreground mt-1">{t("verification_subtitle")}</p>
+        <p className="text-xs text-secondary mt-2">📋 Roadmap: Live camera selfie + face comparison coming soon</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
