@@ -1,21 +1,22 @@
-"""Gift balance withdrawal (Bigo-style). Recipients accumulate withdrawable balance from received gifts.
+"""Referral earnings withdrawal (V3.2 economy system). Users withdraw from referral earnings only.
 
-Conversion: 50% of gift price is converted to withdrawable balance for recipient.
-Min payout: 100,000 UZS. Admin approves manually via CLICK transfer.
+Gifts are NOT withdrawable. Only referral earnings can be withdrawn.
+Min payout: 100,000 UZS. 12% tax withholding. Admin approves manually via CLICK transfer.
 """
 from __future__ import annotations
+
+from datetime import timedelta
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 
 from auth import get_current_admin, get_current_user_id
-from core import db, get_user, iso, log, now_utc, push_notif
+from core import db, get_user, iso, log, now_utc, parse_dt, push_notif
 from models import new_id
 
 router = APIRouter(tags=["withdrawals"])
 
-# Conversion: 50% of gift value goes to recipient's withdrawable balance
-GIFT_CONVERSION_RATE = 0.5
 MIN_WITHDRAW_UZS = 100_000
+TAX_RATE = 0.12  # 12% tax withholding
 
 
 @router.get("/withdrawals/status")
@@ -23,11 +24,12 @@ async def withdraw_status(uid: str = Depends(get_current_user_id)):
     me = await get_user(uid)
     pending = await db.withdrawals.count_documents({"user_id": uid, "status": "pending"})
     return {
-        "withdrawable_balance": int(me.get("withdrawable_balance", 0) or 0),
+        "referral_earnings_withdrawable": int(me.get("referral_earnings_withdrawable", 0) or 0),
+        "referral_earnings_pending": int(me.get("referral_earnings_pending", 0) or 0),
+        "referral_earnings_paid_out": int(me.get("referral_earnings_paid_out", 0) or 0),
         "min_payout": MIN_WITHDRAW_UZS,
-        "conversion_rate_pct": int(GIFT_CONVERSION_RATE * 100),
+        "tax_rate_pct": int(TAX_RATE * 100),
         "pending_count": pending,
-        "gifts_received_total": int(me.get("gifts_received_total", 0) or 0),
     }
 
 
@@ -41,24 +43,43 @@ async def request_withdrawal(
     if amount < MIN_WITHDRAW_UZS:
         raise HTTPException(400, f"Minimal yechib olish: {MIN_WITHDRAW_UZS:,} so'm")
     me = await get_user(uid)
-    bal = int(me.get("withdrawable_balance", 0) or 0)
+    
+    # Check account age >= 30 days
+    account_age = now_utc() - parse_dt(me.get("created_at", now_utc()))
+    if account_age < timedelta(days=30):
+        days_left = 30 - int(account_age.total_seconds() / 86400)
+        raise HTTPException(400, f"Hisobingiz {days_left} kundan keyin pul yechib olishi mumkin")
+    
+    # Check verification requirements
+    if not me.get("verified_identity"):
+        raise HTTPException(400, "Shaxsni tasdiqlash talab qilinadi (Identity verification)")
+    if not me.get("verified_selfie"):
+        raise HTTPException(400, "Selfie tasdiqlash talab qilinadi (Selfie verification)")
+    
+    # Check referral earnings balance
+    bal = int(me.get("referral_earnings_withdrawable", 0) or 0)
     if amount > bal:
         raise HTTPException(400, f"Yetarli mablag' yo'q. Mavjud: {bal:,} so'm")
+    
     card_clean = "".join(ch for ch in card_number if ch.isdigit())
     if len(card_clean) < 16:
         raise HTTPException(400, "Karta raqami noto'g'ri")
-    # Hold the amount
+    
+    # Hold the amount from referral earnings
     res = await db.users.update_one(
-        {"id": uid, "withdrawable_balance": {"$gte": amount}},
-        {"$inc": {"withdrawable_balance": -amount, "withdrawals_pending": amount}},
+        {"id": uid, "referral_earnings_withdrawable": {"$gte": amount}},
+        {"$inc": {"referral_earnings_withdrawable": -amount, "withdrawals_pending": amount}},
     )
     if res.modified_count == 0:
         raise HTTPException(400, "Mablag' yetarli emas yoki bir vaqtda boshqa so'rov qilindi")
+    
     wid = new_id()
     doc = {
         "id": wid,
         "user_id": uid,
-        "amount": amount,
+        "amount": amount,  # Gross amount
+        "tax_amount": 0,   # Will be set on approval
+        "net_amount": 0,   # Will be set on approval
         "card_number": card_clean,
         "holder_name": holder_name or me.get("name", ""),
         "status": "pending",
@@ -97,18 +118,42 @@ async def admin_approve_withdrawal(wid: str, _: str = Depends(get_current_admin)
         raise HTTPException(404, "Not found")
     if w["status"] != "pending":
         raise HTTPException(400, "Already processed")
+    
+    # Calculate tax (12%)
+    gross_amount = w["amount"]
+    tax_amount = int(gross_amount * TAX_RATE)
+    net_amount = gross_amount - tax_amount
+    
+    # Release hold and update referral earnings FIRST (idempotency)
+    res = await db.users.update_one(
+        {"id": w["user_id"], "withdrawals_pending": {"$gte": gross_amount}},
+        {"$inc": {
+            "withdrawals_pending": -gross_amount,
+            "referral_earnings_paid_out": net_amount,
+            "referral_earnings_tax_withheld": tax_amount,
+            "withdrawn_total": net_amount,
+            "tax_paid_total": tax_amount
+        }}
+    )
+    
+    if res.modified_count == 0:
+        raise HTTPException(400, "Failed to update user balance - may have been already processed")
+    
+    # Mark withdrawal as paid AFTER user balance is updated
     await db.withdrawals.update_one(
         {"id": wid},
-        {"$set": {"status": "approved", "processed_at": iso(now_utc())}},
+        {"$set": {
+            "status": "paid",
+            "processed_at": iso(now_utc()),
+            "tax_amount": tax_amount,
+            "net_amount": net_amount
+        }},
     )
-    # Release hold
-    await db.users.update_one(
-        {"id": w["user_id"]}, {"$inc": {"withdrawals_pending": -w["amount"], "withdrawn_total": w["amount"]}}
-    )
+    
     await push_notif(
         w["user_id"],
         "withdraw",
-        f"Sizning {w['amount']:,} so'm yechib olish so'rovingiz tasdiqlandi va kartaga o'tkazildi 💸",
+        f"Sizning {gross_amount:,} so'm yechib olish so'rovingiz tasdiqlandi. Soliq: {tax_amount:,} so'm, Net: {net_amount:,} so'm 💸",
     )
     return {"ok": True}
 
@@ -124,10 +169,10 @@ async def admin_reject_withdrawal(
         raise HTTPException(404, "Not found")
     if w["status"] != "pending":
         raise HTTPException(400, "Already processed")
-    # Return funds
+    # Return funds to referral earnings
     await db.users.update_one(
         {"id": w["user_id"]},
-        {"$inc": {"withdrawable_balance": w["amount"], "withdrawals_pending": -w["amount"]}},
+        {"$inc": {"referral_earnings_withdrawable": w["amount"], "withdrawals_pending": -w["amount"]}},
     )
     await db.withdrawals.update_one(
         {"id": wid},

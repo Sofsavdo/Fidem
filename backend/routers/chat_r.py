@@ -512,14 +512,13 @@ async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id
             {"$inc": {f"free_gifts_used.{week_id}": 1, "gifts_sent_count": 1}},
         )
     else:
-        # 50% of gift price converts to recipient's withdrawable balance (Bigo model)
-        recipient_share = price // 2
+        # Gifts are NOT withdrawable (V3.2 economy system)
         await db.users.update_one(
             {"id": uid}, {"$inc": {"balance": -price, "gifts_sent_total": price, "gifts_sent_count": 1}}
         )
         await db.users.update_one(
             {"id": req.to_user_id},
-            {"$inc": {"gifts_received_total": price, "withdrawable_balance": recipient_share}},
+            {"$inc": {"gifts_received_total": price}},
         )
     gift = {
         "id": new_id(),

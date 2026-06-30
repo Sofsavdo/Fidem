@@ -29,7 +29,7 @@ export default function Withdrawals() {
       toast.error(`${t("withdraw_min_error")}: ${(status?.min_payout || 100000).toLocaleString()} ${t("sum")}`);
       return;
     }
-    if (amt > (status?.withdrawable_balance || 0)) {
+    if (amt > (status?.referral_earnings_withdrawable || 0)) {
       toast.error(t("withdraw_exceed_balance"));
       return;
     }
@@ -69,18 +69,18 @@ export default function Withdrawals() {
         <div className="flex items-center gap-3 mb-3">
           <div className="w-10 h-10 rounded-2xl bg-primary text-white grid place-items-center"><Wallet className="w-5 h-5" /></div>
           <div>
-            <p className="text-xs text-muted-foreground">{t("withdrawable_balance")}</p>
-            <p className="text-2xl font-heading font-semibold" data-testid="withdrawable-balance">{(status.withdrawable_balance || 0).toLocaleString()} {t("sum_word")}</p>
+            <p className="text-xs text-muted-foreground">{t("referral_earnings_withdrawable")}</p>
+            <p className="text-2xl font-heading font-semibold" data-testid="withdrawable-balance">{(status.referral_earnings_withdrawable || 0).toLocaleString()} {t("sum_word")}</p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3 text-xs">
           <div className="rounded-xl bg-card p-3">
-            <p className="text-muted-foreground">{t("total_gifts_received")}</p>
-            <p className="text-sm font-medium mt-1">{(status.gifts_received_total || 0).toLocaleString()} {t("sum_word")}</p>
+            <p className="text-muted-foreground">{t("referral_earnings_pending")}</p>
+            <p className="text-sm font-medium mt-1">{(status.referral_earnings_pending || 0).toLocaleString()} {t("sum_word")}</p>
           </div>
           <div className="rounded-xl bg-card p-3">
-            <p className="text-muted-foreground">{t("min_payout_note")}</p>
-            <p className="text-sm font-medium mt-1">{(status.min_payout || 100000).toLocaleString()} {t("sum_word")}</p>
+            <p className="text-muted-foreground">{t("tax_rate")}</p>
+            <p className="text-sm font-medium mt-1">{status.tax_rate_pct || 12}%</p>
           </div>
         </div>
       </div>
@@ -123,7 +123,7 @@ export default function Withdrawals() {
         <button
           data-testid="withdraw-submit"
           onClick={submit}
-          disabled={loading || (status.withdrawable_balance || 0) < (status.min_payout || 100000)}
+          disabled={loading || (status.referral_earnings_withdrawable || 0) < (status.min_payout || 100000)}
           className="w-full py-3 rounded-2xl bg-primary text-white font-medium disabled:opacity-50 flex items-center justify-center gap-2"
         >
           <ArrowDownToLine className="w-4 h-4" />

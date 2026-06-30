@@ -322,3 +322,137 @@ async def invites_redeem(uid: str = Depends(get_current_user_id)):
     )
     await push_notif(uid, "premium", f"Tabriklaymiz! Premium {INVITE_REWARD_GIVES_PREMIUM_DAYS} kun faollashtirildi 🎉")
     return {"ok": True, "plan_until": iso(new_until)}
+
+
+# ---------- Referral Username System (Phase 1.4) ----------
+@router.get("/referral/username/available/{username}")
+async def check_username_available(username: str):
+    """Check if a referral username is available."""
+    if len(username) < 3 or len(username) > 30:
+        raise HTTPException(400, "Username must be 3-30 characters")
+    
+    # Check allowed characters (a-z, 0-9, _)
+    if not all(c.isalnum() or c == "_" for c in username):
+        raise HTTPException(400, "Username can only contain a-z, 0-9, and _")
+    
+    # Check reserved names
+    reserved = ["admin", "api", "www", "fidem", "support", "help"]
+    if username.lower() in reserved:
+        raise HTTPException(400, "This username is reserved")
+    
+    # Check if already taken
+    existing = await db.referral_usernames.find_one({"username_lower": username.lower()})
+    if existing:
+        raise HTTPException(400, "Username already taken")
+    
+    return {"available": True}
+
+
+@router.get("/referral/username/status")
+async def username_status(uid: str = Depends(get_current_user_id)):
+    """Get current username and change count."""
+    me = await get_user(uid)
+    return {
+        "referral_username": me.get("referral_username"),
+        "referral_id": me.get("referral_id") or uid[:8],
+        "change_count": me.get("referral_username_change_count", 0),
+        "last_changed": me.get("referral_username_last_changed"),
+    }
+
+
+@router.post("/referral/username/set")
+async def set_username(
+    username: str = Body(..., embed=True),
+    uid: str = Depends(get_current_user_id),
+):
+    """Set custom referral username. First change is free, subsequent changes cost 10,000 so'm."""
+    if len(username) < 3 or len(username) > 30:
+        raise HTTPException(400, "Username must be 3-30 characters")
+    
+    # Check allowed characters (a-z, 0-9, _)
+    if not all(c.isalnum() or c == "_" for c in username):
+        raise HTTPException(400, "Username can only contain a-z, 0-9, and _")
+    
+    # Check reserved names
+    reserved = ["admin", "api", "www", "fidem", "support", "help"]
+    if username.lower() in reserved:
+        raise HTTPException(400, "This username is reserved")
+    
+    me = await get_user(uid)
+    change_count = me.get("referral_username_change_count", 0)
+    last_changed = me.get("referral_username_last_changed")
+    
+    # Check cooldown (30 days between changes)
+    if last_changed and change_count > 0:
+        days_since_change = (now_utc() - parse_dt(last_changed)).days
+        if days_since_change < 30:
+            raise HTTPException(400, f"Wait {30 - days_since_change} days before changing username again")
+    
+    # Check if already taken (atomic check with unique index fallback)
+    existing = await db.referral_usernames.find_one({"username_lower": username.lower()})
+    if existing and existing["user_id"] != uid:
+        raise HTTPException(400, "Username already taken")
+    
+    # Check if user already has this username
+    if me.get("referral_username_lower") == username.lower():
+        raise HTTPException(400, "You already have this username")
+    
+    # Atomic update: delete old and insert new in one operation
+    try:
+        if me.get("referral_username_lower"):
+            await db.referral_usernames.delete_one({"username_lower": me["referral_username_lower"]})
+        
+        await db.referral_usernames.update_one(
+            {"user_id": uid},
+            {"$set": {"username_lower": username_lower}},
+            upsert=True
+        )
+    except Exception:
+        # Handle duplicate key error from race condition
+        raise HTTPException(400, "Username already taken")
+    
+    # Charge for subsequent changes (10,000 so'm)
+    if change_count > 0:
+        balance = me.get("balance", 0)
+        if balance < 10000:
+            raise HTTPException(400, "Insufficient balance. Username change costs 10,000 so'm")
+        
+        # Deduct balance
+        await db.users.update_one(
+            {"id": uid, "balance": {"$gte": 10000}},
+            {"$inc": {"balance": -10000}}
+        )
+    
+    # Update username
+    username_lower = username.lower()
+    
+    # Remove old username from referral_usernames collection if exists
+    if me.get("referral_username_lower"):
+        await db.referral_usernames.delete_one({"username_lower": me["referral_username_lower"]})
+    
+    # Add new username to referral_usernames collection
+    await db.referral_usernames.update_one(
+        {"user_id": uid},
+        {"$set": {"username_lower": username_lower}},
+        upsert=True
+    )
+    
+    # Update user document
+    await db.users.update_one(
+        {"id": uid},
+        {
+            "$set": {
+                "referral_username": username,
+                "referral_username_lower": username_lower,
+                "referral_username_change_count": change_count + 1,
+                "referral_username_last_changed": iso(now_utc())
+            }
+        }
+    )
+    
+    return {
+        "ok": True,
+        "username": username,
+        "change_count": change_count + 1,
+        "cost": 0 if change_count == 0 else 10000
+    }
