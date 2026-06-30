@@ -129,7 +129,17 @@ async def startup() -> None:
     # Referral lookup
     await db.users.create_index("referred_by", sparse=True, name="ix_referred_by")
     await db.users.create_index("referral_code", sparse=True, unique=False, name="ix_referral_code")
-    await db.users.create_index("referral_username_lower", sparse=True, unique=True, name="ix_referral_username")
+    # Drop and recreate ix_referral_username with partial filter to allow multiple null values
+    try:
+        await db.users.drop_index("ix_referral_username")
+    except Exception:
+        pass  # Index may not exist on first run
+    await db.users.create_index(
+        "referral_username_lower",
+        unique=True,
+        partialFilterExpression={"referral_username_lower": {"$exists": True, "$ne": None}},
+        name="ix_referral_username"
+    )
     await db.saved.create_index([("target_id", 1), ("at", -1)], name="ix_saved_target_at")
     await db.profile_views.create_index([("target_id", 1), ("at", -1)], name="ix_profile_views_target_at")
     await db.messages.create_index([("to_user_id", 1), ("created_at", -1)], name="ix_msg_to_user_time")
