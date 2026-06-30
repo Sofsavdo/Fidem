@@ -173,14 +173,9 @@ async def startup() -> None:
             {"id": user["id"]},
             {"$set": {"referral_id": user["id"][:8]}}
         )
-    await db.users.update_many(
-        {"referral_username": {"$exists": False}},
-        {"$set": {"referral_username": None}}
-    )
-    await db.users.update_many(
-        {"referral_username_lower": {"$exists": False}},
-        {"$set": {"referral_username_lower": None}}
-    )
+    # Do NOT initialize referral_username or referral_username_lower to None
+    # These fields should only exist when user sets a custom referral username
+    # Sparse unique index on referral_username_lower requires field to not exist for most users
     await db.users.update_many(
         {"referral_username_change_count": {"$exists": False}},
         {"$set": {"referral_username_change_count": 0}}
