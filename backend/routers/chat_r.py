@@ -377,6 +377,77 @@ async def report_user(req: ReportRequest, uid: str = Depends(get_current_user_id
     return {"ok": True}
 
 
+@router.get("/chat/voice/{message_id}")
+async def get_voice_file(
+    message_id: str,
+    auth: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(default=None),
+):
+    """Serve voice file for a message if the user is a chat participant.
+    Accepts auth via Authorization header OR auth query parameter (for audio elements)."""
+    from fastapi import Response, Query, Header
+    from auth import decode_token
+    from core import get_object
+
+    # Extract token from header or query parameter
+    token = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+    elif auth:
+        token = auth
+
+    if not token:
+        raise HTTPException(401, "Auth required")
+
+    payload = decode_token(token)
+    uid = payload.get("sub")
+    if not uid:
+        raise HTTPException(401, "Invalid token")
+
+    # Fetch the message
+    msg = await db.messages.find_one({"id": message_id}, {"_id": 0})
+    if not msg:
+        raise HTTPException(404, "Message not found")
+    
+    # Validate it's a voice message
+    if msg.get("kind") != "voice" or not msg.get("meta", {}).get("voice_url"):
+        raise HTTPException(400, "Not a voice message")
+    
+    # Validate user is a chat participant
+    chat_id = msg.get("chat_id")
+    if not chat_id:
+        raise HTTPException(400, "Invalid message")
+    
+    parts = chat_id.split("_", 1)
+    if len(parts) != 2:
+        raise HTTPException(400, "Invalid chat id")
+    a, b = parts
+    if uid not in (a, b):
+        raise HTTPException(403, "Not your chat")
+    
+    # Extract storage path from voice_url
+    voice_url = msg["meta"]["voice_url"]
+    # voice_url format: /api/files/{storage_path} or full URL
+    # Extract just the storage_path part
+    if voice_url.startswith("/api/files/"):
+        storage_path = voice_url.replace("/api/files/", "")
+    elif voice_url.startswith("http"):
+        # Full URL - extract path after /files/
+        import re
+        match = re.search(r"/files/(.+)$", voice_url)
+        storage_path = match.group(1) if match else voice_url
+    else:
+        storage_path = voice_url
+    
+    # Fetch file from storage
+    try:
+        data, content_type = await get_object(storage_path)
+    except Exception as e:
+        raise HTTPException(500, f"Storage read failed: {e}")
+    
+    return Response(content=data, media_type=content_type or "audio/mpeg")
+
+
 # ---------- Gifts ----------
 @router.get("/gifts/catalog")
 async def gifts_catalog(uid: str = Depends(get_current_user_id)):
@@ -441,14 +512,13 @@ async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id
             {"$inc": {f"free_gifts_used.{week_id}": 1, "gifts_sent_count": 1}},
         )
     else:
-        # 50% of gift price converts to recipient's withdrawable balance (Bigo model)
-        recipient_share = price // 2
+        # Gifts are NOT withdrawable (V3.2 economy system)
         await db.users.update_one(
             {"id": uid}, {"$inc": {"balance": -price, "gifts_sent_total": price, "gifts_sent_count": 1}}
         )
         await db.users.update_one(
             {"id": req.to_user_id},
-            {"$inc": {"gifts_received_total": price, "withdrawable_balance": recipient_share}},
+            {"$inc": {"gifts_received_total": price}},
         )
     gift = {
         "id": new_id(),

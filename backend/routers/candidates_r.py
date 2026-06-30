@@ -452,6 +452,8 @@ async def saved_mine(uid: str = Depends(get_current_user_id)):
 
 @router.get("/saved/by-others")
 async def saved_by_others(uid: str = Depends(get_current_user_id)):
+    """Legacy endpoint kept for backward compatibility with old notification links.
+    Frontend now uses /saved?tab=by_others but this endpoint remains functional."""
     me_doc = await get_user(uid)
     is_premium = me_doc.get("plan") in ("premium", "vip")
 
@@ -481,6 +483,8 @@ async def saved_by_others(uid: str = Depends(get_current_user_id)):
 
 @router.get("/saved/viewers")
 async def viewers(uid: str = Depends(get_current_user_id)):
+    """Legacy endpoint kept for backward compatibility with old notification links.
+    Frontend now uses /saved?tab=viewers but this endpoint remains functional."""
     me_doc = await get_user(uid)
     is_premium = me_doc.get("plan") in ("premium", "vip")
 

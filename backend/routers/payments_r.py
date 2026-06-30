@@ -21,6 +21,7 @@ from core import (
     iso,
     log,
     now_utc,
+    parse_dt,
     push_notif,
 )
 from models import CreatePaymentRequest, VerificationRequest, new_id
@@ -163,6 +164,85 @@ async def apply_payment_success(payment: dict) -> None:
     purpose = payment["purpose"]
     amount = payment["amount"]
     expiry_iso = iso(now_utc() + timedelta(days=30))
+
+    # Phase 1.5: First paid subscription referral reward (V3.2 economy system)
+    # Only for first paid subscription, not recurring
+    if purpose in ("premium", "standard", "vip"):
+        user = await db.users.find_one({"id": uid}, {"_id": 0, "plan": 1, "first_paid_at": 1, "referred_by": 1})
+        
+        # Check if this is the first paid subscription
+        if user and user.get("plan") == "free" and not user.get("first_paid_at"):
+            # Process referral reward
+            referred_by = user.get("referred_by")
+            if referred_by:
+                inviter = await db.users.find_one({"referral_id": referred_by})
+                if not inviter:
+                    inviter = await db.users.find_one({"referral_username_lower": referred_by.lower()})
+                
+                if inviter:
+                    # Check inviter account age >= 30 days
+                    inviter_age = now_utc() - parse_dt(inviter.get("created_at", now_utc()))
+                    if inviter_age >= timedelta(days=30):
+                        # Check for duplicate earning (idempotency)
+                        existing_earning = await db.users.find_one(
+                            {
+                                "id": inviter["id"],
+                                "referral_earnings.referred_user_id": uid,
+                                "referral_earnings.type": "paid_subscription"
+                            }
+                        )
+                        
+                        if not existing_earning:
+                            # Calculate reward: 50% of amount, capped at 29,900 (39,900 for Ambassadors)
+                            reward_cap = 39900 if "ambassador" in inviter.get("badges", []) else 29900
+                            reward = min(int(amount * 0.5), reward_cap)
+                            
+                            if reward > 0:
+                                hold_until = now_utc() + timedelta(days=14)
+                                
+                                # Create pending referral earning
+                                earning_record = {
+                                    "id": new_id(),
+                                    "user_id": inviter["id"],
+                                    "referred_user_id": uid,
+                                    "type": "paid_subscription",
+                                    "amount": reward,
+                                    "status": "pending",
+                                    "created_at": iso(now_utc()),
+                                    "hold_until": iso(hold_until),
+                                    "approved_at": None,
+                                    "paid_at": None,
+                                    "rejected_at": None,
+                                    "rejection_reason": None,
+                                    "gross_amount": reward,
+                                    "tax_amount": 0,
+                                    "net_amount": reward,
+                                    "level": 1,
+                                    "subscription_plan": purpose,
+                                    "subscription_amount": amount,
+                                }
+                                
+                                # Update inviter's referral earnings (atomic)
+                                await db.users.update_one(
+                                    {"id": inviter["id"]},
+                                    {
+                                        "$inc": {
+                                            "referral_earnings_pending": reward,
+                                            "ref_count": 1
+                                        },
+                                        "$push": {"referral_earnings": earning_record}
+                                    }
+                                )
+                                
+                                # Mark as first paid ONLY after earning is successfully created
+                                await db.users.update_one({"id": uid}, {"$set": {"first_paid_at": iso(now_utc())}})
+                                
+                                # Notify inviter
+                                await push_notif(
+                                    inviter["id"],
+                                    "referral",
+                                    f"Tabriklaymiz! Sizning taklifingiz birinchi obunani faollashtirdi. {reward:,} so'm mukofot 14 kundan keyin o'tkaziladi 🎉"
+                                )
 
     if purpose == "premium":
         await db.users.update_one({"id": uid}, {"$set": {"plan": "premium", "plan_until": expiry_iso}})

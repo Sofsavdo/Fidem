@@ -65,7 +65,13 @@ export default function Saved() {
         ))}
       </div>
 
-      {loading && <div className="text-center py-6 text-muted-foreground">{t("loading")}</div>}
+      {loading && (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="aspect-[4/5] rounded-3xl bg-muted animate-pulse" />
+          ))}
+        </div>
+      )}
       {!loading && items.length === 0 && <div className="text-center py-12 text-muted-foreground" data-testid="saved-empty">{t("no_data")}</div>}
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 stagger" data-testid="saved-grid">

@@ -44,6 +44,8 @@ from routers.concierge_r import router as concierge_router  # noqa: E402
 from routers.travel_r import router as travel_router  # noqa: E402
 from routers.boost_analytics_r import router as boost_analytics_router  # noqa: E402
 from routers.face_r import router as face_router  # noqa: E402
+from routers.economy_r import router as economy_router  # noqa: E402
+from routers.rankings_r import router as rankings_router  # noqa: E402
 from services import compute_completeness  # noqa: E402
 from storage import init_storage  # noqa: E402
 
@@ -69,6 +71,8 @@ api.include_router(concierge_router)
 api.include_router(travel_router)
 api.include_router(boost_analytics_router)
 api.include_router(face_router)
+api.include_router(economy_router)
+api.include_router(rankings_router)
 app.include_router(api)
 
 
@@ -125,10 +129,175 @@ async def startup() -> None:
     # Referral lookup
     await db.users.create_index("referred_by", sparse=True, name="ix_referred_by")
     await db.users.create_index("referral_code", sparse=True, unique=False, name="ix_referral_code")
+    await db.users.create_index("referral_username_lower", sparse=True, unique=True, name="ix_referral_username")
     await db.saved.create_index([("target_id", 1), ("at", -1)], name="ix_saved_target_at")
     await db.profile_views.create_index([("target_id", 1), ("at", -1)], name="ix_profile_views_target_at")
     await db.messages.create_index([("to_user_id", 1), ("created_at", -1)], name="ix_msg_to_user_time")
     await db.chat_unlocks.create_index([("user_id", 1), ("target_id", 1)], name="ix_chat_unlocks_user_target")
+
+    # Phase 1.1: Add new DB fields for economy system (safe migration)
+    # Money system fields
+    await db.users.update_many(
+        {"balance": {"$exists": False}},
+        {"$set": {"balance": 0}}
+    )
+    await db.users.update_many(
+        {"coins": {"$exists": False}},
+        {"$set": {"coins": 0}}
+    )
+
+    # Referral system fields
+    # Initialize referral_id for existing users (first 8 chars of id)
+    async for user in db.users.find({"referral_id": {"$exists": False}}, {"id": 1}):
+        await db.users.update_one(
+            {"id": user["id"]},
+            {"$set": {"referral_id": user["id"][:8]}}
+        )
+    await db.users.update_many(
+        {"referral_username": {"$exists": False}},
+        {"$set": {"referral_username": None}}
+    )
+    await db.users.update_many(
+        {"referral_username_lower": {"$exists": False}},
+        {"$set": {"referral_username_lower": None}}
+    )
+    await db.users.update_many(
+        {"referral_username_change_count": {"$exists": False}},
+        {"$set": {"referral_username_change_count": 0}}
+    )
+    await db.users.update_many(
+        {"referral_username_last_changed": {"$exists": False}},
+        {"$set": {"referral_username_last_changed": None}}
+    )
+
+    # Referral earnings fields
+    await db.users.update_many(
+        {"referral_earnings_pending": {"$exists": False}},
+        {"$set": {"referral_earnings_pending": 0}}
+    )
+    await db.users.update_many(
+        {"referral_earnings_approved": {"$exists": False}},
+        {"$set": {"referral_earnings_approved": 0}}
+    )
+    await db.users.update_many(
+        {"referral_earnings_withdrawable": {"$exists": False}},
+        {"$set": {"referral_earnings_withdrawable": 0}}
+    )
+    await db.users.update_many(
+        {"referral_earnings_paid_out": {"$exists": False}},
+        {"$set": {"referral_earnings_paid_out": 0}}
+    )
+    await db.users.update_many(
+        {"referral_earnings_tax_withheld": {"$exists": False}},
+        {"$set": {"referral_earnings_tax_withheld": 0}}
+    )
+
+    # Influence system fields
+    await db.users.update_many(
+        {"influence_score": {"$exists": False}},
+        {"$set": {"influence_score": 0}}
+    )
+    await db.users.update_many(
+        {"status": {"$exists": False}},
+        {"$set": {"status": "bronze"}}
+    )
+    await db.users.update_many(
+        {"status_since": {"$exists": False}},
+        {"$set": {"status_since": iso(now_utc())}}
+    )
+    await db.users.update_many(
+        {"badges": {"$exists": False}},
+        {"$set": {"badges": []}}
+    )
+    await db.users.update_many(
+        {"is_founder": {"$exists": False}},
+        {"$set": {"is_founder": False}}
+    )
+    await db.users.update_many(
+        {"founder_type": {"$exists": False}},
+        {"$set": {"founder_type": None}}
+    )
+    await db.users.update_many(
+        {"founder_achieved_at": {"$exists": False}},
+        {"$set": {"founder_achieved_at": None}}
+    )
+
+    # Ranking system fields
+    await db.users.update_many(
+        {"activity_score": {"$exists": False}},
+        {"$set": {"activity_score": 0}}
+    )
+    await db.users.update_many(
+        {"ranking_score": {"$exists": False}},
+        {"$set": {"ranking_score": 0}}
+    )
+
+    # Lifetime contribution fields
+    await db.users.update_many(
+        {"lifetime_contribution": {"$exists": False}},
+        {"$set": {"lifetime_contribution": 0}}
+    )
+    await db.users.update_many(
+        {"lifetime_contribution_breakdown": {"$exists": False}},
+        {"$set": {"lifetime_contribution_breakdown": {
+            "balance_spent": 0,
+            "referral_earnings_converted": 0,
+            "donations_converted": 0,
+            "subscription_payments": 0,
+            "gifts_sent_value": 0
+        }}}
+    )
+
+    # Auction system fields (Phase 3)
+    await db.users.update_many(
+        {"auction_bids_total": {"$exists": False}},
+        {"$set": {"auction_bids_total": 0}}
+    )
+    await db.users.update_many(
+        {"auction_wins_total": {"$exists": False}},
+        {"$set": {"auction_wins_total": 0}}
+    )
+    await db.users.update_many(
+        {"auction_spent_total": {"$exists": False}},
+        {"$set": {"auction_spent_total": 0}}
+    )
+
+    # Withdrawal system fields
+    await db.users.update_many(
+        {"withdrawals_pending": {"$exists": False}},
+        {"$set": {"withdrawals_pending": 0}}
+    )
+    await db.users.update_many(
+        {"withdrawn_total": {"$exists": False}},
+        {"$set": {"withdrawn_total": 0}}
+    )
+    await db.users.update_many(
+        {"tax_paid_total": {"$exists": False}},
+        {"$set": {"tax_paid_total": 0}}
+    )
+    
+    # Migrate old withdrawable_balance to referral_earnings_withdrawable (V3.2 economy migration)
+    # This ensures users don't lose access to their existing withdrawable funds
+    async for user in db.users.find({"withdrawable_balance": {"$exists": True, "$gt": 0}}, {"id": 1, "withdrawable_balance": 1}):
+        old_balance = user.get("withdrawable_balance", 0)
+        if old_balance > 0:
+            await db.users.update_one(
+                {"id": user["id"]},
+                {
+                    "$inc": {"referral_earnings_withdrawable": old_balance},
+                    "$set": {"withdrawable_balance": 0}
+                }
+            )
+
+    # Privacy settings
+    await db.users.update_many(
+        {"show_in_rankings": {"$exists": False}},
+        {"$set": {"show_in_rankings": True}}
+    )
+
+    # Create referral_usernames collection for uniqueness
+    await db.referral_usernames.create_index("username_lower", unique=True)
+    await db.referral_usernames.create_index("user_id")
 
     # Seed admin
     admin = await db.users.find_one({"email": ADMIN_EMAIL.lower()})

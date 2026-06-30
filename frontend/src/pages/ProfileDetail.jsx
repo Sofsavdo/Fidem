@@ -67,7 +67,21 @@ export default function ProfileDetail() {
   };
 
   if (loading || !c) {
-    return <div className="p-6 text-center text-muted-foreground" data-testid="profile-loading">{t("loading")}</div>;
+    return (
+      <div className="pb-8" data-testid="profile-loading">
+        <div className="relative aspect-square bg-muted animate-pulse" />
+        <div className="px-5 pt-5 space-y-4">
+          <div className="h-8 bg-muted rounded-2xl animate-pulse w-1/3" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {[...Array(9)].map((_, i) => (
+              <div key={i} className="h-20 bg-muted rounded-2xl animate-pulse" />
+            ))}
+          </div>
+          <div className="h-24 bg-muted rounded-2xl animate-pulse" />
+          <div className="h-32 bg-muted rounded-2xl animate-pulse" />
+        </div>
+      </div>
+    );
   }
 
   const blurred = !c.photo_unlocked;

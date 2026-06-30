@@ -5,19 +5,18 @@ import { X, Gift as GiftIcon, Sparkles } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 
 const TIER_META = {
-  free:   { label_uz: "Bepul",       label_ru: "Бесплатно",   label_en: "Free",      cls: "bg-emerald-100 text-emerald-700" },
   care:   { label_uz: "Atash",        label_ru: "Знаки",       label_en: "Cares",     cls: "bg-rose-100 text-rose-700" },
   love:   { label_uz: "Sevish",      label_ru: "Любовь",      label_en: "Love",      cls: "bg-pink-100 text-pink-700" },
   luxury: { label_uz: "Hashamat",    label_ru: "Люкс",        label_en: "Luxury",    cls: "bg-gold-light text-gold-dark" },
 };
 
-const TIER_ORDER = ["free", "care", "love", "luxury"];
+const TIER_ORDER = ["care", "love", "luxury"];
 
 export default function GiftModal({ targetId, targetName, onClose, onSent }) {
   const { user, t, lang, refresh } = useApp();
   const [catalog, setCatalog] = useState(null);
   const [sending, setSending] = useState(null);
-  const [activeTier, setActiveTier] = useState("free");
+  const [activeTier, setActiveTier] = useState("care");
 
   useEffect(() => {
     if (!targetId) return;
@@ -26,7 +25,7 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
 
   const groups = useMemo(() => {
     if (!catalog) return {};
-    const g = { free: [], care: [], love: [], luxury: [] };
+    const g = { care: [], love: [], luxury: [] };
     (catalog.items || []).forEach((it) => {
       if (g[it.tier]) g[it.tier].push(it);
     });
@@ -104,12 +103,8 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
         {/* Gifts grid - scrollable */}
         <div className="overflow-y-auto p-4 grid grid-cols-3 gap-3" style={{ scrollbarWidth: "none" }}>
           {!catalog && <p className="col-span-3 text-center text-sm text-muted-foreground py-6">{t("loading")}</p>}
-          {activeTier === "free" && catalog && (
-            <p className="col-span-3 text-[11px] text-muted-foreground text-center pb-1">{t("gift_rose_note")}</p>
-          )}
           {(groups[activeTier] || []).map((g) => {
-            const isFreeKind = g.tier === "free";
-            const cannotAfford = isFreeKind ? freeRemaining <= 0 : balance < g.price;
+            const cannotAfford = balance < g.price;
             const tier = TIER_META[g.tier];
             return (
               <button
@@ -123,13 +118,9 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
               >
                 <span className="text-4xl leading-none">{g.emoji}</span>
                 <span className="text-[11px] font-medium text-center leading-tight mt-1">{g[labelKey]}</span>
-                {isFreeKind ? (
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${tier.cls}`}>{t("gift_free_badge")}</span>
-                ) : (
-                  <span className="text-[10px] text-muted-foreground">
-                    {g.price >= 1000 ? `${(g.price / 1000).toFixed(g.price >= 10000 ? 0 : 1)}K` : g.price} {t("sum")}
-                  </span>
-                )}
+                <span className="text-[10px] text-muted-foreground">
+                  {g.price >= 1000 ? `${(g.price / 1000).toFixed(g.price >= 10000 ? 0 : 1)}K` : g.price} {t("sum")}
+                </span>
                 {sending === g.kind && <span className="absolute inset-0 grid place-items-center bg-card/80 rounded-2xl text-primary text-xs">{t("gift_sending")}</span>}
               </button>
             );

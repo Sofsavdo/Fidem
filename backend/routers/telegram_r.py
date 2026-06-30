@@ -104,10 +104,18 @@ async def telegram_webhook(request: Request, secret: Optional[str] = Query(None)
         )
 
         if ref_code and (not existing or not existing.get("referred_by")):
+            # Try referral_id first (old system)
             ref_owner = await db.users.find_one(
-                {"referral_code": ref_code},
+                {"referral_id": ref_code},
                 {"_id": 0, "id": 1},
             )
+            
+            # Fallback to referral_username_lower (new custom username system)
+            if not ref_owner:
+                ref_owner = await db.users.find_one(
+                    {"referral_username_lower": ref_code.lower()},
+                    {"_id": 0, "id": 1},
+                )
 
             if ref_owner and (not existing or existing["id"] != ref_owner["id"]):
                 if existing:

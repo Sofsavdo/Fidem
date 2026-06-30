@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from datetime import timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Body, Depends, File, Header, HTTPException, Query, Request, UploadFile
@@ -23,6 +24,7 @@ from core import (
     iso,
     log,
     now_utc,
+    parse_dt,
     rate_limit_auth,
     user_public,
 )
@@ -235,13 +237,24 @@ async def auth_telegram(req: TelegramAuthRequest):
         "plan": "free",
         "balance": 0,
         "blocked": False,
+        "referral_id": uid[:8],  # Phase 1.6: Initialize referral_id for new users
     }
     await db.users.insert_one(doc)
 
     pend = await db.pending_refs.find_one({"telegram_id": tg_id})
     if pend:
-        await db.users.update_one({"id": uid}, {"$set": {"referred_by": pend["ref_code"]}})
-        await db.pending_refs.delete_one({"telegram_id": tg_id})
+        # Phase 1.6: Anti-fraud - self-referral prevention
+        ref_code = pend["ref_code"]
+        ref_owner = await db.users.find_one({"referral_id": ref_code})
+        if not ref_owner:
+            ref_owner = await db.users.find_one({"referral_username_lower": ref_code.lower()})
+        
+        # Block self-referral (same telegram_id)
+        if ref_owner and ref_owner.get("telegram_id") == tg_id:
+            await db.pending_refs.delete_one({"telegram_id": tg_id})
+        else:
+            await db.users.update_one({"id": uid}, {"$set": {"referred_by": ref_code}})
+            await db.pending_refs.delete_one({"telegram_id": tg_id})
 
     return AuthResponse(token=create_token(uid), user_id=uid, onboarded=False)
 
@@ -321,6 +334,53 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
 
     if not was_onboarded:
         await notify_new_profile_to_relevant_users(fresh)
+        
+        # Phase 1.3: Referral signup reward (V3.2 economy system)
+        # 500 so'm to inviter's balance if inviter account age >= 30 days
+        referred_by = fresh.get("referred_by")
+        if referred_by and completeness >= 80:
+            inviter = await db.users.find_one({"referral_id": referred_by})
+            if not inviter:
+                inviter = await db.users.find_one({"referral_username_lower": referred_by.lower()})
+            
+            if inviter:
+                # Check inviter account age >= 30 days
+                inviter_age = now_utc() - parse_dt(inviter.get("created_at", now_utc()))
+                if inviter_age >= timedelta(days=30):
+                    # Check for duplicate earning (idempotency)
+                    existing_earning = await db.users.find_one(
+                        {
+                            "id": inviter["id"],
+                            "referral_earnings.referred_user_id": uid,
+                            "referral_earnings.type": "signup"
+                        }
+                    )
+                    
+                    if not existing_earning:
+                        # Record referral earning FIRST
+                        earning_record = {
+                            "id": new_id(),
+                            "user_id": inviter["id"],
+                            "referred_user_id": uid,
+                            "type": "signup",
+                            "amount": 500,
+                            "status": "approved",
+                            "created_at": iso(now_utc()),
+                            "gross_amount": 500,
+                            "tax_amount": 0,
+                            "net_amount": 500,
+                            "level": 1,
+                        }
+                        await db.users.update_one(
+                            {"id": inviter["id"]},
+                            {"$push": {"referral_earnings": earning_record}}
+                        )
+                        
+                        # Credit 500 so'm to inviter's balance AFTER earning is recorded
+                        await db.users.update_one(
+                            {"id": inviter["id"]},
+                            {"$inc": {"balance": 500, "ref_count": 1}}
+                        )
 
     return {"ok": True, "completeness": completeness}
 

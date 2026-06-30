@@ -8,13 +8,21 @@ import { useApp } from "@/contexts/AppContext";
 export default function Referral() {
   const { t, refresh } = useApp();
   const [data, setData] = useState(null);
+  const [usernameData, setUsernameData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [redeeming, setRedeeming] = useState(false);
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
+  const [checkingUsername, setCheckingUsername] = useState(false);
 
   const load = async () => {
     try {
-      const r = await api.get("/referral/mine");
+      const [r, u] = await Promise.all([
+        api.get("/referral/mine"),
+        api.get("/referral/username/status")
+      ]);
       setData(r.data);
+      setUsernameData(u.data);
     } catch {/* ignore */}
     finally { setLoading(false); }
   };
@@ -23,6 +31,23 @@ export default function Referral() {
 
   const code = data?.code || "";
   const inviteLink = data?.link || (code ? `https://t.me/Fidem_Appbot?start=${code}` : "");
+
+  const setUsername = async () => {
+    if (!newUsername || newUsername.length < 3 || newUsername.length > 30) {
+      toast.error("Username must be 3-30 characters");
+      return;
+    }
+    setCheckingUsername(true);
+    try {
+      await api.post("/referral/username/set", { username: newUsername });
+      toast.success("Username updated successfully");
+      setShowUsernameModal(false);
+      setNewUsername("");
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Failed to set username");
+    } finally { setCheckingUsername(false); }
+  };
 
   const copy = (text, label) => {
     navigator.clipboard.writeText(text).then(() => toast.success(`${label} ${t("copied")}`)).catch(() => toast.error(t("error")));
@@ -122,6 +147,35 @@ export default function Referral() {
                   <Copy className="w-4 h-4" />
                 </button>
               </div>
+              
+              {/* Custom Referral Username */}
+              <div className="pt-2 border-t border-border/40">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Custom Username</p>
+                  <button 
+                    onClick={() => setShowUsernameModal(true)}
+                    className="text-xs text-primary font-medium"
+                  >
+                    {usernameData?.referral_username ? "Change" : "Set"}
+                  </button>
+                </div>
+                {usernameData?.referral_username ? (
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 rounded-xl bg-muted/30 px-3 py-2 text-sm font-medium">
+                      @{usernameData.referral_username}
+                    </div>
+                    <button
+                      onClick={() => copy(`@${usernameData.referral_username}`, "Username")}
+                      className="p-2 rounded-xl border border-border"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">No custom username set</p>
+                )}
+              </div>
+              
               <div>
                 <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">{t("ref_invite_link")}</p>
                 <div className="flex items-center gap-2">
@@ -166,6 +220,44 @@ export default function Referral() {
           </>
         )}
       </main>
+
+      {/* Username Modal */}
+      {showUsernameModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-card rounded-3xl p-6 w-full max-w-md space-y-4">
+            <h3 className="font-heading font-semibold text-lg">Set Custom Username</h3>
+            <p className="text-sm text-muted-foreground">
+              {usernameData?.change_count === 0 
+                ? "First change is free. Subsequent changes cost 10,000 so'm."
+                : "Username change costs 10,000 so'm. 30-day cooldown between changes."
+              }
+            </p>
+            <input
+              type="text"
+              placeholder="username (3-30 chars, a-z, 0-9, _)"
+              value={newUsername}
+              onChange={(e) => setNewUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+              className="w-full px-4 py-3 rounded-xl border border-input bg-background text-sm font-mono"
+              maxLength={30}
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowUsernameModal(false); setNewUsername(""); }}
+                className="flex-1 py-3 rounded-2xl border border-border font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={setUsername}
+                disabled={checkingUsername || !newUsername}
+                className="flex-1 py-3 rounded-2xl bg-primary text-white font-medium disabled:opacity-50"
+              >
+                {checkingUsername ? "..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
