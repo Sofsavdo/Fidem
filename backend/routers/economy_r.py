@@ -510,11 +510,14 @@ async def recalculate_ambassador_status() -> None:
             )
         elif not is_ambassador and "ambassador" in current_badges:
             # Remove Ambassador badge
+            # Recalculate status based on actual influence score
+            user = await get_user(uid)
+            new_status = calculate_status_from_influence(user.get("influence_score", 0))
             await db.users.update_one(
                 {"id": uid},
                 {
                     "$pull": {"badges": "ambassador"},
-                    "$set": {"status": calculate_status_from_influence(0)}
+                    "$set": {"status": new_status}
                 }
             )
 

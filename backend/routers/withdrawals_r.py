@@ -56,6 +56,16 @@ async def request_withdrawal(
     if not me.get("verified_selfie"):
         raise HTTPException(400, "Selfie tasdiqlash talab qilinadi (Selfie verification)")
     
+    # Check minimum 3 paid referrals requirement
+    earnings = me.get("referral_earnings", [])
+    paid_ref_count = 0
+    for earning in earnings:
+        if earning.get("type") == "paid_subscription" and earning.get("status") in ("approved", "withdrawable", "paid"):
+            paid_ref_count += 1
+    
+    if paid_ref_count < 3:
+        raise HTTPException(400, f"Yechib olish uchun kamida 3 ta to'langan tavsiya talab qilinadi. Hozir: {paid_ref_count}")
+    
     # Check referral earnings balance
     bal = int(me.get("referral_earnings_withdrawable", 0) or 0)
     if amount > bal:
