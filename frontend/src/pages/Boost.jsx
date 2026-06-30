@@ -16,7 +16,7 @@ export default function Boost() {
   const load = () => Promise.all([
     api.get("/boost/status").then((r) => setStatus(r.data)),
     api.get("/boost/analytics").then((r) => setAnalytics(r.data)).catch(() => {}),
-    api.get("/boost/leaderboard").then((r) => setLeaderboard(r.data || [])).catch(() => {}),
+    api.get("/rankings/global").then((r) => setLeaderboard(r.data?.rankings || [])).catch(() => {}),
   ]);
   useEffect(() => { load(); }, []);
 

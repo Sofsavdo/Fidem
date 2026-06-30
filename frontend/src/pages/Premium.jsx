@@ -55,6 +55,7 @@ const FEATURE_LABELS = {
 export default function Premium() {
   const { t, lang, user, refresh } = useApp();
   const [sp] = useSearchParams();
+  const tab = sp.get("tab") || "plans";
   const showTopup = sp.get("topup") === "1";
   const [topupAmount, setTopupAmount] = useState(50000);
   const [creating, setCreating] = useState(false);
@@ -63,6 +64,15 @@ export default function Premium() {
   useEffect(() => {
     api.get("/payments/mine").then((r) => setPayments(r.data || []));
   }, []);
+
+  useEffect(() => {
+    if (tab) {
+      const element = document.getElementById(`premium-${tab}`);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+  }, [tab]);
 
   const buy = async (purpose) => {
     setCreating(true);
@@ -96,7 +106,7 @@ export default function Premium() {
       </div>
 
       {/* Subscription Plans - Recurring Monthly Access */}
-      <div>
+      <div id="premium-plans">
         <div className="flex items-center gap-2 mb-2">
           <Crown className="w-5 h-5 text-gold" />
           <p className="text-sm uppercase tracking-wider text-muted-foreground font-medium">{t("premium_section_plans")}</p>
@@ -151,7 +161,7 @@ export default function Premium() {
       </div>
 
       {/* Internal Balance - For Gifts, Boost, AI Features */}
-      <div className="rounded-3xl bg-card border border-border p-5" data-testid="topup-section">
+      <div id="premium-balance" className="rounded-3xl bg-card border border-border p-5" data-testid="topup-section">
         <div className="flex items-center gap-2 mb-3">
           <Wallet className="w-5 h-5 text-primary" />
           <p className="font-heading text-xl font-semibold">{t("topup_balance")}</p>
@@ -183,7 +193,7 @@ export default function Premium() {
       </div>
 
       {/* Roses - Quick Attention Currency */}
-      <div className="rounded-3xl bg-primary/5 border-2 border-primary/30 p-5" data-testid="roses-section">
+      <div id="premium-roses" className="rounded-3xl bg-primary/5 border-2 border-primary/30 p-5" data-testid="roses-section">
         <div className="flex items-center gap-2 mb-2">
           <span className="text-xl">🌹</span>
           <p className="font-heading text-xl font-semibold">{t("premium_section_roses")}</p>

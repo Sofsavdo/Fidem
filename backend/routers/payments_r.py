@@ -341,6 +341,12 @@ async def my_referral(uid: str = Depends(get_current_user_id)):
     available_weeks = max(0, eligible_redemptions - redeemed)
     next_milestone = 3 - (count % 3) if count % 3 != 0 else 3
 
+    # Count paid referrals (users who have made at least one successful payment)
+    paid_referrals = await db.users.count_documents({
+        "referred_by": code,
+        "plan": {"$ne": "free"}
+    })
+
     return {
         "code": code,
         "link": link,
@@ -352,6 +358,11 @@ async def my_referral(uid: str = Depends(get_current_user_id)):
         "vip_bonus_threshold": 5,
         "redeemed_weeks": redeemed,
         "available_weeks": available_weeks,
+        "paid_referrals": paid_referrals,
+        "referral_earnings_pending": me_doc.get("referral_earnings_pending", 0),
+        "referral_earnings_approved": me_doc.get("referral_earnings_approved", 0),
+        "referral_earnings_withdrawable": me_doc.get("referral_earnings_withdrawable", 0),
+        "referral_earnings_paid_out": me_doc.get("referral_earnings_paid_out", 0),
         "next_milestone": next_milestone,
         "premium_per_milestone_days": 7,
     }

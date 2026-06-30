@@ -82,7 +82,7 @@ export default function Saved() {
                 <div className="absolute inset-0 bg-gradient-to-b from-muted to-card flex flex-col items-center justify-center text-center p-4">
                   <Lock className="w-6 h-6 text-muted-foreground" />
                   <p className="text-xs text-muted-foreground mt-2">{t("premium_only")}</p>
-                  <Link data-testid="locked-upgrade" to="/premium" className="mt-3 text-xs font-medium text-primary underline">{t("upgrade")}</Link>
+                  <Link data-testid="locked-upgrade" to="/premium?tab=plans" className="mt-3 text-xs font-medium text-primary underline">{t("upgrade")}</Link>
                 </div>
               </div>
             );

@@ -40,8 +40,8 @@ export default function Me() {
     }
   }, [wsEvent]);
   useEffect(() => {
-    api.get(`/leaderboard?period=${leadPeriod}`).then((r) => setLeaders(r.data || []));
-  }, [leadPeriod]);
+    api.get(`/rankings/global`).then((r) => setLeaders(r.data?.rankings || [])).catch(() => {});
+  }, []);
 
   if (!user) return null;
 
@@ -132,12 +132,12 @@ export default function Me() {
 
       {/* Premium/balance row */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <Link to="/premium" data-testid="link-premium" className="rounded-3xl bg-gradient-to-br from-ink to-zinc-800 text-white p-4 hover:-translate-y-0.5 transition-transform">
+        <Link to="/premium?tab=plans" data-testid="link-premium" className="rounded-3xl bg-gradient-to-br from-ink to-zinc-800 text-white p-4 hover:-translate-y-0.5 transition-transform">
           <Crown className="w-5 h-5 text-gold" />
           <p className="font-heading text-lg mt-2">{t("premium")}</p>
           <p className="text-xs text-white/70 mt-0.5">{t("premium_subtitle")} →</p>
         </Link>
-        <Link to="/premium?topup=1" data-testid="link-balance" className="rounded-3xl bg-card border border-border p-4 hover:-translate-y-0.5 transition-transform">
+        <Link to="/premium?tab=balance" data-testid="link-balance" className="rounded-3xl bg-card border border-border p-4 hover:-translate-y-0.5 transition-transform">
           <Wallet className="w-5 h-5 text-primary" />
           <p className="font-heading text-lg mt-2">{(user.balance || 0).toLocaleString()} {t("sum")}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{t("balance")}</p>

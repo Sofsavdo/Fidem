@@ -329,7 +329,7 @@ export default function Chat() {
                   className="w-full rounded-xl bg-muted text-sm py-2.5 font-medium disabled:opacity-50">
                   {t("pay_with_click")} · {access.price_uzs.toLocaleString()} {t("sum")}
                 </button>
-                <Link to="/premium" data-testid="unlock-upgrade" className="w-full text-center rounded-xl border border-primary/40 text-primary text-sm py-2.5 font-medium">
+                <Link to="/premium?tab=plans" data-testid="unlock-upgrade" className="w-full text-center rounded-xl border border-primary/40 text-primary text-sm py-2.5 font-medium">
                   ⭐ {t("or_subscribe")}
                 </Link>
               </div>

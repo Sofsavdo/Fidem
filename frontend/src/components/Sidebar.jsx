@@ -59,7 +59,7 @@ export default function Sidebar() {
             <span>{t(tab.key) === tab.key ? t(tab.key.replace("_short", "")) : t(tab.key)}</span>
           </NavLink>
         ))}
-        <Link to="/premium" data-testid="side-premium" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
+        <Link to="/premium?tab=plans" data-testid="side-premium" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
           <Crown className="w-4 h-4 text-gold-dark" />
           <span>{t("premium")}</span>
         </Link>
