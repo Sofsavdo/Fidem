@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, Copy, Send, Users, Gift, Sparkles, Crown } from "lucide-react";
+import { ChevronLeft, Copy, Send, Users, Gift, Sparkles, Crown, Info } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { useApp } from "@/contexts/AppContext";
@@ -105,15 +105,40 @@ export default function Referral() {
                 <p className="text-xl font-heading font-bold">{data?.invited_count ?? 0}</p>
                 <p className="text-[11px] text-muted-foreground">{t("ref_invites")}</p>
               </div>
-              <div className="rounded-2xl border border-border bg-card p-3 text-center" data-testid="ref-stat-earned">
-                <Gift className="w-5 h-5 mx-auto text-secondary mb-1" />
-                <p className="text-xl font-heading font-bold">{(data?.earned ?? 0).toLocaleString()}</p>
-                <p className="text-[11px] text-muted-foreground">{t("ref_earned")}</p>
+              <div className="rounded-2xl border border-border bg-card p-3 text-center" data-testid="ref-stat-paid">
+                <Crown className="w-5 h-5 mx-auto text-gold-dark mb-1" />
+                <p className="text-xl font-heading font-bold">{data?.paid_referrals ?? 0}</p>
+                <p className="text-[11px] text-muted-foreground">Paid Referrals</p>
               </div>
               <div className="rounded-2xl border border-border bg-card p-3 text-center" data-testid="ref-stat-progress">
                 <Sparkles className="w-5 h-5 mx-auto text-gold-dark mb-1" />
                 <p className="text-xl font-heading font-bold">{Math.min(data?.invited_count ?? 0, 5)} / 5</p>
                 <p className="text-[11px] text-muted-foreground">{t("ref_vip_bonus")}</p>
+              </div>
+            </section>
+
+            {/* Earnings Breakdown */}
+            <section className="rounded-3xl border border-border bg-card p-4 space-y-3">
+              <h2 className="font-heading font-semibold flex items-center gap-2">
+                <Gift className="w-4 h-4 text-secondary" /> Earnings
+              </h2>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="rounded-xl bg-muted/30 p-3">
+                  <p className="text-muted-foreground text-xs">{t("referral_earnings_pending")}</p>
+                  <p className="font-medium">{(data?.referral_earnings_pending ?? 0).toLocaleString()} {t("sum")}</p>
+                </div>
+                <div className="rounded-xl bg-muted/30 p-3">
+                  <p className="text-muted-foreground text-xs">{t("referral_earnings_approved")}</p>
+                  <p className="font-medium">{(data?.referral_earnings_approved ?? 0).toLocaleString()} {t("sum")}</p>
+                </div>
+                <div className="rounded-xl bg-primary/10 p-3 border border-primary/30">
+                  <p className="text-muted-foreground text-xs">{t("referral_earnings_withdrawable")}</p>
+                  <p className="font-medium text-primary">{(data?.referral_earnings_withdrawable ?? 0).toLocaleString()} {t("sum")}</p>
+                </div>
+                <div className="rounded-xl bg-muted/30 p-3">
+                  <p className="text-muted-foreground text-xs">{t("referral_earnings_paid_out")}</p>
+                  <p className="font-medium">{(data?.referral_earnings_paid_out ?? 0).toLocaleString()} {t("sum")}</p>
+                </div>
               </div>
             </section>
 
@@ -215,6 +240,21 @@ export default function Referral() {
                 <Step n="2" text={t("ref_step2") || "Do'stingiz ro'yxatdan o'tib profilini to'liq tasdiqlasin"} />
                 <Step n="3" text={t("ref_step3") || "Siz +10,000, do'stingiz +5,000 so'm bonus oladi"} />
                 <Step n="★" gold text={t("ref_step4") || "5 ta taklif = 1 hafta bepul Premium"} />
+              </div>
+            </section>
+
+            {/* Withdrawal Rules */}
+            <section className="rounded-3xl border border-border bg-card p-4 space-y-3">
+              <h2 className="font-heading font-semibold flex items-center gap-2">
+                <Info className="w-4 h-4 text-primary" /> Withdrawal Rules
+              </h2>
+              <div className="space-y-2 text-xs text-muted-foreground">
+                <p>• Only referral earnings can be withdrawn (not internal balance, gifts, or roses)</p>
+                <p>• Minimum payout: 100,000 so'm</p>
+                <p>• 12% tax withheld on withdrawals</p>
+                <p>• Requires 3 paid referrals</p>
+                <p>• Requires identity verification</p>
+                <p>• Requires account age 30 days</p>
               </div>
             </section>
           </>
