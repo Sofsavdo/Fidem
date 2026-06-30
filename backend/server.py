@@ -129,17 +129,27 @@ async def startup() -> None:
     # Referral lookup
     await db.users.create_index("referred_by", sparse=True, name="ix_referred_by")
     await db.users.create_index("referral_code", sparse=True, unique=False, name="ix_referral_code")
-    # Drop and recreate ix_referral_username with partial filter to allow multiple null values
+    # Drop any existing index on referral_username_lower and recreate with sparse=True
     try:
-        await db.users.drop_index("ix_referral_username")
-    except Exception:
-        pass  # Index may not exist on first run
-    await db.users.create_index(
-        "referral_username_lower",
-        unique=True,
-        partialFilterExpression={"referral_username_lower": {"$exists": True, "$ne": None}},
-        name="ix_referral_username"
-    )
+        existing_indexes = await db.users.list_indexes()
+        for idx in existing_indexes:
+            if "referral_username_lower" in idx.get("key", {}):
+                await db.users.drop_index(idx["name"])
+                log(f"Dropped index {idx['name']} that references referral_username_lower")
+    except Exception as e:
+        log(f"Warning while dropping referral username indexes: {e}")
+    # Create sparse unique index - allows multiple null values
+    try:
+        await db.users.create_index(
+            "referral_username_lower",
+            unique=True,
+            sparse=True,
+            name="ix_referral_username"
+        )
+        log("Referral username index created successfully")
+    except Exception as e:
+        log(f"Warning: Failed to create referral username index: {e}")
+        log("Server will continue without referral username index")
     await db.saved.create_index([("target_id", 1), ("at", -1)], name="ix_saved_target_at")
     await db.profile_views.create_index([("target_id", 1), ("at", -1)], name="ix_profile_views_target_at")
     await db.messages.create_index([("to_user_id", 1), ("created_at", -1)], name="ix_msg_to_user_time")
