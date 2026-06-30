@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, Body, Depends, HTTPException, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
 
 from auth import decode_token, get_current_user_id
 from ai_service import quick_moderation
@@ -385,7 +385,6 @@ async def get_voice_file(
 ):
     """Serve voice file for a message if the user is a chat participant.
     Accepts auth via Authorization header OR auth query parameter (for audio elements)."""
-    from fastapi import Response, Query, Header
     from auth import decode_token
     from core import get_object
 
