@@ -4,7 +4,7 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, PlanPill } from "@/components/Badges";
 import PhotoUpload from "@/components/PhotoUpload";
-import { ChevronRight, Crown, Gem, Wallet, Share2, Settings as SettingsIcon, LogOut, Copy, Trophy, ShieldCheck, Bell, Clock, SlidersHorizontal, Brain, UsersRound, Pen, BookOpen, Phone, Plane } from "lucide-react";
+import { ChevronRight, Crown, Gem, Wallet, Share2, Settings as SettingsIcon, LogOut, Copy, Trophy, ShieldCheck, Bell, Clock, SlidersHorizontal, Brain, UsersRound, Pen, BookOpen, Phone, Plane, TrendingUp, Award } from "lucide-react";
 import ProgressCard from "@/components/ProgressCard";
 import LangSwitch from "@/components/LangSwitch";
 import { photoSrc } from "@/lib/photo";
@@ -284,6 +284,14 @@ export default function Me() {
         </Link>
         <Link to="/withdrawals" data-testid="link-withdrawals" className="flex items-center justify-between p-4">
           <span className="flex items-center gap-3 text-sm"><Wallet className="w-4 h-4 text-primary" /> {t("withdraw_money")} ({(user.withdrawable_balance || 0).toLocaleString()} {t("sum")})</span>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </Link>
+        <Link to="/economy" data-testid="link-economy" className="flex items-center justify-between p-4">
+          <span className="flex items-center gap-3 text-sm"><TrendingUp className="w-4 h-4 text-secondary" /> {t("economy")}</span>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </Link>
+        <Link to="/rankings" data-testid="link-rankings" className="flex items-center justify-between p-4">
+          <span className="flex items-center gap-3 text-sm"><Award className="w-4 h-4 text-gold-dark" /> {t("rankings")}</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
         <Link to="/verification" data-testid="link-verification" className="flex items-center justify-between p-4">
