@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from auth import get_current_user_id
 from core import db, get_user, iso, now_utc, parse_dt
