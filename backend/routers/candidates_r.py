@@ -171,17 +171,17 @@ async def candidates(
             spotlight = d.get("spotlight_until", "") > now_iso
             return (
                 -2 if spotlight else (-1 if boosted else 0),
-                -x["match_score"],
-                -x["completeness"],
+                -x.get("match_score", 0),
+                -x.get("completeness", 0),
             )
 
         enriched.sort(key=_rank)
 
     elif sort == "active":
-        enriched.sort(key=lambda x: (not x["online"], x["last_active"]), reverse=False)
+        enriched.sort(key=lambda x: (not x.get("online", False), x.get("last_active", "")), reverse=False)
 
     elif sort == "new":
-        enriched.sort(key=lambda x: x["last_active"], reverse=True)
+        enriched.sort(key=lambda x: x.get("last_active", ""), reverse=True)
 
     result = enriched[:limit]
 
