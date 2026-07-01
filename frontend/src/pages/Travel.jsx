@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
@@ -78,7 +79,7 @@ export default function Travel() {
           <Crown className="w-5 h-5 text-amber-600 shrink-0" />
           <div className="text-sm">
             <p className="font-medium text-amber-900">{t("premium")} / {t("vip")}</p>
-            <p className="text-amber-800 mt-1">{t("travel_premium_gate")} <a href="/premium" className="underline font-medium">{t("upgrade")}</a></p>
+            <p className="text-amber-800 mt-1">{t("travel_premium_gate")} <Link to="/premium" className="underline font-medium">{t("upgrade")}</Link></p>
           </div>
         </div>
       )}

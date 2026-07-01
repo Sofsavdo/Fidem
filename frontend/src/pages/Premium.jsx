@@ -251,13 +251,13 @@ export default function Premium() {
           <li>✓ {t("premium_section_concierge_features_2")}</li>
           <li>✓ {t("premium_section_concierge_features_3")}</li>
         </ul>
-        <a
-          href="/concierge"
+        <Link
+          to="/concierge"
           data-testid="concierge-link"
           className="mt-3 block w-full text-center rounded-2xl bg-secondary text-white py-3 font-medium"
         >
           {t("premium_section_concierge_btn").replace("{price}", "199,000").replace("{currency}", t("sum"))}
-        </a>
+        </Link>
       </div>
 
       {/* Payments history */}

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
@@ -80,7 +81,7 @@ export default function Family() {
           <Crown className="w-5 h-5 text-amber-600 shrink-0" />
           <div className="text-sm">
             <p className="font-medium text-amber-900">VIP</p>
-            <p className="text-amber-800 mt-1">{t("family_desc")} <a href="/premium" className="underline font-medium">{t("upgrade_plan")}</a></p>
+            <p className="text-amber-800 mt-1">{t("family_desc")} <Link to="/premium" className="underline font-medium">{t("upgrade_plan")}</Link></p>
           </div>
         </div>
       )}

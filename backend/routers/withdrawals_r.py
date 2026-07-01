@@ -23,6 +23,18 @@ TAX_RATE = 0.12  # 12% tax withholding
 async def withdraw_status(uid: str = Depends(get_current_user_id)):
     me = await get_user(uid)
     pending = await db.withdrawals.count_documents({"user_id": uid, "status": "pending"})
+    
+    # Calculate account age in days
+    account_age = now_utc() - parse_dt(me.get("created_at", now_utc()))
+    account_age_days = int(account_age.total_seconds() / 86400)
+    
+    # Count paid referrals
+    earnings = me.get("referral_earnings", [])
+    paid_referrals_count = 0
+    for earning in earnings:
+        if earning.get("type") == "paid_subscription" and earning.get("status") in ("approved", "withdrawable", "paid"):
+            paid_referrals_count += 1
+    
     return {
         "referral_earnings_withdrawable": int(me.get("referral_earnings_withdrawable", 0) or 0),
         "referral_earnings_pending": int(me.get("referral_earnings_pending", 0) or 0),
@@ -30,6 +42,9 @@ async def withdraw_status(uid: str = Depends(get_current_user_id)):
         "min_payout": MIN_WITHDRAW_UZS,
         "tax_rate_pct": int(TAX_RATE * 100),
         "pending_count": pending,
+        "paid_referrals_count": paid_referrals_count,
+        "account_age_days": account_age_days,
+        "verified_identity": me.get("verified_identity", False),
     }
 
 
