@@ -105,160 +105,194 @@ export default function Premium() {
         <p className="text-sm text-muted-foreground mt-1">{t("tagline")}</p>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-border pb-3">
+        {["plans", "balance", "roses"].map((t) => (
+          <button
+            key={t}
+            onClick={() => window.location.search = `?tab=${t}`}
+            className={`px-4 py-2 rounded-full text-sm font-medium capitalize ${
+              tab === t ? "bg-primary text-white" : "bg-muted/30 text-muted-foreground"
+            }`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
       {/* Subscription Plans - Recurring Monthly Access */}
-      <div id="premium-plans">
-        <div className="flex items-center gap-2 mb-2">
-          <Crown className="w-5 h-5 text-gold" />
-          <p className="text-sm uppercase tracking-wider text-muted-foreground font-medium">{t("premium_section_plans")}</p>
-        </div>
-        <p className="text-xs text-muted-foreground mb-3">{t("premium_section_plans_desc")}</p>
-        <div className="space-y-3 stagger">
-          {PLANS.map((p) => {
-            const isCurrent = user?.plan === p.key;
-            return (
-              <div
-                key={p.key}
-                data-testid={`plan-${p.key}`}
-                className={`rounded-3xl p-5 ${p.style} ${isCurrent ? "ring-2 ring-primary" : ""}`}
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-heading text-2xl font-semibold flex items-center gap-2">
-                      {p.title} {p.badge}
-                    </p>
-                    <p className="text-xs opacity-70 mt-0.5">
-                      {p.price === 0 ? t("plan_free_desc") : t(`plan_${p.key}_desc`)}
+      {tab === "plans" && (
+        <div id="premium-plans">
+          <div className="flex items-center gap-2 mb-2">
+            <Crown className="w-5 h-5 text-gold" />
+            <p className="text-sm uppercase tracking-wider text-muted-foreground font-medium">{t("premium_section_plans")}</p>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">{t("premium_section_plans_desc")}</p>
+          <div className="space-y-3 stagger">
+            {PLANS.map((p) => {
+              const isCurrent = user?.plan === p.key;
+              return (
+                <div
+                  key={p.key}
+                  data-testid={`plan-${p.key}`}
+                  className={`rounded-3xl p-5 ${p.style} ${isCurrent ? "ring-2 ring-primary" : ""}`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-heading text-2xl font-semibold flex items-center gap-2">
+                        {p.title} {p.badge}
+                      </p>
+                      <p className="text-xs opacity-70 mt-0.5">
+                        {p.price === 0 ? t("plan_free_desc") : t(`plan_${p.key}_desc`)}
+                      </p>
+                    </div>
+                    <p className="font-heading text-xl">
+                      {p.price === 0 ? t("plan_free_title") : `${p.price.toLocaleString()} ${t("sum")}`}
                     </p>
                   </div>
-                  <p className="font-heading text-xl">
-                    {p.price === 0 ? t("plan_free_title") : `${p.price.toLocaleString()} ${t("sum")}`}
-                  </p>
+                  <ul className="mt-3 space-y-1.5">
+                    {p.features.map((f) => (
+                      <li key={f} className="text-sm flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 opacity-70" /> {labels[f]}
+                      </li>
+                    ))}
+                  </ul>
+                  {p.key !== "free" && !isCurrent && (
+                    <button
+                      data-testid={`buy-${p.key}`}
+                      onClick={() => buy(p.key)}
+                      disabled={creating}
+                      className={`mt-4 w-full rounded-2xl py-3 font-medium ${
+                        p.key === "vip" ? "bg-ink text-gold border border-gold/30" : "bg-primary text-white"
+                      }`}
+                    >
+                      {t("buy")} · {t("pay_with_click")}
+                    </button>
+                  )}
+                  {isCurrent && <p className="mt-3 text-sm font-medium text-secondary">— {t("current_plan")} —</p>}
                 </div>
-                <ul className="mt-3 space-y-1.5">
-                  {p.features.map((f) => (
-                    <li key={f} className="text-sm flex items-center gap-2">
-                      <Check className="w-3.5 h-3.5 opacity-70" /> {labels[f]}
-                    </li>
-                  ))}
-                </ul>
-                {p.key !== "free" && !isCurrent && (
-                  <button
-                    data-testid={`buy-${p.key}`}
-                    onClick={() => buy(p.key)}
-                    disabled={creating}
-                    className={`mt-4 w-full rounded-2xl py-3 font-medium ${
-                      p.key === "vip" ? "bg-ink text-gold border border-gold/30" : "bg-primary text-white"
-                    }`}
-                  >
-                    {t("buy")} · {t("pay_with_click")}
-                  </button>
-                )}
-                {isCurrent && <p className="mt-3 text-sm font-medium text-secondary">— {t("current_plan")} —</p>}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+
+          {/* Concierge — premium manual matching */}
+          <div className="rounded-3xl bg-gradient-to-br from-secondary/10 via-primary/5 to-gold-light/30 border-2 border-secondary/40 p-5" data-testid="concierge-section">
+            <p className="font-heading text-xl font-semibold flex items-center gap-2">👑 {t("concierge_title")}</p>
+            <p className="text-sm mt-1 text-muted-foreground">{t("concierge_desc")}</p>
+            <ul className="text-xs mt-3 space-y-1 text-foreground/80">
+              <li>✓ {t("premium_section_concierge_features_1")}</li>
+              <li>✓ {t("premium_section_concierge_features_2")}</li>
+              <li>✓ {t("premium_section_concierge_features_3")}</li>
+            </ul>
+            <Link
+              to="/concierge"
+              data-testid="concierge-link"
+              className="mt-3 block w-full text-center rounded-2xl bg-secondary text-white py-3 font-medium"
+            >
+              {t("premium_section_concierge_btn").replace("{price}", "199,000").replace("{currency}", t("sum"))}
+            </Link>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Internal Balance - For Gifts, Boost, AI Features */}
-      <div id="premium-balance" className="rounded-3xl bg-card border border-border p-5" data-testid="topup-section">
-        <div className="flex items-center gap-2 mb-3">
-          <Wallet className="w-5 h-5 text-primary" />
-          <p className="font-heading text-xl font-semibold">{t("topup_balance")}</p>
-        </div>
-        <p className="text-xs text-muted-foreground mb-3">{t("premium_section_balance_hint")}</p>
-        <p className="text-xs text-secondary mb-3">{t("premium_section_balance_usage")}</p>
-        <div className="flex gap-2 mb-3">
-          {[10000, 50000, 100000, 200000].map((v) => (
+      {tab === "balance" && (
+        <div id="premium-balance">
+          <div className="rounded-3xl bg-card border border-border p-5" data-testid="topup-section">
+            <div className="flex items-center gap-2 mb-3">
+              <Wallet className="w-5 h-5 text-primary" />
+              <p className="font-heading text-xl font-semibold">{t("topup_balance")}</p>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">{t("premium_section_balance_hint")}</p>
+            <p className="text-xs text-secondary mb-3">{t("premium_section_balance_usage")}</p>
+            <div className="flex gap-2 mb-3">
+              {[10000, 50000, 100000, 200000].map((v) => (
+                <button
+                  key={v}
+                  data-testid={`topup-${v}`}
+                  onClick={() => setTopupAmount(v)}
+                  className={`flex-1 rounded-xl border py-2 text-sm ${
+                    topupAmount === v ? "bg-primary text-white border-primary" : "bg-card border-border"
+                  }`}
+                >
+                  {(v / 1000).toFixed(0)}k
+                </button>
+              ))}
+            </div>
             <button
-              key={v}
-              data-testid={`topup-${v}`}
-              onClick={() => setTopupAmount(v)}
-              className={`flex-1 rounded-xl border py-2 text-sm ${
-                topupAmount === v ? "bg-primary text-white border-primary" : "bg-card border-border"
-              }`}
+              data-testid="topup-pay"
+              onClick={topup}
+              disabled={creating}
+              className="w-full rounded-2xl bg-secondary text-white py-3 font-medium"
             >
-              {(v / 1000).toFixed(0)}k
+              {t("pay_with_click")} · {topupAmount.toLocaleString()} {t("sum")}
             </button>
-          ))}
+          </div>
+
+          {/* Spending System Explanation */}
+          <div className="rounded-3xl bg-primary/5 border border-primary/30 p-5 mt-4">
+            <h3 className="font-heading font-semibold mb-3">Spending System</h3>
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <p>• <strong className="text-foreground">Balance</strong>: For in-app purchases (gifts, boosts, AI features). Not withdrawable.</p>
+              <p>• <strong className="text-foreground">Referral Earnings</strong>: Withdrawable cash earned from referrals.</p>
+              <p>• <strong className="text-foreground">Gifts/Roses</strong>: Increase influence and ranking. Not withdrawable.</p>
+              <p>• <strong className="text-foreground">Donations</strong>: Convert to influence for higher status. Not withdrawable.</p>
+            </div>
+          </div>
+
+          {/* Super-Application - One-Time Filter Bypass */}
+          <div className="rounded-3xl bg-gold-light/40 border border-gold/40 p-5 mt-4" data-testid="super-section">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xl">✨</span>
+              <p className="font-heading text-xl font-semibold">{t("super_application")}</p>
+            </div>
+            <p className="text-sm mt-1 text-muted-foreground">{t("premium_section_super_desc")}</p>
+            <p className="text-xs text-secondary mt-1">{t("premium_section_super_usage")}</p>
+            <button
+              data-testid="buy-super"
+              onClick={() => buy("super_application")}
+              disabled={creating}
+              className="mt-3 w-full rounded-2xl bg-gradient-to-r from-gold to-gold-dark text-white py-3 font-medium"
+            >
+              {t("buy_super")} · 15,000 {t("sum")}
+            </button>
+          </div>
         </div>
-        <button
-          data-testid="topup-pay"
-          onClick={topup}
-          disabled={creating}
-          className="w-full rounded-2xl bg-secondary text-white py-3 font-medium"
-        >
-          {t("pay_with_click")} · {topupAmount.toLocaleString()} {t("sum")}
-        </button>
-      </div>
+      )}
 
       {/* Roses - Quick Attention Currency */}
-      <div id="premium-roses" className="rounded-3xl bg-primary/5 border-2 border-primary/30 p-5" data-testid="roses-section">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-xl">🌹</span>
-          <p className="font-heading text-xl font-semibold">{t("premium_section_roses")}</p>
+      {tab === "roses" && (
+        <div id="premium-roses" className="rounded-3xl bg-primary/5 border-2 border-primary/30 p-5" data-testid="roses-section">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xl">🌹</span>
+            <p className="font-heading text-xl font-semibold">{t("premium_section_roses")}</p>
+          </div>
+          <p className="text-sm mt-1 text-muted-foreground">{t("premium_section_roses_desc")}</p>
+          <p className="text-xs text-secondary mt-1">{t("premium_section_roses_usage")}</p>
+          <div className="grid grid-cols-3 gap-2 mt-3">
+            {[["1", 1, 5000], ["5", 5, 20000], ["12", 12, 45000]].map(([k, count, price]) => (
+              <button
+                key={k}
+                data-testid={`roses-${k}`}
+                onClick={async () => {
+                  setCreating(true);
+                  try {
+                    const r = await api.post("/roses/purchase", { bundle: k });
+                    window.open(r.data.payment_link, "_blank");
+                    toast.success(t("roses_payment_opened").replace("{count}", count));
+                  } catch (e) { toast.error("Xato"); } finally { setCreating(false); }
+                }}
+                disabled={creating}
+                className="rounded-2xl bg-card border border-border hover:border-primary p-3 text-center transition"
+              >
+                <p className="text-2xl">🌹</p>
+                <p className="font-medium text-sm mt-1">{count} ta</p>
+                <p className="text-xs text-muted-foreground">{price.toLocaleString()} {t("sum")}</p>
+              </button>
+            ))}
+          </div>
         </div>
-        <p className="text-sm mt-1 text-muted-foreground">{t("premium_section_roses_desc")}</p>
-        <p className="text-xs text-secondary mt-1">{t("premium_section_roses_usage")}</p>
-        <div className="grid grid-cols-3 gap-2 mt-3">
-          {[["1", 1, 5000], ["5", 5, 20000], ["12", 12, 45000]].map(([k, count, price]) => (
-            <button
-              key={k}
-              data-testid={`roses-${k}`}
-              onClick={async () => {
-                setCreating(true);
-                try {
-                  const r = await api.post("/roses/purchase", { bundle: k });
-                  window.open(r.data.payment_link, "_blank");
-                  toast.success(t("roses_payment_opened").replace("{count}", count));
-                } catch (e) { toast.error("Xato"); } finally { setCreating(false); }
-              }}
-              disabled={creating}
-              className="rounded-2xl bg-card border border-border hover:border-primary p-3 text-center transition"
-            >
-              <p className="text-2xl">🌹</p>
-              <p className="font-medium text-sm mt-1">{count} ta</p>
-              <p className="text-xs text-muted-foreground">{price.toLocaleString()} {t("sum")}</p>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Super-Application - One-Time Filter Bypass */}
-      <div className="rounded-3xl bg-gold-light/40 border border-gold/40 p-5" data-testid="super-section">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-xl">✨</span>
-          <p className="font-heading text-xl font-semibold">{t("super_application")}</p>
-        </div>
-        <p className="text-sm mt-1 text-muted-foreground">{t("premium_section_super_desc")}</p>
-        <p className="text-xs text-secondary mt-1">{t("premium_section_super_usage")}</p>
-        <button
-          data-testid="buy-super"
-          onClick={() => buy("super_application")}
-          disabled={creating}
-          className="mt-3 w-full rounded-2xl bg-gradient-to-r from-gold to-gold-dark text-white py-3 font-medium"
-        >
-          {t("buy_super")} · 15,000 {t("sum")}
-        </button>
-      </div>
-
-      {/* Concierge — premium manual matching */}
-      <div className="rounded-3xl bg-gradient-to-br from-secondary/10 via-primary/5 to-gold-light/30 border-2 border-secondary/40 p-5" data-testid="concierge-section">
-        <p className="font-heading text-xl font-semibold flex items-center gap-2">👑 {t("concierge_title")}</p>
-        <p className="text-sm mt-1 text-muted-foreground">{t("concierge_desc")}</p>
-        <ul className="text-xs mt-3 space-y-1 text-foreground/80">
-          <li>✓ {t("premium_section_concierge_features_1")}</li>
-          <li>✓ {t("premium_section_concierge_features_2")}</li>
-          <li>✓ {t("premium_section_concierge_features_3")}</li>
-        </ul>
-        <Link
-          to="/concierge"
-          data-testid="concierge-link"
-          className="mt-3 block w-full text-center rounded-2xl bg-secondary text-white py-3 font-medium"
-        >
-          {t("premium_section_concierge_btn").replace("{price}", "199,000").replace("{currency}", t("sum"))}
-        </Link>
-      </div>
+      )}
 
       {/* Payments history */}
       <div>

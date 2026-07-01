@@ -306,6 +306,7 @@ export default function Chat() {
               <p className="text-xs text-muted-foreground">
                 {t("chat_locked_desc")} · 🛡 {access.guarantee_hours}h {t("guarantee")}
               </p>
+              <p className="text-xs text-secondary mt-2">💡 Tip: Match with this user to chat for free</p>
               <div className="grid grid-cols-1 gap-2 pt-1">
                 {access.free_credits > 0 && (
                   <button data-testid="unlock-credit" onClick={() => unlockChat("credit")} disabled={unlocking}

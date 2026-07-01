@@ -82,6 +82,10 @@ async def can_initiate_chat(sender: dict, target_id: str) -> bool:
         return True
     if await _unlock_doc(sender["id"], target_id):
         return True
+    # Check for mutual save (match) - free chat for matched users
+    mutual_save = await db.saved.find_one({"owner_id": sender["id"], "target_id": target_id}) and await db.saved.find_one({"owner_id": target_id, "target_id": sender["id"]})
+    if mutual_save:
+        return True
     return False
 
 

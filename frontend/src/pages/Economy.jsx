@@ -39,14 +39,28 @@ export default function Economy() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {/* Influence Score */}
+        {/* What is Influence */}
         <section className="rounded-3xl border border-border bg-gradient-to-br from-primary/10 to-secondary/10 p-6">
+          <h2 className="font-heading font-semibold mb-3 flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-primary" /> What is Influence?
+          </h2>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>Influence is your reputation score on FIDEM. Higher influence means:</p>
+            <p>• Better ranking in search results</p>
+            <p>• More profile visibility</p>
+            <p>• Higher status (Bronze → Legend)</p>
+            <p>• Exclusive badges (Titan, Ambassador, Founder)</p>
+          </div>
+        </section>
+
+        {/* Influence Score */}
+        <section className="rounded-3xl border border-border bg-card p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-2xl bg-primary text-white grid place-items-center">
               <TrendingUp className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Influence Score</p>
+              <p className="text-xs text-muted-foreground">Your Influence Score</p>
               <p className="text-2xl font-heading font-semibold">{(influenceData?.influence_score || 0).toLocaleString()}</p>
             </div>
           </div>
@@ -59,6 +73,18 @@ export default function Economy() {
               <span className="text-muted-foreground">Badges</span>
               <span className="font-medium">{statusData?.badges?.join(", ") || "None"}</span>
             </div>
+          </div>
+        </section>
+
+        {/* How to Increase Influence */}
+        <section className="rounded-3xl border border-border bg-card p-6">
+          <h2 className="font-heading font-semibold mb-3">How to Increase Influence</h2>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>• <strong>Send gifts</strong>: 10% of gift value as influence</p>
+            <p>• <strong>Convert balance</strong>: Convert balance to influence with bonus</p>
+            <p>• <strong>Convert referral earnings</strong>: Convert earnings to influence</p>
+            <p>• <strong>Donations</strong>: Convert donations to influence</p>
+            <p>• <strong>Activity</strong>: Daily check-ins, profile completion</p>
           </div>
         </section>
 

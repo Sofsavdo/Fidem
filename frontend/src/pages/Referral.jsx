@@ -97,6 +97,11 @@ export default function Referral() {
             <p>3. When they subscribe to Premium, you earn 50% of their first payment (up to 29,900 UZS)</p>
             <p>4. Every 3 friends who subscribe = 7 free Premium days for you</p>
           </div>
+          <div className="mt-3 pt-3 border-t border-border/40">
+            <p className="text-xs text-secondary font-medium">Important:</p>
+            <p className="text-xs text-muted-foreground">• Rewards only from first paid subscription</p>
+            <p className="text-xs text-muted-foreground">• No rewards from gifts, roses, balance top-ups, donations, boosts</p>
+          </div>
         </div>
 
         <section className="text-center space-y-3">
