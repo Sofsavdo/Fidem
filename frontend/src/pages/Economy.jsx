@@ -127,7 +127,7 @@ export default function Economy() {
         >
           <Gift className="w-8 h-8 mx-auto text-primary mb-2" />
           <h3 className="font-heading font-semibold">Convert to Influence</h3>
-          <p className="text-sm text-muted-foreground mt-1">Convert balance or referral earnings to influence score with bonus</p>
+          <p className="text-sm text-muted-foreground mt-1">Higher influence = higher rankings = more visibility</p>
         </Link>
       </main>
     </div>

@@ -86,6 +86,19 @@ export default function Referral() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+        {/* How it works */}
+        <div className="rounded-3xl border border-border bg-gradient-to-br from-primary/10 to-secondary/10 p-5">
+          <h2 className="font-heading font-semibold mb-3 flex items-center gap-2">
+            <Info className="w-5 h-5 text-primary" /> How it works
+          </h2>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>1. Share your unique link with friends</p>
+            <p>2. When they sign up, you become their referrer</p>
+            <p>3. When they subscribe to Premium, you earn 50% of their first payment (up to 29,900 UZS)</p>
+            <p>4. Every 3 friends who subscribe = 7 free Premium days for you</p>
+          </div>
+        </div>
+
         <section className="text-center space-y-3">
           <div className="text-6xl">🎁</div>
           <h1 className="text-2xl font-heading font-bold">{t("ref_subtitle")}</h1>

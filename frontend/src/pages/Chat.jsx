@@ -317,14 +317,6 @@ export default function Chat() {
                   className="w-full rounded-xl bg-primary text-white text-sm py-2.5 font-medium disabled:opacity-50">
                   💳 {t("unlock_one_time")} · {access.price_uzs.toLocaleString()} {t("sum")}
                 </button>
-                <button data-testid="unlock-coins" onClick={() => unlockChat("coins")} disabled={unlocking || access.coins < access.price_coins}
-                  className="w-full rounded-xl bg-card border border-border text-sm py-2.5 font-medium disabled:opacity-50">
-                  🪙 {t("unlock_with_coins")} · {access.price_coins} {t("coin")} ({access.coins})
-                </button>
-                <button data-testid="unlock-click" onClick={() => unlockChat("click")} disabled={unlocking}
-                  className="w-full rounded-xl bg-muted text-sm py-2.5 font-medium disabled:opacity-50">
-                  {t("pay_with_click")} · {access.price_uzs.toLocaleString()} {t("sum")}
-                </button>
                 <Link to="/premium?tab=plans" data-testid="unlock-upgrade" className="w-full text-center rounded-xl border border-primary/40 text-primary text-sm py-2.5 font-medium">
                   ⭐ {t("or_subscribe")}
                 </Link>

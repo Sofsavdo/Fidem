@@ -83,7 +83,6 @@ export default function Verification() {
           <ShieldCheck className="w-6 h-6 text-primary" /> {t("verification_title")}
         </h1>
         <p className="text-sm text-muted-foreground mt-1">{t("verification_subtitle")}</p>
-        <p className="text-xs text-secondary mt-2">📋 Roadmap: Live camera selfie + face comparison coming soon</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
