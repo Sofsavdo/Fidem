@@ -26,7 +26,7 @@ export default function Withdrawals() {
   const submit = async () => {
     const amt = parseInt(amount, 10);
     if (!amt || amt < (status?.min_payout || 100000)) {
-      toast.error(`${t("withdraw_min_error")}: ${(status?.min_payout || 100000).toLocaleString()} ${t("sum")}`);
+      toast.error(`${t("withdraw_min_error")}: ${(status?.min_payout ?? 100000).toLocaleString()} ${t("sum")}`);
       return;
     }
     if (amt > (status?.referral_earnings_withdrawable || 0)) {
@@ -70,13 +70,13 @@ export default function Withdrawals() {
           <div className="w-10 h-10 rounded-2xl bg-primary text-white grid place-items-center"><Wallet className="w-5 h-5" /></div>
           <div>
             <p className="text-xs text-muted-foreground">{t("referral_earnings_withdrawable")}</p>
-            <p className="text-2xl font-heading font-semibold" data-testid="withdrawable-balance">{(status.referral_earnings_withdrawable || 0).toLocaleString()} {t("sum_word")}</p>
+            <p className="text-2xl font-heading font-semibold" data-testid="withdrawable-balance">{(status?.referral_earnings_withdrawable ?? 0).toLocaleString()} {t("sum_word")}</p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3 text-xs">
           <div className="rounded-xl bg-card p-3">
             <p className="text-muted-foreground">{t("referral_earnings_pending")}</p>
-            <p className="text-sm font-medium mt-1">{(status.referral_earnings_pending || 0).toLocaleString()} {t("sum_word")}</p>
+            <p className="text-sm font-medium mt-1">{(status?.referral_earnings_pending ?? 0).toLocaleString()} {t("sum_word")}</p>
           </div>
           <div className="rounded-xl bg-card p-3">
             <p className="text-muted-foreground">{t("tax_rate")}</p>
@@ -129,7 +129,7 @@ export default function Withdrawals() {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">Minimum payout: {(status?.min_payout || 100000).toLocaleString()} {t("sum")}</span>
+            <span className="text-muted-foreground">Minimum payout: {(status?.min_payout ?? 100000).toLocaleString()} {t("sum")}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground">Tax rate: {status?.tax_rate_pct || 12}%</span>
@@ -143,7 +143,7 @@ export default function Withdrawals() {
         <input
           data-testid="withdraw-amount"
           type="number"
-          placeholder={`${t("amount_uzs")} (min ${(status.min_payout || 100000).toLocaleString()})`}
+          placeholder={`${t("amount_uzs")} (min ${(status?.min_payout ?? 100000).toLocaleString()})`}
           className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
@@ -185,8 +185,8 @@ export default function Withdrawals() {
             {history.map((w) => (
               <div key={w.id} className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
                 <div>
-                  <p className="text-sm font-medium">{(w.amount).toLocaleString()} {t("sum_word")}</p>
-                  <p className="text-[11px] text-muted-foreground">{new Date(w.created_at).toLocaleString()}</p>
+                  <p className="text-sm font-medium">{(w.amount || 0).toLocaleString()} {t("sum_word")}</p>
+                  <p className="text-[11px] text-muted-foreground">{w.created_at ? new Date(w.created_at).toLocaleString() : "—"}</p>
                   <p className="text-[11px] text-muted-foreground font-mono">**** **** **** {(w.card_number || "").slice(-4)}</p>
                 </div>
                 {statusBadge(w.status)}

@@ -76,7 +76,7 @@ export default function Notifications() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm">{n.text}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{new Date(n.created_at).toLocaleString()}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{n.created_at ? new Date(n.created_at).toLocaleString() : "—"}</p>
               </div>
               {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2" />}
             </div>

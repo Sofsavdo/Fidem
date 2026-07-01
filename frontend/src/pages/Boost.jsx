@@ -200,7 +200,7 @@ export default function Boost() {
                   <p className="text-[11px] text-muted-foreground">{u.region}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-semibold text-primary">{u.boost_impressions.toLocaleString()}</p>
+                  <p className="text-sm font-semibold text-primary">{(u.boost_impressions || 0).toLocaleString()}</p>
                   <p className="text-[10px] text-muted-foreground">{t("views_word")}</p>
                 </div>
               </div>

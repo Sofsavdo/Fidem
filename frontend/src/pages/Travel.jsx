@@ -91,7 +91,7 @@ export default function Travel() {
             <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
             <div className="flex-1">
               <p className="font-medium text-emerald-900">{translateRegion(status.travel_region)}</p>
-              <p className="text-xs text-emerald-800 mt-1">{new Date(status.travel_until).toLocaleString()}</p>
+              <p className="text-xs text-emerald-800 mt-1">{status.travel_until ? new Date(status.travel_until).toLocaleString() : "—"}</p>
               <p className="text-xs text-emerald-700 mt-1">{t("region")}: {translateRegion(status.home_region)}</p>
             </div>
             <button data-testid="travel-deactivate" onClick={deactivate} className="text-emerald-700 hover:text-emerald-900"><X className="w-5 h-5" /></button>
