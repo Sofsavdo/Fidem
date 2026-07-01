@@ -8,7 +8,7 @@ import { toast } from "sonner";
 const PLANS = [
   {
     key: "free", title: "Free", price: 0,
-    features: ["profile", "candidates", "saved", "limited_apps"],
+    features: ["profile", "candidates", "saved", "likes", "matches", "chat_replies"],
     style: "bg-card border border-border",
   },
   {
@@ -19,13 +19,13 @@ const PLANS = [
   },
   {
     key: "premium", title: "Premium", price: 79000,
-    features: ["chat_unlimited", "more_apps", "who_viewed", "who_saved", "who_interested", "more_filters"],
+    features: ["chat_unlimited", "who_viewed", "who_saved", "who_interested", "more_filters", "boost_visibility"],
     style: "bg-card border-2 border-gold shadow-premium",
     badge: "💎",
   },
   {
     key: "vip", title: "VIP", price: 199000,
-    features: ["max_visibility", "stealth_view", "priority", "vip_badge"],
+    features: ["max_visibility", "stealth_view", "priority", "vip_badge", "travel_mode", "family_share"],
     style: "bg-ink text-white border border-white/10",
     badge: "👑",
   },
@@ -33,22 +33,22 @@ const PLANS = [
 
 const FEATURE_LABELS = {
   uz: {
-    profile: "Profil", candidates: "Nomzodlar", saved: "Saqlash", limited_apps: "Cheklangan murojaat",
+    profile: "Profil", candidates: "Nomzodlar", saved: "Saqlash", likes: "Yoqtirishlar", matches: "Moslashuvlar", chat_replies: "Javob yozish",
     chat_unlimited: "Cheksiz yozishish",
-    more_apps: "Ko'proq murojaat", who_viewed: "Kim ko'rdi", who_saved: "Kim saqladi", who_interested: "Kim qiziqdi", more_filters: "Ko'proq filtrlar",
-    max_visibility: "Maksimal ko'rinish", stealth_view: "Maxfiy ko'rish", priority: "Priority", vip_badge: "VIP badge",
+    who_viewed: "Kim ko'rdi", who_saved: "Kim saqladi", who_interested: "Kim qiziqdi", more_filters: "Ko'proq filtrlar", boost_visibility: "Ko'rinishni oshirish",
+    max_visibility: "Maksimal ko'rinish", stealth_view: "Maxfiy ko'rish", priority: "Priority", vip_badge: "VIP badge", travel_mode: "Sayohat rejimi", family_share: "Oila ulashish",
   },
   ru: {
-    profile: "Профиль", candidates: "Кандидаты", saved: "Сохранять", limited_apps: "Ограниченные заявки",
+    profile: "Профиль", candidates: "Кандидаты", saved: "Сохранять", likes: "Лайки", matches: "Совпадения", chat_replies: "Ответы в чате",
     chat_unlimited: "Безлимитные сообщения",
-    more_apps: "Больше заявок", who_viewed: "Кто видел", who_saved: "Кто сохранил", who_interested: "Кто интересуется", more_filters: "Больше фильтров",
-    max_visibility: "Максимум видимости", stealth_view: "Скрытый просмотр", priority: "Приоритет", vip_badge: "VIP badge",
+    who_viewed: "Кто видел", who_saved: "Кто сохранил", who_interested: "Кто интересуется", more_filters: "Больше фильтров", boost_visibility: "Увеличение видимости",
+    max_visibility: "Максимум видимости", stealth_view: "Скрытый просмотр", priority: "Приоритет", vip_badge: "VIP badge", travel_mode: "Режим путешествия", family_share: "Семейный доступ",
   },
   en: {
-    profile: "Profile", candidates: "Candidates", saved: "Save", limited_apps: "Limited applications",
+    profile: "Profile", candidates: "Candidates", saved: "Save", likes: "Likes", matches: "Matches", chat_replies: "Chat replies",
     chat_unlimited: "Unlimited messaging",
-    more_apps: "More applications", who_viewed: "Who viewed", who_saved: "Who saved", who_interested: "Who interested", more_filters: "More filters",
-    max_visibility: "Max visibility", stealth_view: "Stealth view", priority: "Priority", vip_badge: "VIP badge",
+    who_viewed: "Who viewed", who_saved: "Who saved", who_interested: "Who interested", more_filters: "More filters", boost_visibility: "Boost visibility",
+    max_visibility: "Max visibility", stealth_view: "Stealth view", priority: "Priority", vip_badge: "VIP badge", travel_mode: "Travel mode", family_share: "Family share",
   },
 };
 

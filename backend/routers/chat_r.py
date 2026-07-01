@@ -512,6 +512,12 @@ async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id
         )
     else:
         # Gifts are NOT withdrawable (V3.2 economy system)
+        # Gifts increase influence for sender and receiver
+        from economy_r import add_influence
+        gift_influence = int(price * 0.1)  # 10% of gift value as influence
+        await add_influence(uid, gift_influence, "gift_sent", {"gift_kind": kind, "price": price})
+        await add_influence(req.to_user_id, gift_influence, "gift_received", {"gift_kind": kind, "price": price})
+        
         await db.users.update_one(
             {"id": uid}, {"$inc": {"balance": -price, "gifts_sent_total": price, "gifts_sent_count": 1}}
         )
