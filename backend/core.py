@@ -140,7 +140,6 @@ def user_public(u: dict) -> dict:
         "bio": u.get("bio", ""),
         "photo_url": u.get("photo_url"),
         "photo_verified": bool(u.get("photo_verified", False)),
-        "photo_verification_code": u.get("photo_verification_code"),
         "verified_identity": u.get("verified_identity", False),
         "verified_selfie": u.get("verified_selfie", False),
         "verified_financial": u.get("verified_financial", False),
@@ -151,12 +150,37 @@ def user_public(u: dict) -> dict:
         "completeness": u.get("completeness", compute_completeness(u)),
         "avg_response_min": u.get("avg_response_min"),
         "plan": u.get("plan", "free"),
-        "balance": u.get("balance", 0),
-        "coins": int(u.get("coins", 0) or 0),
-        "withdrawable_balance": int(u.get("withdrawable_balance", 0) or 0),
         "blocked": u.get("blocked", False),
         "prompts": u.get("prompts") or [],
         "big5_scores": u.get("big5_scores") or {},
+    }
+
+
+def user_public_minimal(u: dict) -> dict:
+    """Lean version for candidate lists - removes heavy fields."""
+    age = age_from_birth(u.get("birth_date", "2000-01-01"))
+    la = parse_dt(u.get("last_active"))
+    return {
+        "id": u["id"],
+        "name": u.get("name", ""),
+        "gender": u.get("gender", "male"),
+        "age": age,
+        "region": u.get("region", ""),
+        "district": u.get("district", ""),
+        "marital_status": u.get("marital_status", "single"),
+        "has_children": u.get("has_children", False),
+        "height_cm": u.get("height_cm", 170),
+        "education": u.get("education", ""),
+        "profession": u.get("profession", ""),
+        "bio": u.get("bio", ""),
+        "photo_url": u.get("photo_url"),
+        "verified_selfie": u.get("verified_selfie", False),
+        "verified_financial": u.get("verified_financial", False),
+        "last_active": la,
+        "last_active_label": last_active_label(la),
+        "online": is_online(la),
+        "plan": u.get("plan", "free"),
+        "blocked": u.get("blocked", False),
     }
 
 

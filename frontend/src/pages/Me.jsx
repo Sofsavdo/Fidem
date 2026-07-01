@@ -18,9 +18,15 @@ export default function Me() {
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {
-    api.get("/referral/mine").then((r) => setReferral(r.data)).catch(() => {});
-    api.get("/notifications").then((r) => setUnread((r.data || []).filter((n) => !n.read).length));
-    api.get("/daily/status").then((r) => setDaily(r.data)).catch(() => {});
+    Promise.all([
+      api.get("/referral/mine").catch(() => ({ data: null })),
+      api.get("/notifications").catch(() => ({ data: [] })),
+      api.get("/daily/status").catch(() => ({ data: null })),
+    ]).then(([r, n, d]) => {
+      setReferral(r.data);
+      setUnread((n.data || []).filter((x) => !x.read).length);
+      setDaily(d.data);
+    });
   }, []);
 
   const [daily, setDaily] = useState(null);

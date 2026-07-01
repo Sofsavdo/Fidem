@@ -39,9 +39,11 @@ export default function ProfileDetail() {
   const load = async () => {
     setLoading(true);
     try {
-      const r = await api.get(`/candidates/${id}`);
+      const [r, my] = await Promise.all([
+        api.get(`/candidates/${id}`),
+        api.get("/saved/mine").catch(() => ({ data: [] })),
+      ]);
       setC(r.data);
-      const my = await api.get("/saved/mine");
       setSaved((my.data || []).some((x) => x.id === id));
     } catch (e) {
       toast.error(t("error_generic"));

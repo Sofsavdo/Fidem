@@ -38,18 +38,14 @@ export default function Chat() {
 
   const load = async () => {
     try {
-      const c = await api.get(`/candidates/${otherId}`);
+      const [c, a, m] = await Promise.all([
+        api.get(`/candidates/${otherId}`),
+        api.get(`/chat/access/${otherId}`).catch(() => ({ data: null })),
+        chatId ? api.get(`/messages/${chatId}`).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+      ]);
       setOther(c.data);
-      try {
-        const a = await api.get(`/chat/access/${otherId}`);
-        setAccess(a.data);
-      } catch {
-        /* keep access null → input shown by default */
-      }
-      if (chatId) {
-        const m = await api.get(`/messages/${chatId}`);
-        setMessages(m.data || []);
-      }
+      setAccess(a.data);
+      setMessages(m.data || []);
     } catch (e) { /* ignore */ }
   };
 

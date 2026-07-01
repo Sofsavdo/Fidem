@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from auth import get_current_user_id
-from core import db, get_user, iso, log, manager, now_utc, parse_dt, push_notif, strip_locked_photo, touch_active, user_public
+from core import db, get_user, iso, log, manager, now_utc, parse_dt, push_notif, strip_locked_photo, touch_active, user_public, user_public_minimal
 from models import PhotoUnlockDecision, PhotoUnlockRequest, SaveRequest, new_id
 from services import age_from_birth, compute_match
 
@@ -149,7 +149,7 @@ async def candidates(
                 if bonus >= 5:
                     reasons.append(f"Quiz mosligi (+{bonus})")
 
-        pub = user_public(d)
+        pub = user_public_minimal(d)
         pub["match_score"] = score
         pub["match_reasons"] = reasons
         pub["photo_unlocked"] = d["id"] in unlocked_set
