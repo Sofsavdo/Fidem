@@ -121,25 +121,25 @@ export default function Candidates() {
       {(filters.country || filters.region || filters.district || filters.age_min || filters.age_max) && (
         <div className="flex flex-wrap gap-1.5 mb-3" data-testid="active-filter-chips">
           {filters.country && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2.5 py-1 text-[11px] font-medium">
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-foreground px-2.5 py-1 text-[11px] font-medium">
               <MapPin className="w-3 h-3" /> {filters.country}
               <button onClick={() => setFilters((f) => ({ ...f, country: undefined, region: undefined }))} className="ml-0.5 hover:opacity-70" data-testid="chip-clear-country"><X className="w-3 h-3" /></button>
             </span>
           )}
           {filters.region && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2.5 py-1 text-[11px] font-medium">
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-foreground px-2.5 py-1 text-[11px] font-medium">
               <MapPin className="w-3 h-3" /> {filters.region}
               <button onClick={() => setFilters((f) => ({ ...f, region: undefined }))} className="ml-0.5 hover:opacity-70" data-testid="chip-clear-region"><X className="w-3 h-3" /></button>
             </span>
           )}
           {filters.district && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2.5 py-1 text-[11px] font-medium">
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-foreground px-2.5 py-1 text-[11px] font-medium">
               {filters.district}
               <button onClick={() => setFilters((f) => ({ ...f, district: undefined }))} className="ml-0.5 hover:opacity-70" data-testid="chip-clear-district"><X className="w-3 h-3" /></button>
             </span>
           )}
           {(filters.age_min || filters.age_max) && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2.5 py-1 text-[11px] font-medium">
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-foreground px-2.5 py-1 text-[11px] font-medium">
               {filters.age_min || 18}–{filters.age_max || 80} {t("age").toLowerCase()}
               <button onClick={() => setFilters((f) => ({ ...f, age_min: undefined, age_max: undefined }))} className="ml-0.5 hover:opacity-70" data-testid="chip-clear-age"><X className="w-3 h-3" /></button>
             </span>
