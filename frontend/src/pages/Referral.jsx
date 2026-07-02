@@ -10,7 +10,6 @@ export default function Referral() {
   const [data, setData] = useState(null);
   const [usernameData, setUsernameData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [redeeming, setRedeeming] = useState(false);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [newUsername, setNewUsername] = useState("");
   const [checkingUsername, setCheckingUsername] = useState(false);
@@ -61,19 +60,6 @@ export default function Referral() {
     } else {
       copy(txt, t("share"));
     }
-  };
-
-  const redeem = async () => {
-    if (!data?.available_weeks) return;
-    setRedeeming(true);
-    try {
-      await api.post("/invites/redeem");
-      toast.success("Premium 7 " + t("daily").toLowerCase() + " 🎉");
-      await load();
-      refresh && refresh();
-    } catch (e) {
-      toast.error(t("error"));
-    } finally { setRedeeming(false); }
   };
 
   return (
@@ -142,21 +128,6 @@ export default function Referral() {
                 </div>
               </div>
             </section>
-
-            {/* Free Premium week claim */}
-            {data?.available_weeks > 0 && (
-              <section className="rounded-3xl bg-gradient-to-r from-gold/15 to-card border border-gold/40 p-4" data-testid="ref-redeem-card">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-heading text-lg flex items-center gap-2"><Crown className="w-4 h-4 text-gold-dark" /> {t("free_premium_week")}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">×{data.available_weeks} {t("claim_weeks")}</p>
-                  </div>
-                  <button data-testid="ref-redeem" onClick={redeem} disabled={redeeming} className="rounded-2xl bg-gold text-ink px-4 py-2.5 text-sm font-medium disabled:opacity-50">
-                    {redeeming ? "..." : t("claim_weeks")}
-                  </button>
-                </div>
-              </section>
-            )}
 
             {/* Invite link */}
             <section className="rounded-3xl border border-border bg-card p-4 space-y-3">

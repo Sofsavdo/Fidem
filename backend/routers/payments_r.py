@@ -427,14 +427,7 @@ async def my_referral(uid: str = Depends(get_current_user_id)):
         await db.users.update_one({"id": uid}, {"$set": {"referral_code": code}})
 
     count = await db.users.count_documents({"referred_by": code})
-    bonus_per_invite = 10000
-    earned = count * bonus_per_invite
     link = f"https://t.me/{TELEGRAM_BOT_USERNAME}?start={code}"
-
-    redeemed = me_doc.get("invite_premium_redeemed", 0)
-    eligible_redemptions = count // 3
-    available_weeks = max(0, eligible_redemptions - redeemed)
-    next_milestone = 3 - (count % 3) if count % 3 != 0 else 3
 
     # Count paid referrals (users who have made at least one successful payment)
     paid_referrals = await db.users.count_documents({
@@ -448,16 +441,9 @@ async def my_referral(uid: str = Depends(get_current_user_id)):
         "invited_count": count,
         "invites_count": count,
         "invited": count,
-        "bonus_per_invite": bonus_per_invite,
-        "earned": earned,
-        "vip_bonus_threshold": 5,
-        "redeemed_weeks": redeemed,
-        "available_weeks": available_weeks,
         "paid_referrals": paid_referrals,
         "referral_earnings_pending": me_doc.get("referral_earnings_pending", 0),
         "referral_earnings_approved": me_doc.get("referral_earnings_approved", 0),
         "referral_earnings_withdrawable": me_doc.get("referral_earnings_withdrawable", 0),
         "referral_earnings_paid_out": me_doc.get("referral_earnings_paid_out", 0),
-        "next_milestone": next_milestone,
-        "premium_per_milestone_days": 7,
     }
