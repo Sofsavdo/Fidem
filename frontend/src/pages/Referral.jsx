@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, Copy, Send, Users, Gift, Sparkles, Crown, Info } from "lucide-react";
+import { ChevronLeft, Copy, Send, Users, Gift, Sparkles, Crown } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { useApp } from "@/contexts/AppContext";
@@ -88,7 +88,7 @@ export default function Referral() {
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
         {/* How it works - reduced to tooltip */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Info className="w-4 h-4 cursor-help" title={t("ref_step_1") + " • " + t("ref_step_2") + " • " + t("ref_step_3")} />
+          <span title="Referral linkingizni do'stingizga yuboring • Do'stingiz ro'yxatdan o'tadi • Do'stingiz birinchi pullik tarifni sotib olganda sizga referral mukofoti yoziladi" className="cursor-help">ℹ️</span>
           <span>{t("ref_how_it_works")}</span>
         </div>
 
@@ -96,7 +96,7 @@ export default function Referral() {
           <div className="text-6xl">🎁</div>
           <h1 className="text-2xl font-heading font-bold">{t("ref_subtitle")}</h1>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            Har bir do'st uchun <b className="text-foreground">+10,000 {t("sum")}</b> bonus
+            Do'stingiz birinchi pullik tarifni sotib olganda sizga referral mukofoti yoziladi
           </p>
         </section>
 
@@ -237,15 +237,16 @@ export default function Referral() {
             <section className="rounded-3xl border border-border bg-card p-4 space-y-3">
               <h2 className="font-heading font-semibold">{t("ref_how")}</h2>
               <div className="space-y-2 text-sm">
-                <Step n="1" text={t("ref_step1") || "Yuqoridagi havolani do'stlaringizga yuboring"} />
-                <Step n="2" text={t("ref_step2") || "Do'stingiz ro'yxatdan o'tib profilini to'liq tasdiqlasin"} />
-                <Step n="3" text={t("ref_step3") || "Siz +10,000, do'stingiz +5,000 so'm bonus oladi"} />
+                <Step n="1" text="Referral linkingizni do'stingizga yuboring" />
+                <Step n="2" text="Do'stingiz ro'yxatdan o'tadi" />
+                <Step n="3" text="Do'stingiz birinchi marta pullik tarif sotib olsa, sizga referral mukofoti yoziladi" />
+                <Step n="4" text="Mukofot avval pending bo'ladi. Tekshiruv/hold tugagach withdrawable bo'ladi" />
               </div>
             </section>
 
             {/* Withdrawal Rules - reduced to tooltip */}
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Info className="w-3 h-3 cursor-help" title={t("withdraw_min_payout") + ": 100,000 • " + t("withdraw_tax") + ": 12% • " + t("withdraw_requires_paid") + ": 3"} />
+              <span title="Minimal yechib olish: 100,000 • Soliq: 12% • Talab: 3 ta to'langan tavsiya" className="cursor-help">ℹ️</span>
               <span>{t("withdraw_rules")}</span>
             </div>
           </>

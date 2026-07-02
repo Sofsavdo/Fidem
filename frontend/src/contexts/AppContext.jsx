@@ -10,6 +10,7 @@ export function AppProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [lang, setLang] = useState(detectLang());
   const [wsEvent, setWsEvent] = useState(null);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const wsRef = useRef(null);
 
   const t = useCallback(
@@ -150,12 +151,26 @@ useEffect(() => {
     };
   }, [user]);
 
+  // Online/offline detection
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   return (
     <AppCtx.Provider
       value={{
         user, loading, lang, t, changeLang, setLang: changeLang,
         login, register, logout, refresh: loadMe,
-        wsEvent,
+        wsEvent, isOnline,
       }}
     >
       {children}

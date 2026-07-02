@@ -391,6 +391,18 @@ async def admin_confirm_payment(payment_id: str, _: str = Depends(get_current_ad
 @router.get("/payments/mine")
 async def my_payments(uid: str = Depends(get_current_user_id)):
     rows = await db.payments.find({"user_id": uid}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    
+    # Expire pending payments older than 10 minutes
+    ten_minutes_ago = now_utc() - timedelta(minutes=10)
+    for row in rows:
+        if row.get("status") == "pending" and parse_dt(row.get("created_at", now_utc())) < ten_minutes_ago:
+            row["status"] = "expired"
+            # Update DB status to expired (idempotent)
+            await db.payments.update_one(
+                {"id": row["id"], "status": "pending"},
+                {"$set": {"status": "expired", "updated_at": iso(now_utc())}}
+            )
+    
     return rows
 
 

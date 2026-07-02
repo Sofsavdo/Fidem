@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { WifiOff } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 
@@ -7,21 +7,9 @@ import { useApp } from "@/contexts/AppContext";
  * Disappears on reconnection.
  */
 export default function OfflineBanner() {
-  const { t } = useApp();
-  const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const { t, isOnline } = useApp();
 
-  useEffect(() => {
-    const on = () => setOnline(true);
-    const off = () => setOnline(false);
-    window.addEventListener("online", on);
-    window.addEventListener("offline", off);
-    return () => {
-      window.removeEventListener("online", on);
-      window.removeEventListener("offline", off);
-    };
-  }, []);
-
-  if (online) return null;
+  if (isOnline) return null;
   const label = (typeof t === "function" && t("offline_banner")) || "📴 Internet aloqasi yo'q";
 
   return (
