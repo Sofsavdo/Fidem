@@ -92,6 +92,39 @@ async def create_payment(req: CreatePaymentRequest, uid: str = Depends(get_curre
     else:
         raise HTTPException(400, "Unknown purpose")
 
+    # Smart payment: use balance first, then Click for remainder
+    me = await get_user(uid)
+    balance = me.get("balance", 0) or 0
+    balance_used = min(balance, amount)
+    click_amount = amount - balance_used
+
+    # If balance covers full amount, no Click payment needed
+    if click_amount <= 0:
+        # Deduct from balance directly
+        await db.users.update_one({"id": uid}, {"$inc": {"balance": -balance_used}})
+        # Record payment as completed via balance
+        pid = await generate_payment_id()
+        doc = {
+            "id": pid,
+            "user_id": uid,
+            "purpose": req.purpose,
+            "amount": amount,
+            "balance_used": balance_used,
+            "click_amount": 0,
+            "status": "paid",
+            "method": "balance",
+            "created_at": iso(now_utc()),
+            "updated_at": iso(now_utc()),
+        }
+        if req.target_user_id:
+            doc["target_user_id"] = req.target_user_id
+        if req.order_id:
+            doc["order_id"] = req.order_id
+        await db.payments.insert_one(doc)
+        # Process the purchase immediately
+        await process_completed_payment(uid, req.purpose, amount, balance_used, req.target_user_id, req.order_id)
+        return {"ok": True, "payment_id": pid, "status": "paid", "balance_used": balance_used, "click_amount": 0}
+
     pid = await generate_payment_id()
 
     doc = {
@@ -101,15 +134,22 @@ async def create_payment(req: CreatePaymentRequest, uid: str = Depends(get_curre
         "purpose": req.purpose,
         "target_user_id": req.target_user_id,
         "gift_kind": req.gift_kind,
+        "order_id": req.order_id,
+        "balance_used": balance_used,
+        "click_amount": click_amount,
         "status": "pending",
         "created_at": iso(now_utc()),
     }
 
-    link = click_pay_link(amount, pid)
+    # Deduct balance portion immediately
+    if balance_used > 0:
+        await db.users.update_one({"id": uid}, {"$inc": {"balance": -balance_used}})
+
+    link = click_pay_link(click_amount, pid)
     doc["payment_link"] = link
     await db.payments.insert_one(doc)
 
-    return {"id": pid, "amount": amount, "payment_link": link, "status": "pending"}
+    return {"id": pid, "amount": amount, "balance_used": balance_used, "click_amount": click_amount, "payment_link": link, "status": "pending"}
 
 
 @router.post("/payments/click/callback")
@@ -157,12 +197,8 @@ async def click_callback(request: Request):
     return JSONResponse({"error": -3, "error_note": "Action not found"})
 
 
-async def apply_payment_success(payment: dict) -> None:
-    pid = payment["id"]
-    await db.payments.update_one({"id": pid}, {"$set": {"status": "success", "paid_at": iso(now_utc())}})
-    uid = payment["user_id"]
-    purpose = payment["purpose"]
-    amount = payment["amount"]
+async def process_completed_payment(uid: str, purpose: str, amount: int, balance_used: int, target_user_id: str = None, order_id: str = None) -> None:
+    """Process a payment completed via balance (no Click needed)."""
     expiry_iso = iso(now_utc() + timedelta(days=30))
 
     # Phase 1.5: First paid subscription referral reward (V3.2 economy system)
@@ -246,15 +282,30 @@ async def apply_payment_success(payment: dict) -> None:
 
     if purpose == "premium":
         await db.users.update_one({"id": uid}, {"$set": {"plan": "premium", "plan_until": expiry_iso}})
+        # Add to lifetime contribution
+        await db.users.update_one(
+            {"id": uid},
+            {"$inc": {"lifetime_contribution": amount, "lifetime_contribution_breakdown.subscription_payments": amount}}
+        )
         await push_notif(uid, "premium", "Premium tarif faollashtirildi 💎")
     elif purpose == "standard":
         await db.users.update_one({"id": uid}, {"$set": {"plan": "standard", "plan_until": expiry_iso}})
+        # Add to lifetime contribution
+        await db.users.update_one(
+            {"id": uid},
+            {"$inc": {"lifetime_contribution": amount, "lifetime_contribution_breakdown.subscription_payments": amount}}
+        )
         await push_notif(uid, "premium", "Standard tarif faollashtirildi ✅")
     elif purpose == "vip":
         await db.users.update_one({"id": uid}, {"$set": {"plan": "vip", "plan_until": expiry_iso}})
+        # Add to lifetime contribution
+        await db.users.update_one(
+            {"id": uid},
+            {"$inc": {"lifetime_contribution": amount, "lifetime_contribution_breakdown.subscription_payments": amount}}
+        )
         await push_notif(uid, "premium", "VIP tarif faollashtirildi 👑")
     elif purpose == "chat_unlock":
-        target_id = payment.get("target_user_id")
+        target_id = target_user_id
         if target_id:
             cid = chat_id_for(uid, target_id)
             await db.chat_unlocks.update_one(
@@ -278,10 +329,28 @@ async def apply_payment_success(payment: dict) -> None:
     elif purpose == "super_application":
         await db.users.update_one({"id": uid}, {"$inc": {"super_applications_available": 1}})
         await push_notif(uid, "balance", "Super murojaat sotib olindi")
+        # Track balance spent for lifetime contribution
+        await db.users.update_one(
+            {"id": uid},
+            {"$inc": {"lifetime_contribution": amount, "lifetime_contribution_breakdown.balance_spent": amount}}
+        )
     elif purpose == "gift":
-        await db.users.update_one({"id": uid}, {"$inc": {"balance": amount}})
+        # Send gift to target user and increase influence for sender
+        if target_user_id:
+            # Add gift to target's gifts received
+            await db.users.update_one(
+                {"id": target_user_id},
+                {"$inc": {"gifts_received_count": 1, "gifts_received_value": amount}}
+            )
+            # Increase sender's influence score (10% of gift value)
+            influence_gain = int(amount * 0.1)
+            await db.users.update_one(
+                {"id": uid},
+                {"$inc": {"influence_score": influence_gain}}
+            )
+            await push_notif(uid, "gift", f"Sovg'a yuborildi. Ta'sir +{influence_gain}")
+            await push_notif(target_user_id, "gift", "Sizga sovg'a yuborildi! 🎁")
     elif purpose == "concierge":
-        order_id = payment.get("order_id")
         if order_id:
             await db.concierge_orders.update_one(
                 {"id": order_id},

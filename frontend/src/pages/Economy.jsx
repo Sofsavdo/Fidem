@@ -39,52 +39,29 @@ export default function Economy() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {/* What is Influence */}
-        <section className="rounded-3xl border border-border bg-gradient-to-br from-primary/10 to-secondary/10 p-6">
-          <h2 className="font-heading font-semibold mb-3 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-primary" /> {t("economy_what")}
-          </h2>
-          <div className="space-y-2 text-sm text-muted-foreground">
-            <p>{t("economy_why")}</p>
-            <p>• Better ranking in search results</p>
-            <p>• More profile visibility</p>
-            <p>• Higher status (Bronze → Legend)</p>
-            <p>• Exclusive badges (Titan, Ambassador, Founder)</p>
-          </div>
-        </section>
-
         {/* Influence Score */}
         <section className="rounded-3xl border border-border bg-card p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-2xl bg-primary text-white grid place-items-center">
               <TrendingUp className="w-5 h-5" />
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground">{t("economy_what")}</p>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">{t("economy_what")}</p>
+                <Info className="w-3 h-3 text-muted-foreground cursor-help" title={t("economy_why") + " • " + t("economy_benefit_1")} />
+              </div>
               <p className="text-2xl font-heading font-semibold">{(influenceData?.influence_score || 0).toLocaleString()}</p>
             </div>
           </div>
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Status</span>
+              <span className="text-muted-foreground">{t("economy_status")}</span>
               <span className="font-medium capitalize">{statusData?.status || "Bronze"}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Badges</span>
-              <span className="font-medium">{statusData?.badges?.join(", ") || "None"}</span>
+              <span className="text-muted-foreground">{t("economy_badges")}</span>
+              <span className="font-medium">{statusData?.badges?.join(", ") || t("economy_none")}</span>
             </div>
-          </div>
-        </section>
-
-        {/* How to Increase Influence */}
-        <section className="rounded-3xl border border-border bg-card p-6">
-          <h2 className="font-heading font-semibold mb-3">{t("economy_how")}</h2>
-          <div className="space-y-2 text-sm text-muted-foreground">
-            <p>• <strong>Send gifts</strong>: 10% of gift value as influence</p>
-            <p>• <strong>Convert balance</strong>: Convert balance to influence with bonus</p>
-            <p>• <strong>Convert referral earnings</strong>: Convert earnings to influence</p>
-            <p>• <strong>Donations</strong>: Convert donations to influence</p>
-            <p>• <strong>Activity</strong>: Daily check-ins, profile completion</p>
           </div>
         </section>
 
@@ -124,23 +101,23 @@ export default function Economy() {
           </h2>
           <div className="text-center mb-4">
             <p className="text-3xl font-heading font-bold">{(lifetimeData?.lifetime_contribution || 0).toLocaleString()}</p>
-            <p className="text-sm text-muted-foreground">Total so'm contributed</p>
+            <p className="text-sm text-muted-foreground">{t("economy_total_contributed")}</p>
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-xl bg-muted/30 p-3">
-              <p className="text-muted-foreground">Balance Spent</p>
+              <p className="text-muted-foreground">{t("economy_balance_spent")}</p>
               <p className="font-medium">{(lifetimeData?.breakdown?.balance_spent || 0).toLocaleString()}</p>
             </div>
             <div className="rounded-xl bg-muted/30 p-3">
-              <p className="text-muted-foreground">Donations</p>
+              <p className="text-muted-foreground">{t("economy_donations")}</p>
               <p className="font-medium">{(lifetimeData?.breakdown?.donations_converted || 0).toLocaleString()}</p>
             </div>
             <div className="rounded-xl bg-muted/30 p-3">
-              <p className="text-muted-foreground">Referral Earnings</p>
+              <p className="text-muted-foreground">{t("economy_referral_earnings")}</p>
               <p className="font-medium">{(lifetimeData?.breakdown?.referral_earnings_converted || 0).toLocaleString()}</p>
             </div>
             <div className="rounded-xl bg-muted/30 p-3">
-              <p className="text-muted-foreground">Subscriptions</p>
+              <p className="text-muted-foreground">{t("economy_subscriptions")}</p>
               <p className="font-medium">{(lifetimeData?.breakdown?.subscription_payments || 0).toLocaleString()}</p>
             </div>
           </div>

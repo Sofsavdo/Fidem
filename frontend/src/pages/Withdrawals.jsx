@@ -85,13 +85,10 @@ export default function Withdrawals() {
         </div>
       </div>
 
-      {/* Info */}
-      <div className="rounded-2xl border border-border bg-card p-4 flex gap-3 text-sm">
-        <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-        <div className="text-muted-foreground">
-          <p>{t("withdraw_explainer")}</p>
-          <p className="mt-2 text-xs">{t("withdraw_only_referral")}</p>
-        </div>
+      {/* Info - reduced to tooltip */}
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Info className="w-4 h-4 cursor-help" title={t("withdraw_only_referral")} />
+        <span>{t("withdraw_explainer")}</span>
       </div>
 
       {/* Eligibility */}
@@ -105,7 +102,7 @@ export default function Withdrawals() {
               <XCircle className="w-4 h-4 text-rose-500" />
             )}
             <span className={status?.paid_referrals_count >= 3 ? "text-secondary" : "text-muted-foreground"}>
-              3 paid referrals ({status?.paid_referrals_count || 0}/3)
+              {t("withdraw_requires_paid")} ({status?.paid_referrals_count || 0}/3)
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -115,7 +112,7 @@ export default function Withdrawals() {
               <XCircle className="w-4 h-4 text-rose-500" />
             )}
             <span className={status?.verified_identity ? "text-secondary" : "text-muted-foreground"}>
-              Identity verification
+              {t("withdraw_requires_verification")}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -125,14 +122,14 @@ export default function Withdrawals() {
               <XCircle className="w-4 h-4 text-rose-500" />
             )}
             <span className={status?.account_age_days >= 30 ? "text-secondary" : "text-muted-foreground"}>
-              Account age 30 days ({status?.account_age_days || 0}/30)
+              {t("withdraw_requires_age")} 30 {t("days")} ({status?.account_age_days || 0}/30)
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">Minimum payout: {(status?.min_payout ?? 100000).toLocaleString()} {t("sum")}</span>
+            <span className="text-muted-foreground">{t("withdraw_min_payout")}: {(status?.min_payout ?? 100000).toLocaleString()} {t("sum")}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">Tax rate: {status?.tax_rate_pct || 12}%</span>
+            <span className="text-muted-foreground">{t("withdraw_tax")}: {status?.tax_rate_pct || 12}%</span>
           </div>
         </div>
       </div>

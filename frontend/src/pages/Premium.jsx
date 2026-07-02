@@ -229,15 +229,10 @@ export default function Premium() {
             </button>
           </div>
 
-          {/* Spending System Explanation */}
-          <div className="rounded-3xl bg-primary/5 border border-primary/30 p-5 mt-4">
-            <h3 className="font-heading font-semibold mb-3">{t("premium_spending_system")}</h3>
-            <div className="space-y-2 text-sm text-muted-foreground">
-              <p>• <strong className="text-foreground">{t("premium_balance_label")}</strong>: {t("premium_balance_desc")}</p>
-              <p>• <strong className="text-foreground">{t("premium_referral_label")}</strong>: {t("premium_referral_desc")}</p>
-              <p>• <strong className="text-foreground">{t("premium_gifts_label")}</strong>: {t("premium_gifts_desc")}</p>
-              <p>• <strong className="text-foreground">{t("premium_donations_label")}</strong>: {t("premium_donations_desc")}</p>
-            </div>
+          {/* Spending System Explanation - reduced to tooltip */}
+          <div className="flex items-center gap-2 mt-4 text-xs text-muted-foreground">
+            <Info className="w-4 h-4 cursor-help" title={t("premium_balance_label") + ": " + t("premium_balance_desc") + " • " + t("premium_referral_label") + ": " + t("premium_referral_desc")} />
+            <span>{t("premium_spending_system")}</span>
           </div>
 
           {/* Super-Application - One-Time Filter Bypass */}

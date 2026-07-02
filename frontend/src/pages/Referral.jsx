@@ -86,22 +86,10 @@ export default function Referral() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {/* How it works */}
-        <div className="rounded-3xl border border-border bg-gradient-to-br from-primary/10 to-secondary/10 p-5">
-          <h2 className="font-heading font-semibold mb-3 flex items-center gap-2">
-            <Info className="w-5 h-5 text-primary" /> {t("ref_how_it_works")}
-          </h2>
-          <div className="space-y-2 text-sm text-muted-foreground">
-            <p>1. {t("ref_step_1")}</p>
-            <p>2. {t("ref_step_2")}</p>
-            <p>3. {t("ref_step_3")}</p>
-            <p>4. {t("ref_step_4")}</p>
-          </div>
-          <div className="mt-3 pt-3 border-t border-border/40">
-            <p className="text-xs text-secondary font-medium">{t("ref_important")}:</p>
-            <p className="text-xs text-muted-foreground">• {t("ref_reward_rule_1")}</p>
-            <p className="text-xs text-muted-foreground">• {t("ref_reward_rule_2")}</p>
-          </div>
+        {/* How it works - reduced to tooltip */}
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Info className="w-4 h-4 cursor-help" title={t("ref_step_1") + " • " + t("ref_step_2") + " • " + t("ref_step_3")} />
+          <span>{t("ref_how_it_works")}</span>
         </div>
 
         <section className="text-center space-y-3">
@@ -126,7 +114,7 @@ export default function Referral() {
               <div className="rounded-2xl border border-border bg-card p-3 text-center" data-testid="ref-stat-paid">
                 <Crown className="w-5 h-5 mx-auto text-gold-dark mb-1" />
                 <p className="text-xl font-heading font-bold">{data?.paid_referrals ?? 0}</p>
-                <p className="text-[11px] text-muted-foreground">Paid Referrals</p>
+                <p className="text-[11px] text-muted-foreground">{t("ref_paid_referrals")}</p>
               </div>
               <div className="rounded-2xl border border-border bg-card p-3 text-center" data-testid="ref-stat-progress">
                 <Sparkles className="w-5 h-5 mx-auto text-gold-dark mb-1" />
@@ -261,20 +249,11 @@ export default function Referral() {
               </div>
             </section>
 
-            {/* Withdrawal Rules */}
-            <section className="rounded-3xl border border-border bg-card p-4 space-y-3">
-              <h2 className="font-heading font-semibold flex items-center gap-2">
-                <Info className="w-4 h-4 text-primary" /> Withdrawal Rules
-              </h2>
-              <div className="space-y-2 text-xs text-muted-foreground">
-                <p>• Only referral earnings can be withdrawn (not internal balance, gifts, or roses)</p>
-                <p>• Minimum payout: 100,000 so'm</p>
-                <p>• 12% tax withheld on withdrawals</p>
-                <p>• Requires 3 paid referrals</p>
-                <p>• Requires identity verification</p>
-                <p>• Requires account age 30 days</p>
-              </div>
-            </section>
+            {/* Withdrawal Rules - reduced to tooltip */}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Info className="w-3 h-3 cursor-help" title={t("withdraw_min_payout") + ": 100,000 • " + t("withdraw_tax") + ": 12% • " + t("withdraw_requires_paid") + ": 3"} />
+              <span>{t("withdraw_rules")}</span>
+            </div>
           </>
         )}
       </main>

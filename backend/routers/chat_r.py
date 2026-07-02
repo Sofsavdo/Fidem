@@ -98,16 +98,17 @@ async def chat_access(target_id: str, uid: str = Depends(get_current_user_id)):
     is_reply = (await _incoming_count(uid, target_id)) > 0
     unlocked = bool(await _unlock_doc(uid, target_id))
     plan_ok = _plan_active(me)
-    can = plan_ok or is_reply or unlocked
+    # Free users can always chat - no paywall
+    can = True
     return {
         "can_message": can,
         "is_reply": is_reply,
         "unlocked": unlocked,
         "plan": me.get("plan", "free"),
         "plan_active": plan_ok,
-        "requires_unlock": not can,
-        "price_uzs": PRICE_CHAT_UNLOCK,
-        "price_coins": CHAT_UNLOCK_COINS,
+        "requires_unlock": False,  # No paywall for anyone
+        "price_uzs": 0,
+        "price_coins": 0,
         "balance": int(me.get("balance", 0) or 0),
         "coins": int(me.get("coins", 0) or 0),
         "free_credits": int(me.get("free_chat_credits", 0) or 0),
