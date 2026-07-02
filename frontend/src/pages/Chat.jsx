@@ -236,7 +236,7 @@ export default function Chat() {
               m.from_user_id === user?.id
                 ? "bg-primary text-white rounded-br-sm"
                 : "bg-card border border-border rounded-bl-sm"
-            } ${m.kind === "gift" ? "bg-gold-light text-yellow-900 border-gold/40" : ""} ${m.kind === "super" ? "ring-2 ring-gold" : ""} ${m.kind === "rose" ? "ring-2 ring-primary bg-primary/10 text-primary" : ""}`}>
+            } ${m.kind === "gift" ? "bg-gold-light text-yellow-900 border-gold/40" : ""} ${m.kind === "super" ? "ring-2 ring-gold" : ""} ${m.kind === "rose" ? "ring-2 ring-pink-500 bg-pink-50 text-pink-900 dark:bg-pink-900/20 dark:text-pink-100" : ""}`}>
               {m.kind === "super" && <span className="text-[9px] uppercase tracking-wider opacity-70 block">{t("super_application")}</span>}
               {m.kind === "rose" && <span className="text-[9px] uppercase tracking-wider opacity-70 block">🌹</span>}
               {m.kind === "voice" && m.meta?.voice_url ? (
