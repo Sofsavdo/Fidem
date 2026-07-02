@@ -117,6 +117,7 @@ async def startup() -> None:
     await db.group_post_likes.create_index([("post_id", 1), ("user_id", 1)], unique=True)
     await db.events.create_index("id", unique=True)
     await db.event_rsvps.create_index([("event_id", 1), ("user_id", 1)], unique=True)
+    await db.daily_quests.create_index([("user_id", 1), ("date", 1)], unique=True)
     await db.roses.create_index([("from_user_id", 1), ("created_at", -1)])
     await db.compat_unlocks.create_index([("user_id", 1), ("target_id", 1)], unique=True)
     await db.success_stories.create_index("created_at")
