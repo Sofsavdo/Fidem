@@ -43,98 +43,31 @@ export default function Economy() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {/* Influence Score */}
+        {/* Influence Score - Simplified */}
         <section className="rounded-3xl border border-border bg-card p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-2xl bg-primary text-white grid place-items-center">
               <TrendingUp className="w-5 h-5" />
             </div>
             <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-muted-foreground">{t("economy_what")}</p>
-                <Info className="w-3 h-3 text-muted-foreground cursor-help" title={t("economy_why") + " • " + t("economy_benefit_1")} />
-              </div>
+              <p className="text-xs text-muted-foreground">Reyting balli</p>
               <p className="text-2xl font-heading font-semibold">{(influenceData?.influence_score || 0).toLocaleString()}</p>
             </div>
           </div>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">{t("economy_status")}</span>
-              <span className="font-medium capitalize">{statusData?.status || "Bronze"}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">{t("economy_badges")}</span>
-              <span className="font-medium">{statusData?.badges?.join(", ") || t("economy_none")}</span>
-            </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Status:</span>
+            <span className="font-medium capitalize">{statusData?.status || "Bronze"}</span>
           </div>
         </section>
 
-        {/* Status Ladder */}
-        <section className="rounded-3xl border border-border bg-card p-6">
-          <h2 className="font-heading font-semibold mb-4 flex items-center gap-2">
-            <Crown className="w-5 h-5 text-gold-dark" /> {t("economy_status_ladder")}
-          </h2>
-          <div className="space-y-3">
-            {[
-              { name: "Bronze", threshold: 0 },
-              { name: "Silver", threshold: 1000 },
-              { name: "Gold", threshold: 5000 },
-              { name: "Platinum", threshold: 15000 },
-              { name: "Diamond", threshold: 50000 },
-              { name: "Legend", threshold: 150000 },
-            ].map((s) => (
-              <div
-                key={s.name}
-                className={`flex items-center justify-between p-3 rounded-xl ${
-                  statusData?.status?.toLowerCase() === s.name.toLowerCase()
-                    ? "bg-primary/10 border-2 border-primary"
-                    : "bg-muted/30"
-                }`}
-              >
-                <span className="font-medium">{s.name}</span>
-                <span className="text-sm text-muted-foreground">{s.threshold.toLocaleString()} pts</span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Lifetime Contribution */}
-        <section className="rounded-3xl border border-border bg-card p-6">
-          <h2 className="font-heading font-semibold mb-4 flex items-center gap-2">
-            <Heart className="w-5 h-5 text-rose-500" /> {t("economy_lifetime")}
-          </h2>
-          <div className="text-center mb-4">
-            <p className="text-3xl font-heading font-bold">{(lifetimeData?.lifetime_contribution || 0).toLocaleString()}</p>
-            <p className="text-sm text-muted-foreground">{t("economy_total_contributed")}</p>
-          </div>
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-xl bg-muted/30 p-3">
-              <p className="text-muted-foreground">{t("economy_balance_spent")}</p>
-              <p className="font-medium">{(lifetimeData?.breakdown?.balance_spent || 0).toLocaleString()}</p>
-            </div>
-            <div className="rounded-xl bg-muted/30 p-3">
-              <p className="text-muted-foreground">{t("economy_donations")}</p>
-              <p className="font-medium">{(lifetimeData?.breakdown?.donations_converted || 0).toLocaleString()}</p>
-            </div>
-            <div className="rounded-xl bg-muted/30 p-3">
-              <p className="text-muted-foreground">{t("economy_referral_earnings")}</p>
-              <p className="font-medium">{(lifetimeData?.breakdown?.referral_earnings_converted || 0).toLocaleString()}</p>
-            </div>
-            <div className="rounded-xl bg-muted/30 p-3">
-              <p className="text-muted-foreground">{t("economy_subscriptions")}</p>
-              <p className="font-medium">{(lifetimeData?.breakdown?.subscription_payments || 0).toLocaleString()}</p>
-            </div>
-          </div>
-        </section>
-
-        {/* Donation CTA */}
+        {/* Simple CTA */}
         <Link
           to="/economy/donations"
           className="block rounded-3xl border-2 border-primary bg-primary/5 p-6 text-center"
         >
           <Gift className="w-8 h-8 mx-auto text-primary mb-2" />
-          <h3 className="font-heading font-semibold">Convert to Influence</h3>
-          <p className="text-sm text-muted-foreground mt-1">Higher influence = higher rankings = more visibility</p>
+          <h3 className="font-heading font-semibold">Reytingni oshirish</h3>
+          <p className="text-sm text-muted-foreground mt-1">Yuqori reyting = ko'procha ko'rishlar</p>
         </Link>
       </main>
     </div>
