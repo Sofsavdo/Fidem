@@ -185,7 +185,14 @@ async def click_callback(request: Request):
         })
 
     if action == "1":
-        await apply_payment_success(payment)
+        await process_completed_payment(
+            payment["user_id"],
+            payment["purpose"],
+            payment["amount"],
+            payment.get("balance_used", 0),
+            payment.get("target_user_id"),
+            payment.get("order_id")
+        )
         return JSONResponse({
             "error": 0,
             "error_note": "Success",
@@ -370,7 +377,14 @@ async def admin_confirm_payment(payment_id: str, _: str = Depends(get_current_ad
         raise HTTPException(404, "Not found")
     if payment["status"] == "success":
         return {"ok": True}
-    await apply_payment_success(payment)
+    await process_completed_payment(
+        payment["user_id"],
+        payment["purpose"],
+        payment["amount"],
+        payment.get("balance_used", 0),
+        payment.get("target_user_id"),
+        payment.get("order_id")
+    )
     return {"ok": True}
 
 

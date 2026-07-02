@@ -9,7 +9,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from auth import get_current_admin
 from core import db, iso, now_utc, push_notif, user_public
 from models import AdminUpdateUserRequest
-from routers.payments_r import apply_payment_success
+from routers.payments_r import process_completed_payment
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
