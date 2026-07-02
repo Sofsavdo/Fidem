@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
-import { Crown, Check, Wallet, Info } from "lucide-react";
+import { Crown, Check, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 const PLANS = [
@@ -231,7 +231,7 @@ export default function Premium() {
 
           {/* Spending System Explanation - reduced to tooltip */}
           <div className="flex items-center gap-2 mt-4 text-xs text-muted-foreground">
-            <Info className="w-4 h-4 cursor-help" title={t("premium_balance_label") + ": " + t("premium_balance_desc") + " • " + t("premium_referral_label") + ": " + t("premium_referral_desc")} />
+            <span title={t("premium_balance_label") + ": " + t("premium_balance_desc") + " • " + t("premium_referral_label") + ": " + t("premium_referral_desc")} className="cursor-help">ℹ️</span>
             <span>{t("premium_spending_system")}</span>
           </div>
 
