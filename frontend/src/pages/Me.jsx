@@ -22,10 +22,12 @@ export default function Me() {
       api.get("/referral/mine").catch(() => ({ data: null })),
       api.get("/notifications").catch(() => ({ data: [] })),
       api.get("/daily/status").catch(() => ({ data: null })),
-    ]).then(([r, n, d]) => {
+      api.get(`/rankings/global`).catch(() => ({ data: { rankings: [] } })),
+    ]).then(([r, n, d, l]) => {
       setReferral(r.data);
       setUnread((n.data || []).filter((x) => !x.read).length);
       setDaily(d.data);
+      setLeaders(l.data?.rankings || []);
     });
   }, []);
 
@@ -45,9 +47,6 @@ export default function Me() {
       setUnread((u) => u + 1);
     }
   }, [wsEvent]);
-  useEffect(() => {
-    api.get(`/rankings/global`).then((r) => setLeaders(r.data?.rankings || [])).catch(() => {});
-  }, []);
 
   if (!user) return null;
 

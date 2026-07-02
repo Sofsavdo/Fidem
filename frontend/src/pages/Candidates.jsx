@@ -20,9 +20,11 @@ export default function Candidates() {
     setLoading(true);
     try {
       const params = { ...filters };
-      const r = await api.get("/candidates", { params });
+      const [r, s] = await Promise.all([
+        api.get("/candidates", { params }),
+        api.get("/saved/mine").catch(() => ({ data: [] }))
+      ]);
       setItems(r.data || []);
-      const s = await api.get("/saved/mine");
       setSavedIds(new Set((s.data || []).map((x) => x.id)));
     } catch (e) {
       console.error(e);

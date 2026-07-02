@@ -178,140 +178,65 @@ async def startup() -> None:
     await db.chat_unlocks.create_index([("user_id", 1), ("target_id", 1)], name="ix_chat_unlocks_user_target")
 
     # Phase 1.1: Add new DB fields for economy system (safe migration)
-    # Money system fields
-    await db.users.update_many(
-        {"balance": {"$exists": False}},
-        {"$set": {"balance": 0}}
-    )
-    await db.users.update_many(
-        {"coins": {"$exists": False}},
-        {"$set": {"coins": 0}}
-    )
-
-    # Referral system fields
-    # Initialize referral_id for existing users (first 8 chars of id)
-    async for user in db.users.find({"referral_id": {"$exists": False}}, {"id": 1}):
-        await db.users.update_one(
-            {"id": user["id"]},
-            {"$set": {"referral_id": user["id"][:8]}}
+    # Only run migrations if field doesn't exist on ANY user (performance optimization)
+    migration_fields = [
+        ("balance", 0),
+        ("coins", 0),
+        ("referral_username_change_count", 0),
+        ("referral_username_last_changed", None),
+        ("referral_earnings_pending", 0),
+        ("referral_earnings_approved", 0),
+        ("referral_earnings_withdrawable", 0),
+        ("referral_earnings_paid_out", 0),
+        ("referral_earnings_tax_withheld", 0),
+        ("influence_score", 0),
+        ("status", "bronze"),
+        ("badges", []),
+        ("is_founder", False),
+        ("founder_type", None),
+        ("founder_achieved_at", None),
+        ("activity_score", 0),
+        ("ranking_score", 0),
+        ("lifetime_contribution", 0),
+        ("auction_bids_total", 0),
+        ("auction_wins_total", 0),
+        ("auction_spent_total", 0),
+        ("withdrawals_pending", 0),
+        ("withdrawn_total", 0),
+        ("tax_paid_total", 0),
+        ("show_in_rankings", True),
+    ]
+    
+    for field, default in migration_fields:
+        sample = await db.users.find_one({field: {"$exists": True}}, {field: 1})
+        if not sample:
+            await db.users.update_many(
+                {field: {"$exists": False}},
+                {"$set": {field: default}}
+            )
+    
+    # Special handling for nested objects
+    sample_breakdown = await db.users.find_one({"lifetime_contribution_breakdown": {"$exists": True}}, {"lifetime_contribution_breakdown": 1})
+    if not sample_breakdown:
+        await db.users.update_many(
+            {"lifetime_contribution_breakdown": {"$exists": False}},
+            {"$set": {"lifetime_contribution_breakdown": {
+                "balance_spent": 0,
+                "referral_earnings_converted": 0,
+                "donations_converted": 0,
+                "subscription_payments": 0,
+                "gifts_sent_value": 0
+            }}}
         )
-    # Do NOT initialize referral_username or referral_username_lower to None
-    # These fields should only exist when user sets a custom referral username
-    # Sparse unique index on referral_username_lower requires field to not exist for most users
-    await db.users.update_many(
-        {"referral_username_change_count": {"$exists": False}},
-        {"$set": {"referral_username_change_count": 0}}
-    )
-    await db.users.update_many(
-        {"referral_username_last_changed": {"$exists": False}},
-        {"$set": {"referral_username_last_changed": None}}
-    )
-
-    # Referral earnings fields
-    await db.users.update_many(
-        {"referral_earnings_pending": {"$exists": False}},
-        {"$set": {"referral_earnings_pending": 0}}
-    )
-    await db.users.update_many(
-        {"referral_earnings_approved": {"$exists": False}},
-        {"$set": {"referral_earnings_approved": 0}}
-    )
-    await db.users.update_many(
-        {"referral_earnings_withdrawable": {"$exists": False}},
-        {"$set": {"referral_earnings_withdrawable": 0}}
-    )
-    await db.users.update_many(
-        {"referral_earnings_paid_out": {"$exists": False}},
-        {"$set": {"referral_earnings_paid_out": 0}}
-    )
-    await db.users.update_many(
-        {"referral_earnings_tax_withheld": {"$exists": False}},
-        {"$set": {"referral_earnings_tax_withheld": 0}}
-    )
-
-    # Influence system fields
-    await db.users.update_many(
-        {"influence_score": {"$exists": False}},
-        {"$set": {"influence_score": 0}}
-    )
-    await db.users.update_many(
-        {"status": {"$exists": False}},
-        {"$set": {"status": "bronze"}}
-    )
-    await db.users.update_many(
-        {"status_since": {"$exists": False}},
-        {"$set": {"status_since": iso(now_utc())}}
-    )
-    await db.users.update_many(
-        {"badges": {"$exists": False}},
-        {"$set": {"badges": []}}
-    )
-    await db.users.update_many(
-        {"is_founder": {"$exists": False}},
-        {"$set": {"is_founder": False}}
-    )
-    await db.users.update_many(
-        {"founder_type": {"$exists": False}},
-        {"$set": {"founder_type": None}}
-    )
-    await db.users.update_many(
-        {"founder_achieved_at": {"$exists": False}},
-        {"$set": {"founder_achieved_at": None}}
-    )
-
-    # Ranking system fields
-    await db.users.update_many(
-        {"activity_score": {"$exists": False}},
-        {"$set": {"activity_score": 0}}
-    )
-    await db.users.update_many(
-        {"ranking_score": {"$exists": False}},
-        {"$set": {"ranking_score": 0}}
-    )
-
-    # Lifetime contribution fields
-    await db.users.update_many(
-        {"lifetime_contribution": {"$exists": False}},
-        {"$set": {"lifetime_contribution": 0}}
-    )
-    await db.users.update_many(
-        {"lifetime_contribution_breakdown": {"$exists": False}},
-        {"$set": {"lifetime_contribution_breakdown": {
-            "balance_spent": 0,
-            "referral_earnings_converted": 0,
-            "donations_converted": 0,
-            "subscription_payments": 0,
-            "gifts_sent_value": 0
-        }}}
-    )
-
-    # Auction system fields (Phase 3)
-    await db.users.update_many(
-        {"auction_bids_total": {"$exists": False}},
-        {"$set": {"auction_bids_total": 0}}
-    )
-    await db.users.update_many(
-        {"auction_wins_total": {"$exists": False}},
-        {"$set": {"auction_wins_total": 0}}
-    )
-    await db.users.update_many(
-        {"auction_spent_total": {"$exists": False}},
-        {"$set": {"auction_spent_total": 0}}
-    )
-
-    # Withdrawal system fields
-    await db.users.update_many(
-        {"withdrawals_pending": {"$exists": False}},
-        {"$set": {"withdrawals_pending": 0}}
-    )
-    await db.users.update_many(
-        {"withdrawn_total": {"$exists": False}},
-        {"$set": {"withdrawn_total": 0}}
-    )
-    await db.users.update_many(
-        {"tax_paid_total": {"$exists": False}},
-        {"$set": {"tax_paid_total": 0}}
-    )
+    
+    # Initialize referral_id for existing users (first 8 chars of id) - only if needed
+    sample_referral = await db.users.find_one({"referral_id": {"$exists": True}}, {"referral_id": 1})
+    if not sample_referral:
+        async for user in db.users.find({"referral_id": {"$exists": False}}, {"id": 1}):
+            await db.users.update_one(
+                {"id": user["id"]},
+                {"$set": {"referral_id": user["id"][:8]}}
+            )
     
     # Migrate old withdrawable_balance to referral_earnings_withdrawable (V3.2 economy migration)
     # This ensures users don't lose access to their existing withdrawable funds
@@ -325,12 +250,6 @@ async def startup() -> None:
                     "$set": {"withdrawable_balance": 0}
                 }
             )
-
-    # Privacy settings
-    await db.users.update_many(
-        {"show_in_rankings": {"$exists": False}},
-        {"$set": {"show_in_rankings": True}}
-    )
 
     # Create referral_usernames collection for uniqueness
     await db.referral_usernames.create_index("username_lower", unique=True)
