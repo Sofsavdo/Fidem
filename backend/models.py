@@ -198,6 +198,7 @@ class CreatePaymentRequest(BaseModel):
     amount: Optional[int] = None  # for balance / gift / super
     target_user_id: Optional[str] = None  # for super application or gift
     gift_kind: Optional[str] = None
+    order_id: Optional[str] = None  # for concierge orders
 
 
 class PaymentOut(BaseModel):
