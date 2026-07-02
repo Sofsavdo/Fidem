@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, TrendingUp, Crown, Gift, Heart, Coins, Zap } from "lucide-react";
+import { ChevronLeft, TrendingUp, Crown, Gift, Heart, Coins, Zap, Info } from "lucide-react";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 
