@@ -273,7 +273,7 @@ function AdminConcierge() {
                     {u.photo_url && <img loading="lazy" decoding="async" src={photoSrc(u.photo_url)} alt="" className="w-full h-full object-cover" />}
                   </div>
                   <span className="flex-1 truncate">{u.name} · {u.age} · {u.region}</span>
-                  <span className="text-primary">+ Qo'shish</span>
+                  <span className="text-foreground">+ Qo'shish</span>
                 </button>
               ))}
             </div>

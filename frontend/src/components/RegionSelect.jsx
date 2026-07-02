@@ -102,7 +102,7 @@ export default function RegionSelect({ country, value, onChange, placeholder = "
                     className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left hover:bg-muted transition ${active ? "bg-primary/10" : ""}`}
                   >
                     <span className="flex-1 truncate">{r}</span>
-                    {active && <Check className="w-4 h-4 text-primary" />}
+                    {active && <Check className="w-4 h-4 text-foreground" />}
                   </button>
                 );
               })}

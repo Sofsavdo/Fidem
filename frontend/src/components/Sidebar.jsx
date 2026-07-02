@@ -72,11 +72,11 @@ export default function Sidebar() {
           <span>{t("profile_prompts")}</span>
         </Link>
         <Link to="/stories" data-testid="side-stories" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
-          <BookOpen className="w-4 h-4 text-primary" />
+          <BookOpen className="w-4 h-4 text-foreground" />
           <span>{t("success_stories")}</span>
         </Link>
         <Link to="/boost" data-testid="side-boost" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
-          <Sparkles className="w-4 h-4 text-primary" />
+          <Sparkles className="w-4 h-4 text-foreground" />
           <span>{t("boost_title")}</span>
         </Link>
         <Link to="/concierge" data-testid="side-concierge" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
@@ -88,11 +88,11 @@ export default function Sidebar() {
           <span>{t("travel_mode")}</span>
         </Link>
         <Link to="/family" data-testid="side-family" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
-          <Phone className="w-4 h-4 text-primary" />
+          <Phone className="w-4 h-4 text-foreground" />
           <span>{t("family_contact")}</span>
         </Link>
         <Link to="/withdrawals" data-testid="side-withdrawals" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">
-          <Wallet className="w-4 h-4 text-primary" />
+          <Wallet className="w-4 h-4 text-foreground" />
           <span>{t("withdraw_money")}</span>
         </Link>
         <Link to="/notifications" data-testid="side-notif" className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm hover:bg-muted text-foreground">

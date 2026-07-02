@@ -103,7 +103,7 @@ export default function CountrySelect({ value, onChange, lang = "en", placeholde
                     <span className="text-lg leading-none">{c.flag}</span>
                     <span className="flex-1 truncate">{countryLabel(c, lang)}</span>
                     <span className="text-[10px] text-muted-foreground tracking-wider">{c.code}</span>
-                    {active && <Check className="w-4 h-4 text-primary" />}
+                    {active && <Check className="w-4 h-4 text-foreground" />}
                   </button>
                 );
               })}

@@ -40,7 +40,7 @@ export default function About() {
             { icon: MessageCircle, title: t("land_f6_t"), text: t("land_f6_d") },
           ].map((b, i) => (
             <div key={i} className="rounded-2xl border border-border bg-card p-4">
-              <b.icon className="w-5 h-5 text-primary mb-2" />
+              <b.icon className="w-5 h-5 text-foreground mb-2" />
               <p className="font-semibold">{b.title}</p>
               <p className="text-sm text-muted-foreground mt-1">{b.text}</p>
             </div>

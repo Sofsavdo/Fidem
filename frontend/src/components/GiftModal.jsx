@@ -63,7 +63,7 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
         <div className="flex items-center justify-between p-4 border-b border-border/40 shrink-0">
           <div>
             <h3 className="font-heading text-lg font-semibold flex items-center gap-2">
-              <GiftIcon className="w-5 h-5 text-primary" /> {t("gift_send_title")}
+              <GiftIcon className="w-5 h-5 text-foreground" /> {t("gift_send_title")}
             </h3>
             {targetName && <p className="text-xs text-muted-foreground">→ {targetName}</p>}
           </div>
@@ -121,7 +121,7 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
                 <span className="text-[10px] text-muted-foreground">
                   {g.price >= 1000 ? `${(g.price / 1000).toFixed(g.price >= 10000 ? 0 : 1)}K` : g.price} {t("sum")}
                 </span>
-                {sending === g.kind && <span className="absolute inset-0 grid place-items-center bg-card/80 rounded-2xl text-primary text-xs">{t("gift_sending")}</span>}
+                {sending === g.kind && <span className="absolute inset-0 grid place-items-center bg-card/80 rounded-2xl text-foreground text-xs">{t("gift_sending")}</span>}
               </button>
             );
           })}
