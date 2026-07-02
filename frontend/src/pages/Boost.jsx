@@ -65,8 +65,8 @@ export default function Boost() {
         {/* Boost */}
         <div className="rounded-3xl border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-card p-5" data-testid="card-boost">
           <div className="flex items-center justify-between">
-            <Rocket className="w-7 h-7 text-primary" />
-            <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary font-medium">24 {t("hour_word").toUpperCase()}</span>
+            <Rocket className="w-7 h-7 text-foreground" />
+            <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-foreground font-medium">24 {t("hour_word").toUpperCase()}</span>
           </div>
           <h2 className="font-heading text-2xl font-semibold mt-3">{t("profile_boost_title")}</h2>
           <p className="text-sm text-muted-foreground mt-1">{t("profile_boost_desc")}</p>
@@ -140,12 +140,12 @@ export default function Boost() {
       {analytics && (
         <div className="rounded-3xl border border-border bg-card p-5" data-testid="boost-analytics">
           <h2 className="font-heading text-xl font-semibold flex items-center gap-2">
-            <Activity className="w-5 h-5 text-primary" /> Analytics
+            <Activity className="w-5 h-5 text-foreground" /> Analytics
           </h2>
 
           {/* Boost session */}
           <div className="mt-3 rounded-2xl bg-primary/5 border border-primary/20 p-4">
-            <p className="text-xs font-medium text-primary mb-2">{t("profile_boost_title")} {analytics.boost.active ? `(${t("travel_active")})` : ""}</p>
+            <p className="text-xs font-medium text-foreground mb-2">{t("profile_boost_title")} {analytics.boost.active ? `(${t("travel_active")})` : ""}</p>
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
               <StatBox icon={<Eye className="w-4 h-4" />} label={t("views_word")} value={analytics.boost.impressions} />
               <StatBox icon={<Activity className="w-4 h-4" />} label={t("views_word")} value={analytics.boost.views} />
@@ -200,7 +200,7 @@ export default function Boost() {
                   <p className="text-[11px] text-muted-foreground">{u.city || u.region}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-semibold text-primary">{(u.ranking_score || u.boost_impressions || 0).toLocaleString()}</p>
+                  <p className="text-sm font-semibold text-foreground">{(u.ranking_score || u.boost_impressions || 0).toLocaleString()}</p>
                   <p className="text-[10px] text-muted-foreground">{t("views_word")}</p>
                 </div>
               </div>

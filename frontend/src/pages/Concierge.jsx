@@ -79,7 +79,7 @@ export default function Concierge() {
             <button data-testid="concierge-click" onClick={() => order("click")} disabled={loading} className="py-3 rounded-2xl bg-primary text-white font-medium disabled:opacity-50">
               {t("activate_with_click")}
             </button>
-            <button data-testid="concierge-balance" onClick={() => order("balance")} disabled={loading || !info.can_balance_pay} className="py-3 rounded-2xl border-2 border-primary text-primary font-medium disabled:opacity-30">
+            <button data-testid="concierge-balance" onClick={() => order("balance")} disabled={loading || !info.can_balance_pay} className="py-3 rounded-2xl border-2 border-primary text-foreground font-medium disabled:opacity-30">
               {t("activate_with_balance")} {info.can_balance_pay ? "✓" : "✗"}
             </button>
           </div>

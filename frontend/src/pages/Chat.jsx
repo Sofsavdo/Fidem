@@ -211,10 +211,10 @@ export default function Chat() {
           {menuOpen && (
             <div data-testid="chat-menu-dropdown" className="absolute right-0 top-10 z-40 bg-card border border-border rounded-2xl shadow-elevated w-44 py-1">
               <button data-testid="chat-block" onClick={blockUser} className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted">
-                <Ban className="w-4 h-4 text-primary" /> {t("block")}
+                <Ban className="w-4 h-4 text-foreground" /> {t("block")}
               </button>
               <button data-testid="chat-report" onClick={() => { setReportOpen(true); setMenuOpen(false); }} className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted">
-                <Flag className="w-4 h-4 text-primary" /> {t("report")}
+                <Flag className="w-4 h-4 text-foreground" /> {t("report")}
               </button>
             </div>
           )}
@@ -320,7 +320,7 @@ export default function Chat() {
                   className="w-full rounded-xl bg-primary text-white text-sm py-2.5 font-medium disabled:opacity-50">
                   💳 {t("unlock_one_time")} · {access.price_uzs.toLocaleString()} {t("sum")}
                 </button>
-                <Link to="/premium?tab=plans" data-testid="unlock-upgrade" className="w-full text-center rounded-xl border border-primary/40 text-primary text-sm py-2.5 font-medium">
+                <Link to="/premium?tab=plans" data-testid="unlock-upgrade" className="w-full text-center rounded-xl border border-primary/40 text-foreground text-sm py-2.5 font-medium">
                   ⭐ {t("or_subscribe")}
                 </Link>
               </div>
@@ -382,7 +382,7 @@ function ReportModal({ t, onClose, onSubmit }) {
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative w-full max-w-md bg-card rounded-t-3xl sm:rounded-3xl p-6 mx-auto">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-heading text-lg font-semibold flex items-center gap-2"><Flag className="w-5 h-5 text-primary" /> {t("report_modal_title")}</h3>
+          <h3 className="font-heading text-lg font-semibold flex items-center gap-2"><Flag className="w-5 h-5 text-foreground" /> {t("report_modal_title")}</h3>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-muted" data-testid="report-close">✕</button>
         </div>
         <p className="text-xs text-muted-foreground mb-3">{t("report_modal_hint")}</p>

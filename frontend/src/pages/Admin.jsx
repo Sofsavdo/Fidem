@@ -114,7 +114,7 @@ function AdminUsers() {
           <div className="flex gap-1 mt-2 flex-wrap">
             <button data-testid={`adm-verify-selfie-${u.id}`} onClick={() => patch(u.id, { verified_selfie: !u.verified_selfie })} className="text-[10px] rounded-full bg-secondary/10 text-secondary px-2 py-1">{u.verified_selfie ? "✓ Selfie" : "Verify selfie"}</button>
             <button data-testid={`adm-verify-fin-${u.id}`} onClick={() => patch(u.id, { verified_financial: !u.verified_financial })} className="text-[10px] rounded-full bg-gold-light text-yellow-900 px-2 py-1">{u.verified_financial ? "💎 Financial" : "Verify financial"}</button>
-            <button data-testid={`adm-premium-${u.id}`} onClick={() => patch(u.id, { plan: u.plan === "premium" ? "free" : "premium" })} className="text-[10px] rounded-full bg-primary/10 text-primary px-2 py-1">{u.plan === "premium" ? "Cancel Premium" : "Make Premium"}</button>
+            <button data-testid={`adm-premium-${u.id}`} onClick={() => patch(u.id, { plan: u.plan === "premium" ? "free" : "premium" })} className="text-[10px] rounded-full bg-primary/10 text-foreground px-2 py-1">{u.plan === "premium" ? "Cancel Premium" : "Make Premium"}</button>
             <button data-testid={`adm-vip-${u.id}`} onClick={() => patch(u.id, { plan: u.plan === "vip" ? "free" : "vip" })} className="text-[10px] rounded-full bg-ink text-gold px-2 py-1">{u.plan === "vip" ? "Cancel VIP" : "Make VIP"}</button>
             <button data-testid={`adm-add-${u.id}`} onClick={() => patch(u.id, { add_balance: 10000 })} className="text-[10px] rounded-full border border-border px-2 py-1">+10k</button>
             <button data-testid={`adm-block-${u.id}`} onClick={() => patch(u.id, { blocked: !u.blocked })} className="text-[10px] rounded-full bg-red-50 text-red-700 px-2 py-1">{u.blocked ? "Unblock" : "Block"}</button>
@@ -217,7 +217,7 @@ function AdminWithdrawals() {
         <div key={w.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`adm-wd-${w.id}`}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium">{w.user?.name || w.user_id?.slice(0, 8)} · <span className="text-primary">{w.amount?.toLocaleString()} so'm</span></p>
+              <p className="text-sm font-medium">{w.user?.name || w.user_id?.slice(0, 8)} · <span className="text-foreground">{w.amount?.toLocaleString()} so'm</span></p>
               <p className="text-xs text-muted-foreground font-mono">{w.card_number} · {w.holder_name}</p>
               <p className="text-[10px] text-muted-foreground">{new Date(w.created_at).toLocaleString("uz-UZ")} · {w.status}</p>
             </div>
