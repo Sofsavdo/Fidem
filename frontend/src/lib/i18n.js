@@ -643,6 +643,8 @@ const dict = {
     match_reason_goals_partial: "Maqsadlar qisman mos",
     match_reason_family_goal: "Oila qurish maqsadi",
     match_reason_interests: "Qiziqishlar yaqin",
+    share_success: "Ulandi",
+    share_copied: "Nusxalandi",
   },
   ru: {
     app_name: "FIDEM",
@@ -1277,6 +1279,8 @@ const dict = {
     match_reason_goals_partial: "Цели частично совпадают",
     match_reason_family_goal: "Цель — создание семьи",
     match_reason_interests: "Интересы близки",
+    share_success: "Поделиться",
+    share_copied: "Скопировано",
   },
   en: {
     app_name: "FIDEM",
@@ -1911,6 +1915,8 @@ const dict = {
     match_reason_goals_partial: "Goals partially align",
     match_reason_family_goal: "Family-building goal",
     match_reason_interests: "Shared interests",
+    share_success: "Shared",
+    share_copied: "Copied",
   },
 };
 

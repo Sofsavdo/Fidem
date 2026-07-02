@@ -19,6 +19,16 @@ DAILY_COINS = 20          # +20 coins (non-cashable) per daily check-in
 STREAK_7_COINS = 100      # week-7 streak bonus (coins)
 INVITE_REWARD_GIVES_PREMIUM_DAYS = 7  # 3 invites → 7 free Premium days
 
+# Enhanced referral rewards
+REFERRAL_TIERS = {
+    1: {"coins": 50, "label": "Birinchi do'st"},
+    3: {"coins": 200, "premium_days": 7, "label": "3 do'st"},
+    5: {"coins": 500, "premium_days": 14, "label": "5 do'st"},
+    10: {"coins": 1500, "premium_days": 30, "label": "10 do'st"},
+    25: {"coins": 5000, "premium_days": 60, "vip_days": 7, "label": "25 do'st"},
+    50: {"coins": 15000, "premium_days": 90, "vip_days": 14, "label": "50 do'st"},
+}
+
 
 # ---------- Daily check-in / Streak ----------
 @router.get("/daily/status")
@@ -288,6 +298,15 @@ async def invites_status(uid: str = Depends(get_current_user_id)):
     available_redemptions = max(0, eligible_redemptions - redeemed)
     from core import TELEGRAM_BOT_USERNAME
     link = f"https://t.me/{TELEGRAM_BOT_USERNAME}?start={code}"
+    
+    # Calculate tier rewards
+    claimed_tiers = me.get("referral_claimed_tiers", [])
+    next_tier = None
+    for tier_count in sorted(REFERRAL_TIERS.keys()):
+        if tier_count not in claimed_tiers and invited >= tier_count:
+            next_tier = tier_count
+            break
+    
     return {
         "code": code,
         "link": link,
@@ -295,6 +314,9 @@ async def invites_status(uid: str = Depends(get_current_user_id)):
         "redeemed_weeks": redeemed,
         "available_weeks": available_redemptions,
         "next_milestone": 3 - (invited % 3) if invited % 3 != 0 else 3,
+        "claimed_tiers": claimed_tiers,
+        "next_tier": next_tier,
+        "tier_rewards": REFERRAL_TIERS,
     }
 
 
@@ -322,6 +344,64 @@ async def invites_redeem(uid: str = Depends(get_current_user_id)):
     )
     await push_notif(uid, "premium", f"Tabriklaymiz! Premium {INVITE_REWARD_GIVES_PREMIUM_DAYS} kun faollashtirildi 🎉")
     return {"ok": True, "plan_until": iso(new_until)}
+
+
+@router.post("/invites/claim-tier")
+async def claim_tier_reward(tier: int = Body(..., embed=True), uid: str = Depends(get_current_user_id)):
+    """Claim tier-based referral rewards (coins, premium days, VIP days)."""
+    if tier not in REFERRAL_TIERS:
+        raise HTTPException(400, "Invalid tier")
+    
+    me = await get_user(uid)
+    code = me.get("referral_code") or uid[:8]
+    invited = await db.users.count_documents({"referred_by": code})
+    claimed_tiers = me.get("referral_claimed_tiers", [])
+    
+    if tier in claimed_tiers:
+        raise HTTPException(400, "Tier already claimed")
+    
+    if invited < tier:
+        raise HTTPException(400, f"Need {tier} invites to claim this tier")
+    
+    reward = REFERRAL_TIERS[tier]
+    
+    # Grant rewards
+    updates = {"$inc": {}, "$set": {}}
+    updates["$push"] = {"referral_claimed_tiers": tier}
+    
+    if "coins" in reward:
+        updates["$inc"]["coins"] = reward["coins"]
+    
+    if "premium_days" in reward:
+        cur_until = me.get("plan_until")
+        base = parse_dt(cur_until) if cur_until else now_utc()
+        if base < now_utc():
+            base = now_utc()
+        new_until = base + timedelta(days=reward["premium_days"])
+        updates["$set"]["plan"] = "premium"
+        updates["$set"]["plan_until"] = iso(new_until)
+    
+    if "vip_days" in reward:
+        cur_until = me.get("plan_until")
+        base = parse_dt(cur_until) if cur_until else now_utc()
+        if base < now_utc():
+            base = now_utc()
+        new_until = base + timedelta(days=reward["vip_days"])
+        updates["$set"]["plan"] = "vip"
+        updates["$set"]["plan_until"] = iso(new_until)
+    
+    await db.users.update_one({"id": uid}, updates)
+    
+    # Send notification
+    reward_text = f"{reward.get('coins', 0)} coins"
+    if "premium_days" in reward:
+        reward_text += f" + {reward['premium_days']} kun Premium"
+    if "vip_days" in reward:
+        reward_text += f" + {reward['vip_days']} kun VIP"
+    
+    await push_notif(uid, "referral", f"Tabriklaymiz! {reward['label']} mukofoti: {reward_text} 🎉")
+    
+    return {"ok": True, "reward": reward, "claimed_tiers": claimed_tiers + [tier]}
 
 
 # ---------- Referral Username System (Phase 1.4) ----------

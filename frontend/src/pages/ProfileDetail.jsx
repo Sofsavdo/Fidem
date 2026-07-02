@@ -7,7 +7,7 @@ import RoseModal from "@/components/RoseModal";
 import CompatibilityCard from "@/components/CompatibilityCard";
 import { photoSrc } from "@/lib/photo";
 import { formatLastActive } from "@/lib/time";
-import { Bookmark, MessageCircle, ArrowLeft, Lock, Clock, Shield } from "lucide-react";
+import { Bookmark, MessageCircle, ArrowLeft, Lock, Clock, Shield, Share2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ProfileDetail() {
@@ -20,6 +20,7 @@ export default function ProfileDetail() {
   const [saved, setSaved] = useState(false);
   const [roseOpen, setRoseOpen] = useState(false);
   const [famSending, setFamSending] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const requestFamily = async () => {
     if (user?.plan !== "vip") {
@@ -34,6 +35,37 @@ export default function ProfileDetail() {
     } catch (e) {
       toast.error(t("error_generic"));
     } finally { setFamSending(false); }
+  };
+
+  const shareProfile = async () => {
+    const shareText = `${c.name}, ${c.age} — ${c.region}. FIDEM orqali tanishing!`;
+    const shareUrl = `https://t.me/${window.Telegram?.WebApp?.initDataUnsafe?.user?.username || 'Fidem_Appbot'}?start=share_${id}`;
+    
+    if (window.Telegram?.WebApp) {
+      try {
+        window.Telegram.WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`);
+        toast.success(t("share_success"));
+      } catch (e) {
+        toast.error(t("error_generic"));
+      }
+    } else {
+      // Fallback for web
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: `${c.name} — FIDEM`,
+            text: shareText,
+            url: shareUrl,
+          });
+        } catch (e) {
+          toast.error(t("error_generic"));
+        }
+      } else {
+        // Copy to clipboard
+        navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
+        toast.success(t("share_copied"));
+      }
+    }
   };
 
   const load = async () => {
@@ -210,6 +242,9 @@ export default function ProfileDetail() {
           </Link>
           <button data-testid="profile-rose" onClick={() => setRoseOpen(true)} className="rounded-2xl py-3 px-4 bg-primary/10 text-primary font-medium text-xl">
             🌹
+          </button>
+          <button data-testid="profile-share" onClick={shareProfile} className="rounded-2xl py-3 px-4 bg-card border border-border hover:bg-muted font-medium">
+            <Share2 className="w-4 h-4" />
           </button>
         </div>
         {/* Family Share (VIP only) */}
