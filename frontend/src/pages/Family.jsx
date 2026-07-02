@@ -71,7 +71,7 @@ export default function Family() {
     <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-heading font-semibold flex items-center gap-2">
-          <Users className="w-6 h-6 text-primary" /> {t("family_title")}
+          <Users className="w-6 h-6 text-foreground" /> {t("family_title")}
         </h1>
         <p className="text-sm text-muted-foreground mt-1">{t("family_desc")}</p>
       </div>
@@ -174,13 +174,13 @@ function FamilyRow({ request, statusBadge }) {
         {statusBadge(request.status)}
       </div>
       {request.status === "accepted" && !show && (
-        <button onClick={fetchContact} className="mt-2 text-xs text-primary underline">{t("phone")} →</button>
+        <button onClick={fetchContact} className="mt-2 text-xs text-foreground underline">{t("phone")} →</button>
       )}
       {show && contact && (
         <div className="mt-2 p-3 rounded-lg bg-card border border-border text-sm">
           <p className="font-medium">{contact.family_contact.name || "Oilaviy aloqa"}</p>
           <p className="text-muted-foreground capitalize text-xs">{contact.family_contact.relation}</p>
-          <a href={`tel:${contact.family_contact.phone}`} className="mt-1 inline-flex items-center gap-1 text-primary font-medium">
+          <a href={`tel:${contact.family_contact.phone}`} className="mt-1 inline-flex items-center gap-1 text-foreground font-medium">
             <Phone className="w-4 h-4" /> {contact.family_contact.phone}
           </a>
         </div>

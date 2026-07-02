@@ -143,12 +143,12 @@ export default function Me() {
           <p className="text-xs text-white/70 mt-0.5">{t("premium_subtitle")} →</p>
         </Link>
         <Link to="/premium?tab=balance" data-testid="link-balance" className="rounded-3xl bg-card border border-border p-4 hover:-translate-y-0.5 transition-transform">
-          <Wallet className="w-5 h-5 text-primary" />
+          <Wallet className="w-5 h-5 text-foreground" />
           <p className="font-heading text-lg mt-2">{(user.balance || 0).toLocaleString()} {t("sum")}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{t("balance")}</p>
         </Link>
         <Link to="/boost" data-testid="link-boost" className="rounded-3xl bg-gradient-to-br from-primary/10 to-card border border-primary/30 p-4 hover:-translate-y-0.5 transition-transform col-span-2 md:col-span-1">
-          <Trophy className="w-5 h-5 text-primary" />
+          <Trophy className="w-5 h-5 text-foreground" />
           <p className="font-heading text-lg mt-2">{t("boost_title")}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{t("boost_subtitle")} →</p>
         </Link>
@@ -209,14 +209,14 @@ export default function Me() {
           icon={<ShieldCheck className="w-4 h-4 text-secondary" />}
           label={t("request_selfie")}
           right={user.verified_selfie ? <span className="text-secondary text-xs">✓</span> : (
-            <Link to="/verification" data-testid="req-verify-selfie" className="text-xs text-primary font-medium">{t("verify_go_page")}</Link>
+            <Link to="/verification" data-testid="req-verify-selfie" className="text-xs text-foreground font-medium">{t("verify_go_page")}</Link>
           )}
         />
         <Row
           icon={<Gem className="w-4 h-4 text-gold-dark" />}
           label={t("financial_verification")}
           right={user.verified_financial ? <span className="text-secondary text-xs">✓</span> : (
-            <Link to="/verification" data-testid="req-verify-financial" className="text-xs text-primary font-medium">{t("verify_go_page")}</Link>
+            <Link to="/verification" data-testid="req-verify-financial" className="text-xs text-foreground font-medium">{t("verify_go_page")}</Link>
           )}
         />
       </div>

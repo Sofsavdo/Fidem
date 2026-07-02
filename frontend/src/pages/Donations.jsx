@@ -94,7 +94,7 @@ export default function Donations() {
             </div>
           </div>
           {rates?.is_weekend && (
-            <div className="mt-3 text-xs text-primary font-medium">🎉 Weekend bonus active!</div>
+            <div className="mt-3 text-xs text-foreground font-medium">🎉 Weekend bonus active!</div>
           )}
         </section>
 
@@ -140,11 +140,11 @@ export default function Donations() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Bonus (+{currentBonus}%)</span>
-                <span className="font-medium text-primary">+{Math.floor(parseInt(amount) * currentBonus / 100).toLocaleString()}</span>
+                <span className="font-medium text-foreground">+{Math.floor(parseInt(amount) * currentBonus / 100).toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-sm font-semibold pt-2 border-t border-border/40">
                 <span>Influence Gained</span>
-                <span className="text-primary">{influenceGained.toLocaleString()}</span>
+                <span className="text-foreground">{influenceGained.toLocaleString()}</span>
               </div>
             </div>
           )}
@@ -161,7 +161,7 @@ export default function Donations() {
 
         {/* Info */}
         <div className="rounded-2xl border border-border bg-card p-4 flex gap-3 text-sm">
-          <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+          <Info className="w-4 h-4 text-foreground shrink-0 mt-0.5" />
           <div className="text-muted-foreground">
             <p>Convert your balance or referral earnings to influence score. Influence determines your ranking and status in the community.</p>
           </div>
@@ -181,7 +181,7 @@ export default function Donations() {
                     <p className="text-[11px] text-muted-foreground">{new Date(d.created_at).toLocaleString()}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-medium text-primary">+{d.influence_gained.toLocaleString()}</p>
+                    <p className="text-sm font-medium text-foreground">+{d.influence_gained.toLocaleString()}</p>
                     <p className="text-[11px] text-muted-foreground">+{d.bonus_percentage}% bonus</p>
                   </div>
                 </div>
