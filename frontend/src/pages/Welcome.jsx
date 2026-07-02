@@ -63,7 +63,7 @@ export default function Welcome() {
         {/* Hero */}
         <section className="grid md:grid-cols-2 gap-8 items-center">
           <div className="text-center md:text-left space-y-4 order-2 md:order-1">
-            <div className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/30">
+            <div className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-primary/10 text-foreground border border-primary/30">
               <Sparkles className="w-3.5 h-3.5" /> {t("land_badge")}
             </div>
             <h1 className="text-4xl sm:text-5xl font-heading font-bold leading-tight">
@@ -93,7 +93,7 @@ export default function Welcome() {
               <div className="absolute inset-0 bg-gradient-to-t from-foreground/30 via-transparent to-transparent" />
             </div>
             <div className="absolute -bottom-4 -left-2 sm:left-4 glass rounded-2xl px-4 py-2.5 border border-border/60 shadow-lg flex items-center gap-2">
-              <Heart className="w-5 h-5 text-primary" fill="currentColor" />
+              <Heart className="w-5 h-5 text-foreground" fill="currentColor" />
               <div className="leading-tight">
                 <p className="text-sm font-semibold">{t("land_badge_users") || "Verified members"}</p>
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wide">FIDEM</p>
@@ -106,7 +106,7 @@ export default function Welcome() {
         <section className="grid grid-cols-3 gap-3 text-center">
           {trustBadges.map((b, i) => (
             <div key={i} className="rounded-2xl border border-border bg-card p-3">
-              <b.icon className="w-6 h-6 mx-auto text-primary" />
+              <b.icon className="w-6 h-6 mx-auto text-foreground" />
               <p className="text-sm font-medium mt-2">{t(b.t)}</p>
               <p className="text-[11px] text-muted-foreground">{t(b.s)}</p>
             </div>
@@ -155,7 +155,7 @@ export default function Welcome() {
               <p className="font-heading font-semibold mt-1">0 {t("sum")}</p>
             </div>
             <div className="rounded-2xl border-2 border-primary bg-card p-3 relative">
-              <p className="text-xs text-primary">PREMIUM</p>
+              <p className="text-xs text-foreground">PREMIUM</p>
               <p className="font-heading font-semibold mt-1">79K</p>
             </div>
             <div className="rounded-2xl border border-gold/40 bg-card p-3">

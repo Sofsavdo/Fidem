@@ -16,7 +16,7 @@ export default function Stories() {
   return (
     <div className="p-5 max-w-5xl mx-auto pb-24" data-testid="stories-page">
       <div className="flex items-start gap-3 mb-6">
-        <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary grid place-items-center">
+        <div className="w-12 h-12 rounded-2xl bg-primary/10 text-foreground grid place-items-center">
           <Heart className="w-5 h-5" fill="currentColor" />
         </div>
         <div>
@@ -55,7 +55,7 @@ export default function Stories() {
               <p className="text-sm leading-relaxed text-foreground/90 line-clamp-5">{s.story_text}</p>
               <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between">
                 <span className="text-xs text-muted-foreground inline-flex items-center gap-1"><Eye className="w-3 h-3" /> {s.views || 0}</span>
-                <span className="text-[10px] uppercase tracking-wider text-primary">FIDEM</span>
+                <span className="text-[10px] uppercase tracking-wider text-foreground">FIDEM</span>
               </div>
             </div>
           </article>

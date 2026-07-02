@@ -58,7 +58,7 @@ export default function FAQ() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-3">
-        <p className="text-center text-sm text-muted-foreground pb-4">{t("faq_cta_subtitle")} <Link to="/about" className="text-primary underline">{t("contact_us")}</Link></p>
+        <p className="text-center text-sm text-muted-foreground pb-4">{t("faq_cta_subtitle")} <Link to="/about" className="text-foreground underline">{t("contact_us")}</Link></p>
 
         {QA.map((it, i) => (
           <div key={i} className="rounded-2xl border border-border bg-card overflow-hidden" data-testid={`faq-${i}`}>
@@ -67,7 +67,7 @@ export default function FAQ() {
               className="w-full text-left px-4 py-3 flex items-center justify-between gap-3 hover:bg-muted/30"
             >
               <span className="font-medium text-sm sm:text-base">{it.q}</span>
-              {open === i ? <Minus className="w-4 h-4 shrink-0 text-primary" /> : <Plus className="w-4 h-4 shrink-0 text-muted-foreground" />}
+              {open === i ? <Minus className="w-4 h-4 shrink-0 text-foreground" /> : <Plus className="w-4 h-4 shrink-0 text-muted-foreground" />}
             </button>
             {open === i && (
               <div className="px-4 pb-4 text-sm text-muted-foreground border-t border-border/40 pt-3">

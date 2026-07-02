@@ -205,7 +205,7 @@ export default function Swipe() {
         <button data-testid="swipe-pass" onClick={handlePass} className="w-16 h-16 rounded-full border-2 border-rose-500/30 bg-white grid place-items-center hover:scale-105 transition shadow-lg"><X className="w-7 h-7 text-rose-500" strokeWidth={3} /></button>
         <button data-testid="swipe-super" onClick={handleSuper} className="w-14 h-14 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 text-white grid place-items-center hover:scale-105 transition shadow-lg"><span className="text-2xl">🌹</span></button>
         <button data-testid="swipe-like" onClick={handleLike} className="w-16 h-16 rounded-full border-2 border-emerald-500/30 bg-white grid place-items-center hover:scale-105 transition shadow-lg"><Heart className="w-7 h-7 text-emerald-500 fill-emerald-500" /></button>
-        <button data-testid="swipe-chat" onClick={() => nav(`/chat/${current.id}`)} className="w-12 h-12 rounded-full border-2 border-border bg-card grid place-items-center hover:scale-105 transition shadow"><MessageCircle className="w-5 h-5 text-primary" /></button>
+        <button data-testid="swipe-chat" onClick={() => nav(`/chat/${current.id}`)} className="w-12 h-12 rounded-full border-2 border-border bg-card grid place-items-center hover:scale-105 transition shadow"><MessageCircle className="w-5 h-5 text-foreground" /></button>
       </div>
 
       <p className="text-center text-[11px] text-muted-foreground pt-3">{remaining} ta qoldi · Swipe yoki tugma bosing</p>
@@ -232,7 +232,7 @@ function CardImage({ c }) {
         <div className="flex gap-1">
           {c.verified_selfie && <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px]">✓ Verified</span>}
           {c.verified_financial && <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px]">💎</span>}
-          {c.boosted && <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[10px]">🚀 Boost</span>}
+          {c.boosted && <span className="px-2 py-0.5 rounded-full bg-primary/20 text-foreground text-[10px]">🚀 Boost</span>}
         </div>
       </div>
       <div className="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-black/85 via-black/50 to-transparent text-white pointer-events-none">

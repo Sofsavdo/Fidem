@@ -178,9 +178,9 @@ export default function Referral() {
               <div className="pt-2 border-t border-border/40">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs uppercase tracking-wider text-muted-foreground">Custom Username</p>
-                  <button 
+                  <button
                     onClick={() => setShowUsernameModal(true)}
-                    className="text-xs text-primary font-medium"
+                    className="text-xs text-foreground font-medium"
                   >
                     {usernameData?.referral_username ? "Change" : "Set"}
                   </button>
