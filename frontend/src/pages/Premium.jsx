@@ -198,6 +198,30 @@ export default function Premium() {
       {/* Internal Balance - For Gifts, Boost, AI Features */}
       {tab === "balance" && (
         <div id="premium-balance">
+          {/* Current Balance Display */}
+          <div className="rounded-3xl bg-gradient-to-br from-secondary/10 to-card border border-secondary/30 p-5 mb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("balance")}</p>
+                <p className="font-heading text-3xl font-semibold mt-1">{(user.balance || 0).toLocaleString()} {t("sum")}</p>
+              </div>
+              <Wallet className="w-8 h-8 text-secondary" />
+            </div>
+          </div>
+
+          {/* Convert to Ranking/Influence */}
+          <Link to="/economy/donations" className="block rounded-3xl bg-gradient-to-br from-primary/10 to-card border border-primary/30 p-5 mb-4 hover:-translate-y-0.5 transition-transform">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-heading text-lg font-semibold flex items-center gap-2">📈 {t("convert_to_influence")}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t("convert_balance_desc")}</p>
+                <p className="text-xs text-secondary mt-0.5">{t("convert_sources")}: Balance, Referral Earnings</p>
+              </div>
+              <span className="text-primary font-medium">→</span>
+            </div>
+          </Link>
+
+          {/* Topup Section */}
           <div className="rounded-3xl bg-card border border-border p-5" data-testid="topup-section">
             <div className="flex items-center gap-2 mb-3">
               <Wallet className="w-5 h-5 text-foreground" />
