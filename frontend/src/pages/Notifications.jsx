@@ -19,9 +19,11 @@ export default function Notifications() {
   const load = async () => {
     setLoading(true);
     try {
-      const r = await api.get("/notifications");
+      const [r] = await Promise.all([
+        api.get("/notifications"),
+        api.post("/notifications/read-all").catch(() => {})
+      ]);
       setItems(r.data || []);
-      await api.post("/notifications/read-all");
     } finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);

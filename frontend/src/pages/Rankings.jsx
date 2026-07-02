@@ -18,7 +18,7 @@ export default function Rankings() {
       if (tab === "men") endpoint = "/rankings/men";
       else if (tab === "women") endpoint = "/rankings/women";
       else if (tab === "ambassadors") endpoint = "/rankings/ambassadors";
-      
+
       const r = await api.get(endpoint);
       setRankings(r.data.rankings || []);
     } catch {/* ignore */}
@@ -32,8 +32,9 @@ export default function Rankings() {
     } catch {/* ignore */}
   };
 
-  useEffect(() => { loadMyRankings(); }, []);
-  useEffect(() => { loadRankings(activeTab); }, [activeTab]);
+  useEffect(() => {
+    Promise.all([loadMyRankings(), loadRankings(activeTab)]);
+  }, []);
 
   const tabs = [
     { id: "global", label: t("rank_global"), icon: Trophy },
