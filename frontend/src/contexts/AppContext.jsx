@@ -40,8 +40,6 @@ export function AppProvider({ children }) {
     try {
       const r = await api.get("/auth/me");
       setUser(r.data);
-      // Cache user data for instant UI on next load
-      localStorage.setItem("fidem_user", JSON.stringify(r.data));
       if (r.data.language && dict[r.data.language]) {
         setLang(r.data.language);
       }
@@ -51,17 +49,6 @@ export function AppProvider({ children }) {
       return null;
     } finally {
       setLoading(false);
-    }
-  }, []);
-
-  // Load user from localStorage cache immediately for instant UI
-  useEffect(() => {
-    const cachedUser = localStorage.getItem("fidem_user");
-    if (cachedUser) {
-      try {
-        setUser(JSON.parse(cachedUser));
-        setLoading(false);
-      } catch {}
     }
   }, []);
 

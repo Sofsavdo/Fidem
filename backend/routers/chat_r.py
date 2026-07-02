@@ -303,9 +303,7 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
         # Replying to someone who already wrote to you is always free.
         pass
     else:
-        # Initiating a new conversation requires an active paid plan or a chat unlock.
-        if not (_plan_active(sender) or await _unlock_doc(uid, req.to_user_id)):
-            raise HTTPException(402, "chat_locked")
+        # All messaging is free - no paywall
         if is_first:
             status = "application"
 

@@ -17,17 +17,7 @@ export default function Candidates() {
   const [savedIds, setSavedIds] = useState(new Set());
 
   const load = async () => {
-    // Load from cache first for instant UI
-    const cached = localStorage.getItem("fidem_candidates");
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        setItems(parsed.items || []);
-        setSavedIds(new Set(parsed.savedIds || []));
-        setLoading(false);
-      } catch {}
-    }
-
+    setLoading(true);
     try {
       const params = { ...filters };
       const [r, s] = await Promise.all([
@@ -36,12 +26,6 @@ export default function Candidates() {
       ]);
       setItems(r.data || []);
       setSavedIds(new Set((s.data || []).map((x) => x.id)));
-      // Cache for instant UI on next load
-      localStorage.setItem("fidem_candidates", JSON.stringify({
-        items: r.data || [],
-        savedIds: (s.data || []).map((x) => x.id),
-        cachedAt: Date.now()
-      }));
     } catch (e) {
       console.error(e);
     } finally {

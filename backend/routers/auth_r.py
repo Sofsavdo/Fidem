@@ -54,8 +54,9 @@ async def _may_access_file(uid: str, is_admin: bool, rec: dict) -> bool:
     # Owner can always access their own files
     if uid == owner_id:
         return True
-    # Public profile photos are accessible to all authenticated users
-    if rec.get("is_public", False):
+    # All authenticated users can access profile photos (backward compatibility)
+    # If is_public is not set, assume it's a profile photo and allow access
+    if rec.get("is_public", True):
         return True
     # Private photos require approved unlock
     unlock = await db.photo_unlocks.find_one(
