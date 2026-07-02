@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
-import { Crown, Check, Wallet } from "lucide-react";
+import { Crown, Check, Wallet, Info } from "lucide-react";
 import { toast } from "sonner";
 
 const PLANS = [
@@ -147,7 +147,7 @@ export default function Premium() {
                       </p>
                     </div>
                     <p className="font-heading text-xl">
-                      {p.price === 0 ? t("plan_free_title") : `${p.price.toLocaleString()} ${t("sum")}`}
+                      {p.price === 0 ? t("plan_free_title") : `${Number(p.price).toLocaleString()} ${t("sum")}`}
                     </p>
                   </div>
                   <ul className="mt-3 space-y-1.5">
@@ -225,7 +225,7 @@ export default function Premium() {
               disabled={creating}
               className="w-full rounded-2xl bg-secondary text-white py-3 font-medium"
             >
-              {t("pay_with_click")} · {topupAmount.toLocaleString()} {t("sum")}
+              {t("pay_with_click")} · {Number(topupAmount).toLocaleString()} {t("sum")}
             </button>
           </div>
 
@@ -282,7 +282,7 @@ export default function Premium() {
               >
                 <p className="text-2xl">🌹</p>
                 <p className="font-medium text-sm mt-1">{count} ta</p>
-                <p className="text-xs text-muted-foreground">{price.toLocaleString()} {t("sum")}</p>
+                <p className="text-xs text-muted-foreground">{Number(price).toLocaleString()} {t("sum")}</p>
               </button>
             ))}
           </div>
@@ -294,11 +294,11 @@ export default function Premium() {
         <p className="font-heading text-lg font-semibold mb-2">{t("payments")}</p>
         <div className="space-y-2">
           {payments.length === 0 && <p className="text-sm text-muted-foreground">{t("no_data")}</p>}
-          {payments.map((p) => (
+          {(payments || []).map((p) => (
             <div key={p.id} className="rounded-2xl bg-card border border-border p-3 flex items-center justify-between" data-testid={`payment-${p.id}`}>
               <div>
                 <p className="text-sm font-medium">{p.purpose}</p>
-                <p className="text-xs text-muted-foreground">{p.amount?.toLocaleString()} {t("sum")}</p>
+                <p className="text-xs text-muted-foreground">{Number(p.amount || 0).toLocaleString()} {t("sum")}</p>
               </div>
               <span className={`text-xs px-2 py-1 rounded-full ${
                 p.status === "success" ? "bg-secondary/10 text-secondary" : p.status === "failed" ? "bg-red-50 text-red-700" : "bg-gold-light text-yellow-900"
