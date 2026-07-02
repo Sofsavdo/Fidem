@@ -10,24 +10,28 @@ export default function Economy() {
   const [statusData, setStatusData] = useState(null);
   const [lifetimeData, setLifetimeData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const load = async () => {
     try {
       const [i, s, l] = await Promise.all([
-        api.get("/me/influence"),
-        api.get("/me/status"),
-        api.get("/me/lifetime-contribution")
+        api.get("/me/influence").catch(() => ({ data: null })),
+        api.get("/me/status").catch(() => ({ data: null })),
+        api.get("/me/lifetime-contribution").catch(() => ({ data: null }))
       ]);
       setInfluenceData(i.data);
       setStatusData(s.data);
       setLifetimeData(l.data);
-    } catch {/* ignore */}
-    finally { setLoading(false); }
+    } catch (e) {
+      console.error("Economy load error:", e);
+      setError("Failed to load economy data");
+    } finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
 
   if (loading) return <div className="p-6 text-muted-foreground">{t("loading")}</div>;
+  if (error) return <div className="p-6 text-red-500">{error}</div>;
 
   return (
     <div className="min-h-screen">
