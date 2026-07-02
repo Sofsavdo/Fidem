@@ -268,6 +268,24 @@ class AdminUpdateUserRequest(BaseModel):
     add_balance: Optional[int] = None
 
 
+# ---------- Community Groups ----------
+class CreateGroupRequest(BaseModel):
+    name: str
+    description: str
+    category: str  # e.g., "interests", "region", "hobbies"
+    region: Optional[str] = None
+    is_private: bool = False
+
+
+class JoinGroupRequest(BaseModel):
+    group_id: str
+
+
+class GroupPostRequest(BaseModel):
+    group_id: str
+    text: str
+
+
 # ---------- Reports / blocks ----------
 class ReportRequest(BaseModel):
     user_id: str
