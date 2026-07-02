@@ -200,7 +200,7 @@ export default function Premium() {
         <div id="premium-balance">
           <div className="rounded-3xl bg-card border border-border p-5" data-testid="topup-section">
             <div className="flex items-center gap-2 mb-3">
-              <Wallet className="w-5 h-5 text-primary" />
+              <Wallet className="w-5 h-5 text-foreground" />
               <p className="font-heading text-xl font-semibold">{t("topup_balance")}</p>
             </div>
             <p className="text-xs text-muted-foreground mb-3">{t("premium_section_balance_hint")}</p>

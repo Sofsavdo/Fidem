@@ -74,7 +74,7 @@ export default function Notifications() {
               className={`rounded-2xl border border-border p-3 flex items-start gap-3 ${n.read ? "bg-card" : "bg-muted/40"} ${clickable ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}`}
             >
               <div className="w-9 h-9 rounded-full bg-muted grid place-items-center flex-shrink-0">
-                <Icon className="w-4 h-4 text-primary" />
+                <Icon className="w-4 h-4 text-foreground" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm">{n.text}</p>

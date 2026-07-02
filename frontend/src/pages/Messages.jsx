@@ -40,7 +40,7 @@ export default function Messages() {
             data-testid={`tab-${x.k}`}
             onClick={() => setTab(x.k)}
             className={`pb-2 px-1 text-sm border-b-2 -mb-px ${
-              tab === x.k ? "border-primary text-primary font-medium" : "border-transparent text-muted-foreground"
+              tab === x.k ? "border-primary text-foreground font-medium" : "border-transparent text-muted-foreground"
             }`}
           >
             {x.l}

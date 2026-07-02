@@ -96,7 +96,7 @@ export default function Referral() {
           <div className="text-6xl">🎁</div>
           <h1 className="text-2xl font-heading font-bold">{t("ref_subtitle")}</h1>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            Har bir do'st uchun <b className="text-primary">+10,000 {t("sum")}</b> bonus
+            Har bir do'st uchun <b className="text-foreground">+10,000 {t("sum")}</b> bonus
           </p>
         </section>
 
@@ -107,7 +107,7 @@ export default function Referral() {
             {/* Stats */}
             <section className="grid grid-cols-2 gap-2">
               <div className="rounded-2xl border border-border bg-card p-3 text-center" data-testid="ref-stat-invites">
-                <Users className="w-5 h-5 mx-auto text-primary mb-1" />
+                <Users className="w-5 h-5 mx-auto text-foreground mb-1" />
                 <p className="text-xl font-heading font-bold">{data?.invited_count ?? 0}</p>
                 <p className="text-[11px] text-muted-foreground">{t("ref_invites")}</p>
               </div>
@@ -134,7 +134,7 @@ export default function Referral() {
                 </div>
                 <div className="rounded-xl bg-primary/10 p-3 border border-primary/30">
                   <p className="text-muted-foreground text-xs">{t("referral_earnings_withdrawable")}</p>
-                  <p className="font-medium text-primary">{(data?.referral_earnings_withdrawable ?? 0).toLocaleString()} {t("sum")}</p>
+                  <p className="font-medium text-foreground">{(data?.referral_earnings_withdrawable ?? 0).toLocaleString()} {t("sum")}</p>
                 </div>
                 <div className="rounded-xl bg-muted/30 p-3">
                   <p className="text-muted-foreground text-xs">{t("referral_earnings_paid_out")}</p>

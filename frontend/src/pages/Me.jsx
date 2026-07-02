@@ -272,7 +272,7 @@ export default function Me() {
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
         <Link to="/stories" data-testid="link-stories" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><BookOpen className="w-4 h-4 text-primary" /> {t("success_stories")}</span>
+          <span className="flex items-center gap-3 text-sm"><BookOpen className="w-4 h-4 text-foreground" /> {t("success_stories")}</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
         <Link to="/concierge" data-testid="link-concierge" className="flex items-center justify-between p-4">
@@ -284,11 +284,11 @@ export default function Me() {
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
         <Link to="/family" data-testid="link-family" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><Phone className="w-4 h-4 text-primary" /> {t("family_contact")}</span>
+          <span className="flex items-center gap-3 text-sm"><Phone className="w-4 h-4 text-foreground" /> {t("family_contact")}</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
         <Link to="/withdrawals" data-testid="link-withdrawals" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><Wallet className="w-4 h-4 text-primary" /> {t("withdraw_money")} ({(user.withdrawable_balance || 0).toLocaleString()} {t("sum")})</span>
+          <span className="flex items-center gap-3 text-sm"><Wallet className="w-4 h-4 text-foreground" /> {t("withdraw_money")} ({(user.withdrawable_balance || 0).toLocaleString()} {t("sum")})</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
         <Link to="/economy" data-testid="link-economy" className="flex items-center justify-between p-4">
@@ -300,7 +300,7 @@ export default function Me() {
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
         <Link to="/verification" data-testid="link-verification" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><ShieldCheck className="w-4 h-4 text-primary" /> {t("profile_verification")}</span>
+          <span className="flex items-center gap-3 text-sm"><ShieldCheck className="w-4 h-4 text-foreground" /> {t("profile_verification")}</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
         <Link to="/settings" data-testid="link-settings" className="flex items-center justify-between p-4">
@@ -314,7 +314,7 @@ export default function Me() {
           </Link>
         )}
         <button data-testid="btn-logout" onClick={logout} className="flex items-center justify-between p-4 w-full text-left">
-          <span className="flex items-center gap-3 text-sm text-primary"><LogOut className="w-4 h-4" /> {t("logout")}</span>
+          <span className="flex items-center gap-3 text-sm text-foreground"><LogOut className="w-4 h-4" /> {t("logout")}</span>
         </button>
       </div>
     </div>

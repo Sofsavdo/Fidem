@@ -144,7 +144,7 @@ export default function Rankings() {
 
         {/* Info */}
         <div className="rounded-2xl border border-border bg-card p-4 flex gap-3 text-sm">
-          <Calendar className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+          <Calendar className="w-4 h-4 text-foreground shrink-0 mt-0.5" />
           <div className="text-muted-foreground">
             <p>Rankings are updated daily based on influence score, activity, and contribution.</p>
           </div>

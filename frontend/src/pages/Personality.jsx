@@ -111,7 +111,7 @@ export default function Personality() {
               onClick={() => setAns(q.id, opt.value)}
               className={`w-full rounded-2xl border px-4 py-3 text-left text-sm transition ${
                 answers[q.id] === opt.value
-                  ? "border-primary bg-primary/5 text-primary font-medium"
+                  ? "border-primary bg-primary/5 text-foreground font-medium"
                   : "border-border hover:bg-muted"
               }`}
             >

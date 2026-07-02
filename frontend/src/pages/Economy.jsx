@@ -65,7 +65,7 @@ export default function Economy() {
           to="/economy/donations"
           className="block rounded-3xl border-2 border-primary bg-primary/5 p-6 text-center"
         >
-          <Gift className="w-8 h-8 mx-auto text-primary mb-2" />
+          <Gift className="w-8 h-8 mx-auto text-foreground mb-2" />
           <h3 className="font-heading font-semibold">Reytingni oshirish</h3>
           <p className="text-sm text-muted-foreground mt-1">Yuqori reyting = ko'procha ko'rishlar</p>
         </Link>
