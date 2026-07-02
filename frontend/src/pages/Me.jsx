@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
@@ -17,7 +17,7 @@ export default function Me() {
   const [leadPeriod, setLeadPeriod] = useState("all");
   const [unread, setUnread] = useState(0);
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
     Promise.all([
       api.get("/referral/mine").catch(() => ({ data: null })),
       api.get("/notifications").catch(() => ({ data: [] })),
@@ -30,6 +30,8 @@ export default function Me() {
       setLeaders(l.data?.rankings || []);
     });
   }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   const [daily, setDaily] = useState(null);
 
@@ -314,11 +316,11 @@ export default function Me() {
   );
 }
 
-function Row({ icon, label, right }) {
+const Row = React.memo(function Row({ icon, label, right }) {
   return (
     <div className="flex items-center justify-between p-4">
       <span className="flex items-center gap-3 text-sm">{icon} {label}</span>
       <div>{right}</div>
     </div>
   );
-}
+});

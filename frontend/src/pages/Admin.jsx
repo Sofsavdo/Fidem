@@ -78,14 +78,14 @@ export default function Admin() {
   );
 }
 
-function StatCard({ label, value, icon }) {
+const StatCard = React.memo(function StatCard({ label, value, icon }) {
   return (
     <div className="rounded-3xl bg-card border border-border p-4">
       <div className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">{icon}{label}</div>
       <p className="font-heading text-2xl mt-1">{value}</p>
     </div>
   );
-}
+});
 
 function AdminUsers() {
   const [q, setQ] = useState("");
