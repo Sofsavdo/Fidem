@@ -256,25 +256,40 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
     if req.to_user_id == uid:
         raise HTTPException(400, "Cannot message self")
     is_voice = req.kind == "voice"
+    is_video = req.kind == "video"
+    
     if is_voice:
         if not req.voice_url:
             raise HTTPException(400, "voice_url required for voice message")
         # No moderation on voice (binary content); just length sanity
         if req.voice_duration and req.voice_duration > 60:
             raise HTTPException(400, "Voice message too long (max 60s)")
+    elif is_video:
+        # Video messages are premium feature
+        sender = await get_user(uid)
+        if sender.get("plan") not in ("premium", "vip"):
+            raise HTTPException(402, "Video messages are premium only")
+        if not req.video_url:
+            raise HTTPException(400, "video_url required for video message")
+        if req.video_duration and req.video_duration > 120:
+            raise HTTPException(400, "Video message too long (max 120s)")
     else:
         # AI moderation (fast check) — text only
         ok, reason = quick_moderation(req.text)
         if not ok:
             raise HTTPException(422, reason)
+    
     sender = await get_user(uid)
     await get_user(req.to_user_id)  # ensure target exists
     cid = chat_id_for(uid, req.to_user_id)
     existing_msgs = await db.messages.count_documents({"chat_id": cid})
     is_first = existing_msgs == 0
     is_reply = (await _incoming_count(uid, req.to_user_id)) > 0
+    
     if is_voice:
         kind = "voice"
+    elif is_video:
+        kind = "video"
     else:
         kind = "super" if req.is_super else "text"
     status = "chat"
@@ -299,7 +314,7 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
         "chat_id": cid,
         "from_user_id": uid,
         "to_user_id": req.to_user_id,
-        "text": req.text or ("[voice]" if is_voice else ""),
+        "text": req.text or ("[voice]" if is_voice else "[video]" if is_video else ""),
         "kind": kind,
         "created_at": iso(now_utc()),
         "read": False,
@@ -307,6 +322,12 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
     }
     if is_voice:
         msg["meta"] = {"voice_url": req.voice_url, "voice_duration": req.voice_duration or 0}
+    elif is_video:
+        msg["meta"] = {
+            "video_url": req.video_url,
+            "video_duration": req.video_duration or 0,
+            "video_thumbnail": req.video_thumbnail
+        }
     await db.messages.insert_one(msg)
     msg.pop("_id", None)
     if is_first or req.is_super:

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import random
 from datetime import timedelta
 from typing import Optional
 
@@ -13,6 +14,121 @@ from models import PhotoUnlockDecision, PhotoUnlockRequest, SaveRequest, new_id
 from services import age_from_birth, compute_match
 
 router = APIRouter(tags=["candidates"])
+
+
+def compute_ai_match(viewer: dict, candidate: dict, lang: str = "uz") -> tuple[int, list[str]]:
+    """Enhanced AI-powered match calculation with premium features."""
+    base_score, base_reasons = compute_match(viewer, candidate, lang)
+    
+    # AI enhancements for premium users
+    ai_boost = 0
+    ai_reasons = []
+    
+    # 1. Activity pattern matching (premium feature)
+    viewer_active = viewer.get("last_active_minutes", 9999)
+    candidate_active = candidate.get("last_active_minutes", 9999)
+    if abs(viewer_active - candidate_active) < 60:  # Both active within 1 hour
+        ai_boost += 5
+        if lang == "uz":
+            ai_reasons.append("Faollik vaqti mos")
+        elif lang == "ru":
+            ai_reasons.append("Активность совпадает")
+        else:
+            ai_reasons.append("Activity patterns match")
+    
+    # 2. Response time compatibility (premium feature)
+    viewer_response = viewer.get("avg_response_min", 999)
+    candidate_response = candidate.get("avg_response_min", 999)
+    if viewer_response and candidate_response:
+        if abs(viewer_response - candidate_response) < 30:
+            ai_boost += 5
+            if lang == "uz":
+                ai_reasons.append("Javob tezligi mos")
+            elif lang == "ru":
+                ai_reasons.append("Скорость ответа совпадает")
+            else:
+                ai_reasons.append("Response speed compatible")
+    
+    # 3. Profile completeness bonus (premium feature)
+    viewer_completeness = viewer.get("completeness", 0)
+    candidate_completeness = candidate.get("completeness", 0)
+    if viewer_completeness > 80 and candidate_completeness > 80:
+        ai_boost += 5
+        if lang == "uz":
+            ai_reasons.append("Ikkala profil ham to'liq")
+        elif lang == "ru":
+            ai_reasons.append("Оба профиля полные")
+        else:
+            ai_reasons.append("Both profiles complete")
+    
+    # 4. Verification status alignment (premium feature)
+    viewer_verified = viewer.get("verified_selfie", False) or viewer.get("verified_identity", False)
+    candidate_verified = candidate.get("verified_selfie", False) or candidate.get("verified_identity", False)
+    if viewer_verified and candidate_verified:
+        ai_boost += 8
+        if lang == "uz":
+            ai_reasons.append("Ikkala taraf ham tasdiqlangan")
+        elif lang == "ru":
+            ai_reasons.append("Оба подтверждены")
+        else:
+            ai_reasons.append("Both verified")
+    
+    # 5. Plan compatibility (premium feature)
+    viewer_plan = viewer.get("plan", "free")
+    candidate_plan = candidate.get("plan", "free")
+    if viewer_plan == candidate_plan and viewer_plan != "free":
+        ai_boost += 5
+        if lang == "uz":
+            ai_reasons.append(f"{viewer_plan.capitalize()} foydalanuvchilar")
+        elif lang == "ru":
+            ai_reasons.append(f"{viewer_plan.capitalize()} пользователи")
+        else:
+            ai_reasons.append(f"{viewer_plan.capitalize()} users")
+    
+    # 6. Influence score proximity (premium feature)
+    viewer_influence = viewer.get("influence_score", 0)
+    candidate_influence = candidate.get("influence_score", 0)
+    if viewer_influence > 0 and candidate_influence > 0:
+        influence_diff = abs(viewer_influence - candidate_influence)
+        if influence_diff < 1000:
+            ai_boost += 5
+            if lang == "uz":
+                ai_reasons.append("Ta'sir darajasi yaqin")
+            elif lang == "ru":
+                ai_reasons.append("Уровень влияния близок")
+            else:
+                ai_reasons.append("Influence levels close")
+    
+    # 7. Big5 personality compatibility (if available)
+    viewer_big5 = viewer.get("big5_scores", {})
+    candidate_big5 = candidate.get("big5_scores", {})
+    if viewer_big5 and candidate_big5:
+        personality_match = 0
+        for trait in ["openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism"]:
+            v_score = viewer_big5.get(trait, 50)
+            c_score = candidate_big5.get(trait, 50)
+            # Complementary traits get bonus
+            if trait == "extraversion":
+                # Opposites attract for extraversion
+                personality_match += (100 - abs(v_score - c_score)) / 5
+            else:
+                # Similar traits for others
+                personality_match += (100 - abs(v_score - c_score)) / 10
+        
+        if personality_match > 30:
+            ai_boost += int(personality_match / 10)
+            if lang == "uz":
+                ai_reasons.append("Shaxsiyat mosligi yuqori")
+            elif lang == "ru":
+                ai_reasons.append("Совпадение личности высокое")
+            else:
+                ai_reasons.append("High personality compatibility")
+    
+    # Combine base score with AI boost
+    final_score = min(100, base_score + ai_boost)
+    final_reasons = base_reasons + ai_reasons
+    
+    return final_score, final_reasons[:8]  # Return top 8 reasons
 
 
 def candidate_can_message(target: dict, sender: dict) -> bool:
@@ -135,7 +251,11 @@ async def candidates(
         if height_max and d.get("height_cm", 999) > height_max:
             continue
 
-        score, reasons = compute_match(me_doc, d, lang=match_lang)
+        # Use AI match calculation for premium users
+        if me_doc.get("plan") in ("premium", "vip"):
+            score, reasons = compute_ai_match(me_doc, d, lang=match_lang)
+        else:
+            score, reasons = compute_match(me_doc, d, lang=match_lang)
 
         my_quiz = me_doc.get("quiz_answers") or {}
         their_quiz = d.get("quiz_answers") or {}

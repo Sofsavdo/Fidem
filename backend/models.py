@@ -153,9 +153,12 @@ class SendMessageRequest(BaseModel):
     to_user_id: str
     text: str
     is_super: bool = False
-    kind: Literal["text", "voice"] = "text"
+    kind: Literal["text", "voice", "video"] = "text"
     voice_url: Optional[str] = None
     voice_duration: Optional[int] = None  # seconds
+    video_url: Optional[str] = None
+    video_duration: Optional[int] = None  # seconds
+    video_thumbnail: Optional[str] = None
 
 
 class MessageOut(BaseModel):
@@ -165,7 +168,7 @@ class MessageOut(BaseModel):
     to_user_id: str
     text: str
     created_at: datetime
-    kind: Literal["text", "gift", "photo_request", "photo_grant", "super", "rose", "voice"] = "text"
+    kind: Literal["text", "gift", "photo_request", "photo_grant", "super", "rose", "voice", "video"] = "text"
     meta: dict = {}
 
 

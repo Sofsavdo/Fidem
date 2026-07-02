@@ -645,6 +645,9 @@ const dict = {
     match_reason_interests: "Qiziqishlar yaqin",
     share_success: "Ulandi",
     share_copied: "Nusxalandi",
+    video_message_premium_only: "Video xabarlar faqat Premium uchun",
+    video_message_too_long: "Video xabar juda uzun (maksimal 120 soniya)",
+    video_message_required: "video_url video xabar uchun talab qilinadi",
   },
   ru: {
     app_name: "FIDEM",
@@ -1281,6 +1284,9 @@ const dict = {
     match_reason_interests: "Интересы близки",
     share_success: "Поделиться",
     share_copied: "Скопировано",
+    video_message_premium_only: "Видеосообщения только для Premium",
+    video_message_too_long: "Видеосообщение слишком длинное (максимум 120 секунд)",
+    video_message_required: "video_url требуется для видеосообщения",
   },
   en: {
     app_name: "FIDEM",
@@ -1917,6 +1923,9 @@ const dict = {
     match_reason_interests: "Shared interests",
     share_success: "Shared",
     share_copied: "Copied",
+    video_message_premium_only: "Video messages are premium only",
+    video_message_too_long: "Video message too long (max 120 seconds)",
+    video_message_required: "video_url required for video message",
   },
 };
 
