@@ -96,7 +96,7 @@ export default function Referral() {
           <div className="text-6xl">🎁</div>
           <h1 className="text-2xl font-heading font-bold">{t("ref_subtitle")}</h1>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            +<b className="text-primary">10,000 {t("sum")}</b> · 5 → <b className="text-primary">1 {t("free_premium_week")}</b>
+            Har bir do'st uchun <b className="text-primary">+10,000 {t("sum")}</b> bonus
           </p>
         </section>
 
@@ -105,7 +105,7 @@ export default function Referral() {
         ) : (
           <>
             {/* Stats */}
-            <section className="grid grid-cols-3 gap-2">
+            <section className="grid grid-cols-2 gap-2">
               <div className="rounded-2xl border border-border bg-card p-3 text-center" data-testid="ref-stat-invites">
                 <Users className="w-5 h-5 mx-auto text-primary mb-1" />
                 <p className="text-xl font-heading font-bold">{data?.invited_count ?? 0}</p>
@@ -115,11 +115,6 @@ export default function Referral() {
                 <Crown className="w-5 h-5 mx-auto text-gold-dark mb-1" />
                 <p className="text-xl font-heading font-bold">{data?.paid_referrals ?? 0}</p>
                 <p className="text-[11px] text-muted-foreground">{t("ref_paid_referrals")}</p>
-              </div>
-              <div className="rounded-2xl border border-border bg-card p-3 text-center" data-testid="ref-stat-progress">
-                <Sparkles className="w-5 h-5 mx-auto text-gold-dark mb-1" />
-                <p className="text-xl font-heading font-bold">{Math.min(data?.invited_count ?? 0, 5)} / 5</p>
-                <p className="text-[11px] text-muted-foreground">{t("ref_vip_bonus")}</p>
               </div>
             </section>
 
@@ -245,7 +240,6 @@ export default function Referral() {
                 <Step n="1" text={t("ref_step1") || "Yuqoridagi havolani do'stlaringizga yuboring"} />
                 <Step n="2" text={t("ref_step2") || "Do'stingiz ro'yxatdan o'tib profilini to'liq tasdiqlasin"} />
                 <Step n="3" text={t("ref_step3") || "Siz +10,000, do'stingiz +5,000 so'm bonus oladi"} />
-                <Step n="★" gold text={t("ref_step4") || "5 ta taklif = 1 hafta bepul Premium"} />
               </div>
             </section>
 

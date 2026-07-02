@@ -360,7 +360,11 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
         upsert=True,
     )
 
-    score, reasons = compute_match(me_doc, target, lang=match_lang)
+    # Use AI match calculation for premium users in detail view too
+    if me_doc.get("plan") in ("premium", "vip"):
+        score, reasons = compute_ai_match(me_doc, target, lang=match_lang)
+    else:
+        score, reasons = compute_match(me_doc, target, lang=match_lang)
 
     pub = user_public(target)
     pub["match_score"] = score
