@@ -54,10 +54,10 @@ export default function CompatibilityCard({ targetId }) {
     <div className="rounded-2xl border-2 border-primary/30 bg-primary/5 p-4" data-testid="compat-card">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-primary" />
+          <Sparkles className="w-4 h-4 text-foreground" />
           <h3 className="font-heading font-semibold">{t("compat_title")}</h3>
         </div>
-        <div className="text-3xl font-heading font-semibold text-primary">{data.score}<span className="text-base text-muted-foreground">/100</span></div>
+        <div className="text-3xl font-heading font-semibold text-foreground">{data.score}<span className="text-base text-muted-foreground">/100</span></div>
       </div>
 
       {data.locked ? (
@@ -93,7 +93,7 @@ export default function CompatibilityCard({ targetId }) {
             <div>
               <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">{t("compat_conversation")}</p>
               <ul className="space-y-1">
-                {data.report.conversation_starters.map((s, i) => (<li key={i} className="text-sm flex gap-2"><span className="text-primary">💬</span>{s}</li>))}
+                {data.report.conversation_starters.map((s, i) => (<li key={i} className="text-sm flex gap-2"><span className="text-foreground">💬</span>{s}</li>))}
               </ul>
             </div>
           )}
