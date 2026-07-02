@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from datetime import timedelta
 from typing import Optional
+from functools import lru_cache
+import asyncio
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
@@ -11,6 +13,11 @@ from core import db, get_user, iso, now_utc, parse_dt
 from services import age_from_birth
 
 router = APIRouter(tags=["rankings"])
+
+# Simple in-memory cache for rankings (5 minute TTL)
+_rankings_cache = {}
+_rankings_cache_time = {}
+CACHE_TTL = 300  # 5 minutes
 
 
 def format_ranking_user(user: dict, rank: int) -> dict:
@@ -49,7 +56,16 @@ async def get_ranking_users(
     filter_value: Optional[str] = None,
     limit: int = 100
 ) -> list:
-    """Get users for a specific ranking type."""
+    """Get users for a specific ranking type with caching."""
+    cache_key = f"{ranking_type}:{filter_value}:{limit}"
+    now = now_utc()
+    
+    # Check cache
+    if cache_key in _rankings_cache:
+        cache_time = _rankings_cache_time.get(cache_key)
+        if cache_time and (now - cache_time).total_seconds() < CACHE_TTL:
+            return _rankings_cache[cache_key]
+    
     query = {
         "onboarded": True,
         "blocked": {"$ne": True},
@@ -94,6 +110,10 @@ async def get_ranking_users(
     ranked_users = []
     for idx, user in enumerate(users, 1):
         ranked_users.append(format_ranking_user(user, idx))
+    
+    # Cache result
+    _rankings_cache[cache_key] = ranked_users
+    _rankings_cache_time[cache_key] = now
     
     return ranked_users
 
