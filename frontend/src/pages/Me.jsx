@@ -250,13 +250,13 @@ export default function Me() {
         <div className="space-y-2">
           {leaders.length === 0 && <p className="text-xs text-muted-foreground">{t("no_data")}</p>}
           {leaders.slice(0, 10).map((row, i) => (
-            <div key={row.user?.id || i} className="flex items-center gap-3 text-sm">
+            <div key={row.user_id || row.id || i} className="flex items-center gap-3 text-sm">
               <span className="w-5 text-center font-medium text-muted-foreground">{i + 1}</span>
               <div className="w-7 h-7 rounded-full bg-muted overflow-hidden">
-                {row.user?.photo_url && <img loading="lazy" decoding="async" src={photoSrc(row.user.photo_url)} alt="" className="w-full h-full object-cover" />}
+                {row.photo_url && <img loading="lazy" decoding="async" src={photoSrc(row.photo_url)} alt="" className="w-full h-full object-cover" />}
               </div>
-              <span className="flex-1 truncate">{row.user?.name || "—"}</span>
-              <span className="text-gold-dark font-medium">{row.total?.toLocaleString() || 0}</span>
+              <span className="flex-1 truncate">{row.name || "—"}</span>
+              <span className="text-gold-dark font-medium">{(row.ranking_score || row.total || 0).toLocaleString()}</span>
             </div>
           ))}
         </div>

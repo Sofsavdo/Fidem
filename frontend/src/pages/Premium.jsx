@@ -54,7 +54,7 @@ const FEATURE_LABELS = {
 
 export default function Premium() {
   const { t, lang, user, refresh } = useApp();
-  const [sp] = useSearchParams();
+  const [sp, setSearchParams] = useSearchParams();
   const tab = sp.get("tab") || "plans";
   const showTopup = sp.get("topup") === "1";
   const [topupAmount, setTopupAmount] = useState(50000);
@@ -107,15 +107,15 @@ export default function Premium() {
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-border pb-3">
-        {["plans", "balance", "roses"].map((t) => (
+        {["plans", "balance", "roses"].map((tabKey) => (
           <button
-            key={t}
-            onClick={() => window.location.search = `?tab=${t}`}
+            key={tabKey}
+            onClick={() => setSearchParams({ tab: tabKey })}
             className={`px-4 py-2 rounded-full text-sm font-medium capitalize ${
-              tab === t ? "bg-primary text-white" : "bg-muted/30 text-muted-foreground"
+              tab === tabKey ? "bg-primary text-white" : "bg-muted/30 text-muted-foreground"
             }`}
           >
-            {t}
+            {t(`premium_tab_${tabKey}`)}
           </button>
         ))}
       </div>
@@ -231,12 +231,12 @@ export default function Premium() {
 
           {/* Spending System Explanation */}
           <div className="rounded-3xl bg-primary/5 border border-primary/30 p-5 mt-4">
-            <h3 className="font-heading font-semibold mb-3">Spending System</h3>
+            <h3 className="font-heading font-semibold mb-3">{t("premium_spending_system")}</h3>
             <div className="space-y-2 text-sm text-muted-foreground">
-              <p>• <strong className="text-foreground">Balance</strong>: For in-app purchases (gifts, boosts, AI features). Not withdrawable.</p>
-              <p>• <strong className="text-foreground">Referral Earnings</strong>: Withdrawable cash earned from referrals.</p>
-              <p>• <strong className="text-foreground">Gifts/Roses</strong>: Increase influence and ranking. Not withdrawable.</p>
-              <p>• <strong className="text-foreground">Donations</strong>: Convert to influence for higher status. Not withdrawable.</p>
+              <p>• <strong className="text-foreground">{t("premium_balance_label")}</strong>: {t("premium_balance_desc")}</p>
+              <p>• <strong className="text-foreground">{t("premium_referral_label")}</strong>: {t("premium_referral_desc")}</p>
+              <p>• <strong className="text-foreground">{t("premium_gifts_label")}</strong>: {t("premium_gifts_desc")}</p>
+              <p>• <strong className="text-foreground">{t("premium_donations_label")}</strong>: {t("premium_donations_desc")}</p>
             </div>
           </div>
 

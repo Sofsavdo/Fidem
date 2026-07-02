@@ -42,10 +42,10 @@ export default function Economy() {
         {/* What is Influence */}
         <section className="rounded-3xl border border-border bg-gradient-to-br from-primary/10 to-secondary/10 p-6">
           <h2 className="font-heading font-semibold mb-3 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-primary" /> What is Influence?
+            <TrendingUp className="w-5 h-5 text-primary" /> {t("economy_what")}
           </h2>
           <div className="space-y-2 text-sm text-muted-foreground">
-            <p>Influence is your reputation score on FIDEM. Higher influence means:</p>
+            <p>{t("economy_why")}</p>
             <p>• Better ranking in search results</p>
             <p>• More profile visibility</p>
             <p>• Higher status (Bronze → Legend)</p>
@@ -60,7 +60,7 @@ export default function Economy() {
               <TrendingUp className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Your Influence Score</p>
+              <p className="text-xs text-muted-foreground">{t("economy_what")}</p>
               <p className="text-2xl font-heading font-semibold">{(influenceData?.influence_score || 0).toLocaleString()}</p>
             </div>
           </div>
@@ -78,7 +78,7 @@ export default function Economy() {
 
         {/* How to Increase Influence */}
         <section className="rounded-3xl border border-border bg-card p-6">
-          <h2 className="font-heading font-semibold mb-3">How to Increase Influence</h2>
+          <h2 className="font-heading font-semibold mb-3">{t("economy_how")}</h2>
           <div className="space-y-2 text-sm text-muted-foreground">
             <p>• <strong>Send gifts</strong>: 10% of gift value as influence</p>
             <p>• <strong>Convert balance</strong>: Convert balance to influence with bonus</p>
@@ -91,7 +91,7 @@ export default function Economy() {
         {/* Status Ladder */}
         <section className="rounded-3xl border border-border bg-card p-6">
           <h2 className="font-heading font-semibold mb-4 flex items-center gap-2">
-            <Crown className="w-5 h-5 text-gold-dark" /> Status Ladder
+            <Crown className="w-5 h-5 text-gold-dark" /> {t("economy_status_ladder")}
           </h2>
           <div className="space-y-3">
             {[
@@ -120,7 +120,7 @@ export default function Economy() {
         {/* Lifetime Contribution */}
         <section className="rounded-3xl border border-border bg-card p-6">
           <h2 className="font-heading font-semibold mb-4 flex items-center gap-2">
-            <Heart className="w-5 h-5 text-rose-500" /> Lifetime Contribution
+            <Heart className="w-5 h-5 text-rose-500" /> {t("economy_lifetime")}
           </h2>
           <div className="text-center mb-4">
             <p className="text-3xl font-heading font-bold">{(lifetimeData?.lifetime_contribution || 0).toLocaleString()}</p>

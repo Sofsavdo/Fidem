@@ -90,13 +90,13 @@ export default function Withdrawals() {
         <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
         <div className="text-muted-foreground">
           <p>{t("withdraw_explainer")}</p>
-          <p className="mt-2 text-xs">Only referral earnings can be withdrawn. Internal balance, gifts, roses, and influence are not withdrawable.</p>
+          <p className="mt-2 text-xs">{t("withdraw_only_referral")}</p>
         </div>
       </div>
 
       {/* Eligibility */}
       <div className="rounded-3xl border border-border bg-card p-5 space-y-3">
-        <h2 className="font-semibold">Withdrawal Eligibility</h2>
+        <h2 className="font-semibold">{t("withdraw_eligibility")}</h2>
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2">
             {status?.paid_referrals_count >= 3 ? (

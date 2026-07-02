@@ -188,7 +188,7 @@ export default function Boost() {
           <p className="text-xs text-muted-foreground mt-1">{t("leaderboard_desc")}</p>
           <div className="mt-3 space-y-2">
             {leaderboard.map((u, i) => (
-              <div key={u.id} className="flex items-center gap-3 py-2 border-b border-border/30 last:border-0">
+              <div key={u.user_id || u.id || i} className="flex items-center gap-3 py-2 border-b border-border/30 last:border-0">
                 <span className={`text-xs font-semibold w-6 text-center ${i === 0 ? "text-gold-dark" : i === 1 ? "text-gray-500" : i === 2 ? "text-amber-700" : "text-muted-foreground"}`}>
                   #{i + 1}
                 </span>
@@ -197,10 +197,10 @@ export default function Boost() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{u.name}, {u.age}</p>
-                  <p className="text-[11px] text-muted-foreground">{u.region}</p>
+                  <p className="text-[11px] text-muted-foreground">{u.city || u.region}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-semibold text-primary">{(u.boost_impressions || 0).toLocaleString()}</p>
+                  <p className="text-sm font-semibold text-primary">{(u.ranking_score || u.boost_impressions || 0).toLocaleString()}</p>
                   <p className="text-[10px] text-muted-foreground">{t("views_word")}</p>
                 </div>
               </div>

@@ -36,10 +36,10 @@ export default function Rankings() {
   useEffect(() => { loadRankings(activeTab); }, [activeTab]);
 
   const tabs = [
-    { id: "global", label: "Global", icon: Trophy },
-    { id: "men", label: "Men", icon: Users },
-    { id: "women", label: "Women", icon: Users },
-    { id: "ambassadors", label: "Ambassadors", icon: Crown },
+    { id: "global", label: t("rank_global"), icon: Trophy },
+    { id: "men", label: t("rank_men"), icon: Users },
+    { id: "women", label: t("rank_women"), icon: Users },
+    { id: "ambassadors", label: t("rank_ambassadors"), icon: Crown },
   ];
 
   const getRankBadge = (rank) => {
@@ -81,15 +81,15 @@ export default function Rankings() {
         {myRankings && (
           <section className="rounded-3xl border border-border bg-gradient-to-br from-primary/10 to-secondary/10 p-4">
             <h3 className="font-heading font-semibold mb-3 flex items-center gap-2">
-              <Award className="w-5 h-5" /> Your Rank
+              <Award className="w-5 h-5" /> {t("rank_your_rank")}
             </h3>
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-xl bg-card p-3">
-                <p className="text-xs text-muted-foreground">Global</p>
+                <p className="text-xs text-muted-foreground">{t("rank_global")}</p>
                 <p className="text-lg font-heading font-bold">#{myRankings.global?.rank || "—"}</p>
               </div>
               <div className="rounded-xl bg-card p-3">
-                <p className="text-xs text-muted-foreground">Score</p>
+                <p className="text-xs text-muted-foreground">{t("rank_score")}</p>
                 <p className="text-lg font-heading font-bold">{myRankings.global?.ranking_score || 0}</p>
               </div>
             </div>

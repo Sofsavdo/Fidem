@@ -89,18 +89,18 @@ export default function Referral() {
         {/* How it works */}
         <div className="rounded-3xl border border-border bg-gradient-to-br from-primary/10 to-secondary/10 p-5">
           <h2 className="font-heading font-semibold mb-3 flex items-center gap-2">
-            <Info className="w-5 h-5 text-primary" /> How it works
+            <Info className="w-5 h-5 text-primary" /> {t("ref_how_it_works")}
           </h2>
           <div className="space-y-2 text-sm text-muted-foreground">
-            <p>1. Share your unique link with friends</p>
-            <p>2. When they sign up, you become their referrer</p>
-            <p>3. When they subscribe to Premium, you earn 50% of their first payment (up to 29,900 UZS)</p>
-            <p>4. Every 3 friends who subscribe = 7 free Premium days for you</p>
+            <p>1. {t("ref_step_1")}</p>
+            <p>2. {t("ref_step_2")}</p>
+            <p>3. {t("ref_step_3")}</p>
+            <p>4. {t("ref_step_4")}</p>
           </div>
           <div className="mt-3 pt-3 border-t border-border/40">
-            <p className="text-xs text-secondary font-medium">Important:</p>
-            <p className="text-xs text-muted-foreground">• Rewards only from first paid subscription</p>
-            <p className="text-xs text-muted-foreground">• No rewards from gifts, roses, balance top-ups, donations, boosts</p>
+            <p className="text-xs text-secondary font-medium">{t("ref_important")}:</p>
+            <p className="text-xs text-muted-foreground">• {t("ref_reward_rule_1")}</p>
+            <p className="text-xs text-muted-foreground">• {t("ref_reward_rule_2")}</p>
           </div>
         </div>
 
