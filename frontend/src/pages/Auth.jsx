@@ -78,7 +78,7 @@ export default function Auth() {
 
         {/* Premium card */}
         <div className="card-premium p-6 sm:p-7 stagger">
-          <div className="inline-flex items-center gap-1.5 text-[11px] tracking-wider uppercase font-semibold text-primary bg-primary/10 px-3 py-1 rounded-full">
+          <div className="inline-flex items-center gap-1.5 text-[11px] tracking-wider uppercase font-semibold text-foreground bg-primary/10 px-3 py-1 rounded-full">
             <Sparkles className="w-3 h-3" /> {t("safe_search") || "Premium"}
           </div>
 

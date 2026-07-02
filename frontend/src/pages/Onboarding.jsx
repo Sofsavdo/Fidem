@@ -152,7 +152,7 @@ export default function Onboarding() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <div className="inline-flex items-center gap-1.5 text-[10px] tracking-wider uppercase font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-full">
+            <div className="inline-flex items-center gap-1.5 text-[10px] tracking-wider uppercase font-semibold text-foreground bg-primary/10 px-2.5 py-1 rounded-full">
               <Sparkles className="w-3 h-3" /> {`${step + 1} / ${STEPS}`}
             </div>
             <h2 className="mt-3 font-heading text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight leading-tight">
