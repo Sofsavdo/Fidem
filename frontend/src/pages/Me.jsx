@@ -18,6 +18,18 @@ export default function Me() {
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {
+    // Load from cache first for instant UI
+    const cached = localStorage.getItem("fidem_me_data");
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        setReferral(parsed.referral);
+        setUnread(parsed.unread);
+        setDaily(parsed.daily);
+        setLeaders(parsed.leaders);
+      } catch {}
+    }
+
     Promise.all([
       api.get("/referral/mine").catch(() => ({ data: null })),
       api.get("/notifications").catch(() => ({ data: [] })),
@@ -28,6 +40,14 @@ export default function Me() {
       setUnread((n.data || []).filter((x) => !x.read).length);
       setDaily(d.data);
       setLeaders(l.data?.rankings || []);
+      // Cache for instant UI on next load
+      localStorage.setItem("fidem_me_data", JSON.stringify({
+        referral: r.data,
+        unread: (n.data || []).filter((x) => !x.read).length,
+        daily: d.data,
+        leaders: l.data?.rankings || [],
+        cachedAt: Date.now()
+      }));
     });
   }, []);
 
