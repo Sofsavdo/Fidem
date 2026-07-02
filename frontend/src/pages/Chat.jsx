@@ -392,7 +392,7 @@ function ReportModal({ t, onClose, onSubmit }) {
               key={r.id}
               data-testid={`report-reason-${r.id}`}
               onClick={() => setReason(r.id)}
-              className={`w-full text-left rounded-xl border px-3 py-2.5 text-sm transition ${reason === r.id ? "border-primary bg-primary/5 text-primary" : "border-border bg-card hover:bg-muted"}`}
+              className={`w-full text-left rounded-xl border px-3 py-2.5 text-sm transition ${reason === r.id ? "border-primary bg-primary/5 text-foreground" : "border-border bg-card hover:bg-muted"}`}
             >
               {r.label}
             </button>
