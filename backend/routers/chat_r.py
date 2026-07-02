@@ -51,19 +51,6 @@ async def _incoming_count(uid: str, target_id: str) -> int:
     return await db.messages.count_documents({"chat_id": cid, "from_user_id": target_id})
 
 
-async def _free_daily_initiated_count(uid: str) -> int:
-    """Count how many new conversations free user started today."""
-    today_start = now_utc().replace(hour=0, minute=0, second=0, microsecond=0)
-    # Count unique chat_ids where user sent first message today
-    pipeline = [
-        {"$match": {"from_user_id": uid, "created_at": {"$gte": iso(today_start)}}},
-        {"$group": {"_id": "$chat_id", "first_msg": {"$min": "$created_at"}}},
-        {"$count": "total"}
-    ]
-    result = await db.messages.aggregate(pipeline).to_list(1)
-    return result[0]["total"] if result else 0
-
-
 async def _unlock_doc(uid: str, target_id: str):
     return await db.chat_unlocks.find_one({"user_id": uid, "target_id": target_id}, {"_id": 0})
 
@@ -111,26 +98,17 @@ async def chat_access(target_id: str, uid: str = Depends(get_current_user_id)):
     is_reply = (await _incoming_count(uid, target_id)) > 0
     unlocked = bool(await _unlock_doc(uid, target_id))
     plan_ok = _plan_active(me)
-    
-    # Free users: limited daily initiations, unlimited replies
-    FREE_DAILY_INITIATIONS = 3
-    daily_initiated = await _free_daily_initiated_count(uid)
-    free_limit_reached = not plan_ok and not is_reply and not unlocked and daily_initiated >= FREE_DAILY_INITIATIONS
-    
-    can = not free_limit_reached
-    
+    # Free users can always chat - no paywall
+    can = True
     return {
         "can_message": can,
         "is_reply": is_reply,
         "unlocked": unlocked,
         "plan": me.get("plan", "free"),
         "plan_active": plan_ok,
-        "requires_unlock": free_limit_reached,
-        "free_daily_limit": FREE_DAILY_INITIATIONS,
-        "free_daily_used": daily_initiated,
-        "free_daily_remaining": max(0, FREE_DAILY_INITIATIONS - daily_initiated),
-        "price_uzs": PRICE_CHAT_UNLOCK if free_limit_reached else 0,
-        "price_coins": CHAT_UNLOCK_COINS if free_limit_reached else 0,
+        "requires_unlock": False,  # No paywall for anyone
+        "price_uzs": 0,
+        "price_coins": 0,
         "balance": int(me.get("balance", 0) or 0),
         "coins": int(me.get("coins", 0) or 0),
         "free_credits": int(me.get("free_chat_credits", 0) or 0),
@@ -325,12 +303,9 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
         # Replying to someone who already wrote to you is always free.
         pass
     else:
-        # Free users: limited daily initiations
-        if not _plan_active(sender):
-            daily_initiated = await _free_daily_initiated_count(uid)
-            FREE_DAILY_INITIATIONS = 3
-            if daily_initiated >= FREE_DAILY_INITIATIONS and not await _unlock_doc(uid, req.to_user_id):
-                raise HTTPException(402, "free_daily_limit_reached")
+        # Initiating a new conversation requires an active paid plan or a chat unlock.
+        if not (_plan_active(sender) or await _unlock_doc(uid, req.to_user_id)):
+            raise HTTPException(402, "chat_locked")
         if is_first:
             status = "application"
 
