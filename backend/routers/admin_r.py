@@ -24,21 +24,75 @@ async def admin_stats(_: str = Depends(get_current_admin)):
     vip = await db.users.count_documents({"plan": "vip"})
     today_iso = iso(datetime.now(timezone.utc) - timedelta(days=1))
     week_iso = iso(datetime.now(timezone.utc) - timedelta(days=7))
+    month_iso = iso(datetime.now(timezone.utc) - timedelta(days=30))
     dau = await db.users.count_documents({"last_active": {"$gte": today_iso}})
     wau = await db.users.count_documents({"last_active": {"$gte": week_iso}})
+    mau = await db.users.count_documents({"last_active": {"$gte": month_iso}})
     rev_agg = await db.payments.aggregate([
         {"$match": {"status": "success"}},
         {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
     ]).to_list(1)
     revenue = rev_agg[0]["total"] if rev_agg else 0
+    
+    # Revenue by period
+    rev_today = await db.payments.aggregate([
+        {"$match": {"status": "success", "created_at": {"$gte": today_iso}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
+    ]).to_list(1)
+    rev_week = await db.payments.aggregate([
+        {"$match": {"status": "success", "created_at": {"$gte": week_iso}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
+    ]).to_list(1)
+    rev_month = await db.payments.aggregate([
+        {"$match": {"status": "success", "created_at": {"$gte": month_iso}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
+    ]).to_list(1)
+    
+    # Revenue by purpose
+    rev_by_purpose = await db.payments.aggregate([
+        {"$match": {"status": "success"}},
+        {"$group": {"_id": "$purpose", "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
+        {"$sort": {"total": -1}},
+    ]).to_list(20)
+    
+    # Top regions
+    top_regions = await db.users.aggregate([
+        {"$match": {"onboarded": True, "region": {"$ne": None}}},
+        {"$group": {"_id": "$region", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 10},
+    ]).to_list(10)
+    
+    # Messages stats
+    total_messages = await db.messages.count_documents({})
+    messages_today = await db.messages.count_documents({"created_at": {"$gte": today_iso}})
+    
+    # Referral stats
+    total_referrals = await db.users.count_documents({"referred_by": {"$ne": None}})
+    
     return {
         "total_users": total, "males": males, "females": females,
         "onboarded": onboarded, "premium": premium, "vip": vip,
-        "dau": dau, "wau": wau, "revenue_uzs": revenue,
+        "dau": dau, "wau": wau, "mau": mau,
+        "revenue": {
+            "total": revenue,
+            "today": rev_today[0]["total"] if rev_today else 0,
+            "week": rev_week[0]["total"] if rev_week else 0,
+            "month": rev_month[0]["total"] if rev_month else 0,
+            "by_purpose": rev_by_purpose,
+        },
         "conversion_premium": round((premium + vip) / total * 100, 2) if total else 0,
         "pending_payments": await db.payments.count_documents({"status": "pending"}),
         "pending_verifications": await db.verifications.count_documents({"status": "pending"}),
         "open_reports": await db.reports.count_documents({"status": "open"}),
+        "top_regions": top_regions,
+        "messages": {
+            "total": total_messages,
+            "today": messages_today,
+        },
+        "referrals": {
+            "total": total_referrals,
+        },
     }
 
 
