@@ -47,6 +47,7 @@ from routers.face_r import router as face_router  # noqa: E402
 from routers.economy_r import router as economy_router  # noqa: E402
 from routers.rankings_r import router as rankings_router  # noqa: E402
 from routers.community_r import router as community_router  # noqa: E402
+from routers.settings_r import router as settings_router  # noqa: E402
 from services import compute_completeness  # noqa: E402
 from storage import init_storage  # noqa: E402
 
@@ -75,6 +76,7 @@ api.include_router(face_router)
 api.include_router(economy_router)
 api.include_router(rankings_router)
 api.include_router(community_router)
+api.include_router(settings_router)
 app.include_router(api)
 
 

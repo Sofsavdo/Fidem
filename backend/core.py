@@ -193,34 +193,74 @@ def user_public_minimal(u: dict) -> dict:
     }
 
 
-async def notify_telegram(uid: str, text: str, link: Optional[str] = None) -> None:
-    user = await db.users.find_one({"id": uid}, {"telegram_id": 1, "_id": 0})
-    if user and user.get("telegram_id"):
+async def notify_telegram(uid: str, text: str, link: Optional[str] = None, kind: str = "general") -> None:
+    """Send Telegram notification with user preference check and rate limiting."""
+    user = await db.users.find_one({"id": uid}, {"telegram_id": 1, "notification_prefs": 1, "_id": 0})
+    if not user or not user.get("telegram_id"):
+        return
+    
+    # Check user notification preferences
+    prefs = user.get("notification_prefs", {})
+    if prefs.get(f"disable_{kind}", False):
+        log.debug(f"User {uid} has disabled {kind} notifications")
+        return
+    
+    # Rate limiting: check last notification time for this kind
+    last_notif_key = f"last_notif_{kind}"
+    last_notif = user.get(last_notif_key)
+    if last_notif:
         try:
-            base = get_webapp_url()
-            full = base
+            last_time = parse_dt(last_notif)
+            # Don't send more than 3 notifications of same kind per hour
+            if (now_utc() - last_time).total_seconds() < 1200:  # 20 minutes
+                log.debug(f"Rate limited {kind} notification for user {uid}")
+                return
+        except Exception:
+            pass
+    
+    try:
+        base = get_webapp_url()
+        full = base
 
-            if link:
-                full = link if link.startswith("http") else f"{base}{link}"
+        if link:
+            full = link if link.startswith("http") else f"{base}{link}"
 
-            reply_markup = {
-                "inline_keyboard": [
-                    [
-                        {
-                            "text": "💖 FIDEM'ni ochish",
-                            "web_app": {"url": full},
-                        }
-                    ]
+        reply_markup = {
+            "inline_keyboard": [
+                [
+                    {
+                        "text": "💖 FIDEM'ni ochish",
+                        "web_app": {"url": full},
+                    }
                 ]
-            }
+            ]
+        }
 
-            await send_telegram_message(
-                int(user["telegram_id"]),
-                text,
-                reply_markup=reply_markup,
-            )
-        except Exception as e:
-            log.warning(f"telegram notify failed: {e}")
+        await send_telegram_message(
+            int(user["telegram_id"]),
+            text,
+            reply_markup=reply_markup,
+        )
+        
+        # Update last notification time
+        await db.users.update_one(
+            {"id": uid},
+            {"$set": {last_notif_key: iso(now_utc())}}
+        )
+    except Exception as e:
+        log.warning(f"telegram notify failed: {e}")
+
+
+async def notify_telegram_batch(uids: list[str], text: str, link: Optional[str] = None, kind: str = "general") -> int:
+    """Send batch notifications with rate limiting and preference checks."""
+    sent_count = 0
+    for uid in uids:
+        await notify_telegram(uid, text, link, kind)
+        sent_count += 1
+        # Small delay to avoid hitting Telegram API rate limits
+        import asyncio
+        await asyncio.sleep(0.1)
+    return sent_count
 
 
 async def push_notif(

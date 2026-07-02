@@ -286,6 +286,17 @@ class GroupPostRequest(BaseModel):
     text: str
 
 
+# ---------- Notification Preferences ----------
+class NotificationPreferencesRequest(BaseModel):
+    disable_general: bool = False
+    disable_match: bool = False
+    disable_message: bool = False
+    disable_premium: bool = False
+    disable_community: bool = False
+    disable_referral: bool = False
+    disable_balance: bool = False
+
+
 # ---------- Reports / blocks ----------
 class ReportRequest(BaseModel):
     user_id: str
