@@ -189,15 +189,8 @@ export default function Me() {
           <div className="flex items-center justify-between">
             <div className="min-w-0">
               <p className="font-heading text-lg flex items-center gap-2"><Share2 className="w-4 h-4 text-secondary" /> {t("invite_friends")}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{t("invite_card_progress")}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{referral.invited_count || 0} {t("ref_invites")} · {referral.paid_referrals || 0} {t("ref_paid_referrals")}</p>
             </div>
-            <span className="text-xs whitespace-nowrap ml-2">{referral.invited_count || 0} / 5</span>
-          </div>
-          <div className="h-2 rounded-full bg-border overflow-hidden mt-3">
-            <div className="h-full bg-secondary transition-all" style={{ width: `${Math.min(100, ((referral.invited_count || 0) / 5) * 100)}%` }} />
-          </div>
-          <div className="mt-3 flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">{(referral.earned || 0).toLocaleString()} {t("sum")}</span>
             <span className="text-secondary font-medium">{t("share")} →</span>
           </div>
         </Link>
