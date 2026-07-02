@@ -108,9 +108,10 @@ export default function Chat() {
       await api.post("/messages/send", { to_user_id: otherId, text: finalText, is_super: isSuper });
       setText("");
       setShowTemplates(false);
-      load();
+      // Optimistic: don't reload, let WebSocket handle the update
     } catch (e) {
       toast.error(t("error"));
+      load(); // Reload only on error
     } finally { setSending(false); }
   };
 
@@ -126,9 +127,10 @@ export default function Chat() {
       });
       setShowTemplates(false);
       toast.success("✅");
-      load();
+      // Optimistic: don't reload, let WebSocket handle the update
     } catch (e) {
       toast.error(t("error"));
+      load(); // Reload only on error
     } finally { setSending(false); }
   };
 

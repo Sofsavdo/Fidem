@@ -48,8 +48,16 @@ async def _may_access_file(uid: str, is_admin: bool, rec: dict) -> bool:
     owner_id = rec.get("owner_id")
     if not owner_id:
         return bool(is_admin)
-    if is_admin or uid == owner_id:
+    # Admin can access all files
+    if is_admin:
         return True
+    # Owner can always access their own files
+    if uid == owner_id:
+        return True
+    # Public profile photos are accessible to all authenticated users
+    if rec.get("is_public", False):
+        return True
+    # Private photos require approved unlock
     unlock = await db.photo_unlocks.find_one(
         {"requester_id": uid, "target_id": owner_id, "approved": True},
         {"_id": 1},
@@ -454,6 +462,7 @@ async def upload_file(request: Request, file: UploadFile = File(...), uid: str =
             "content_type": MIME[ext],
             "size": result.get("size", len(data)),
             "is_deleted": False,
+            "is_public": True,  # Profile photos are public by default
             "created_at": iso(now_utc()),
         }
     )
