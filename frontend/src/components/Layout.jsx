@@ -10,14 +10,24 @@ export default function Layout({ children }) {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin");
   const isChat = location.pathname.startsWith("/chat/");
+  
+  // Admin pages have their own layout, bypass Layout entirely
+  if (isAdmin) {
+    return (
+      <div className="min-h-screen bg-background bg-grain">
+        <OfflineBanner />
+        {children || <Outlet />}
+      </div>
+    );
+  }
+  
   // Mobile-first: sidebar only shown on admin pages
   return (
     <div className="min-h-screen bg-background bg-grain">
       <OfflineBanner />
-      {isAdmin && <Sidebar />}
       {!isAdmin && !isChat && <MobileTopBar />}
-      <main className={isAdmin ? "" : ""}>
-        <div className={`${isAdmin ? "w-full" : "max-w-2xl xl:max-w-3xl mx-auto"} ${isChat ? "pb-0" : "pb-24 md:pb-10"} min-h-screen relative`}>
+      <main>
+        <div className={`max-w-2xl xl:max-w-3xl mx-auto ${isChat ? "pb-0" : "pb-24 md:pb-10"} min-h-screen relative`}>
           {children || <Outlet />}
         </div>
       </main>
