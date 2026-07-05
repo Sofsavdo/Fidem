@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import CandidateCard from "@/components/CandidateCard";
@@ -16,7 +16,7 @@ export default function Candidates() {
   const [filters, setFilters] = useState({ sort: "match", verified_only: false, financial_only: false });
   const [savedIds, setSavedIds] = useState(new Set());
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const params = { ...filters };
@@ -31,14 +31,13 @@ export default function Candidates() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters.sort, filters.verified_only, filters.financial_only, filters.country, filters.region, filters.district, filters.age_min, filters.age_max]);
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line
-  }, [filters.sort, filters.verified_only, filters.financial_only, filters.country, filters.region, filters.district, filters.age_min, filters.age_max]);
+  }, [load]);
 
-  const onSave = async (c) => {
+  const onSave = useCallback(async (c) => {
     try {
       if (savedIds.has(c.id)) {
         await api.delete(`/saved/${c.id}`);
@@ -51,7 +50,7 @@ export default function Candidates() {
     } catch (e) {
       toast.error(t("error"));
     }
-  };
+  }, [savedIds, t]);
 
   return (
     <div className="px-4 md:px-8 pt-6 pb-4">

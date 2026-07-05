@@ -74,13 +74,18 @@ export default function Premium() {
     }
   }, [tab]);
 
-  const buy = async (purpose) => {
+  const buy = async (purpose, amount) => {
     setCreating(true);
     try {
-      const r = await api.post("/payments/create", { purpose });
-      toast.success(t("pay_with_click"));
-      window.open(r.data.payment_link, "_blank");
-      setPayments((p) => [{ ...r.data, purpose, user_id: user.id, created_at: new Date() }, ...p]);
+      const r = await api.post("/payments/create", { purpose, amount });
+      if (r.data.status === "paid") {
+        toast.success(t("payment_success"));
+        refresh();
+      } else {
+        toast.success(t("pay_with_click"));
+        window.open(r.data.payment_link, "_blank");
+      }
+      setPayments((p) => [{ ...r.data, purpose, amount, user_id: user.id, created_at: new Date() }, ...p]);
     } catch (e) {
       toast.error(t("error_generic"));
     } finally { setCreating(false); }
@@ -89,8 +94,14 @@ export default function Premium() {
     setCreating(true);
     try {
       const r = await api.post("/payments/create", { purpose: "balance_topup", amount: topupAmount });
-      window.open(r.data.payment_link, "_blank");
-      setPayments((p) => [{ ...r.data, purpose: "balance_topup" }, ...p]);
+      if (r.data.status === "paid") {
+        toast.success(t("payment_success"));
+        refresh();
+      } else {
+        toast.success(t("pay_with_click"));
+        window.open(r.data.payment_link, "_blank");
+      }
+      setPayments((p) => [{ ...r.data, purpose: "balance_topup", amount: topupAmount }, ...p]);
     } catch (e) {
       toast.error(t("error_generic"));
     } finally { setCreating(false); }
@@ -160,13 +171,13 @@ export default function Premium() {
                   {p.key !== "free" && !isCurrent && (
                     <button
                       data-testid={`buy-${p.key}`}
-                      onClick={() => buy(p.key)}
+                      onClick={() => buy(p.key, p.price)}
                       disabled={creating}
                       className={`mt-4 w-full rounded-2xl py-3 font-medium ${
                         p.key === "vip" ? "bg-ink text-gold border border-gold/30" : "bg-primary text-white"
                       }`}
                     >
-                      {t("buy")} · {t("pay_with_click")}
+                      {t("buy")} · {Number(p.price).toLocaleString()} {t("sum")}
                     </button>
                   )}
                   {isCurrent && <p className="mt-3 text-sm font-medium text-secondary">— {t("current_plan")} —</p>}

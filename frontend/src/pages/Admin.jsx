@@ -253,6 +253,7 @@ function AdminUsers() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [regions, setRegions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [zoomPhoto, setZoomPhoto] = useState(null);
   const limit = 20;
   
   const load = () => {
@@ -367,7 +368,7 @@ function AdminUsers() {
             <div className="space-y-4">
               {/* Profile */}
               <div className="flex items-center gap-4 p-4 bg-muted rounded-2xl">
-                <div className="w-20 h-20 rounded-full bg-muted overflow-hidden">
+                <div className="w-20 h-20 rounded-full bg-muted overflow-hidden cursor-pointer hover:opacity-80 transition-opacity" onClick={() => selectedUser.photo_url && setZoomPhoto(selectedUser.photo_url)}>
                   {selectedUser.photo_url && <img src={photoSrc(selectedUser.photo_url)} alt="" className="w-full h-full object-cover" />}
                 </div>
                 <div>
@@ -469,6 +470,14 @@ function AdminUsers() {
           </div>
         </div>
       )}
+
+      {/* Photo Zoom Modal */}
+      {zoomPhoto && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[60] p-4" onClick={() => setZoomPhoto(null)}>
+          <img src={photoSrc(zoomPhoto)} alt="Zoomed" className="max-w-full max-h-full object-contain" onClick={(e) => e.stopPropagation()} />
+          <button onClick={() => setZoomPhoto(null)} className="absolute top-4 right-4 p-2 rounded-full bg-white/20 text-white hover:bg-white/30">✕</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -483,11 +492,6 @@ function AdminPayments() {
     setTotal(r.data.total || 0);
   });
   useEffect(() => { load(); }, [page]);
-  const confirm = async (id) => {
-    await api.post(`/payments/admin-confirm/${id}`);
-    toast.success("Confirmed");
-    load();
-  };
   const blockPayment = async (id) => {
     await api.post(`/admin/payments/${id}/block`);
     toast.success("Blocked");
@@ -508,9 +512,6 @@ function AdminPayments() {
               <p className="text-xs text-muted-foreground">{p.status} {p.blocked_by_admin && "🚫 Blocked"}</p>
             </div>
             <div className="flex gap-1">
-              {p.status !== "success" && !p.blocked_by_admin && (
-                <button data-testid={`adm-pay-confirm-${p.id}`} onClick={() => confirm(p.id)} className="text-xs rounded-full bg-secondary text-white px-3 py-1.5">Confirm</button>
-              )}
               {p.blocked_by_admin ? (
                 <button onClick={() => unblockPayment(p.id)} className="text-xs rounded-full bg-emerald-100 text-emerald-700 px-3 py-1.5">Unblock</button>
               ) : (

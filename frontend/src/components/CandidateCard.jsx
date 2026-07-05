@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo } from "react";
 import { Link } from "react-router-dom";
 import { Bookmark, MessageCircle, Lock } from "lucide-react";
 import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot } from "@/components/Badges";
@@ -6,7 +6,7 @@ import { useApp } from "@/contexts/AppContext";
 import { photoSrc } from "@/lib/photo";
 import { formatLastActive } from "@/lib/time";
 
-export default function CandidateCard({ c, onSave, saved }) {
+function CandidateCardInner({ c, onSave, saved }) {
   const { t } = useApp();
   const blurred = !c.photo_unlocked;
   const photoUrl = photoSrc(c.photo_url) || "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=800";
@@ -104,3 +104,5 @@ export default function CandidateCard({ c, onSave, saved }) {
     </div>
   );
 }
+
+export default memo(CandidateCardInner);

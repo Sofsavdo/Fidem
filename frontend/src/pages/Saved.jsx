@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
@@ -27,23 +27,27 @@ export default function Saved() {
     }
   }, [searchParams]);
 
-  useEffect(() => {
-    const cur = TABS.find((x) => x.k === tab);
+  const loadTab = useCallback(async (currentTab) => {
+    const cur = TABS.find((x) => x.k === currentTab);
     setLoading(true);
     api.get(cur.api)
-      .then((r) => setData((d) => ({ ...d, [tab]: r.data || [] })))
+      .then((r) => setData((d) => ({ ...d, [currentTab]: r.data || [] })))
       .catch(() => toast.error(t("error_generic")))
       .finally(() => setLoading(false));
-  }, [tab, t]);
+  }, [t]);
 
-  const selectTab = (k) => {
+  useEffect(() => {
+    loadTab(tab);
+  }, [tab, loadTab]);
+
+  const selectTab = useCallback((k) => {
     setTab(k);
     if (k === "mine") {
       setSearchParams({}, { replace: true });
     } else {
       setSearchParams({ tab: k }, { replace: true });
     }
-  };
+  }, [setSearchParams]);
 
   const items = data[tab] || [];
 

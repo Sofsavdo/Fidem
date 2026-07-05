@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
@@ -11,7 +11,7 @@ export default function Messages() {
   const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const [c, a] = await Promise.all([
@@ -21,8 +21,9 @@ export default function Messages() {
       setChats(c.data || []);
       setApps(a.data || []);
     } finally { setLoading(false); }
-  };
-  useEffect(() => { load(); }, []);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   const matches = chats.filter((c) => c.status === "match" || (c.last_message && c.last_message.kind !== "super"));
 
@@ -53,64 +54,21 @@ export default function Messages() {
       {tab === "chats" && (
         <div className="space-y-2" data-testid="chat-list">
           {chats.length === 0 && !loading && <Empty label={t("no_data")} />}
-          {chats.map((c) => <ChatRow key={c.chat_id} c={c} />)}
+          {chats.map((c) => <ChatRowMemo key={c.chat_id} c={c} />)}
         </div>
       )}
       {tab === "applications" && (
         <div className="space-y-2" data-testid="app-list">
           {apps.length === 0 && !loading && <Empty label={t("no_data")} />}
-          {apps.map((a) => <ApplicationRow key={a.application.id} a={a} onChange={load} />)}
+          {apps.map((a) => <ApplicationRowMemo key={a.application.id} a={a} onChange={load} />)}
         </div>
       )}
       {tab === "matches" && (
         <div className="space-y-2" data-testid="matches-list">
           {matches.length === 0 && !loading && <Empty label={t("no_data")} />}
-          {matches.map((c) => <ChatRow key={c.chat_id} c={c} />)}
+          {matches.map((c) => <ChatRowMemo key={c.chat_id} c={c} />)}
         </div>
       )}
-    </div>
-  );
-}
-
-function ChatRow({ c }) {
-  return (
-    <Link
-      to={`/chat/${c.other.id}`}
-      data-testid={`chat-row-${c.other.id}`}
-      className="flex items-center gap-3 bg-card rounded-2xl p-3 border border-border hover:shadow-soft transition"
-    >
-      <Avatar user={c.other} />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between">
-          <p className="font-medium truncate">{c.other.name}</p>
-          {c.unread > 0 && <span className="text-[10px] bg-primary text-white px-1.5 py-0.5 rounded-full">{c.unread}</span>}
-        </div>
-        <p className="text-sm text-muted-foreground truncate">{c.last_message?.text || "..."}</p>
-      </div>
-    </Link>
-  );
-}
-
-function ApplicationRow({ a, onChange }) {
-  const decide = async (approve) => {
-    await api.post(`/messages/applications/${a.application.id}/decide`, { approve });
-    onChange();
-  };
-  return (
-    <div className="bg-card rounded-2xl p-3 border border-border" data-testid={`app-row-${a.application.id}`}>
-      <div className="flex items-center gap-3">
-        <Avatar user={a.from_user} />
-        <div className="flex-1 min-w-0">
-          <p className="font-medium">{a.from_user.name}, {a.from_user.age}</p>
-          <p className="text-xs text-muted-foreground">{a.from_user.region}</p>
-          {a.application.is_super && <span className="text-[10px] uppercase tracking-wider text-gold-dark">Super</span>}
-        </div>
-      </div>
-      <p className="mt-2 text-sm">{a.application.text}</p>
-      <div className="flex gap-2 mt-2">
-        <button data-testid={`app-approve-${a.application.id}`} onClick={() => decide(true)} className="flex-1 rounded-xl bg-secondary text-white text-sm py-2">Qabul</button>
-        <button data-testid={`app-reject-${a.application.id}`} onClick={() => decide(false)} className="flex-1 rounded-xl border border-border text-sm py-2">Rad</button>
-      </div>
     </div>
   );
 }
@@ -128,6 +86,55 @@ function Avatar({ user }) {
     </div>
   );
 }
+
+const AvatarMemo = React.memo(Avatar);
+
+function ChatRow({ c }) {
+  return (
+    <Link
+      to={`/chat/${c.other.id}`}
+      data-testid={`chat-row-${c.other.id}`}
+      className="flex items-center gap-3 bg-card rounded-2xl p-3 border border-border hover:shadow-soft transition"
+    >
+      <AvatarMemo user={c.other} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between">
+          <p className="font-medium truncate">{c.other.name}</p>
+          {c.unread > 0 && <span className="text-[10px] bg-primary text-white px-1.5 py-0.5 rounded-full">{c.unread}</span>}
+        </div>
+        <p className="text-sm text-muted-foreground truncate">{c.last_message?.text || "..."}</p>
+      </div>
+    </Link>
+  );
+}
+
+const ChatRowMemo = React.memo(ChatRow);
+
+function ApplicationRow({ a, onChange }) {
+  const decide = async (approve) => {
+    await api.post(`/messages/applications/${a.application.id}/decide`, { approve });
+    onChange();
+  };
+  return (
+    <div className="bg-card rounded-2xl p-3 border border-border" data-testid={`app-row-${a.application.id}`}>
+      <div className="flex items-center gap-3">
+        <AvatarMemo user={a.from_user} />
+        <div className="flex-1 min-w-0">
+          <p className="font-medium">{a.from_user.name}, {a.from_user.age}</p>
+          <p className="text-xs text-muted-foreground">{a.from_user.region}</p>
+          {a.application.is_super && <span className="text-[10px] uppercase tracking-wider text-gold-dark">Super</span>}
+        </div>
+      </div>
+      <p className="mt-2 text-sm">{a.application.text}</p>
+      <div className="flex gap-2 mt-2">
+        <button data-testid={`app-approve-${a.application.id}`} onClick={() => decide(true)} className="flex-1 rounded-xl bg-secondary text-white text-sm py-2">Qabul</button>
+        <button data-testid={`app-reject-${a.application.id}`} onClick={() => decide(false)} className="flex-1 rounded-xl border border-border text-sm py-2">Rad</button>
+      </div>
+    </div>
+  );
+}
+
+const ApplicationRowMemo = React.memo(ApplicationRow);
 
 function Empty({ label }) {
   return <div className="py-16 text-center text-muted-foreground" data-testid="empty">{label}</div>;
