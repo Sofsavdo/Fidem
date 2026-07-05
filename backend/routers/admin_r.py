@@ -278,3 +278,27 @@ async def admin_unblock_payment(pid: str, _: str = Depends(get_current_admin)):
     if result.modified_count == 0:
         raise HTTPException(404, "Payment not found")
     return {"ok": True}
+
+
+@router.get("/fraud")
+async def admin_fraud_detection(min_score: int = 50, page: int = 1, limit: int = 50, _: str = Depends(get_current_admin)):
+    """Get users with high fraud scores."""
+    skip = (page - 1) * limit
+    total = await db.users.count_documents({"fraud_score": {"$gte": min_score}})
+    rows = await db.users.find(
+        {"fraud_score": {"$gte": min_score}},
+        {"_id": 0, "password_hash": 0}
+    ).sort("fraud_score", -1).skip(skip).limit(limit).to_list(limit)
+    return {"users": [user_public(u) for u in rows], "total": total, "page": page, "limit": limit}
+
+
+@router.post("/users/{uid}/mark-safe")
+async def admin_mark_user_safe(uid: str, _: str = Depends(get_current_admin)):
+    """Mark a user as safe (reset fraud score)."""
+    result = await db.users.update_one(
+        {"id": uid},
+        {"$set": {"fraud_score": 0, "fraud_reasons": [], "flagged_as_bot": False}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(404, "User not found")
+    return {"ok": True}

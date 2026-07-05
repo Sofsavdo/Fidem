@@ -17,6 +17,7 @@ const menuItems = [
   { id: "referrals", icon: TrendingUp, label: "Referrals" },
   { id: "messages", icon: MessageSquare, label: "Chat" },
   { id: "concierge", icon: Search, label: "Concierge" },
+  { id: "fraud", icon: AlertTriangle, label: "Fraud" },
   { id: "reports", icon: Settings, label: "Reports" },
 ];
 
@@ -110,6 +111,7 @@ export default function Admin() {
           {activeTab === "referrals" && <AdminReferrals />}
           {activeTab === "messages" && <AdminMessages />}
           {activeTab === "concierge" && <AdminConcierge />}
+          {activeTab === "fraud" && <AdminFraud />}
           {activeTab === "reports" && <AdminReports />}
         </div>
       </main>
@@ -753,6 +755,64 @@ function AdminMessages() {
           </div>
         </div>
       ))}
+      {total > limit && (
+        <div className="flex justify-center gap-2 mt-4">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
+          <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
+          <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdminFraud() {
+  const [list, setList] = useState([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [minScore, setMinScore] = useState(50);
+  const limit = 50;
+  const load = () => api.get("/admin/fraud", { params: { min_score: minScore, page, limit } }).then((r) => {
+    setList(r.data.users || []);
+    setTotal(r.data.total || 0);
+  });
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [minScore, page]);
+  const markSafe = async (uid) => {
+    await api.post(`/admin/users/${uid}/mark-safe`);
+    toast.success("Marked as safe");
+    load();
+  };
+  return (
+    <div className="space-y-4" data-testid="admin-fraud">
+      <div className="flex gap-2 items-center">
+        <label className="text-sm">Min fraud score:</label>
+        <input type="number" value={minScore} onChange={(e) => { setMinScore(Number(e.target.value)); setPage(1); }} className="rounded-xl border border-border bg-card px-3 py-2 text-sm w-24" />
+      </div>
+      {list.length === 0 && <p className="text-sm text-muted-foreground">No suspicious users found</p>}
+      <div className="space-y-2">
+        {list.map((u) => (
+          <div key={u.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`adm-fraud-${u.id}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-muted overflow-hidden">
+                  {u.photo_url && <img loading="lazy" decoding="async" src={photoSrc(u.photo_url)} alt="" className="w-full h-full object-cover" />}
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{u.name} · Score: {u.fraud_score || 0}</p>
+                  <p className="text-xs text-muted-foreground">{u.email} · {u.ip_address || "Unknown IP"}</p>
+                  {u.fraud_reasons && u.fraud_reasons.length > 0 && (
+                    <p className="text-[10px] text-red-600">{u.fraud_reasons.join(", ")}</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-1">
+                {u.flagged_as_bot && <span className="text-[10px] px-2 py-1 rounded-full bg-red-100 text-red-700">🤖 Bot</span>}
+                <button onClick={() => markSafe(u.id)} className="text-xs rounded-full bg-emerald-100 text-emerald-700 px-2 py-1">Mark Safe</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
       {total > limit && (
         <div className="flex justify-center gap-2 mt-4">
           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>

@@ -172,6 +172,10 @@ async def register(req: RegisterRequest, request: Request):
     existing = await db.users.find_one({"email": req.email.lower()})
     if existing:
         raise HTTPException(400, "Email already registered")
+    
+    # Get client IP for fraud detection
+    client_ip = request.client.host if request.client else "unknown"
+    
     uid = new_id()
     doc = {
         "id": uid,
@@ -187,7 +191,19 @@ async def register(req: RegisterRequest, request: Request):
         "plan": "free",
         "balance": 0,
         "blocked": False,
+        "ip_address": client_ip,
+        "fraud_score": 0,
+        "fraud_reasons": [],
+        "flagged_as_bot": False,
     }
+    
+    # Check for multiple accounts from same IP (potential fraud)
+    ip_count = await db.users.count_documents({"ip_address": client_ip, "created_at": {"$gte": iso(now_utc() - timedelta(hours=24))}})
+    if ip_count >= 3:
+        doc["fraud_score"] = 30
+        doc["fraud_reasons"] = ["multiple_accounts_same_ip"]
+        doc["flagged_as_bot"] = True
+    
     await db.users.insert_one(doc)
     return AuthResponse(token=create_token(uid), user_id=uid, onboarded=False)
 
@@ -208,7 +224,7 @@ async def login(req: LoginRequest, request: Request):
 
 
 @router.post("/auth/telegram", response_model=AuthResponse)
-async def auth_telegram(req: TelegramAuthRequest):
+async def auth_telegram(req: TelegramAuthRequest, request: Request):
     if not TELEGRAM_BOT_TOKEN:
         raise HTTPException(500, "Bot token not configured")
     tg_user = validate_telegram_init_data(req.init_data, TELEGRAM_BOT_TOKEN)
@@ -216,11 +232,14 @@ async def auth_telegram(req: TelegramAuthRequest):
     if not tg_id:
         raise HTTPException(400, "No telegram user id")
 
+    # Get client IP for fraud detection
+    client_ip = request.client.host if request.client else "unknown"
+
     existing = await db.users.find_one({"telegram_id": tg_id})
     if existing:
         await db.users.update_one(
             {"id": existing["id"]},
-            {"$set": {"last_active": iso(now_utc())}},
+            {"$set": {"last_active": iso(now_utc()), "ip_address": client_ip}},
         )
         return AuthResponse(
             token=create_token(existing["id"], is_admin=existing.get("is_admin", False)),
@@ -231,6 +250,17 @@ async def auth_telegram(req: TelegramAuthRequest):
 
     uid = new_id()
     name = (tg_user.get("first_name", "") + " " + tg_user.get("last_name", "")).strip() or f"User{tg_id[-4:]}"
+    
+    # Check for multiple accounts from same IP (potential fraud)
+    ip_count = await db.users.count_documents({"ip_address": client_ip, "created_at": {"$gte": iso(now_utc() - timedelta(hours=24))}})
+    fraud_score = 0
+    fraud_reasons = []
+    flagged_as_bot = False
+    if ip_count >= 3:
+        fraud_score = 30
+        fraud_reasons = ["multiple_accounts_same_ip"]
+        flagged_as_bot = True
+    
     doc = {
         "id": uid,
         "telegram_id": tg_id,
@@ -246,7 +276,11 @@ async def auth_telegram(req: TelegramAuthRequest):
         "plan": "free",
         "balance": 0,
         "blocked": False,
-        "referral_id": uid[:8],  # Phase 1.6: Initialize referral_id for new users
+        "ip_address": client_ip,
+        "fraud_score": fraud_score,
+        "fraud_reasons": fraud_reasons,
+        "flagged_as_bot": flagged_as_bot,
+        "referral_id": uid[:8],
     }
     await db.users.insert_one(doc)
 
