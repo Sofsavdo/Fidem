@@ -252,12 +252,26 @@ function AdminUsers() {
   const [total, setTotal] = useState(0);
   const [selectedUser, setSelectedUser] = useState(null);
   const [regions, setRegions] = useState([]);
+  const [loading, setLoading] = useState(false);
   const limit = 20;
   
-  const load = () => api.get("/admin/users", { params: { q, page, limit, ...filters } }).then((r) => {
-    setList(r.data.users || []);
-    setTotal(r.data.total || 0);
-  });
+  const load = () => {
+    setLoading(true);
+    const params = { q, page, limit };
+    if (filters.gender) params.gender = filters.gender;
+    if (filters.region) params.region = filters.region;
+    if (filters.marital_status) params.marital_status = filters.marital_status;
+    if (filters.age_min) params.age_min = parseInt(filters.age_min);
+    if (filters.age_max) params.age_max = parseInt(filters.age_max);
+    
+    api.get("/admin/users", { params }).then((r) => {
+      setList(r.data.users || []);
+      setTotal(r.data.total || 0);
+    }).catch((e) => {
+      console.error("Failed to load users:", e);
+      toast.error("Foydalanuvchilarni yuklashda xatolik");
+    }).finally(() => setLoading(false));
+  };
   
   const loadRegions = () => api.get("/admin/regions").then((r) => {
     setRegions(r.data.regions || []);
@@ -302,14 +316,20 @@ function AdminUsers() {
         </div>
       </div>
 
+      {loading && (
+        <div className="text-center py-8 text-muted-foreground">
+          Yuklanmoqda...
+        </div>
+      )}
+
       {/* User List */}
       <div className="space-y-2">
-        {list.length === 0 && (
+        {!loading && list.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
             Foydalanuvchilar topilmadi
           </div>
         )}
-        {list.map((u) => (
+        {!loading && list.map((u) => (
           <div key={u.id} className="rounded-2xl bg-card border border-border p-4 cursor-pointer hover:border-primary/50 transition-colors" data-testid={`admin-user-${u.id}`} onClick={() => setSelectedUser(u)}>
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-muted overflow-hidden flex-shrink-0">
@@ -783,11 +803,21 @@ function AdminMessages() {
   const [userIdFilter, setUserIdFilter] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
   const limit = 20;
-  const load = () => api.get("/admin/messages", { params: { q, user_id: userIdFilter, page, limit } }).then((r) => {
-    setList(r.data.messages || []);
-    setTotal(r.data.total || 0);
-  });
+  const load = () => {
+    setLoading(true);
+    const params = { q, page, limit };
+    if (userIdFilter) params.user_id = userIdFilter;
+    
+    api.get("/admin/messages", { params }).then((r) => {
+      setList(r.data.messages || []);
+      setTotal(r.data.total || 0);
+    }).catch((e) => {
+      console.error("Failed to load messages:", e);
+      toast.error("Xabarlarni yuklashda xatolik");
+    }).finally(() => setLoading(false));
+  };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [q, userIdFilter, page]);
   const deleteMsg = async (id) => {
     if (confirm("Xabarni o'chirmoqchimisiz?")) {
@@ -802,8 +832,15 @@ function AdminMessages() {
         <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search messages by text..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" />
         <input value={userIdFilter} onChange={(e) => { setUserIdFilter(e.target.value); setPage(1); }} placeholder="Filter by user ID..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" />
       </div>
-      {list.length === 0 && <p className="text-sm text-muted-foreground">Xabarlar topilmadi</p>}
-      {list.map((m) => (
+      
+      {loading && (
+        <div className="text-center py-8 text-muted-foreground">
+          Yuklanmoqda...
+        </div>
+      )}
+      
+      {!loading && list.length === 0 && <p className="text-sm text-muted-foreground">Xabarlar topilmadi</p>}
+      {!loading && list.map((m) => (
         <div key={m.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`adm-msg-${m.id}`}>
           <div className="flex items-start gap-3">
             <div className="flex-1 min-w-0">
