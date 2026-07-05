@@ -37,13 +37,19 @@ export default function Admin() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background flex flex-col lg:flex-row">
       {/* Sidebar */}
-      <aside className={`fixed left-0 top-0 h-full bg-card border-r border-border transition-all duration-300 z-50 ${sidebarOpen ? "w-64" : "w-16"}`}>
-        <div className="p-4 border-b border-border">
+      <aside className={`lg:fixed lg:left-0 lg:top-0 lg:h-full bg-card border-r border-border transition-all duration-300 z-50 ${sidebarOpen ? "lg:w-64 w-full" : "lg:w-16 w-full"}`}>
+        <div className="p-4 border-b border-border flex items-center justify-between">
           <h1 className={`font-heading font-semibold ${sidebarOpen ? "text-xl" : "text-center text-sm"}`}>
             {sidebarOpen ? "Admin Panel" : "AP"}
           </h1>
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="lg:hidden p-2 rounded-full hover:bg-muted"
+          >
+            <ChevronRight className={`w-5 h-5 transition-transform ${sidebarOpen ? "rotate-180" : ""}`} />
+          </button>
         </div>
         <nav className="p-2 space-y-1">
           {menuItems.map((item) => (
@@ -61,7 +67,7 @@ export default function Admin() {
             </button>
           ))}
         </nav>
-        <div className="absolute bottom-0 left-0 right-0 p-2 border-t border-border">
+        <div className="hidden lg:block absolute bottom-0 left-0 right-0 p-2 border-t border-border">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl hover:bg-muted text-muted-foreground"
@@ -72,14 +78,14 @@ export default function Admin() {
       </aside>
 
       {/* Main Content */}
-      <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? "ml-64" : "ml-16"}`}>
-        <div className="p-6">
+      <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? "lg:ml-64" : "lg:ml-16"}`}>
+        <div className="p-4 lg:p-6 max-w-[1600px] mx-auto">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <Link to="/me" className="p-2 rounded-full hover:bg-muted">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
-              <h2 className="font-heading text-2xl font-semibold">{menuItems.find(m => m.id === activeTab)?.label}</h2>
+              <h2 className="font-heading text-xl lg:text-2xl font-semibold">{menuItems.find(m => m.id === activeTab)?.label}</h2>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span>{user.name}</span>
@@ -245,48 +251,68 @@ function AdminUsers() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [regions, setRegions] = useState([]);
   const limit = 20;
+  
   const load = () => api.get("/admin/users", { params: { q, page, limit, ...filters } }).then((r) => {
     setList(r.data.users || []);
     setTotal(r.data.total || 0);
   });
+  
+  const loadRegions = () => api.get("/admin/regions").then((r) => {
+    setRegions(r.data.regions || []);
+  }).catch(() => {});
+  
+  useEffect(() => { load(); loadRegions(); /* eslint-disable-next-line */ }, []);
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [q, page, filters]);
+  
   const patch = async (id, patch) => {
     await api.patch(`/admin/users/${id}`, patch);
     load();
     toast.success("Updated");
   };
+  
   return (
     <div className="space-y-4" data-testid="admin-users">
       {/* Search and Filters */}
       <div className="space-y-3">
         <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search by name, email, username..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" data-testid="admin-user-search" />
         <div className="flex flex-wrap gap-2">
-          <select value={filters.gender} onChange={(e) => setFilters(f => ({ ...f, gender: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm">
+          <select value={filters.gender} onChange={(e) => setFilters(f => ({ ...f, gender: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm min-w-[120px]">
             <option value="">Jins: Hammasi</option>
             <option value="male">Erkak</option>
             <option value="female">Ayol</option>
           </select>
-          <select value={filters.marital_status} onChange={(e) => setFilters(f => ({ ...f, marital_status: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm">
+          <select value={filters.marital_status} onChange={(e) => setFilters(f => ({ ...f, marital_status: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm min-w-[140px]">
             <option value="">Oilaviy holat: Hammasi</option>
             <option value="single">Yolg'iz</option>
             <option value="married">Turmush qurgan</option>
             <option value="divorced">Ajrashgan</option>
             <option value="widowed">Beva</option>
           </select>
+          <select value={filters.region} onChange={(e) => setFilters(f => ({ ...f, region: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm min-w-[150px]">
+            <option value="">Hudud: Hammasi</option>
+            {regions.map(r => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
           <input type="number" placeholder="Yosh min" value={filters.age_min} onChange={(e) => setFilters(f => ({ ...f, age_min: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm w-24" />
           <input type="number" placeholder="Yosh max" value={filters.age_max} onChange={(e) => setFilters(f => ({ ...f, age_max: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm w-24" />
-          <input placeholder="Hudud" value={filters.region} onChange={(e) => setFilters(f => ({ ...f, region: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm w-32" />
           <button onClick={() => setFilters({ gender: "", region: "", age_min: "", age_max: "", marital_status: "" })} className="text-xs rounded-full border border-border px-3 py-2">Tozalash</button>
         </div>
       </div>
 
       {/* User List */}
       <div className="space-y-2">
+        {list.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground">
+            Foydalanuvchilar topilmadi
+          </div>
+        )}
         {list.map((u) => (
           <div key={u.id} className="rounded-2xl bg-card border border-border p-4 cursor-pointer hover:border-primary/50 transition-colors" data-testid={`admin-user-${u.id}`} onClick={() => setSelectedUser(u)}>
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-muted overflow-hidden">
+              <div className="w-12 h-12 rounded-full bg-muted overflow-hidden flex-shrink-0">
                 {u.photo_url && <img loading="lazy" decoding="async" src={photoSrc(u.photo_url)} alt="" className="w-full h-full object-cover" />}
               </div>
               <div className="flex-1 min-w-0">
@@ -294,7 +320,7 @@ function AdminUsers() {
                 <p className="text-xs text-muted-foreground truncate">{u.region} · age {u.age} · {u.gender} · {u.marital_status || "Noma'lum"}</p>
                 <p className="text-[10px] text-muted-foreground">{u.email} · {u.phone || "Telefon yo'q"}</p>
               </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+              <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
             </div>
           </div>
         ))}

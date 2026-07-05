@@ -323,3 +323,10 @@ async def admin_mark_user_safe(uid: str, _: str = Depends(get_current_admin)):
     if result.modified_count == 0:
         raise HTTPException(404, "User not found")
     return {"ok": True}
+
+
+@router.get("/regions")
+async def admin_regions(_: str = Depends(get_current_admin)):
+    """Get list of all regions for filtering."""
+    regions = await db.users.distinct("region", {"region": {"$ne": "", "$ne": None}})
+    return {"regions": sorted(regions)}
