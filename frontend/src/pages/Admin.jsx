@@ -95,11 +95,18 @@ export default function Admin() {
               <StatCard label="Premium" value={stats.premium} />
               <StatCard label="VIP" value={stats.vip} />
               <StatCard label="M/F Ratio" value={`${stats.males} / ${stats.females}`} />
-              <StatCard label="Revenue" value={`${(stats.revenue_uzs || 0).toLocaleString()} so'm`} icon={<DollarSign className="w-4 h-4" />} />
+              <StatCard label="Revenue" value={`${(stats.revenue?.total || 0).toLocaleString()} so'm`} icon={<DollarSign className="w-4 h-4" />} />
               <StatCard label="Pending Pay" value={stats.pending_payments} />
               <StatCard label="Pending Verif" value={stats.pending_verifications} />
               <StatCard label="Referrals" value={stats.referrals?.total || 0} />
               <StatCard label="Reports" value={stats.open_reports || 0} />
+              {stats.quality && (
+                <>
+                  <StatCard label="Avg Completion" value={`${stats.quality.avg_completion}%`} />
+                  <StatCard label="Retention" value={`${stats.quality.retention_rate}%`} />
+                  <StatCard label="Msgs/User" value={stats.quality.avg_messages_per_user} />
+                </>
+              )}
             </div>
           )}
 

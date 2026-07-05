@@ -70,6 +70,22 @@ async def admin_stats(_: str = Depends(get_current_admin)):
     # Referral stats
     total_referrals = await db.users.count_documents({"referred_by": {"$ne": None}})
     
+    # User quality metrics
+    avg_completeness = await db.users.aggregate([
+        {"$match": {"onboarded": True}},
+        {"$group": {"_id": None, "avg": {"$avg": "$completeness"}}}
+    ]).to_list(1)
+    avg_completion = avg_completeness[0]["avg"] if avg_completeness else 0
+    
+    # Retention: users who onboarded in last 30 days and still active
+    from core import parse_dt
+    new_users = await db.users.find({"created_at": {"$gte": month_iso}}, {"_id": 0, "id": 1, "last_active": 1}).to_list(1000)
+    retained = sum(1 for u in new_users if u.get("last_active") and parse_dt(u["last_active"]) >= datetime.fromisoformat(today_iso.replace('Z', '+00:00')))
+    retention_rate = (retained / len(new_users) * 100) if new_users else 0
+
+    # Usage: average messages per active user
+    avg_messages_per_user = messages_today / dau if dau > 0 else 0
+    
     return {
         "total_users": total, "males": males, "females": females,
         "onboarded": onboarded, "premium": premium, "vip": vip,
@@ -92,6 +108,11 @@ async def admin_stats(_: str = Depends(get_current_admin)):
         },
         "referrals": {
             "total": total_referrals,
+        },
+        "quality": {
+            "avg_completion": round(avg_completion, 1),
+            "retention_rate": round(retention_rate, 1),
+            "avg_messages_per_user": round(avg_messages_per_user, 1),
         },
     }
 
