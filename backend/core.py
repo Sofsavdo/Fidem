@@ -10,6 +10,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Any, Optional
 
 import bcrypt
+import bleach
 from fastapi import HTTPException, Request, WebSocket
 from motor.motor_asyncio import AsyncIOMotorClient
 
@@ -32,7 +33,13 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_BOT_USERNAME = os.environ.get("TELEGRAM_BOT_USERNAME", "Fidem_Appbot")
 TELEGRAM_WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "fidem-tg")
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@fidem.uz")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Admin@123")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
+
+# Validate ADMIN_PASSWORD in production
+if os.environ.get("ENV") == "production" and not ADMIN_PASSWORD:
+    raise ValueError("ADMIN_PASSWORD must be set in production environment")
+if not ADMIN_PASSWORD:
+    ADMIN_PASSWORD = "Admin@123"  # Only for development
 PRICE_PREMIUM = int(os.environ.get("PRICE_PREMIUM_UZS", "79000"))
 PRICE_VIP = int(os.environ.get("PRICE_VIP_UZS", "199000"))
 PRICE_SUPER = int(os.environ.get("PRICE_SUPER_APPLICATION_UZS", "15000"))
@@ -80,6 +87,17 @@ def parse_dt(v: Any) -> datetime:
 
 def chat_id_for(a: str, b: str) -> str:
     return "_".join(sorted([a, b]))
+
+
+def sanitize_text(text: str, allow_tags: bool = False) -> str:
+    """Sanitize user-provided text to prevent XSS attacks."""
+    if not text:
+        return ""
+    if allow_tags:
+        # Allow some basic formatting tags
+        allowed_tags = ["b", "i", "u", "em", "strong", "br", "p"]
+        return bleach.clean(text, tags=allowed_tags, strip=True)
+    return bleach.clean(text, tags=[], strip=True)
 
 
 async def get_user(uid: str) -> dict:
@@ -269,7 +287,6 @@ async def notify_telegram_batch(uids: list[str], text: str, link: Optional[str] 
         await notify_telegram(uid, text, link, kind)
         sent_count += 1
         # Small delay to avoid hitting Telegram API rate limits
-        import asyncio
         await asyncio.sleep(0.1)
     return sent_count
 
@@ -360,6 +377,7 @@ class RateLimiter:
 
 
 auth_limiter = RateLimiter(max_attempts=10, window_sec=300)
+payment_limiter = RateLimiter(max_attempts=5, window_sec=60)
 
 
 def rate_limit_auth(request: Request) -> None:
@@ -368,3 +386,11 @@ def rate_limit_auth(request: Request) -> None:
     if forwarded:
         ip = forwarded.split(",")[0].strip()
     auth_limiter.check(f"auth:{ip}")
+
+
+def rate_limit_payment(request: Request) -> None:
+    ip = request.client.host if request.client else "unknown"
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        ip = forwarded.split(",")[0].strip()
+    payment_limiter.check(f"payment:{ip}")

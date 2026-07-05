@@ -23,6 +23,7 @@ from core import (
     now_utc,
     parse_dt,
     push_notif,
+    rate_limit_payment,
 )
 from models import CreatePaymentRequest, VerificationRequest, new_id
 from services import CLICK_SECRET_KEY, click_pay_link, verify_click_sign
@@ -170,7 +171,8 @@ async def my_verifications(uid: str = Depends(get_current_user_id)):
 
 
 @router.post("/payments/create")
-async def create_payment(req: CreatePaymentRequest, uid: str = Depends(get_current_user_id)):
+async def create_payment(req: CreatePaymentRequest, request: Request, uid: str = Depends(get_current_user_id)):
+    rate_limit_payment(request)
     if req.purpose == "premium":
         amount = PRICE_PREMIUM
     elif req.purpose == "standard":
@@ -291,6 +293,12 @@ async def click_callback(request: Request):
         })
 
     if action == "1":
+        # Verify payment amount matches expected amount
+        expected_amount = payment.get("click_amount", 0)
+        received_amount = int(form.get("amount", "0"))
+        if received_amount != expected_amount:
+            return JSONResponse({"error": -7, "error_note": "Amount mismatch"})
+        
         await process_completed_payment(
             payment["user_id"],
             payment["purpose"],

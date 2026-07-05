@@ -1,6 +1,7 @@
 """FIDEM backend entrypoint — thin app + lifespan + router mounting."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from pathlib import Path
@@ -88,7 +89,6 @@ async def startup() -> None:
         log.warning(f"Storage init: {e}")
 
     # Set Telegram webhook in background (non-fatal)
-    import asyncio
     asyncio.create_task(setup_telegram_webhook())
 
     # Indexes

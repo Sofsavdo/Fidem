@@ -23,6 +23,7 @@ from core import (
     now_utc,
     parse_dt,
     push_notif,
+    sanitize_text,
     strip_locked_photo,
     user_public,
 )
@@ -270,9 +271,12 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
         if req.video_duration and req.video_duration > 120:
             raise HTTPException(400, "Video message too long (max 120s)")
     else:
-        ok, reason = quick_moderation(req.text)
+        # Sanitize text to prevent XSS
+        sanitized_text = sanitize_text(req.text, allow_tags=False)
+        ok, reason = quick_moderation(sanitized_text)
         if not ok:
             raise HTTPException(422, reason)
+        req.text = sanitized_text
     
     sender = await get_user(uid)
     await get_user(req.to_user_id)
