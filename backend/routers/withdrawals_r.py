@@ -163,6 +163,20 @@ async def admin_approve_withdrawal(wid: str, _: str = Depends(get_current_admin)
     if w["status"] != "pending":
         raise HTTPException(400, "Already processed")
     
+    # Get user's referral earnings breakdown for source tracking
+    user = await db.users.find_one({"id": w["user_id"]}, {"_id": 0, "referral_earnings": 1})
+    source_breakdown = []
+    if user and user.get("referral_earnings"):
+        for earning in user.get("referral_earnings", []):
+            if earning.get("status") == "withdrawable":
+                source_breakdown.append({
+                    "id": earning.get("id"),
+                    "type": earning.get("type"),
+                    "amount": earning.get("amount"),
+                    "referred_user_id": earning.get("referred_user_id"),
+                    "created_at": earning.get("created_at"),
+                })
+    
     # Calculate tax (12%)
     gross_amount = w["amount"]
     tax_amount = int(gross_amount * TAX_RATE)
@@ -190,7 +204,8 @@ async def admin_approve_withdrawal(wid: str, _: str = Depends(get_current_admin)
             "status": "paid",
             "processed_at": iso(now_utc()),
             "tax_amount": tax_amount,
-            "net_amount": net_amount
+            "net_amount": net_amount,
+            "source_breakdown": source_breakdown
         }},
     )
     

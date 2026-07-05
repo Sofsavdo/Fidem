@@ -260,3 +260,21 @@ async def admin_delete_message(mid: str, _: str = Depends(get_current_admin)):
     if result.deleted_count == 0:
         raise HTTPException(404, "Message not found")
     return {"ok": True}
+
+
+@router.post("/payments/{pid}/block")
+async def admin_block_payment(pid: str, _: str = Depends(get_current_admin)):
+    """Block a payment from being processed."""
+    result = await db.payments.update_one({"id": pid}, {"$set": {"blocked_by_admin": True}})
+    if result.modified_count == 0:
+        raise HTTPException(404, "Payment not found")
+    return {"ok": True}
+
+
+@router.post("/payments/{pid}/unblock")
+async def admin_unblock_payment(pid: str, _: str = Depends(get_current_admin)):
+    """Unblock a payment."""
+    result = await db.payments.update_one({"id": pid}, {"$set": {"blocked_by_admin": False}})
+    if result.modified_count == 0:
+        raise HTTPException(404, "Payment not found")
+    return {"ok": True}

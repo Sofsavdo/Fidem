@@ -411,17 +411,36 @@ function AdminPayments() {
     toast.success("Confirmed");
     load();
   };
+  const blockPayment = async (id) => {
+    await api.post(`/admin/payments/${id}/block`);
+    toast.success("Blocked");
+    load();
+  };
+  const unblockPayment = async (id) => {
+    await api.post(`/admin/payments/${id}/unblock`);
+    toast.success("Unblocked");
+    load();
+  };
   return (
     <div className="space-y-2" data-testid="admin-payments">
       {list.map((p) => (
-        <div key={p.id} className="rounded-2xl bg-card border border-border p-3 flex items-center justify-between" data-testid={`adm-pay-${p.id}`}>
-          <div>
-            <p className="text-sm">{p.purpose} · {p.amount?.toLocaleString()} so'm</p>
-            <p className="text-xs text-muted-foreground">{p.status}</p>
+        <div key={p.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`adm-pay-${p.id}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm">{p.purpose} · {p.amount?.toLocaleString()} so'm</p>
+              <p className="text-xs text-muted-foreground">{p.status} {p.blocked_by_admin && "🚫 Blocked"}</p>
+            </div>
+            <div className="flex gap-1">
+              {p.status !== "success" && !p.blocked_by_admin && (
+                <button data-testid={`adm-pay-confirm-${p.id}`} onClick={() => confirm(p.id)} className="text-xs rounded-full bg-secondary text-white px-3 py-1.5">Confirm</button>
+              )}
+              {p.blocked_by_admin ? (
+                <button onClick={() => unblockPayment(p.id)} className="text-xs rounded-full bg-emerald-100 text-emerald-700 px-3 py-1.5">Unblock</button>
+              ) : (
+                <button onClick={() => blockPayment(p.id)} className="text-xs rounded-full bg-red-50 text-red-700 px-3 py-1.5">Block</button>
+              )}
+            </div>
           </div>
-          {p.status !== "success" && (
-            <button data-testid={`adm-pay-confirm-${p.id}`} onClick={() => confirm(p.id)} className="text-xs rounded-full bg-secondary text-white px-3 py-1.5">Confirm</button>
-          )}
         </div>
       ))}
       {total > limit && (
@@ -496,48 +515,124 @@ function AdminWithdrawals() {
   const [filter, setFilter] = useState("pending");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [selectedWithdrawal, setSelectedWithdrawal] = useState(null);
   const limit = 20;
   const load = () => api.get("/admin/withdrawals", { params: { status: filter || undefined, page, limit } }).then((r) => {
     setList(r.data.withdrawals || []);
     setTotal(r.data.total || 0);
   });
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter, page]);
-  const approve = async (id) => { await api.post(`/admin/withdrawals/${id}/approve`); toast.success("Tasdiqlandi"); load(); };
+  const approve = async (id) => { 
+    await api.post(`/admin/withdrawals/${id}/approve`); 
+    toast.success("Tasdiqlandi"); 
+    load(); 
+  };
   const reject = async (id) => {
     const reason = prompt("Rad etish sababi:") || "";
     await api.post(`/admin/withdrawals/${id}/reject`, { reason });
-    toast.success("Rad etildi"); load();
+    toast.success("Rad etildi"); 
+    load();
   };
   return (
-    <div className="space-y-2" data-testid="admin-withdrawals">
+    <div className="space-y-4" data-testid="admin-withdrawals">
       <div className="flex gap-1">
         {["pending", "approved", "rejected", ""].map((f) => (
           <button key={f || "all"} onClick={() => { setFilter(f); setPage(1); }} className={`text-xs rounded-full px-3 py-1.5 border ${filter === f ? "bg-foreground text-background" : "bg-card"}`}>{f || "Hammasi"}</button>
         ))}
       </div>
       {list.length === 0 && <p className="text-sm text-muted-foreground">Yo'q</p>}
-      {list.map((w) => (
-        <div key={w.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`adm-wd-${w.id}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">{w.user?.name || w.user_id?.slice(0, 8)} · <span className="text-foreground">{w.amount?.toLocaleString()} so'm</span></p>
-              <p className="text-xs text-muted-foreground font-mono">{w.card_number} · {w.holder_name}</p>
-              <p className="text-[10px] text-muted-foreground">{new Date(w.created_at).toLocaleString("uz-UZ")} · {w.status}</p>
-            </div>
-            {w.status === "pending" && (
-              <div className="flex gap-1">
-                <button onClick={() => approve(w.id)} className="text-xs rounded-full bg-emerald-600 text-white px-3 py-1.5">✓ Tasdiqlash</button>
-                <button onClick={() => reject(w.id)} className="text-xs rounded-full border border-border px-3 py-1.5">✕ Rad</button>
+      <div className="space-y-2">
+        {list.map((w) => (
+          <div key={w.id} className="rounded-2xl bg-card border border-border p-3 cursor-pointer hover:border-primary/50 transition-colors" data-testid={`adm-wd-${w.id}`} onClick={() => setSelectedWithdrawal(w)}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">{w.user?.name || w.user_id?.slice(0, 8)} · <span className="text-foreground">{w.amount?.toLocaleString()} so'm</span></p>
+                <p className="text-xs text-muted-foreground font-mono">{w.card_number} · {w.holder_name}</p>
+                <p className="text-[10px] text-muted-foreground">{new Date(w.created_at).toLocaleString("uz-UZ")} · {w.status}</p>
               </div>
-            )}
+              {w.status === "pending" && (
+                <div className="flex gap-1">
+                  <button onClick={(e) => { e.stopPropagation(); approve(w.id); }} className="text-xs rounded-full bg-emerald-600 text-white px-3 py-1.5">✓ Tasdiqlash</button>
+                  <button onClick={(e) => { e.stopPropagation(); reject(w.id); }} className="text-xs rounded-full border border-border px-3 py-1.5">✕ Rad</button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
       {total > limit && (
         <div className="flex justify-center gap-2 mt-4">
           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
           <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
           <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
+        </div>
+      )}
+
+      {/* Withdrawal Detail Modal */}
+      {selectedWithdrawal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedWithdrawal(null)}>
+          <div className="bg-card rounded-3xl border border-border max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-heading text-xl font-semibold">Yechib olish tafsilotlari</h3>
+              <button onClick={() => setSelectedWithdrawal(null)} className="p-2 rounded-full hover:bg-muted">✕</button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-muted rounded-xl">
+                  <p className="text-xs text-muted-foreground">Summa</p>
+                  <p className="font-medium">{selectedWithdrawal.amount?.toLocaleString()} so'm</p>
+                </div>
+                <div className="p-3 bg-muted rounded-xl">
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  <p className="font-medium">{selectedWithdrawal.status}</p>
+                </div>
+                <div className="p-3 bg-muted rounded-xl">
+                  <p className="text-xs text-muted-foreground">Karta raqami</p>
+                  <p className="font-medium font-mono">{selectedWithdrawal.card_number}</p>
+                </div>
+                <div className="p-3 bg-muted rounded-xl">
+                  <p className="text-xs text-muted-foreground">Karta egasi</p>
+                  <p className="font-medium">{selectedWithdrawal.holder_name}</p>
+                </div>
+              </div>
+
+              {selectedWithdrawal.source_breakdown && selectedWithdrawal.source_breakdown.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-2">Pul manbai (referral daromadlari):</h4>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {selectedWithdrawal.source_breakdown.map((source, idx) => (
+                      <div key={idx} className="p-3 bg-muted rounded-xl text-xs">
+                        <p className="font-medium">{source.type} · {source.amount?.toLocaleString()} so'm</p>
+                        <p className="text-muted-foreground">Referred user: {source.referred_user_id?.slice(0, 8)}</p>
+                        <p className="text-muted-foreground">{new Date(source.created_at).toLocaleString("uz-UZ")}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedWithdrawal.status === "paid" && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 bg-muted rounded-xl">
+                    <p className="text-xs text-muted-foreground">Soliq (12%)</p>
+                    <p className="font-medium">{selectedWithdrawal.tax_amount?.toLocaleString()} so'm</p>
+                  </div>
+                  <div className="p-3 bg-muted rounded-xl">
+                    <p className="text-xs text-muted-foreground">Net summa</p>
+                    <p className="font-medium">{selectedWithdrawal.net_amount?.toLocaleString()} so'm</p>
+                  </div>
+                </div>
+              )}
+
+              {selectedWithdrawal.status === "pending" && (
+                <div className="flex gap-2">
+                  <button onClick={() => { approve(selectedWithdrawal.id); setSelectedWithdrawal(null); }} className="flex-1 text-sm rounded-full bg-emerald-600 text-white px-4 py-2">✓ Tasdiqlash</button>
+                  <button onClick={() => { reject(selectedWithdrawal.id); setSelectedWithdrawal(null); }} className="flex-1 text-sm rounded-full border border-border px-4 py-2">✕ Rad</button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

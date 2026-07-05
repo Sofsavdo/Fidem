@@ -273,6 +273,10 @@ async def click_callback(request: Request):
     if payment["status"] == "success":
         return JSONResponse({"error": -4, "error_note": "Already paid"})
 
+    # Check if payment is blocked by admin
+    if payment.get("blocked_by_admin"):
+        return JSONResponse({"error": -6, "error_note": "Payment blocked by admin"})
+
     if action == "0":
         await db.payments.update_one(
             {"id": pid},
