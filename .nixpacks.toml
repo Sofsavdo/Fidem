@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["nodejs-20_x"]
+
+[phases.build]
+cmds = ["yarn build"]
+
+[start]
+cmd = "npx serve -s build --single --listen 3000"
