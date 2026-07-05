@@ -307,6 +307,21 @@ async def invites_status(uid: str = Depends(get_current_user_id)):
             next_tier = tier_count
             break
     
+    # Monthly tier system
+    monthly_count = me.get("monthly_referral_count", 0)
+    if monthly_count >= 1001:
+        monthly_tier = "gold"
+        next_tier_threshold = None
+        tier_max_reward = 49900
+    elif monthly_count >= 301:
+        monthly_tier = "silver"
+        next_tier_threshold = 1001
+        tier_max_reward = 39900
+    else:
+        monthly_tier = "bronze"
+        next_tier_threshold = 301
+        tier_max_reward = 29900
+    
     return {
         "code": code,
         "link": link,
@@ -317,6 +332,10 @@ async def invites_status(uid: str = Depends(get_current_user_id)):
         "claimed_tiers": claimed_tiers,
         "next_tier": next_tier,
         "tier_rewards": REFERRAL_TIERS,
+        "monthly_tier": monthly_tier,
+        "monthly_count": monthly_count,
+        "next_tier_threshold": next_tier_threshold,
+        "tier_max_reward": tier_max_reward,
     }
 
 

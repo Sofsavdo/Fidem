@@ -345,7 +345,7 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
         await notify_new_profile_to_relevant_users(fresh)
         
         # Phase 1.3: Referral signup reward (V3.2 economy system)
-        # 500 so'm to inviter's balance if inviter account age >= 30 days
+        # 100 so'm to inviter's referral earnings if inviter account age >= 30 days and user has 80%+ profile
         referred_by = fresh.get("referred_by")
         if referred_by and completeness >= 80:
             inviter = await db.users.find_one({"referral_id": referred_by})
@@ -361,34 +361,36 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
                         {
                             "id": inviter["id"],
                             "referral_earnings.referred_user_id": uid,
-                            "referral_earnings.type": "signup"
+                            "referral_earnings.type": "signup_free"
                         }
                     )
                     
                     if not existing_earning:
-                        # Record referral earning FIRST
+                        hold_until = now_utc() + timedelta(days=30)
+                        
+                        # Record referral earning with 1 month hold
                         earning_record = {
                             "id": new_id(),
                             "user_id": inviter["id"],
                             "referred_user_id": uid,
-                            "type": "signup",
-                            "amount": 500,
-                            "status": "approved",
+                            "type": "signup_free",
+                            "amount": 100,
+                            "status": "pending",
                             "created_at": iso(now_utc()),
-                            "gross_amount": 500,
+                            "hold_until": iso(hold_until),
+                            "approved_at": None,
+                            "paid_at": None,
+                            "gross_amount": 100,
                             "tax_amount": 0,
-                            "net_amount": 500,
+                            "net_amount": 100,
                             "level": 1,
                         }
                         await db.users.update_one(
                             {"id": inviter["id"]},
-                            {"$push": {"referral_earnings": earning_record}}
-                        )
-                        
-                        # Credit 500 so'm to inviter's balance AFTER earning is recorded
-                        await db.users.update_one(
-                            {"id": inviter["id"]},
-                            {"$inc": {"balance": 500, "ref_count": 1}}
+                            {
+                                "$push": {"referral_earnings": earning_record},
+                                "$inc": {"referral_earnings_pending": 100}
+                            }
                         )
 
     return {"ok": True, "completeness": completeness}

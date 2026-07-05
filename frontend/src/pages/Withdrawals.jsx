@@ -133,7 +133,7 @@ export default function Withdrawals() {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">{t("withdraw_min_payout")}: {(status?.min_payout ?? 100000).toLocaleString()} {t("sum")}</span>
+            <span className="text-muted-foreground">{t("withdraw_min_payout")}: 100,000 {t("sum")}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground">{t("withdraw_tax")}: {status?.tax_rate_pct || 12}%</span>

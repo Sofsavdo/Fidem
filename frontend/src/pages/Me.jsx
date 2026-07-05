@@ -192,6 +192,9 @@ export default function Me() {
             <div className="min-w-0">
               <p className="font-heading text-lg flex items-center gap-2"><Share2 className="w-4 h-4 text-secondary" /> {t("invite_friends")}</p>
               <p className="text-xs text-muted-foreground mt-0.5">{referral.invited_count || 0} {t("ref_invites")} · {referral.paid_referrals || 0} {t("ref_paid_referrals")}</p>
+              {referral.monthly_tier && (
+                <p className="text-xs text-secondary mt-0.5">{t("monthly_tier")}: {referral.monthly_tier} ({referral.monthly_count || 0}/{referral.next_tier_threshold || 300})</p>
+              )}
             </div>
             <span className="text-secondary font-medium">{t("share")} →</span>
           </div>

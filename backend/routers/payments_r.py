@@ -30,6 +30,108 @@ from services import CLICK_SECRET_KEY, click_pay_link, verify_click_sign
 router = APIRouter(tags=["payments"])
 
 
+# Referral tier system helpers
+def get_tier_max_reward(monthly_count: int) -> int:
+    """Get max reward based on monthly referral count."""
+    if monthly_count >= 1001:
+        return 49900  # Gold tier
+    elif monthly_count >= 301:
+        return 39900  # Silver tier
+    else:
+        return 29900  # Bronze tier
+
+
+def get_tier_name(monthly_count: int) -> str:
+    """Get tier name based on monthly referral count."""
+    if monthly_count >= 1001:
+        return "gold"
+    elif monthly_count >= 301:
+        return "silver"
+    else:
+        return "bronze"
+
+
+async def get_monthly_referral_count(user_id: str) -> int:
+    """Get current month's referral count for a user."""
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "monthly_referral_count": 1, "tier_reset_date": 1})
+    
+    # Reset monthly count if new month
+    now = now_utc()
+    reset_date = user.get("tier_reset_date")
+    if reset_date:
+        reset_dt = parse_dt(reset_date)
+        # Reset if it's a new month
+        if reset_dt.month != now.month or reset_dt.year != now.year:
+            await db.users.update_one(
+                {"id": user_id},
+                {"$set": {"monthly_referral_count": 0, "tier_reset_date": iso(now)}}
+            )
+            return 0
+    
+    return user.get("monthly_referral_count", 0)
+
+
+async def process_level_2_reward(inviter_id: str, level1_reward: int, referred_user_id: str, plan: str, amount: int) -> None:
+    """Process 2-zanjir (level 2) reward - 5% of level 1 reward."""
+    inviter = await db.users.find_one({"id": inviter_id}, {"_id": 0, "referred_by": 1})
+    if not inviter:
+        return
+    
+    referred_by = inviter.get("referred_by")
+    if not referred_by:
+        return
+    
+    # Find level 2 inviter
+    level2_inviter = await db.users.find_one({"referral_id": referred_by})
+    if not level2_inviter:
+        level2_inviter = await db.users.find_one({"referral_username_lower": referred_by.lower()})
+    
+    if not level2_inviter:
+        return
+    
+    # Check level 2 inviter account age >= 30 days
+    inviter_age = now_utc() - parse_dt(level2_inviter.get("created_at", now_utc()))
+    if inviter_age < timedelta(days=30):
+        return
+    
+    # Calculate 5% reward
+    level2_reward = int(level1_reward * 0.05)
+    if level2_reward <= 0:
+        return
+    
+    hold_until = now_utc() + timedelta(days=14)
+    
+    # Create level 2 earning record
+    earning_record = {
+        "id": new_id(),
+        "user_id": level2_inviter["id"],
+        "referred_user_id": inviter_id,
+        "type": "multi_level_2",
+        "amount": level2_reward,
+        "status": "pending",
+        "created_at": iso(now_utc()),
+        "hold_until": iso(hold_until),
+        "approved_at": None,
+        "paid_at": None,
+        "rejected_at": None,
+        "rejection_reason": None,
+        "gross_amount": level2_reward,
+        "tax_amount": 0,
+        "net_amount": level2_reward,
+        "level": 2,
+        "subscription_plan": plan,
+        "subscription_amount": amount,
+    }
+    
+    await db.users.update_one(
+        {"id": level2_inviter["id"]},
+        {
+            "$inc": {"referral_earnings_pending": level2_reward},
+            "$push": {"referral_earnings": earning_record}
+        }
+    )
+
+
 async def generate_payment_id() -> str:
     while True:
         pid = f"FD{datetime.now().strftime('%y%m%d')}{random.randint(1000, 9999)}"
@@ -236,8 +338,9 @@ async def process_completed_payment(uid: str, purpose: str, amount: int, balance
                         )
                         
                         if not existing_earning:
-                            # Calculate reward: 50% of amount, capped at 29,900 (39,900 for Ambassadors)
-                            reward_cap = 39900 if "ambassador" in inviter.get("badges", []) else 29900
+                            # Calculate tier-based max reward
+                            monthly_count = await get_monthly_referral_count(inviter["id"])
+                            reward_cap = get_tier_max_reward(monthly_count)
                             reward = min(int(amount * 0.5), reward_cap)
                             
                             if reward > 0:
@@ -261,21 +364,26 @@ async def process_completed_payment(uid: str, purpose: str, amount: int, balance
                                     "tax_amount": 0,
                                     "net_amount": reward,
                                     "level": 1,
+                                    "tier_at_time": get_tier_name(monthly_count),
                                     "subscription_plan": purpose,
                                     "subscription_amount": amount,
                                 }
                                 
-                                # Update inviter's referral earnings (atomic)
+                                # Update inviter's referral earnings and monthly count (atomic)
                                 await db.users.update_one(
                                     {"id": inviter["id"]},
                                     {
                                         "$inc": {
                                             "referral_earnings_pending": reward,
-                                            "ref_count": 1
+                                            "ref_count": 1,
+                                            "monthly_referral_count": 1
                                         },
                                         "$push": {"referral_earnings": earning_record}
                                     }
                                 )
+                                
+                                # Process 2-zanjir (level 2) reward
+                                await process_level_2_reward(inviter["id"], reward, uid, purpose, amount)
                                 
                                 # Mark as first paid ONLY after earning is successfully created
                                 await db.users.update_one({"id": uid}, {"$set": {"first_paid_at": iso(now_utc())}})

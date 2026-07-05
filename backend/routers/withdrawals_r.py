@@ -15,8 +15,8 @@ from models import new_id
 
 router = APIRouter(tags=["withdrawals"])
 
-MIN_WITHDRAW_UZS_FREE = 10_000  # Free users: minimum 10,000
-MIN_WITHDRAW_UZS_PAID = 50_000  # Paid users: minimum 50,000
+MIN_WITHDRAW_UZS_FREE = 100_000  # Free users: minimum 100,000
+MIN_WITHDRAW_UZS_PAID = 100_000  # Paid users: minimum 100,000
 MAX_WITHDRAW_UZS_PAID = 29_900  # Paid users: maximum 29,900
 TAX_RATE = 0.12  # 12% tax withholding
 
