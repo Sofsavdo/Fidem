@@ -34,7 +34,8 @@ export default function Rankings() {
 
   useEffect(() => {
     Promise.all([loadMyRankings(), loadRankings(activeTab)]);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   const tabs = [
     { id: "global", label: t("rank_global"), icon: Trophy },

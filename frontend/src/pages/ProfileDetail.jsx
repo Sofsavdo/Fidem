@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, memo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
@@ -22,7 +22,7 @@ export default function ProfileDetail() {
   const [famSending, setFamSending] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
 
-  const requestFamily = async () => {
+  const requestFamily = useCallback(async () => {
     if (user?.plan !== "vip") {
       toast.error(t("family_vip_only"));
       nav("/premium");
@@ -35,9 +35,9 @@ export default function ProfileDetail() {
     } catch (e) {
       toast.error(t("error_generic"));
     } finally { setFamSending(false); }
-  };
+  }, [user?.plan, t, nav, id]);
 
-  const shareProfile = async () => {
+  const shareProfile = useCallback(async () => {
     const shareText = `${c.name}, ${c.age} — ${c.region}. FIDEM orqali tanishing!`;
     const shareUrl = `https://t.me/${window.Telegram?.WebApp?.initDataUnsafe?.user?.username || 'Fidem_Appbot'}?start=share_${id}`;
     
@@ -66,9 +66,9 @@ export default function ProfileDetail() {
         toast.success(t("share_copied"));
       }
     }
-  };
+  }, [c, id, t]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const [r, my] = await Promise.all([
@@ -82,23 +82,25 @@ export default function ProfileDetail() {
     } finally {
       setLoading(false);
     }
-  };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
+  }, [id, t]);
 
-  const unlockPhoto = async () => {
+  useEffect(() => { load(); }, [load]);
+
+  const unlockPhoto = useCallback(async () => {
     try {
       const r = await api.post("/photo-unlock/request", { target_user_id: id });
       toast.success(r.data.status === "approved" ? t("photo_unlocked_toast") : t("photo_request_sent_toast"));
       load();
     } catch (e) { toast.error(t("error_generic")); }
-  };
-  const toggleSave = async () => {
+  }, [id, t, load]);
+
+  const toggleSave = useCallback(async () => {
     setSaving(true);
     try {
       if (saved) { await api.delete(`/saved/${id}`); setSaved(false); }
       else { await api.post("/saved", { user_id: id }); setSaved(true); toast.success(t("saved_successfully")); }
     } finally { setSaving(false); }
-  };
+  }, [saved, id, t]);
 
   if (loading || !c) {
     return (
@@ -262,11 +264,11 @@ export default function ProfileDetail() {
   );
 }
 
-function Stat({ label, value }) {
+const Stat = memo(function Stat({ label, value }) {
   return (
     <div className="rounded-2xl bg-card border border-border p-3 min-w-0">
       <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
       <p className="text-sm font-semibold mt-1 leading-tight break-words">{value}</p>
     </div>
   );
-}
+});

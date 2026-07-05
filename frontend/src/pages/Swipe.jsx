@@ -143,7 +143,7 @@ export default function Swipe() {
     window.addEventListener("touchcancel", onUp);
   };
 
-  useEffect(() => () => stopDrag(), []);
+  useEffect(() => () => stopDrag(), [stopDrag]);
 
   if (loading) {
     return (
