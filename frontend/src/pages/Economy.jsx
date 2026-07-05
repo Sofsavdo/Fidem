@@ -30,7 +30,7 @@ export default function Economy() {
 
   useEffect(() => { load(); }, []);
 
-  if (loading && !rates) return <div className="p-6 text-muted-foreground">{t("loading")}</div>;
+  if (loading) return <div className="p-6 text-muted-foreground">{t("loading")}</div>;
   if (error) return <div className="p-6 text-red-500">{error}</div>;
 
   return (
