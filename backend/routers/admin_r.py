@@ -97,7 +97,7 @@ async def admin_stats(_: str = Depends(get_current_admin)):
 
 
 @router.get("/users")
-async def admin_list_users(q: str = "", page: int = 1, limit: int = 20, _: str = Depends(get_current_admin)):
+async def admin_list_users(q: str = "", page: int = 1, limit: int = 20, gender: str = "", region: str = "", age_min: int = None, age_max: int = None, marital_status: str = "", _: str = Depends(get_current_admin)):
     query = {}
     if q:
         query["$or"] = [
@@ -105,6 +105,20 @@ async def admin_list_users(q: str = "", page: int = 1, limit: int = 20, _: str =
             {"name": {"$regex": q, "$options": "i"}},
             {"telegram_username": {"$regex": q, "$options": "i"}},
         ]
+    if gender:
+        query["gender"] = gender
+    if region:
+        query["region"] = {"$regex": region, "$options": "i"}
+    if marital_status:
+        query["marital_status"] = marital_status
+    if age_min is not None or age_max is not None:
+        age_query = {}
+        if age_min is not None:
+            age_query["$gte"] = age_min
+        if age_max is not None:
+            age_query["$lte"] = age_max
+        if age_query:
+            query["age"] = age_query
     skip = (page - 1) * limit
     total = await db.users.count_documents(query)
     rows = await db.users.find(query, {"_id": 0, "password_hash": 0}).skip(skip).limit(limit).to_list(limit)

@@ -3,13 +3,28 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ShieldCheck, Wallet, Users as UsersIcon, DollarSign } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Wallet, Users as UsersIcon, DollarSign, TrendingUp, BarChart3, LayoutDashboard, Search, MessageSquare, Settings, ChevronRight, Filter, Calendar, MapPin, Phone, Mail, Clock, Activity, AlertTriangle } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
+
+const menuItems = [
+  { id: "dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { id: "analytics", icon: BarChart3, label: "Analytics" },
+  { id: "users", icon: UsersIcon, label: "Users" },
+  { id: "payments", icon: DollarSign, label: "Payments" },
+  { id: "verifications", icon: ShieldCheck, label: "Verifications" },
+  { id: "withdrawals", icon: Wallet, label: "Withdrawals" },
+  { id: "referrals", icon: TrendingUp, label: "Referrals" },
+  { id: "messages", icon: MessageSquare, label: "Chat" },
+  { id: "concierge", icon: Search, label: "Concierge" },
+  { id: "reports", icon: Settings, label: "Reports" },
+];
 
 export default function Admin() {
   const { user, t } = useApp();
   const [stats, setStats] = useState(null);
-  const [tab, setTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
     api.get("/admin/stats").then((r) => setStats(r.data)).catch(() => {});
@@ -21,64 +36,83 @@ export default function Admin() {
   }
 
   return (
-    <div className="px-4 pt-6 pb-8 space-y-5">
-      <div className="flex items-center gap-3">
-        <Link to="/me" className="p-2 rounded-full hover:bg-muted" data-testid="admin-back">
-          <ArrowLeft className="w-4 h-4" />
-        </Link>
-        <h1 className="font-heading text-3xl font-semibold tracking-tight">{t("admin_panel")}</h1>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-1 overflow-x-auto no-scrollbar">
-        {[
-          ["dashboard", "Dashboard"],
-          ["users", t("users")],
-          ["payments", t("payments")],
-          ["verifications", t("verifications")],
-          ["withdrawals", "Yechishlar"],
-          ["referrals", "Referral"],
-          ["messages", "Chat"],
-          ["concierge", "Concierge"],
-          ["reports", t("reports")],
-        ].map(([k, l]) => (
-          <button
-            key={k}
-            data-testid={`admin-tab-${k}`}
-            onClick={() => setTab(k)}
-            className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs border ${
-              tab === k ? "bg-foreground text-background border-foreground" : "bg-card border-border"
-            }`}
-          >
-            {l}
-          </button>
-        ))}
-      </div>
-
-      {tab === "dashboard" && stats && (
-        <div className="grid grid-cols-2 gap-3 stagger" data-testid="admin-stats">
-          <StatCard label={t("users")} value={stats.total_users} icon={<UsersIcon className="w-4 h-4" />} />
-          <StatCard label={t("dau")} value={stats.dau} />
-          <StatCard label={t("wau")} value={stats.wau} />
-          <StatCard label={t("conversion")} value={`${stats.conversion_premium}%`} />
-          <StatCard label="Premium" value={stats.premium} />
-          <StatCard label="VIP" value={stats.vip} />
-          <StatCard label={t("male_female_ratio")} value={`${stats.males} / ${stats.females}`} />
-          <StatCard label={t("revenue")} value={`${(stats.revenue_uzs || 0).toLocaleString()} so'm`} icon={<DollarSign className="w-4 h-4" />} />
-          <StatCard label="Pending pay" value={stats.pending_payments} />
-          <StatCard label="Pending verif" value={stats.pending_verifications} />
-          <StatCard label="Referrals" value={stats.referrals?.total || 0} />
+    <div className="min-h-screen bg-background flex">
+      {/* Sidebar */}
+      <aside className={`fixed left-0 top-0 h-full bg-card border-r border-border transition-all duration-300 z-50 ${sidebarOpen ? "w-64" : "w-16"}`}>
+        <div className="p-4 border-b border-border">
+          <h1 className={`font-heading font-semibold ${sidebarOpen ? "text-xl" : "text-center text-sm"}`}>
+            {sidebarOpen ? "Admin Panel" : "AP"}
+          </h1>
         </div>
-      )}
+        <nav className="p-2 space-y-1">
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
+                activeTab === item.id
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <item.icon className="w-5 h-5 flex-shrink-0" />
+              {sidebarOpen && <span className="text-sm font-medium">{item.label}</span>}
+            </button>
+          ))}
+        </nav>
+        <div className="absolute bottom-0 left-0 right-0 p-2 border-t border-border">
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl hover:bg-muted text-muted-foreground"
+          >
+            <ChevronRight className={`w-5 h-5 transition-transform ${sidebarOpen ? "rotate-180" : ""}`} />
+          </button>
+        </div>
+      </aside>
 
-      {tab === "users" && <AdminUsers />}
-      {tab === "payments" && <AdminPayments />}
-      {tab === "verifications" && <AdminVerifications />}
-      {tab === "withdrawals" && <AdminWithdrawals />}
-      {tab === "referrals" && <AdminReferrals />}
-      {tab === "messages" && <AdminMessages />}
-      {tab === "concierge" && <AdminConcierge />}
-      {tab === "reports" && <AdminReports />}
+      {/* Main Content */}
+      <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? "ml-64" : "ml-16"}`}>
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <Link to="/me" className="p-2 rounded-full hover:bg-muted">
+                <ArrowLeft className="w-5 h-5" />
+              </Link>
+              <h2 className="font-heading text-2xl font-semibold">{menuItems.find(m => m.id === activeTab)?.label}</h2>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>{user.name}</span>
+            </div>
+          </div>
+
+          {activeTab === "dashboard" && stats && (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="admin-stats">
+              <StatCard label="Users" value={stats.total_users} icon={<UsersIcon className="w-4 h-4" />} />
+              <StatCard label="DAU" value={stats.dau} />
+              <StatCard label="WAU" value={stats.wau} />
+              <StatCard label="Conversion" value={`${stats.conversion_premium}%`} />
+              <StatCard label="Premium" value={stats.premium} />
+              <StatCard label="VIP" value={stats.vip} />
+              <StatCard label="M/F Ratio" value={`${stats.males} / ${stats.females}`} />
+              <StatCard label="Revenue" value={`${(stats.revenue_uzs || 0).toLocaleString()} so'm`} icon={<DollarSign className="w-4 h-4" />} />
+              <StatCard label="Pending Pay" value={stats.pending_payments} />
+              <StatCard label="Pending Verif" value={stats.pending_verifications} />
+              <StatCard label="Referrals" value={stats.referrals?.total || 0} />
+              <StatCard label="Reports" value={stats.open_reports || 0} />
+            </div>
+          )}
+
+          {activeTab === "analytics" && stats && <AdminAnalytics stats={stats} />}
+          {activeTab === "users" && <AdminUsers />}
+          {activeTab === "payments" && <AdminPayments />}
+          {activeTab === "verifications" && <AdminVerifications />}
+          {activeTab === "withdrawals" && <AdminWithdrawals />}
+          {activeTab === "referrals" && <AdminReferrals />}
+          {activeTab === "messages" && <AdminMessages />}
+          {activeTab === "concierge" && <AdminConcierge />}
+          {activeTab === "reports" && <AdminReports />}
+        </div>
+      </main>
     </div>
   );
 }
@@ -92,51 +126,270 @@ const StatCard = React.memo(function StatCard({ label, value, icon }) {
   );
 });
 
+function AdminAnalytics({ stats }) {
+  const revenueData = [
+    { name: "Bugun", value: stats.revenue?.today || 0 },
+    { name: "Hafta", value: stats.revenue?.week || 0 },
+    { name: "Oy", value: stats.revenue?.month || 0 },
+  ];
+
+  const purposeData = (stats.revenue?.by_purpose || []).map(p => ({
+    name: p._id,
+    value: p.total,
+    count: p.count,
+  }));
+
+  const regionData = (stats.top_regions || []).map(r => ({
+    name: r._id,
+    value: r.count,
+  }));
+
+  const genderData = [
+    { name: "Erkak", value: stats.males || 0 },
+    { name: "Ayol", value: stats.females || 0 },
+  ];
+
+  const COLORS = ["hsl(var(--primary))", "hsl(var(--secondary))"];
+
+  return (
+    <div className="space-y-6" data-testid="admin-analytics">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="rounded-3xl bg-card border border-border p-4">
+          <h3 className="font-heading text-lg mb-4 flex items-center gap-2"><TrendingUp className="w-4 h-4" /> Daromad (so'm)</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={revenueData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="value" fill="hsl(var(--primary))" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="rounded-3xl bg-card border border-border p-4">
+          <h3 className="font-heading text-lg mb-4 flex items-center gap-2"><UsersIcon className="w-4 h-4" /> Jins nisbati</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie data={genderData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label>
+                {genderData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {purposeData.length > 0 && (
+        <div className="rounded-3xl bg-card border border-border p-4">
+          <h3 className="font-heading text-lg mb-4">Daromad bo'yicha</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={purposeData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="value" fill="hsl(var(--secondary))" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {regionData.length > 0 && (
+        <div className="rounded-3xl bg-card border border-border p-4">
+          <h3 className="font-heading text-lg mb-4 flex items-center gap-2"><MapPin className="w-4 h-4" /> Top hududlar</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={regionData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="value" fill="hsl(var(--gold))" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      <div className="rounded-3xl bg-card border border-border p-4">
+        <h3 className="font-heading text-lg mb-4 flex items-center gap-2"><Activity className="w-4 h-4" /> Xabarlar statistikasi</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="p-4 bg-muted rounded-2xl">
+            <p className="text-sm text-muted-foreground">Jami xabarlar</p>
+            <p className="text-2xl font-semibold">{stats.messages?.total?.toLocaleString() || 0}</p>
+          </div>
+          <div className="p-4 bg-muted rounded-2xl">
+            <p className="text-sm text-muted-foreground">Bugun xabarlar</p>
+            <p className="text-2xl font-semibold">{stats.messages?.today?.toLocaleString() || 0}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AdminUsers() {
   const [q, setQ] = useState("");
+  const [filters, setFilters] = useState({ gender: "", region: "", age_min: "", age_max: "", marital_status: "" });
   const [list, setList] = useState([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [selectedUser, setSelectedUser] = useState(null);
   const limit = 20;
-  const load = () => api.get("/admin/users", { params: { q, page, limit } }).then((r) => {
+  const load = () => api.get("/admin/users", { params: { q, page, limit, ...filters } }).then((r) => {
     setList(r.data.users || []);
     setTotal(r.data.total || 0);
   });
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [q, page]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [q, page, filters]);
   const patch = async (id, patch) => {
     await api.patch(`/admin/users/${id}`, patch);
     load();
     toast.success("Updated");
   };
   return (
-    <div className="space-y-2" data-testid="admin-users">
-      <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" data-testid="admin-user-search" />
-      {list.map((u) => (
-        <div key={u.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`admin-user-${u.id}`}>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-muted overflow-hidden">
-              {u.photo_url && <img loading="lazy" decoding="async" src={photoSrc(u.photo_url)} alt="" className="w-full h-full object-cover" />}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{u.name} · {u.plan} {u.blocked ? "🚫" : ""}</p>
-              <p className="text-xs text-muted-foreground truncate">{u.region} · age {u.age} · {u.gender}</p>
-            </div>
-          </div>
-          <div className="flex gap-1 mt-2 flex-wrap">
-            <button data-testid={`adm-verify-selfie-${u.id}`} onClick={() => patch(u.id, { verified_selfie: !u.verified_selfie })} className="text-[10px] rounded-full bg-secondary/10 text-secondary px-2 py-1">{u.verified_selfie ? "✓ Selfie" : "Verify selfie"}</button>
-            <button data-testid={`adm-verify-fin-${u.id}`} onClick={() => patch(u.id, { verified_financial: !u.verified_financial })} className="text-[10px] rounded-full bg-gold-light text-yellow-900 px-2 py-1">{u.verified_financial ? "💎 Financial" : "Verify financial"}</button>
-            <button data-testid={`adm-premium-${u.id}`} onClick={() => patch(u.id, { plan: u.plan === "premium" ? "free" : "premium" })} className="text-[10px] rounded-full bg-primary/10 text-foreground px-2 py-1">{u.plan === "premium" ? "Cancel Premium" : "Make Premium"}</button>
-            <button data-testid={`adm-vip-${u.id}`} onClick={() => patch(u.id, { plan: u.plan === "vip" ? "free" : "vip" })} className="text-[10px] rounded-full bg-ink text-gold px-2 py-1">{u.plan === "vip" ? "Cancel VIP" : "Make VIP"}</button>
-            <button data-testid={`adm-add-${u.id}`} onClick={() => patch(u.id, { add_balance: 10000 })} className="text-[10px] rounded-full border border-border px-2 py-1">+10k</button>
-            <button data-testid={`adm-block-${u.id}`} onClick={() => patch(u.id, { blocked: !u.blocked })} className="text-[10px] rounded-full bg-red-50 text-red-700 px-2 py-1">{u.blocked ? "Unblock" : "Block"}</button>
-          </div>
+    <div className="space-y-4" data-testid="admin-users">
+      {/* Search and Filters */}
+      <div className="space-y-3">
+        <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search by name, email, username..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" data-testid="admin-user-search" />
+        <div className="flex flex-wrap gap-2">
+          <select value={filters.gender} onChange={(e) => setFilters(f => ({ ...f, gender: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm">
+            <option value="">Jins: Hammasi</option>
+            <option value="male">Erkak</option>
+            <option value="female">Ayol</option>
+          </select>
+          <select value={filters.marital_status} onChange={(e) => setFilters(f => ({ ...f, marital_status: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm">
+            <option value="">Oilaviy holat: Hammasi</option>
+            <option value="single">Yolg'iz</option>
+            <option value="married">Turmush qurgan</option>
+            <option value="divorced">Ajrashgan</option>
+            <option value="widowed">Beva</option>
+          </select>
+          <input type="number" placeholder="Yosh min" value={filters.age_min} onChange={(e) => setFilters(f => ({ ...f, age_min: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm w-24" />
+          <input type="number" placeholder="Yosh max" value={filters.age_max} onChange={(e) => setFilters(f => ({ ...f, age_max: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm w-24" />
+          <input placeholder="Hudud" value={filters.region} onChange={(e) => setFilters(f => ({ ...f, region: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm w-32" />
+          <button onClick={() => setFilters({ gender: "", region: "", age_min: "", age_max: "", marital_status: "" })} className="text-xs rounded-full border border-border px-3 py-2">Tozalash</button>
         </div>
-      ))}
+      </div>
+
+      {/* User List */}
+      <div className="space-y-2">
+        {list.map((u) => (
+          <div key={u.id} className="rounded-2xl bg-card border border-border p-4 cursor-pointer hover:border-primary/50 transition-colors" data-testid={`admin-user-${u.id}`} onClick={() => setSelectedUser(u)}>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-muted overflow-hidden">
+                {u.photo_url && <img loading="lazy" decoding="async" src={photoSrc(u.photo_url)} alt="" className="w-full h-full object-cover" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{u.name} · {u.plan} {u.blocked ? "🚫" : ""}</p>
+                <p className="text-xs text-muted-foreground truncate">{u.region} · age {u.age} · {u.gender} · {u.marital_status || "Noma'lum"}</p>
+                <p className="text-[10px] text-muted-foreground">{u.email} · {u.phone || "Telefon yo'q"}</p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Pagination */}
       {total > limit && (
         <div className="flex justify-center gap-2 mt-4">
           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
           <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
           <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
+        </div>
+      )}
+
+      {/* User Detail Modal */}
+      {selectedUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedUser(null)}>
+          <div className="bg-card rounded-3xl border border-border max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-heading text-xl font-semibold">Foydalanuvchi tafsilotlari</h3>
+              <button onClick={() => setSelectedUser(null)} className="p-2 rounded-full hover:bg-muted">✕</button>
+            </div>
+            
+            <div className="space-y-4">
+              {/* Profile */}
+              <div className="flex items-center gap-4 p-4 bg-muted rounded-2xl">
+                <div className="w-20 h-20 rounded-full bg-muted overflow-hidden">
+                  {selectedUser.photo_url && <img src={photoSrc(selectedUser.photo_url)} alt="" className="w-full h-full object-cover" />}
+                </div>
+                <div>
+                  <p className="font-semibold text-lg">{selectedUser.name}</p>
+                  <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
+                  <p className="text-sm text-muted-foreground">{selectedUser.phone || "Telefon yo'q"}</p>
+                  <p className="text-xs text-muted-foreground mt-1">ID: {selectedUser.id}</p>
+                </div>
+              </div>
+
+              {/* Personal Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-muted rounded-xl">
+                  <p className="text-xs text-muted-foreground">Jins</p>
+                  <p className="font-medium">{selectedUser.gender}</p>
+                </div>
+                <div className="p-3 bg-muted rounded-xl">
+                  <p className="text-xs text-muted-foreground">Yosh</p>
+                  <p className="font-medium">{selectedUser.age}</p>
+                </div>
+                <div className="p-3 bg-muted rounded-xl">
+                  <p className="text-xs text-muted-foreground">Hudud</p>
+                  <p className="font-medium">{selectedUser.region}</p>
+                </div>
+                <div className="p-3 bg-muted rounded-xl">
+                  <p className="text-xs text-muted-foreground">Oilaviy holat</p>
+                  <p className="font-medium">{selectedUser.marital_status || "Noma'lum"}</p>
+                </div>
+              </div>
+
+              {/* Account Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-muted rounded-xl">
+                  <p className="text-xs text-muted-foreground">Plan</p>
+                  <p className="font-medium">{selectedUser.plan}</p>
+                </div>
+                <div className="p-3 bg-muted rounded-xl">
+                  <p className="text-xs text-muted-foreground">Balance</p>
+                  <p className="font-medium">{selectedUser.balance?.toLocaleString()} so'm</p>
+                </div>
+                <div className="p-3 bg-muted rounded-xl">
+                  <p className="text-xs text-muted-foreground">Referral earnings</p>
+                  <p className="font-medium">{selectedUser.referral_earnings_withdrawable?.toLocaleString()} so'm</p>
+                </div>
+                <div className="p-3 bg-muted rounded-xl">
+                  <p className="text-xs text-muted-foreground">Influence</p>
+                  <p className="font-medium">{selectedUser.influence?.toLocaleString()}</p>
+                </div>
+              </div>
+
+              {/* Verification Status */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className={`p-3 rounded-xl ${selectedUser.verified_selfie ? "bg-emerald-100 text-emerald-700" : "bg-muted"}`}>
+                  <p className="text-xs">Selfie</p>
+                  <p className="font-medium">{selectedUser.verified_selfie ? "✓" : "✕"}</p>
+                </div>
+                <div className={`p-3 rounded-xl ${selectedUser.verified_identity ? "bg-emerald-100 text-emerald-700" : "bg-muted"}`}>
+                  <p className="text-xs">Identity</p>
+                  <p className="font-medium">{selectedUser.verified_identity ? "✓" : "✕"}</p>
+                </div>
+                <div className={`p-3 rounded-xl ${selectedUser.verified_financial ? "bg-emerald-100 text-emerald-700" : "bg-muted"}`}>
+                  <p className="text-xs">Financial</p>
+                  <p className="font-medium">{selectedUser.verified_financial ? "✓" : "✕"}</p>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 flex-wrap">
+                <button onClick={() => patch(selectedUser.id, { verified_selfie: !selectedUser.verified_selfie })} className="text-xs rounded-full bg-secondary/10 text-secondary px-3 py-2">{selectedUser.verified_selfie ? "✓ Selfie" : "Verify selfie"}</button>
+                <button onClick={() => patch(selectedUser.id, { verified_financial: !selectedUser.verified_financial })} className="text-xs rounded-full bg-gold-light text-yellow-900 px-3 py-2">{selectedUser.verified_financial ? "💎 Financial" : "Verify financial"}</button>
+                <button onClick={() => patch(selectedUser.id, { plan: selectedUser.plan === "premium" ? "free" : "premium" })} className="text-xs rounded-full bg-primary/10 text-foreground px-3 py-2">{selectedUser.plan === "premium" ? "Cancel Premium" : "Make Premium"}</button>
+                <button onClick={() => patch(selectedUser.id, { plan: selectedUser.plan === "vip" ? "free" : "vip" })} className="text-xs rounded-full bg-ink text-gold px-3 py-2">{selectedUser.plan === "vip" ? "Cancel VIP" : "Make VIP"}</button>
+                <button onClick={() => patch(selectedUser.id, { add_balance: 10000 })} className="text-xs rounded-full border border-border px-3 py-2">+10k</button>
+                <button onClick={() => patch(selectedUser.id, { blocked: !selectedUser.blocked })} className={`text-xs rounded-full px-3 py-2 ${selectedUser.blocked ? "bg-emerald-100 text-emerald-700" : "bg-red-50 text-red-700"}`}>{selectedUser.blocked ? "Unblock" : "Block"}</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
