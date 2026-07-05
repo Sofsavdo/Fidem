@@ -162,6 +162,17 @@ def user_public(u: dict) -> dict:
         "referral_earnings_paid_out": u.get("referral_earnings_paid_out", 0),
         "withdrawable_balance": u.get("referral_earnings_withdrawable", 0),  # Legacy alias
         "influence_score": u.get("influence_score", 0),
+        # Admin-only fields (for admin panel)
+        "email": u.get("email", ""),
+        "phone": u.get("phone", ""),
+        "telegram_id": u.get("telegram_id", ""),
+        "telegram_username": u.get("telegram_username", ""),
+        "ip_address": u.get("ip_address", ""),
+        "user_agent": u.get("user_agent", ""),
+        "created_at": u.get("created_at", ""),
+        "fraud_score": u.get("fraud_score", 0),
+        "fraud_reasons": u.get("fraud_reasons", []),
+        "flagged_as_bot": u.get("flagged_as_bot", False),
     }
 
 

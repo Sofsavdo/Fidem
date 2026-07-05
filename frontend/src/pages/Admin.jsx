@@ -79,7 +79,7 @@ export default function Admin() {
 
       {/* Main Content */}
       <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? "lg:ml-64" : "lg:ml-16"}`}>
-        <div className="p-4 lg:p-6 max-w-[1600px] mx-auto">
+        <div className="p-4 lg:p-6 w-full">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <Link to="/me" className="p-2 rounded-full hover:bg-muted">
@@ -354,6 +354,8 @@ function AdminUsers() {
                   <p className="font-semibold text-lg">{selectedUser.name}</p>
                   <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
                   <p className="text-sm text-muted-foreground">{selectedUser.phone || "Telefon yo'q"}</p>
+                  {selectedUser.telegram_id && <p className="text-sm text-muted-foreground">Telegram ID: {selectedUser.telegram_id}</p>}
+                  {selectedUser.telegram_username && <p className="text-sm text-muted-foreground">@{selectedUser.telegram_username}</p>}
                   <p className="text-xs text-muted-foreground mt-1">ID: {selectedUser.id}</p>
                 </div>
               </div>
@@ -778,14 +780,15 @@ function AdminReferrals() {
 function AdminMessages() {
   const [list, setList] = useState([]);
   const [q, setQ] = useState("");
+  const [userIdFilter, setUserIdFilter] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const limit = 20;
-  const load = () => api.get("/admin/messages", { params: { q, page, limit } }).then((r) => {
+  const load = () => api.get("/admin/messages", { params: { q, user_id: userIdFilter, page, limit } }).then((r) => {
     setList(r.data.messages || []);
     setTotal(r.data.total || 0);
   });
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [q, page]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [q, userIdFilter, page]);
   const deleteMsg = async (id) => {
     if (confirm("Xabarni o'chirmoqchimisiz?")) {
       await api.delete(`/admin/messages/${id}`);
@@ -794,17 +797,31 @@ function AdminMessages() {
     }
   };
   return (
-    <div className="space-y-2" data-testid="admin-messages">
-      <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search messages..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" />
+    <div className="space-y-4" data-testid="admin-messages">
+      <div className="space-y-2">
+        <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search messages by text..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" />
+        <input value={userIdFilter} onChange={(e) => { setUserIdFilter(e.target.value); setPage(1); }} placeholder="Filter by user ID..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" />
+      </div>
+      {list.length === 0 && <p className="text-sm text-muted-foreground">Xabarlar topilmadi</p>}
       {list.map((m) => (
         <div key={m.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`adm-msg-${m.id}`}>
-          <div className="flex items-center justify-between">
+          <div className="flex items-start gap-3">
             <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-8 h-8 rounded-full bg-muted overflow-hidden flex-shrink-0">
+                  {m.from_user_photo && <img loading="lazy" decoding="async" src={photoSrc(m.from_user_photo)} alt="" className="w-full h-full object-cover" />}
+                </div>
+                <p className="text-sm font-medium">{m.from_user_name || "Unknown"}</p>
+                <span className="text-muted-foreground">→</span>
+                <div className="w-8 h-8 rounded-full bg-muted overflow-hidden flex-shrink-0">
+                  {m.to_user_photo && <img loading="lazy" decoding="async" src={photoSrc(m.to_user_photo)} alt="" className="w-full h-full object-cover" />}
+                </div>
+                <p className="text-sm font-medium">{m.to_user_name || "Unknown"}</p>
+              </div>
               <p className="text-sm font-medium truncate">{m.text || "[voice/video]"}</p>
-              <p className="text-xs text-muted-foreground">{m.from_user_id?.slice(0, 8)} → {m.to_user_id?.slice(0, 8)} · {m.kind}</p>
-              <p className="text-[10px] text-muted-foreground">{new Date(m.created_at).toLocaleString("uz-UZ")}</p>
+              <p className="text-xs text-muted-foreground">{m.kind} · {new Date(m.created_at).toLocaleString("uz-UZ")}</p>
             </div>
-            <button onClick={() => deleteMsg(m.id)} className="text-xs rounded-full bg-red-50 text-red-700 px-2 py-1">O'chirish</button>
+            <button onClick={() => deleteMsg(m.id)} className="text-xs rounded-full bg-red-50 text-red-700 px-2 py-1 flex-shrink-0">O'chirish</button>
           </div>
         </div>
       ))}
