@@ -23,29 +23,20 @@ export default function Boost() {
   const activate = async (kind) => {
     setBusy(true);
     try {
-      const r = await api.post(`/${kind}/activate`, { use_balance: true });
-      toast.success(kind === "boost" ? t("profile_boost_title") + " ✅" : t("spotlight_title") + " ✅");
-      await refresh();
+      const r = await api.post(`/${kind}/activate`);
+      if (r.data.status === "paid") {
+        toast.success(kind === "boost" ? t("profile_boost_title") + " ✅" : t("spotlight_title") + " ✅");
+        await refresh();
+      } else {
+        toast.success("To'lov sahifasi ochildi");
+        window.open(r.data.payment_link, "_blank");
+      }
       load();
     } catch (e) {
       const msg = e.response?.data?.detail;
-      if (msg && msg.includes("Need")) {
-        toast.error(`${msg} — balansni to'ldiring`);
-      } else {
-        toast.error(msg || "Xato");
-      }
+      toast.error(msg || "Xato");
     } finally {
       setBusy(false);
-    }
-  };
-
-  const payViaClick = async (purpose, amount) => {
-    try {
-      const r = await api.post("/payments/create", { purpose: "balance_topup", amount });
-      window.open(r.data.payment_link, "_blank");
-      toast.success("To'lov sahifasi ochildi — to'lovdan keyin balansni avto-yangilaymiz");
-    } catch (e) {
-      toast.error("Xato");
     }
   };
 
@@ -79,23 +70,14 @@ export default function Boost() {
           {status?.active && (
             <p className="text-xs text-secondary mt-2">{t("travel_active")} — {new Date(status.until).toLocaleString()}</p>
           )}
-          <div className="flex flex-col sm:flex-row gap-2 mt-3">
-            <button
-              data-testid="buy-boost-balance"
-              onClick={() => activate("boost")}
-              disabled={busy || status?.active}
-              className="flex-1 rounded-2xl bg-primary text-white py-3 font-medium disabled:opacity-50"
-            >
-              {t("activate_with_balance")} ({(user?.balance || 0).toLocaleString()})
-            </button>
-            <button
-              data-testid="buy-boost-click"
-              onClick={() => payViaClick("boost", 5000)}
-              className="flex-1 rounded-2xl border border-border bg-card py-3 font-medium hover:bg-muted"
-            >
-              CLICK
-            </button>
-          </div>
+          <button
+            data-testid="buy-boost"
+            onClick={() => activate("boost")}
+            disabled={busy || status?.active}
+            className="w-full mt-3 rounded-2xl bg-primary text-white py-3 font-medium disabled:opacity-50"
+          >
+            {t("activate")} · 5,000 {t("sum_word")}
+          </button>
         </div>
 
         {/* Spotlight */}
@@ -112,23 +94,14 @@ export default function Boost() {
             <li>★ {t("bullet_constant_visibility")}</li>
           </ul>
           <p className="font-heading text-xl mt-4">25,000 {t("sum_word")}</p>
-          <div className="flex flex-col sm:flex-row gap-2 mt-3">
-            <button
-              data-testid="buy-spotlight-balance"
-              onClick={() => activate("spotlight")}
-              disabled={busy}
-              className="flex-1 rounded-2xl bg-gold text-ink py-3 font-medium disabled:opacity-50"
-            >
-              {t("activate_with_balance")}
-            </button>
-            <button
-              data-testid="buy-spotlight-click"
-              onClick={() => payViaClick("spotlight", 25000)}
-              className="flex-1 rounded-2xl border border-border bg-card py-3 font-medium hover:bg-muted"
-            >
-              CLICK
-            </button>
-          </div>
+          <button
+            data-testid="buy-spotlight"
+            onClick={() => activate("spotlight")}
+            disabled={busy}
+            className="w-full mt-3 rounded-2xl bg-gold text-ink py-3 font-medium disabled:opacity-50"
+          >
+            {t("activate")} · 25,000 {t("sum_word")}
+          </button>
         </div>
       </div>
 
