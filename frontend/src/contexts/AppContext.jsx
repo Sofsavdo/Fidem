@@ -59,61 +59,78 @@ export function AppProvider({ children }) {
   }, [loadMe]);
 
   // Telegram WebApp auto-auth
-useEffect(() => {
-  if (user) return;
+  useEffect(() => {
+    if (user) return;
 
-  let cancelled = false;
+    let cancelled = false;
 
-  const tryTelegramAuth = async () => {
-    const token = localStorage.getItem("fidem_token");
-    if (token) return;
+    const tryTelegramAuth = async () => {
+      const token = localStorage.getItem("fidem_token");
+      if (token) return;
 
-    const tg = window.Telegram?.WebApp;
-    const initData = tg?.initData;
+      const tg = window.Telegram?.WebApp;
+      const initData = tg?.initData;
 
-    if (!initData) return false;
-
-    try {
-      tg.ready?.();
-      tg.expand?.();
-
-      const r = await api.post("/auth/telegram", {
-        init_data: initData,
-      });
-
-      if (cancelled) return true;
-
-      localStorage.setItem("fidem_token", r.data.token);
-      await loadMe();
-
-      if (r.data.onboarded) {
-        window.history.replaceState(null, "", "/");
-      } else {
-        window.history.replaceState(null, "", "/onboarding");
+      if (!initData) {
+        console.log("No Telegram initData available");
+        return false;
       }
 
-      return true;
-    } catch (e) {
-      console.warn("Telegram auto-auth failed:", e);
-      return true;
-    }
-  };
+      try {
+        console.log("Attempting Telegram auth...");
+        tg.ready?.();
+        tg.expand?.();
 
-  const run = async () => {
-    for (let i = 0; i < 20; i++) {
-      if (cancelled) return;
-      const ok = await tryTelegramAuth();
-      if (ok) return;
-      await new Promise((resolve) => setTimeout(resolve, 250));
-    }
-  };
+        const r = await api.post("/auth/telegram", {
+          init_data: initData,
+        });
 
-  run();
+        if (cancelled) return true;
 
-  return () => {
-    cancelled = true;
-  };
-}, [user, loadMe]);
+        localStorage.setItem("fidem_token", r.data.token);
+        await loadMe();
+
+        if (r.data.onboarded) {
+          window.history.replaceState(null, "", "/");
+        } else {
+          window.history.replaceState(null, "", "/onboarding");
+        }
+
+        console.log("Telegram auth successful");
+        return true;
+      } catch (e) {
+        console.error("Telegram auto-auth failed:", e);
+        return false;
+      }
+    };
+
+    // Try once immediately, then retry a few times with delays
+    const run = async () => {
+      // Try immediately
+      if (!cancelled) {
+        const ok = await tryTelegramAuth();
+        if (ok) return;
+      }
+
+      // Retry with exponential backoff
+      for (let i = 0; i < 5; i++) {
+        if (cancelled) return;
+        const delay = 100 * Math.pow(2, i); // 100, 200, 400, 800, 1600ms
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        if (cancelled) return;
+        const ok = await tryTelegramAuth();
+        if (ok) return;
+      }
+      
+      console.log("Telegram auth failed after retries");
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, loadMe]);
   const login = async (email, password) => {
     const r = await api.post("/auth/login", { email, password });
     localStorage.setItem("fidem_token", r.data.token);

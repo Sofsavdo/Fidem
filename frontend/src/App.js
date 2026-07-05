@@ -100,40 +100,25 @@ function RootRoute() {
 
 function Inner() {
   useEffect(() => {
-    const init = () => {
-      const tg = window.Telegram?.WebApp;
-      if (!tg) return;
-      try {
-        tg.ready();
-        // Delay expand to allow UI to render first
-        setTimeout(() => {
-          tg.expand();
-        }, 100);
-        // Only set colors if supported
-        if (tg.setHeaderColor && tg.version >= '6.1') {
-          tg.setHeaderColor("#ffffff");
-        }
-        if (tg.setBackgroundColor && tg.version >= '6.1') {
-          tg.setBackgroundColor("#ffffff");
-        }
-        if (tg.enableClosingConfirmation && tg.version >= '6.2') {
-          tg.enableClosingConfirmation();
-        }
-      } catch (e) {
-        console.warn("Telegram WebApp init error:", e);
-      }
-    };
-
-    if (window.Telegram?.WebApp) {
-      init();
+    const tg = window.Telegram?.WebApp;
+    if (!tg) {
+      console.warn("Telegram WebApp not available");
       return;
     }
-
-    const s = document.createElement("script");
-    s.src = "https://telegram.org/js/telegram-web-app.js";
-    s.async = true;
-    s.onload = init;
-    document.head.appendChild(s);
+    
+    try {
+      tg.ready();
+      tg.expand();
+      
+      // Set colors immediately
+      if (tg.setHeaderColor) tg.setHeaderColor("#ffffff");
+      if (tg.setBackgroundColor) tg.setBackgroundColor("#ffffff");
+      if (tg.enableClosingConfirmation) tg.enableClosingConfirmation();
+      
+      console.log("Telegram WebApp initialized successfully");
+    } catch (e) {
+      console.error("Telegram WebApp init error:", e);
+    }
   }, []);
 
   return (
