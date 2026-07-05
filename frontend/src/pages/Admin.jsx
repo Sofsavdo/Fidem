@@ -352,6 +352,26 @@ function AdminUsers() {
                 </div>
               </div>
 
+              {/* Device & Session Info */}
+              <div className="grid grid-cols-1 gap-4">
+                <div className="p-3 bg-muted rounded-xl">
+                  <p className="text-xs text-muted-foreground">IP Address</p>
+                  <p className="font-medium font-mono text-sm">{selectedUser.ip_address || "Unknown"}</p>
+                </div>
+                <div className="p-3 bg-muted rounded-xl">
+                  <p className="text-xs text-muted-foreground">User Agent</p>
+                  <p className="font-medium text-xs break-all">{selectedUser.user_agent || "Unknown"}</p>
+                </div>
+                <div className="p-3 bg-muted rounded-xl">
+                  <p className="text-xs text-muted-foreground">Last Active</p>
+                  <p className="font-medium text-sm">{selectedUser.last_active ? new Date(selectedUser.last_active).toLocaleString("uz-UZ") : "Unknown"}</p>
+                </div>
+                <div className="p-3 bg-muted rounded-xl">
+                  <p className="text-xs text-muted-foreground">Created At</p>
+                  <p className="font-medium text-sm">{selectedUser.created_at ? new Date(selectedUser.created_at).toLocaleString("uz-UZ") : "Unknown"}</p>
+                </div>
+              </div>
+
               {/* Account Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-muted rounded-xl">

@@ -173,8 +173,9 @@ async def register(req: RegisterRequest, request: Request):
     if existing:
         raise HTTPException(400, "Email already registered")
     
-    # Get client IP for fraud detection
+    # Get client IP and user agent for analytics
     client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown")
     
     uid = new_id()
     doc = {
@@ -192,6 +193,7 @@ async def register(req: RegisterRequest, request: Request):
         "balance": 0,
         "blocked": False,
         "ip_address": client_ip,
+        "user_agent": user_agent,
         "fraud_score": 0,
         "fraud_reasons": [],
         "flagged_as_bot": False,
@@ -232,14 +234,15 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request):
     if not tg_id:
         raise HTTPException(400, "No telegram user id")
 
-    # Get client IP for fraud detection
+    # Get client IP and user agent for analytics
     client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown")
 
     existing = await db.users.find_one({"telegram_id": tg_id})
     if existing:
         await db.users.update_one(
             {"id": existing["id"]},
-            {"$set": {"last_active": iso(now_utc()), "ip_address": client_ip}},
+            {"$set": {"last_active": iso(now_utc()), "ip_address": client_ip, "user_agent": user_agent}},
         )
         return AuthResponse(
             token=create_token(existing["id"], is_admin=existing.get("is_admin", False)),
@@ -277,6 +280,7 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request):
         "balance": 0,
         "blocked": False,
         "ip_address": client_ip,
+        "user_agent": user_agent,
         "fraud_score": fraud_score,
         "fraud_reasons": fraud_reasons,
         "flagged_as_bot": flagged_as_bot,
