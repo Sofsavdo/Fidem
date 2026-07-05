@@ -151,10 +151,16 @@ useEffect(() => {
     };
   }, [user]);
 
-  // Online/offline detection
+  // Online/offline detection with offline UI
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const handleOnline = () => {
+      setIsOnline(true);
+      toast.success("Internet ulanish tiklandi");
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast.error("Internet ulanish yo'q. Offline rejimda ishlaysiz.");
+    };
     
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);

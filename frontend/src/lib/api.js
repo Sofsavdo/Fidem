@@ -27,7 +27,18 @@ const perfLog = process.env.NODE_ENV === 'development' ? {
   }
 } : null;
 
-const cacheableUrls = ['/icebreakers', '/gifts/catalog', '/me/progress'];
+const cacheableUrls = [
+  '/icebreakers',
+  '/gifts/catalog',
+  '/me/progress',
+  '/invites/status',
+  '/economy/status',
+  '/daily/status',
+  '/rankings',
+  '/referral/mine',
+  '/notifications',
+  '/withdrawals/status',
+];
 
 client.interceptors.request.use((config) => {
   config.metadata = { startTime: performance.now() };

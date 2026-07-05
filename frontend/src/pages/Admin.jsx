@@ -37,6 +37,7 @@ export default function Admin() {
           ["payments", t("payments")],
           ["verifications", t("verifications")],
           ["withdrawals", "Yechishlar"],
+          ["referrals", "Referral"],
           ["concierge", "Concierge"],
           ["reports", t("reports")],
         ].map(([k, l]) => (
@@ -65,6 +66,7 @@ export default function Admin() {
           <StatCard label={t("revenue")} value={`${(stats.revenue_uzs || 0).toLocaleString()} so'm`} icon={<DollarSign className="w-4 h-4" />} />
           <StatCard label="Pending pay" value={stats.pending_payments} />
           <StatCard label="Pending verif" value={stats.pending_verifications} />
+          <StatCard label="Referrals" value={stats.referrals?.total || 0} />
         </div>
       )}
 
@@ -72,6 +74,7 @@ export default function Admin() {
       {tab === "payments" && <AdminPayments />}
       {tab === "verifications" && <AdminVerifications />}
       {tab === "withdrawals" && <AdminWithdrawals />}
+      {tab === "referrals" && <AdminReferrals />}
       {tab === "concierge" && <AdminConcierge />}
       {tab === "reports" && <AdminReports />}
     </div>
@@ -278,6 +281,37 @@ function AdminConcierge() {
               ))}
             </div>
           )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AdminReferrals() {
+  const [list, setList] = useState([]);
+  const [filter, setFilter] = useState("all");
+  const load = () => api.get("/admin/referrals", { params: { type: filter || undefined } }).then((r) => setList(r.data || []));
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter]);
+  return (
+    <div className="space-y-2" data-testid="admin-referrals">
+      <div className="flex gap-1">
+        {["all", "signup_free", "paid_subscription", "multi_level_2"].map((f) => (
+          <button key={f} onClick={() => setFilter(f)} className={`text-xs rounded-full px-3 py-1.5 border ${filter === f ? "bg-foreground text-background" : "bg-card"}`}>{f}</button>
+        ))}
+      </div>
+      {list.length === 0 && <p className="text-sm text-muted-foreground">Yo'q</p>}
+      {list.map((r) => (
+        <div key={r.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`adm-ref-${r.id}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">{r.type} · <span className="text-foreground">{r.amount?.toLocaleString()} so'm</span></p>
+              <p className="text-xs text-muted-foreground">{r.user_id?.slice(0, 8)} → {r.referred_user_id?.slice(0, 8)}</p>
+              <p className="text-[10px] text-muted-foreground">{new Date(r.created_at).toLocaleString("uz-UZ")} · {r.status}</p>
+            </div>
+            {r.status === "pending" && (
+              <span className="text-[10px] px-2 py-1 rounded-full bg-amber-100 text-amber-700">Kutilmoqda</span>
+            )}
+          </div>
         </div>
       ))}
     </div>

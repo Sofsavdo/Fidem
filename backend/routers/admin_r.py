@@ -193,3 +193,29 @@ async def admin_broadcast(text: str = Body(..., embed=True), dry_run: bool = Bod
         else:
             skipped += 1
     return {"sent": sent, "skipped_daily_cap": skipped}
+
+
+@router.get("/referrals")
+async def admin_referrals(type: Optional[str] = None, limit: int = 200, _: str = Depends(get_current_admin)):
+    """Get all referral earnings with optional type filter."""
+    q = {}
+    if type:
+        q["type"] = type
+    rows = await db.users.aggregate([
+        {"$unwind": "$referral_earnings"},
+        {"$match": q if q else {}},
+        {"$sort": {"referral_earnings.created_at": -1}},
+        {"$limit": limit},
+        {"$project": {
+            "_id": 0,
+            "id": "$referral_earnings.id",
+            "user_id": "$id",
+            "referred_user_id": "$referral_earnings.referred_user_id",
+            "type": "$referral_earnings.type",
+            "amount": "$referral_earnings.amount",
+            "status": "$referral_earnings.status",
+            "created_at": "$referral_earnings.created_at",
+            "level": "$referral_earnings.level",
+        }}
+    ]).to_list(limit)
+    return rows
