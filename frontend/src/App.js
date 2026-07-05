@@ -105,11 +105,23 @@ function Inner() {
       if (!tg) return;
       try {
         tg.ready();
-        tg.expand();
-        tg.setHeaderColor?.("#ffffff");
-        tg.setBackgroundColor?.("#ffffff");
-        tg.enableClosingConfirmation?.();
-      } catch {}
+        // Delay expand to allow UI to render first
+        setTimeout(() => {
+          tg.expand();
+        }, 100);
+        // Only set colors if supported
+        if (tg.setHeaderColor && tg.version >= '6.1') {
+          tg.setHeaderColor("#ffffff");
+        }
+        if (tg.setBackgroundColor && tg.version >= '6.1') {
+          tg.setBackgroundColor("#ffffff");
+        }
+        if (tg.enableClosingConfirmation && tg.version >= '6.2') {
+          tg.enableClosingConfirmation();
+        }
+      } catch (e) {
+        console.warn("Telegram WebApp init error:", e);
+      }
     };
 
     if (window.Telegram?.WebApp) {
