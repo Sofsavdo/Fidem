@@ -6,30 +6,18 @@ import Layout from "@/components/Layout";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ScrollToTop from "@/components/ScrollToTop";
 
-// Prefetch critical routes on hover
-const prefetchRoute = (importFn) => {
-  let prefetched = false;
-  return () => {
-    if (!prefetched) {
-      prefetched = true;
-      importFn();
-    }
-    return importFn();
-  };
-};
-
-const Auth = lazy(prefetchRoute(() => import("@/pages/Auth")));
-const Onboarding = lazy(prefetchRoute(() => import("@/pages/Onboarding")));
-const Candidates = lazy(prefetchRoute(() => import("@/pages/Candidates")));
-const ProfileDetail = lazy(prefetchRoute(() => import("@/pages/ProfileDetail")));
-const Messages = lazy(prefetchRoute(() => import("@/pages/Messages")));
-const Chat = lazy(prefetchRoute(() => import("@/pages/Chat")));
-const Saved = lazy(prefetchRoute(() => import("@/pages/Saved")));
-const Me = lazy(prefetchRoute(() => import("@/pages/Me")));
-const Premium = lazy(prefetchRoute(() => import("@/pages/Premium")));
+const Auth = lazy(() => import("@/pages/Auth"));
+const Onboarding = lazy(() => import("@/pages/Onboarding"));
+const Candidates = lazy(() => import("@/pages/Candidates"));
+const ProfileDetail = lazy(() => import("@/pages/ProfileDetail"));
+const Messages = lazy(() => import("@/pages/Messages"));
+const Chat = lazy(() => import("@/pages/Chat"));
+const Saved = lazy(() => import("@/pages/Saved"));
+const Me = lazy(() => import("@/pages/Me"));
+const Premium = lazy(() => import("@/pages/Premium"));
 const Admin = lazy(() => import("@/pages/Admin"));
-const Settings = lazy(prefetchRoute(() => import("@/pages/Settings")));
-const Notifications = lazy(prefetchRoute(() => import("@/pages/Notifications")));
+const Settings = lazy(() => import("@/pages/Settings"));
+const Notifications = lazy(() => import("@/pages/Notifications"));
 const Quiz = lazy(() => import("@/pages/Quiz"));
 const Boost = lazy(() => import("@/pages/Boost"));
 const Personality = lazy(() => import("@/pages/Personality"));
@@ -40,11 +28,11 @@ const Family = lazy(() => import("@/pages/Family"));
 const Concierge = lazy(() => import("@/pages/Concierge"));
 const Travel = lazy(() => import("@/pages/Travel"));
 const Verification = lazy(() => import("@/pages/Verification"));
-const Welcome = lazy(prefetchRoute(() => import("@/pages/Welcome")));
+const Welcome = lazy(() => import("@/pages/Welcome"));
 const About = lazy(() => import("@/pages/About"));
 const FAQ = lazy(() => import("@/pages/FAQ"));
 const Referral = lazy(() => import("@/pages/Referral"));
-const Swipe = lazy(prefetchRoute(() => import("@/pages/Swipe")));
+const Swipe = lazy(() => import("@/pages/Swipe"));
 const Economy = lazy(() => import("@/pages/Economy"));
 const Donations = lazy(() => import("@/pages/Donations"));
 const Rankings = lazy(() => import("@/pages/Rankings"));

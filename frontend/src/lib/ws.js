@@ -31,12 +31,14 @@ export class WS {
     try {
       sock = new WebSocket(url);
     } catch (e) {
+      console.warn("WebSocket connection failed:", e);
       this._scheduleReconnect(token);
       return;
     }
     this.sock = sock;
     sock.onopen = () => {
       this.reconnectAttempt = 0;
+      console.log("WebSocket connected");
       this.onOpen();
       this.pingInterval = setInterval(() => {
         try { sock.readyState === 1 && sock.send("ping"); } catch {}
@@ -47,10 +49,15 @@ export class WS {
       try {
         const m = JSON.parse(evt.data);
         this.onMessage(m);
-      } catch {}
+      } catch (e) {
+        console.warn("WebSocket message parse error:", e);
+      }
     };
-    sock.onerror = () => { /* will trigger onclose */ };
-    sock.onclose = () => {
+    sock.onerror = (e) => {
+      console.warn("WebSocket error:", e);
+    };
+    sock.onclose = (e) => {
+      console.log("WebSocket closed:", e.code, e.reason);
       if (this.pingInterval) { clearInterval(this.pingInterval); this.pingInterval = null; }
       this.onClose();
       this._scheduleReconnect(token);
