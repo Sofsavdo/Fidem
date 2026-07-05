@@ -97,7 +97,7 @@ async def admin_stats(_: str = Depends(get_current_admin)):
 
 
 @router.get("/users")
-async def admin_list_users(q: str = "", limit: int = 100, _: str = Depends(get_current_admin)):
+async def admin_list_users(q: str = "", page: int = 1, limit: int = 20, _: str = Depends(get_current_admin)):
     query = {}
     if q:
         query["$or"] = [
@@ -105,8 +105,10 @@ async def admin_list_users(q: str = "", limit: int = 100, _: str = Depends(get_c
             {"name": {"$regex": q, "$options": "i"}},
             {"telegram_username": {"$regex": q, "$options": "i"}},
         ]
-    rows = await db.users.find(query, {"_id": 0, "password_hash": 0}).limit(limit).to_list(limit)
-    return [user_public(u) for u in rows]
+    skip = (page - 1) * limit
+    total = await db.users.count_documents(query)
+    rows = await db.users.find(query, {"_id": 0, "password_hash": 0}).skip(skip).limit(limit).to_list(limit)
+    return {"users": [user_public(u) for u in rows], "total": total, "page": page, "limit": limit}
 
 
 @router.patch("/users/{target_id}")
@@ -124,24 +126,28 @@ async def admin_update_user(target_id: str, req: AdminUpdateUserRequest, _: str 
 
 
 @router.get("/payments")
-async def admin_payments(status: Optional[str] = None, _: str = Depends(get_current_admin)):
+async def admin_payments(status: Optional[str] = None, page: int = 1, limit: int = 20, _: str = Depends(get_current_admin)):
     q: dict = {}
     if status:
         q["status"] = status
-    rows = await db.payments.find(q, {"_id": 0}).sort("created_at", -1).limit(200).to_list(200)
-    return rows
+    skip = (page - 1) * limit
+    total = await db.payments.count_documents(q)
+    rows = await db.payments.find(q, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    return {"payments": rows, "total": total, "page": page, "limit": limit}
 
 
 @router.get("/verifications")
-async def admin_verifications(status: str = "pending", _: str = Depends(get_current_admin)):
+async def admin_verifications(status: str = "pending", page: int = 1, limit: int = 20, _: str = Depends(get_current_admin)):
     q = {} if status == "all" else {"status": status}
-    rows = await db.verifications.find(q, {"_id": 0}).sort("created_at", -1).limit(200).to_list(200)
+    skip = (page - 1) * limit
+    total = await db.verifications.count_documents(q)
+    rows = await db.verifications.find(q, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     out = []
     for r in rows:
         u = await db.users.find_one({"id": r["user_id"]}, {"_id": 0, "name": 1, "email": 1, "photo_url": 1, "id": 1, "verified_financial": 1, "verified_identity": 1, "verified_selfie": 1})
         r["user"] = u or {}
         out.append(r)
-    return out
+    return {"verifications": out, "total": total, "page": page, "limit": limit}
 
 
 @router.post("/verifications/{vid}/decide")
@@ -219,3 +225,24 @@ async def admin_referrals(type: Optional[str] = None, limit: int = 200, _: str =
         }}
     ]).to_list(limit)
     return rows
+
+
+@router.get("/messages")
+async def admin_messages(q: str = "", page: int = 1, limit: int = 20, _: str = Depends(get_current_admin)):
+    """Get all messages with optional search and pagination."""
+    query = {}
+    if q:
+        query["text"] = {"$regex": q, "$options": "i"}
+    skip = (page - 1) * limit
+    total = await db.messages.count_documents(query)
+    rows = await db.messages.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    return {"messages": rows, "total": total, "page": page, "limit": limit}
+
+
+@router.delete("/messages/{mid}")
+async def admin_delete_message(mid: str, _: str = Depends(get_current_admin)):
+    """Delete a message by ID."""
+    result = await db.messages.delete_one({"id": mid})
+    if result.deleted_count == 0:
+        raise HTTPException(404, "Message not found")
+    return {"ok": True}

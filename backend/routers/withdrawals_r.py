@@ -140,17 +140,19 @@ async def my_withdrawals(uid: str = Depends(get_current_user_id)):
 
 # ---------- Admin ----------
 @router.get("/admin/withdrawals")
-async def admin_list_withdrawals(status: str | None = None, _: str = Depends(get_current_admin)):
+async def admin_list_withdrawals(status: str | None = None, page: int = 1, limit: int = 20, _: str = Depends(get_current_admin)):
     q: dict = {}
     if status:
         q["status"] = status
-    rows = await db.withdrawals.find(q, {"_id": 0}).sort("created_at", -1).limit(200).to_list(200)
+    skip = (page - 1) * limit
+    total = await db.withdrawals.count_documents(q)
+    rows = await db.withdrawals.find(q, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     out = []
     for r in rows:
         u = await db.users.find_one({"id": r["user_id"]}, {"_id": 0, "name": 1, "email": 1, "phone": 1, "telegram_username": 1})
         r["user"] = u or {}
         out.append(r)
-    return out
+    return {"withdrawals": out, "total": total, "page": page, "limit": limit}
 
 
 @router.post("/admin/withdrawals/{wid}/approve")

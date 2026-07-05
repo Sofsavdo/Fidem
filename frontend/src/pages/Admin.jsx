@@ -38,6 +38,7 @@ export default function Admin() {
           ["verifications", t("verifications")],
           ["withdrawals", "Yechishlar"],
           ["referrals", "Referral"],
+          ["messages", "Chat"],
           ["concierge", "Concierge"],
           ["reports", t("reports")],
         ].map(([k, l]) => (
@@ -75,6 +76,7 @@ export default function Admin() {
       {tab === "verifications" && <AdminVerifications />}
       {tab === "withdrawals" && <AdminWithdrawals />}
       {tab === "referrals" && <AdminReferrals />}
+      {tab === "messages" && <AdminMessages />}
       {tab === "concierge" && <AdminConcierge />}
       {tab === "reports" && <AdminReports />}
     </div>
@@ -93,8 +95,14 @@ const StatCard = React.memo(function StatCard({ label, value, icon }) {
 function AdminUsers() {
   const [q, setQ] = useState("");
   const [list, setList] = useState([]);
-  const load = () => api.get("/admin/users", { params: { q } }).then((r) => setList(r.data || []));
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [q]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 20;
+  const load = () => api.get("/admin/users", { params: { q, page, limit } }).then((r) => {
+    setList(r.data.users || []);
+    setTotal(r.data.total || 0);
+  });
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [q, page]);
   const patch = async (id, patch) => {
     await api.patch(`/admin/users/${id}`, patch);
     load();
@@ -102,7 +110,7 @@ function AdminUsers() {
   };
   return (
     <div className="space-y-2" data-testid="admin-users">
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" data-testid="admin-user-search" />
+      <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" data-testid="admin-user-search" />
       {list.map((u) => (
         <div key={u.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`admin-user-${u.id}`}>
           <div className="flex items-center gap-3">
@@ -124,14 +132,27 @@ function AdminUsers() {
           </div>
         </div>
       ))}
+      {total > limit && (
+        <div className="flex justify-center gap-2 mt-4">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
+          <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
+          <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
+        </div>
+      )}
     </div>
   );
 }
 
 function AdminPayments() {
   const [list, setList] = useState([]);
-  const load = () => api.get("/admin/payments").then((r) => setList(r.data || []));
-  useEffect(() => { load(); }, []);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 20;
+  const load = () => api.get("/admin/payments", { params: { page, limit } }).then((r) => {
+    setList(r.data.payments || []);
+    setTotal(r.data.total || 0);
+  });
+  useEffect(() => { load(); }, [page]);
   const confirm = async (id) => {
     await api.post(`/payments/admin-confirm/${id}`);
     toast.success("Confirmed");
@@ -150,14 +171,27 @@ function AdminPayments() {
           )}
         </div>
       ))}
+      {total > limit && (
+        <div className="flex justify-center gap-2 mt-4">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
+          <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
+          <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
+        </div>
+      )}
     </div>
   );
 }
 
 function AdminVerifications() {
   const [list, setList] = useState([]);
-  const load = () => api.get("/admin/verifications").then((r) => setList(r.data || []));
-  useEffect(() => { load(); }, []);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 20;
+  const load = () => api.get("/admin/verifications", { params: { page, limit } }).then((r) => {
+    setList(r.data.verifications || []);
+    setTotal(r.data.total || 0);
+  });
+  useEffect(() => { load(); }, [page]);
   const decide = async (id, approve) => {
     await api.post(`/admin/verifications/${id}/decide`, { approve });
     load();
@@ -177,6 +211,13 @@ function AdminVerifications() {
           </div>
         </div>
       ))}
+      {total > limit && (
+        <div className="flex justify-center gap-2 mt-4">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
+          <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
+          <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -200,8 +241,14 @@ function AdminReports() {
 function AdminWithdrawals() {
   const [list, setList] = useState([]);
   const [filter, setFilter] = useState("pending");
-  const load = () => api.get("/admin/withdrawals", { params: { status: filter || undefined } }).then((r) => setList(r.data || []));
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 20;
+  const load = () => api.get("/admin/withdrawals", { params: { status: filter || undefined, page, limit } }).then((r) => {
+    setList(r.data.withdrawals || []);
+    setTotal(r.data.total || 0);
+  });
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter, page]);
   const approve = async (id) => { await api.post(`/admin/withdrawals/${id}/approve`); toast.success("Tasdiqlandi"); load(); };
   const reject = async (id) => {
     const reason = prompt("Rad etish sababi:") || "";
@@ -212,7 +259,7 @@ function AdminWithdrawals() {
     <div className="space-y-2" data-testid="admin-withdrawals">
       <div className="flex gap-1">
         {["pending", "approved", "rejected", ""].map((f) => (
-          <button key={f || "all"} onClick={() => setFilter(f)} className={`text-xs rounded-full px-3 py-1.5 border ${filter === f ? "bg-foreground text-background" : "bg-card"}`}>{f || "Hammasi"}</button>
+          <button key={f || "all"} onClick={() => { setFilter(f); setPage(1); }} className={`text-xs rounded-full px-3 py-1.5 border ${filter === f ? "bg-foreground text-background" : "bg-card"}`}>{f || "Hammasi"}</button>
         ))}
       </div>
       {list.length === 0 && <p className="text-sm text-muted-foreground">Yo'q</p>}
@@ -233,6 +280,13 @@ function AdminWithdrawals() {
           </div>
         </div>
       ))}
+      {total > limit && (
+        <div className="flex justify-center gap-2 mt-4">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
+          <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
+          <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -314,6 +368,50 @@ function AdminReferrals() {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function AdminMessages() {
+  const [list, setList] = useState([]);
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 20;
+  const load = () => api.get("/admin/messages", { params: { q, page, limit } }).then((r) => {
+    setList(r.data.messages || []);
+    setTotal(r.data.total || 0);
+  });
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [q, page]);
+  const deleteMsg = async (id) => {
+    if (confirm("Xabarni o'chirmoqchimisiz?")) {
+      await api.delete(`/admin/messages/${id}`);
+      toast.success("O'chirildi");
+      load();
+    }
+  };
+  return (
+    <div className="space-y-2" data-testid="admin-messages">
+      <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search messages..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" />
+      {list.map((m) => (
+        <div key={m.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`adm-msg-${m.id}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{m.text || "[voice/video]"}</p>
+              <p className="text-xs text-muted-foreground">{m.from_user_id?.slice(0, 8)} → {m.to_user_id?.slice(0, 8)} · {m.kind}</p>
+              <p className="text-[10px] text-muted-foreground">{new Date(m.created_at).toLocaleString("uz-UZ")}</p>
+            </div>
+            <button onClick={() => deleteMsg(m.id)} className="text-xs rounded-full bg-red-50 text-red-700 px-2 py-1">O'chirish</button>
+          </div>
+        </div>
+      ))}
+      {total > limit && (
+        <div className="flex justify-center gap-2 mt-4">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
+          <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
+          <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
+        </div>
+      )}
     </div>
   );
 }
