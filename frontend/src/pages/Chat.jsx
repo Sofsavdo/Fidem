@@ -123,7 +123,9 @@ export default function Chat() {
       // Remove temp message, WebSocket will add the real one
       setMessages((prev) => prev.filter((m) => m.id !== tempMsg.id));
     } catch (e) {
-      toast.error(t("error"));
+      console.error("Send message error:", e);
+      const errorMsg = e.response?.data?.detail || e.message || t("error");
+      toast.error(errorMsg);
       setMessages((prev) => prev.filter((m) => m.id !== tempMsg.id));
       load();
     } finally { setSending(false); }
@@ -143,7 +145,9 @@ export default function Chat() {
       toast.success("✅");
       // Optimistic: don't reload, let WebSocket handle the update
     } catch (e) {
-      toast.error(t("error"));
+      console.error("Send voice error:", e);
+      const errorMsg = e.response?.data?.detail || e.message || t("error");
+      toast.error(errorMsg);
       load(); // Reload only on error
     } finally { setSending(false); }
   };
