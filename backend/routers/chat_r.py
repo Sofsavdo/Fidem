@@ -261,30 +261,21 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
     if is_voice:
         if not req.voice_url:
             raise HTTPException(400, "voice_url required for voice message")
-        # No moderation on voice (binary content); just length sanity
         if req.voice_duration and req.voice_duration > 60:
             raise HTTPException(400, "Voice message too long (max 60s)")
     elif is_video:
-        # Video messages are premium feature
-        sender = await get_user(uid)
-        if sender.get("plan") not in ("premium", "vip"):
-            raise HTTPException(402, "Video messages are premium only")
         if not req.video_url:
             raise HTTPException(400, "video_url required for video message")
         if req.video_duration and req.video_duration > 120:
             raise HTTPException(400, "Video message too long (max 120s)")
     else:
-        # AI moderation (fast check) — text only
         ok, reason = quick_moderation(req.text)
         if not ok:
             raise HTTPException(422, reason)
     
     sender = await get_user(uid)
-    await get_user(req.to_user_id)  # ensure target exists
+    await get_user(req.to_user_id)
     cid = chat_id_for(uid, req.to_user_id)
-    existing_msgs = await db.messages.count_documents({"chat_id": cid})
-    is_first = existing_msgs == 0
-    is_reply = (await _incoming_count(uid, req.to_user_id)) > 0
     
     if is_voice:
         kind = "voice"
@@ -295,17 +286,12 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
     status = "chat"
 
     if req.is_super:
+        if sender.get("plan") not in ("premium", "vip"):
+            raise HTTPException(402, "Video messages are premium only")
         if sender.get("balance", 0) < PRICE_SUPER:
             raise HTTPException(402, "Insufficient balance for super application")
         await db.users.update_one({"id": uid}, {"$inc": {"balance": -PRICE_SUPER}})
         status = "application"
-    elif is_reply:
-        # Replying to someone who already wrote to you is always free.
-        pass
-    else:
-        # All messaging is free - no paywall
-        if is_first:
-            status = "application"
 
     msg = {
         "id": new_id(),
@@ -326,56 +312,77 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
             "video_duration": req.video_duration or 0,
             "video_thumbnail": req.video_thumbnail
         }
+    
+    # Insert message immediately for fast response
     await db.messages.insert_one(msg)
     msg.pop("_id", None)
-    if is_first or req.is_super:
-        await db.applications.update_one(
-            {"from_user_id": uid, "to_user_id": req.to_user_id},
-            {"$set": {
-                "id": new_id(), "from_user_id": uid, "to_user_id": req.to_user_id,
-                "is_super": req.is_super, "status": "pending",
-                "created_at": iso(now_utc()), "text": req.text,
-            }},
-            upsert=True,
-        )
-    # Response time tracking
-    if not is_first:
-        last_incoming = await db.messages.find_one(
-            {"chat_id": cid, "to_user_id": uid},
-            sort=[("created_at", -1)],
-            projection={"_id": 0, "created_at": 1, "from_user_id": 1},
-        )
-        if last_incoming and last_incoming.get("from_user_id") == req.to_user_id:
+    
+    # Background operations - don't block response
+    asyncio.create_task(_background_message_ops(uid, req.to_user_id, cid, req.is_super, req.text, sender))
+    
+    return msg
+
+
+async def _background_message_ops(uid: str, to_user_id: str, cid: str, is_super: bool, text: str, sender: dict):
+    """Background operations after message send - don't block response"""
+    try:
+        existing_msgs = await db.messages.count_documents({"chat_id": cid})
+        is_first = existing_msgs == 1
+        is_reply = (await _incoming_count(uid, to_user_id)) > 0
+        
+        if is_first or is_super:
+            await db.applications.update_one(
+                {"from_user_id": uid, "to_user_id": to_user_id},
+                {"$set": {
+                    "id": new_id(), "from_user_id": uid, "to_user_id": to_user_id,
+                    "is_super": is_super, "status": "pending",
+                    "created_at": iso(now_utc()), "text": text,
+                }},
+                upsert=True,
+            )
+        
+        # Response time tracking
+        if not is_first:
+            last_incoming = await db.messages.find_one(
+                {"chat_id": cid, "to_user_id": uid},
+                sort=[("created_at", -1)],
+                projection={"_id": 0, "created_at": 1, "from_user_id": 1},
+            )
+            if last_incoming and last_incoming.get("from_user_id") == to_user_id:
+                try:
+                    delta_min = (now_utc() - parse_dt(last_incoming["created_at"])).total_seconds() / 60.0
+                    if 0 < delta_min < 7 * 24 * 60:
+                        samples = (sender.get("response_samples") or []) + [round(delta_min, 1)]
+                        samples = samples[-20:]
+                        avg = round(sum(samples) / len(samples))
+                        await db.users.update_one(
+                            {"id": uid},
+                            {"$set": {"response_samples": samples, "avg_response_min": avg}},
+                        )
+                except Exception:
+                    pass
+        
+        # WebSocket push: deliver to BOTH parties
+        msg = await db.messages.find_one({"chat_id": cid}, sort=[("created_at", -1)])
+        if msg:
+            ws_payload = {"type": "message", "data": {**msg, "created_at": iso(parse_dt(msg["created_at"]))}}
+            await manager.broadcast_chat([uid, to_user_id], ws_payload)
+            
+            # Also notify chaperones
             try:
-                delta_min = (now_utc() - parse_dt(last_incoming["created_at"])).total_seconds() / 60.0
-                if 0 < delta_min < 7 * 24 * 60:
-                    samples = (sender.get("response_samples") or []) + [round(delta_min, 1)]
-                    samples = samples[-20:]
-                    avg = round(sum(samples) / len(samples))
-                    await db.users.update_one(
-                        {"id": uid},
-                        {"$set": {"response_samples": samples, "avg_response_min": avg}},
-                    )
+                chap_rows = await db.chaperones.find(
+                    {"$or": [{"owner_id": uid}, {"owner_id": to_user_id}], "status": "active"},
+                    {"_id": 0, "wali_id": 1},
+                ).to_list(50)
+                chaperone_ids = list({c["wali_id"] for c in chap_rows})
+                if chaperone_ids:
+                    await manager.broadcast_chat(chaperone_ids, {"type": "chaperone_message", "data": ws_payload["data"]})
             except Exception:
                 pass
-    # WebSocket push: deliver to BOTH parties (so sender's other tabs update too)
-    ws_payload = {"type": "message", "data": {**msg, "created_at": iso(parse_dt(msg["created_at"]))}}
-    await manager.broadcast_chat([uid, req.to_user_id], ws_payload)
-    # Also notify chaperones (read-only) of both sender and recipient
-    try:
-        chap_rows = await db.chaperones.find(
-            {"$or": [{"owner_id": uid}, {"owner_id": req.to_user_id}], "status": "active"},
-            {"_id": 0, "wali_id": 1},
-        ).to_list(50)
-        chaperone_ids = list({c["wali_id"] for c in chap_rows})
-        if chaperone_ids:
-            await manager.broadcast_chat(chaperone_ids, {"type": "chaperone_message", "data": ws_payload["data"]})
+        
+        await push_notif(to_user_id, "message", f"Yangi xabar: {sender.get('name','')}")
     except Exception:
         pass
-
-    await push_notif(req.to_user_id, "message", f"Yangi xabar: {sender.get('name','')}")
-    msg["created_at"] = parse_dt(msg["created_at"])
-    return msg
 
 
 @router.post("/messages/block")

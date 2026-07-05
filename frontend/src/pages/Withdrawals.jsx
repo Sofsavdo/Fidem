@@ -25,8 +25,15 @@ export default function Withdrawals() {
 
   const submit = async () => {
     const amt = parseInt(amount, 10);
-    if (!amt || amt < (status?.min_payout || 100000)) {
-      toast.error(`${t("withdraw_min_error")}: ${(status?.min_payout ?? 100000).toLocaleString()} ${t("sum")}`);
+    const minPayout = status?.min_payout || 100000;
+    const maxPayout = status?.max_payout;
+    
+    if (!amt || amt < minPayout) {
+      toast.error(`${t("withdraw_min_error")}: ${minPayout.toLocaleString()} ${t("sum")}`);
+      return;
+    }
+    if (maxPayout && amt > maxPayout) {
+      toast.error(`${t("withdraw_max_error")}: ${maxPayout.toLocaleString()} ${t("sum")}`);
       return;
     }
     if (amt > (status?.referral_earnings_withdrawable || 0)) {
@@ -140,7 +147,7 @@ export default function Withdrawals() {
         <input
           data-testid="withdraw-amount"
           type="number"
-          placeholder={`${t("amount_uzs")} (min ${(status?.min_payout ?? 100000).toLocaleString()})`}
+          placeholder={`${t("amount_uzs")} (min ${(status?.min_payout ?? 100000).toLocaleString()}${status?.max_payout ? `, max ${status.max_payout.toLocaleString()}` : ""})`}
           className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}

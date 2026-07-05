@@ -15,7 +15,9 @@ from models import new_id
 
 router = APIRouter(tags=["withdrawals"])
 
-MIN_WITHDRAW_UZS = 100_000
+MIN_WITHDRAW_UZS_FREE = 10_000  # Free users: minimum 10,000
+MIN_WITHDRAW_UZS_PAID = 50_000  # Paid users: minimum 50,000
+MAX_WITHDRAW_UZS_PAID = 29_900  # Paid users: maximum 29,900
 TAX_RATE = 0.12  # 12% tax withholding
 
 
@@ -35,11 +37,17 @@ async def withdraw_status(uid: str = Depends(get_current_user_id)):
         if earning.get("type") == "paid_subscription" and earning.get("status") in ("approved", "withdrawable", "paid"):
             paid_referrals_count += 1
     
+    # Determine withdrawal limits based on user plan
+    is_paid = me.get("plan") in ("premium", "vip")
+    min_payout = MIN_WITHDRAW_UZS_PAID if is_paid else MIN_WITHDRAW_UZS_FREE
+    max_payout = MAX_WITHDRAW_UZS_PAID if is_paid else None
+    
     return {
         "referral_earnings_withdrawable": int(me.get("referral_earnings_withdrawable", 0) or 0),
         "referral_earnings_pending": int(me.get("referral_earnings_pending", 0) or 0),
         "referral_earnings_paid_out": int(me.get("referral_earnings_paid_out", 0) or 0),
-        "min_payout": MIN_WITHDRAW_UZS,
+        "min_payout": min_payout,
+        "max_payout": max_payout,
         "tax_rate_pct": int(TAX_RATE * 100),
         "pending_count": pending,
         "paid_referrals_count": paid_referrals_count,
@@ -55,9 +63,18 @@ async def request_withdrawal(
     holder_name: str = Body("", embed=True),
     uid: str = Depends(get_current_user_id),
 ):
-    if amount < MIN_WITHDRAW_UZS:
-        raise HTTPException(400, f"Minimal yechib olish: {MIN_WITHDRAW_UZS:,} so'm")
     me = await get_user(uid)
+    
+    # Determine withdrawal limits based on user plan
+    is_paid = me.get("plan") in ("premium", "vip")
+    min_payout = MIN_WITHDRAW_UZS_PAID if is_paid else MIN_WITHDRAW_UZS_FREE
+    max_payout = MAX_WITHDRAW_UZS_PAID if is_paid else None
+    
+    if amount < min_payout:
+        raise HTTPException(400, f"Minimal yechib olish: {min_payout:,} so'm")
+    
+    if max_payout and amount > max_payout:
+        raise HTTPException(400, f"Maksimal yechib olish: {max_payout:,} so'm")
     
     # Check account age >= 30 days
     account_age = now_utc() - parse_dt(me.get("created_at", now_utc()))

@@ -49,7 +49,7 @@ export default function Donations() {
     } finally { setConverting(false); }
   };
 
-  if (loading) return <div className="p-6 text-muted-foreground">{t("loading")}</div>;
+  if (loading && !rates) return <div className="p-6 text-muted-foreground">{t("loading")}</div>;
 
   const currentBonus = rates?.current_bonus || 10;
   const influenceGained = amount ? Math.floor(parseInt(amount) * (1 + currentBonus / 100)) : 0;

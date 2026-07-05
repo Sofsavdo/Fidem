@@ -103,15 +103,29 @@ export default function Chat() {
   const send = async (txt, isSuper = false) => {
     const finalText = txt ?? text;
     if (!finalText.trim()) return;
+    
+    // Optimistic UI update - show message immediately
+    const tempMsg = {
+      id: `temp-${Date.now()}`,
+      from_user_id: user.id,
+      text: finalText,
+      kind: isSuper ? "super" : "text",
+      created_at: new Date().toISOString(),
+      sending: true,
+    };
+    setMessages((prev) => [...prev, tempMsg]);
+    setText("");
+    setShowTemplates(false);
+    
     setSending(true);
     try {
       await api.post("/messages/send", { to_user_id: otherId, text: finalText, is_super: isSuper });
-      setText("");
-      setShowTemplates(false);
-      // Optimistic: don't reload, let WebSocket handle the update
+      // Remove temp message, WebSocket will add the real one
+      setMessages((prev) => prev.filter((m) => m.id !== tempMsg.id));
     } catch (e) {
       toast.error(t("error"));
-      load(); // Reload only on error
+      setMessages((prev) => prev.filter((m) => m.id !== tempMsg.id));
+      load();
     } finally { setSending(false); }
   };
 
