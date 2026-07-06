@@ -382,7 +382,7 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
     if not was_onboarded:
         await notify_new_profile_to_relevant_users(fresh)
         
-        # Phase 1.3: Referral signup reward (V3.2 economy system)
+        # Referral signup reward
         # 100 so'm to inviter's referral earnings if inviter account age >= 30 days and user has 80%+ profile
         referred_by = fresh.get("referred_by")
         if referred_by and completeness >= 80:

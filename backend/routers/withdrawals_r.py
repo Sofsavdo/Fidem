@@ -1,4 +1,4 @@
-"""Referral earnings withdrawal (V3.2 economy system). Users withdraw from referral earnings only.
+"""Referral earnings withdrawal. Users withdraw from referral earnings only.
 
 Gifts are NOT withdrawable. Only referral earnings can be withdrawn.
 Min payout: 100,000 UZS. 12% tax withholding. Admin approves manually via CLICK transfer.

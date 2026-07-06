@@ -319,7 +319,7 @@ async def process_completed_payment(uid: str, purpose: str, amount: int, balance
     """Process a payment completed via balance (no Click needed)."""
     expiry_iso = iso(now_utc() + timedelta(days=30))
 
-    # Phase 1.5: First paid subscription referral reward (V3.2 economy system)
+    # First paid subscription referral reward
     # Only for first paid subscription, not recurring
     if purpose in ("premium", "standard", "vip"):
         user = await db.users.find_one({"id": uid}, {"_id": 0, "plan": 1, "first_paid_at": 1, "referred_by": 1})
