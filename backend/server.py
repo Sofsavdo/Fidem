@@ -34,7 +34,6 @@ from routers.growth_r import router as growth_router  # noqa: E402
 from routers.payments_r import router as payments_router  # noqa: E402
 from routers.telegram_r import router as telegram_router, setup_telegram_webhook  # noqa: E402
 from routers.personality_r import router as personality_router  # noqa: E402
-from routers.roses_r import router as roses_router  # noqa: E402
 from routers.ai_r import router as ai_router  # noqa: E402
 from routers.prompts_r import router as prompts_router  # noqa: E402
 from routers.stories_r import router as stories_router  # noqa: E402
@@ -63,7 +62,6 @@ api.include_router(payments_router)
 api.include_router(admin_router)
 api.include_router(telegram_router)
 api.include_router(personality_router)
-api.include_router(roses_router)
 api.include_router(ai_router)
 api.include_router(prompts_router)
 api.include_router(stories_router)
@@ -125,7 +123,6 @@ async def startup() -> None:
     await db.events.create_index("id", unique=True)
     await db.event_rsvps.create_index([("event_id", 1), ("user_id", 1)], unique=True)
     await db.daily_quests.create_index([("user_id", 1), ("date", 1)], unique=True)
-    await db.roses.create_index([("from_user_id", 1), ("created_at", -1)])
     await db.compat_unlocks.create_index([("user_id", 1), ("target_id", 1)], unique=True)
     await db.success_stories.create_index("created_at")
     await db.files.create_index("path")

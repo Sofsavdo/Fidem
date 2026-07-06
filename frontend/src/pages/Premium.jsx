@@ -128,7 +128,7 @@ export default function Premium() {
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-border pb-3">
-        {["plans", "balance", "roses"].map((tabKey) => (
+        {["plans", "balance"].map((tabKey) => (
           <button
             key={tabKey}
             onClick={() => setSearchParams({ tab: tabKey })}
@@ -278,58 +278,6 @@ export default function Premium() {
           <div className="flex items-center gap-2 mt-4 text-xs text-muted-foreground">
             <span title={t("premium_balance_label") + ": " + t("premium_balance_desc") + " • " + t("premium_referral_label") + ": " + t("premium_referral_desc")} className="cursor-help">ℹ️</span>
             <span>{t("premium_spending_system")}</span>
-          </div>
-
-          {/* Super-Application - One-Time Filter Bypass */}
-          <div className="rounded-3xl bg-gold-light/40 border border-gold/40 p-5 mt-4" data-testid="super-section">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xl">✨</span>
-              <p className="font-heading text-xl font-semibold">{t("super_application")}</p>
-            </div>
-            <p className="text-sm mt-1 text-muted-foreground">{t("premium_section_super_desc")}</p>
-            <p className="text-xs text-secondary mt-1">{t("premium_section_super_usage")}</p>
-            <button
-              data-testid="buy-super"
-              onClick={() => buy("super_application")}
-              disabled={creating}
-              className="mt-3 w-full rounded-2xl bg-gradient-to-r from-gold to-gold-dark text-white py-3 font-medium"
-            >
-              {t("buy_super")} · 15,000 {t("sum")}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Roses - Quick Attention Currency */}
-      {tab === "roses" && (
-        <div id="premium-roses" className="rounded-3xl bg-primary/5 border-2 border-primary/30 p-5" data-testid="roses-section">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xl">🌹</span>
-            <p className="font-heading text-xl font-semibold">{t("premium_section_roses")}</p>
-          </div>
-          <p className="text-sm mt-1 text-muted-foreground">{t("premium_section_roses_desc")}</p>
-          <p className="text-xs text-secondary mt-1">{t("premium_section_roses_usage")}</p>
-          <div className="grid grid-cols-3 gap-2 mt-3">
-            {[["1", 1, 5000], ["5", 5, 20000], ["12", 12, 45000]].map(([k, count, price]) => (
-              <button
-                key={k}
-                data-testid={`roses-${k}`}
-                onClick={async () => {
-                  setCreating(true);
-                  try {
-                    const r = await api.post("/roses/purchase", { bundle: k });
-                    window.open(r.data.payment_link, "_blank");
-                    toast.success(t("roses_payment_opened").replace("{count}", count));
-                  } catch (e) { toast.error("Xato"); } finally { setCreating(false); }
-                }}
-                disabled={creating}
-                className="rounded-2xl bg-card border border-border hover:border-primary p-3 text-center transition"
-              >
-                <p className="text-2xl">🌹</p>
-                <p className="font-medium text-sm mt-1">{count} ta</p>
-                <p className="text-xs text-muted-foreground">{Number(price).toLocaleString()} {t("sum")}</p>
-              </button>
-            ))}
           </div>
         </div>
       )}

@@ -3,7 +3,6 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import GiftModal from "@/components/GiftModal";
-import RoseModal from "@/components/RoseModal";
 import ChatVoiceRecorder from "@/components/ChatVoiceRecorder";
 import { ArrowLeft, Send, Gift, MoreVertical, Ban, Flag, Wand2, Play } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
@@ -23,7 +22,6 @@ export default function Chat() {
   const [unlocking, setUnlocking] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
-  const [roseOpen, setRoseOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [icebreakers, setIcebreakers] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
@@ -100,26 +98,26 @@ export default function Chat() {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  const send = async (txt, isSuper = false) => {
+  const send = async (txt) => {
     const finalText = txt ?? text;
     if (!finalText.trim()) return;
-    
+
     // Optimistic UI update - show message immediately
     const tempMsg = {
       id: `temp-${Date.now()}`,
       from_user_id: user.id,
       text: finalText,
-      kind: isSuper ? "super" : "text",
+      kind: "text",
       created_at: new Date().toISOString(),
       sending: true,
     };
     setMessages((prev) => [...prev, tempMsg]);
     setText("");
     setShowTemplates(false);
-    
+
     setSending(true);
     try {
-      await api.post("/messages/send", { to_user_id: otherId, text: finalText, is_super: isSuper });
+      await api.post("/messages/send", { to_user_id: otherId, text: finalText });
       // Remove temp message, WebSocket will add the real one
       setMessages((prev) => prev.filter((m) => m.id !== tempMsg.id));
     } catch (e) {
@@ -254,9 +252,7 @@ export default function Chat() {
               m.from_user_id === user?.id
                 ? "bg-primary text-white rounded-br-sm"
                 : "bg-card border border-border rounded-bl-sm"
-            } ${m.kind === "gift" ? "bg-gold-light text-yellow-900 border-gold/40" : ""} ${m.kind === "super" ? "ring-2 ring-gold" : ""} ${m.kind === "rose" ? "ring-2 ring-pink-500 bg-pink-50 text-pink-900 dark:bg-pink-900/20 dark:text-pink-100" : ""}`}>
-              {m.kind === "super" && <span className="text-[9px] uppercase tracking-wider opacity-70 block">{t("super_application")}</span>}
-              {m.kind === "rose" && <span className="text-[9px] uppercase tracking-wider opacity-70 block">🌹</span>}
+            } ${m.kind === "gift" ? "bg-gold-light text-yellow-900 border-gold/40" : ""}`}>
               {m.kind === "voice" && m.meta?.voice_url ? (
                 <div className="flex items-center gap-2 min-w-[200px]" data-testid={`voice-msg-${m.id}`}>
                   <span className="text-[9px] uppercase tracking-wider opacity-70">🎙 · {m.meta.voice_duration || 0}s</span>
@@ -346,9 +342,6 @@ export default function Chat() {
           )}
           {/* Always-visible message composer (disabled when locked) */}
           <div className="flex items-end gap-1.5 min-w-0">
-            <button data-testid="rose-open" onClick={() => setRoseOpen(true)} disabled={access?.requires_unlock} className="shrink-0 w-10 h-10 grid place-items-center rounded-full bg-primary/10 hover:bg-primary/20 disabled:opacity-40 text-base" title="🌹">
-              🌹
-            </button>
             <button data-testid="gift-open" onClick={() => setGiftOpen(true)} disabled={access?.requires_unlock} className="shrink-0 w-10 h-10 grid place-items-center rounded-full bg-muted hover:bg-border disabled:opacity-40" title={t("send_gift")}>
               <Gift className="w-4 h-4" />
             </button>
@@ -374,7 +367,6 @@ export default function Chat() {
         </div>
       </div>
       {giftOpen && <GiftModal targetId={otherId} targetName={other.name} onClose={() => setGiftOpen(false)} onSent={load} />}
-      {roseOpen && <RoseModal targetId={otherId} targetName={other.name} onClose={() => setRoseOpen(false)} onSent={load} />}
       {reportOpen && <ReportModal t={t} onClose={() => setReportOpen(false)} onSubmit={reportUser} />}
     </div>
   );

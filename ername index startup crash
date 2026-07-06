@@ -1,0 +1,42 @@
+[1mdiff --git a/backend/server.py b/backend/server.py[m
+[1mindex 819374d..c4dd8ef 100644[m
+[1m--- a/backend/server.py[m
+[1m+++ b/backend/server.py[m
+[36m@@ -129,17 +129,27 @@[m [masync def startup() -> None:[m
+     # Referral lookup[m
+     await db.users.create_index("referred_by", sparse=True, name="ix_referred_by")[m
+     await db.users.create_index("referral_code", sparse=True, unique=False, name="ix_referral_code")[m
+[31m-    # Drop and recreate ix_referral_username with partial filter to allow multiple null values[m
+[32m+[m[32m    # Drop any existing index on referral_username_lower and recreate with sparse=True[m
+     try:[m
+[31m-        await db.users.drop_index("ix_referral_username")[m
+[31m-    except Exception:[m
+[31m-        pass  # Index may not exist on first run[m
+[31m-    await db.users.create_index([m
+[31m-        "referral_username_lower",[m
+[31m-        unique=True,[m
+[31m-        partialFilterExpression={"referral_username_lower": {"$exists": True, "$ne": None}},[m
+[31m-        name="ix_referral_username"[m
+[31m-    )[m
+[32m+[m[32m        existing_indexes = await db.users.list_indexes()[m
+[32m+[m[32m        for idx in existing_indexes:[m
+[32m+[m[32m            if "referral_username_lower" in idx.get("key", {}):[m
+[32m+[m[32m                await db.users.drop_index(idx["name"])[m
+[32m+[m[32m                log(f"Dropped index {idx['name']} that references referral_username_lower")[m
+[32m+[m[32m    except Exception as e:[m
+[32m+[m[32m        log(f"Warning while dropping referral username indexes: {e}")[m
+[32m+[m[32m    # Create sparse unique index - allows multiple null values[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        await db.users.create_index([m
+[32m+[m[32m            "referral_username_lower",[m
+[32m+[m[32m            unique=True,[m
+[32m+[m[32m            sparse=True,[m
+[32m+[m[32m            name="ix_referral_username"[m
+[32m+[m[32m        )[m
+[32m+[m[32m        log("Referral username index created successfully")[m
+[32m+[m[32m    except Exception as e:[m
+[32m+[m[32m        log(f"Warning: Failed to create referral username index: {e}")[m
+[32m+[m[32m        log("Server will continue without referral username index")[m
+     await db.saved.create_index([("target_id", 1), ("at", -1)], name="ix_saved_target_at")[m
+     await db.profile_views.create_index([("target_id", 1), ("at", -1)], name="ix_profile_views_target_at")[m
+     await db.messages.create_index([("to_user_id", 1), ("created_at", -1)], name="ix_msg_to_user_time")[m

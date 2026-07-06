@@ -3,7 +3,6 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot } from "@/components/Badges";
-import RoseModal from "@/components/RoseModal";
 import CompatibilityCard from "@/components/CompatibilityCard";
 import { photoSrc } from "@/lib/photo";
 import { formatLastActive } from "@/lib/time";
@@ -18,7 +17,6 @@ export default function ProfileDetail() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [roseOpen, setRoseOpen] = useState(false);
   const [famSending, setFamSending] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
 
@@ -242,9 +240,6 @@ export default function ProfileDetail() {
           <Link data-testid="profile-write" to={`/chat/${c.id}`} className="flex-1 rounded-2xl py-3 inline-flex items-center justify-center gap-2 font-medium bg-secondary text-white">
             <MessageCircle className="w-4 h-4" /> {t("write")}
           </Link>
-          <button data-testid="profile-rose" onClick={() => setRoseOpen(true)} className="rounded-2xl py-3 px-4 bg-primary/10 text-foreground font-medium text-xl">
-            🌹
-          </button>
           <button data-testid="profile-share" onClick={shareProfile} className="rounded-2xl py-3 px-4 bg-card border border-border hover:bg-muted font-medium">
             <Share2 className="w-4 h-4" />
           </button>
@@ -259,7 +254,6 @@ export default function ProfileDetail() {
           📞 {t("family_request_btn")}
         </button>
       </div>
-      {roseOpen && <RoseModal targetId={c.id} targetName={c.name} onClose={() => setRoseOpen(false)} onSent={load} />}
     </div>
   );
 }

@@ -25,7 +25,7 @@ export default function Messages() {
 
   useEffect(() => { load(); }, [load]);
 
-  const matches = chats.filter((c) => c.status === "match" || (c.last_message && c.last_message.kind !== "super"));
+  const matches = chats.filter((c) => c.status === "match");
 
   return (
     <div className="px-4 md:px-8 pt-6">
@@ -122,7 +122,6 @@ function ApplicationRow({ a, onChange }) {
         <div className="flex-1 min-w-0">
           <p className="font-medium">{a.from_user.name}, {a.from_user.age}</p>
           <p className="text-xs text-muted-foreground">{a.from_user.region}</p>
-          {a.application.is_super && <span className="text-[10px] uppercase tracking-wider text-gold-dark">Super</span>}
         </div>
       </div>
       <p className="mt-2 text-sm">{a.application.text}</p>

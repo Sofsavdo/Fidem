@@ -183,8 +183,6 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
         amount = PRICE_CHAT_UNLOCK
         if not req.target_user_id:
             raise HTTPException(400, "target_user_id required for chat_unlock")
-    elif req.purpose == "super_application":
-        amount = PRICE_SUPER
     elif req.purpose == "balance_topup":
         amount = req.amount or 0
         if amount < 1000:
@@ -453,14 +451,6 @@ async def process_completed_payment(uid: str, purpose: str, amount: int, balance
     elif purpose == "balance_topup":
         await db.users.update_one({"id": uid}, {"$inc": {"balance": amount}})
         await push_notif(uid, "balance", f"Balansingiz {amount:,} so'mga to'ldirildi")
-    elif purpose == "super_application":
-        await db.users.update_one({"id": uid}, {"$inc": {"super_applications_available": 1}})
-        await push_notif(uid, "balance", "Super murojaat sotib olindi")
-        # Track balance spent for lifetime contribution
-        await db.users.update_one(
-            {"id": uid},
-            {"$inc": {"lifetime_contribution": amount, "lifetime_contribution_breakdown.balance_spent": amount}}
-        )
     elif purpose == "gift":
         # Send gift to target user and increase influence for sender
         if target_user_id:

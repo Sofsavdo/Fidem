@@ -20,12 +20,12 @@ export default function Boost() {
   ]);
   useEffect(() => { load(); }, []);
 
-  const activate = async (kind) => {
+  const activate = async () => {
     setBusy(true);
     try {
-      const r = await api.post(`/${kind}/activate`);
+      const r = await api.post("/boost/activate");
       if (r.data.status === "paid") {
-        toast.success(kind === "boost" ? t("profile_boost_title") + " ✅" : t("spotlight_title") + " ✅");
+        toast.success(t("profile_boost_title") + " ✅");
         await refresh();
       } else {
         toast.success("To'lov sahifasi ochildi");
@@ -72,42 +72,14 @@ export default function Boost() {
           )}
           <button
             data-testid="buy-boost"
-            onClick={() => activate("boost")}
+            onClick={() => activate()}
             disabled={busy || status?.active}
             className="w-full mt-3 rounded-2xl bg-primary text-white py-3 font-medium disabled:opacity-50"
           >
             {t("activate")} · 5,000 {t("sum_word")}
           </button>
         </div>
-
-        {/* Spotlight */}
-        <div className="rounded-3xl border-2 border-gold/40 bg-gradient-to-br from-gold-light/30 to-card p-5" data-testid="card-spotlight">
-          <div className="flex items-center justify-between">
-            <Star className="w-7 h-7 text-gold-dark" fill="currentColor" />
-            <span className="text-xs px-2 py-1 rounded-full bg-gold-light text-yellow-900 font-medium">7 {t("day_word").toUpperCase()}</span>
-          </div>
-          <h2 className="font-heading text-2xl font-semibold mt-3">{t("spotlight_title")}</h2>
-          <p className="text-sm text-muted-foreground mt-1">{t("spotlight_desc")}</p>
-          <ul className="text-sm mt-3 space-y-1">
-            <li>★ {t("bullet_region_top")}</li>
-            <li>★ {t("bullet_spotlight_badge")}</li>
-            <li>★ {t("bullet_constant_visibility")}</li>
-          </ul>
-          <p className="font-heading text-xl mt-4">25,000 {t("sum_word")}</p>
-          <button
-            data-testid="buy-spotlight"
-            onClick={() => activate("spotlight")}
-            disabled={busy}
-            className="w-full mt-3 rounded-2xl bg-gold text-ink py-3 font-medium disabled:opacity-50"
-          >
-            {t("activate")} · 25,000 {t("sum_word")}
-          </button>
-        </div>
       </div>
-
-      <p className="text-xs text-muted-foreground text-center pt-2">
-        💡 Spotlight + Premium = 10x konversiya
-      </p>
 
       {/* Analytics */}
       {analytics && (
@@ -123,21 +95,9 @@ export default function Boost() {
               <StatBox icon={<Eye className="w-4 h-4" />} label={t("views_word")} value={analytics.boost.impressions} />
               <StatBox icon={<Activity className="w-4 h-4" />} label={t("views_word")} value={analytics.boost.views} />
               <StatBox icon={<Heart className="w-4 h-4" />} label="Likes" value={analytics.boost.likes} />
-              <StatBox icon={<MessageSquare className="w-4 h-4" />} label="Roses" value={analytics.boost.roses} />
               <StatBox icon={<MessageSquare className="w-4 h-4" />} label="Msg" value={analytics.boost.messages} />
             </div>
           </div>
-
-          {/* Spotlight session */}
-          {analytics.spotlight.active && (
-            <div className="mt-3 rounded-2xl bg-gold-light/30 border border-gold/40 p-4">
-              <p className="text-xs font-medium text-gold-dark mb-2">{t("current_session")}</p>
-              <div className="grid grid-cols-2 gap-3">
-                <StatBox icon={<Eye className="w-4 h-4" />} label={t("views_word")} value={analytics.spotlight.impressions} />
-                <StatBox icon={<Activity className="w-4 h-4" />} label={t("views_word")} value={analytics.spotlight.views} />
-              </div>
-            </div>
-          )}
 
           {/* Lifetime */}
           <div className="mt-3">

@@ -278,7 +278,6 @@ async def candidates(
 
         now_iso2 = iso(now_utc())
         pub["boosted"] = bool(d.get("boost_until") and d["boost_until"] > now_iso2)
-        pub["spotlight"] = bool(d.get("spotlight_until") and d["spotlight_until"] > now_iso2)
 
         enriched.append(pub)
 
@@ -288,9 +287,8 @@ async def candidates(
         def _rank(x):
             d = next((dd for dd in docs if dd["id"] == x["id"]), {})
             boosted = d.get("boost_until", "") > now_iso
-            spotlight = d.get("spotlight_until", "") > now_iso
             return (
-                -2 if spotlight else (-1 if boosted else 0),
+                -1 if boosted else 0,
                 -x.get("match_score", 0),
                 -x.get("completeness", 0),
             )
@@ -308,21 +306,13 @@ async def candidates(
     try:
         now_iso3 = iso(now_utc())
         boosted_ids = [d["id"] for d in docs if d.get("boost_until") and d["boost_until"] > now_iso3]
-        spotlight_ids = [d["id"] for d in docs if d.get("spotlight_until") and d["spotlight_until"] > now_iso3]
         result_ids = {x["id"] for x in result}
         boosted_hit = [i for i in boosted_ids if i in result_ids]
-        spotlight_hit = [i for i in spotlight_ids if i in result_ids]
 
         if boosted_hit:
             await db.users.update_many(
                 {"id": {"$in": boosted_hit}},
                 {"$inc": {"boost_metrics.impressions": 1, "impressions_total": 1}},
-            )
-
-        if spotlight_hit:
-            await db.users.update_many(
-                {"id": {"$in": spotlight_hit}},
-                {"$inc": {"boost_metrics.sp_impressions": 1, "impressions_total": 1}},
             )
 
     except Exception:
@@ -385,9 +375,6 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
 
         if target.get("boost_until") and target["boost_until"] > now_iso:
             inc["boost_metrics.views"] = 1
-
-        if target.get("spotlight_until") and target["spotlight_until"] > now_iso:
-            inc["boost_metrics.sp_views"] = 1
 
         await db.users.update_one({"id": target_id}, {"$inc": inc})
 

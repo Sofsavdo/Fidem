@@ -7,7 +7,7 @@ import { ArrowLeft, Bell, Eye, Heart, Gift, MessageCircle, ShieldCheck, Trophy, 
 const ICONS = {
   view: Eye, saved: Heart, gift: Gift, message: MessageCircle, photo_request: ShieldCheck,
   photo_grant: ShieldCheck, match: Sparkles, premium: Trophy, balance: Trophy, marketing: Bell,
-  referral: Trophy, verified: ShieldCheck, rose: Heart,
+  referral: Trophy, verified: ShieldCheck,
 };
 
 export default function Notifications() {
