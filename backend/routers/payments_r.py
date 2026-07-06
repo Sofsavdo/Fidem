@@ -12,7 +12,6 @@ from core import (
     PRICE_CHAT_UNLOCK,
     PRICE_PREMIUM,
     PRICE_STANDARD,
-    PRICE_SUPER,
     PRICE_VIP,
     TELEGRAM_BOT_USERNAME,
     chat_id_for,
