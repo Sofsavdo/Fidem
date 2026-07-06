@@ -117,6 +117,7 @@
     "resolve-url-loader": "5.0.0",
     "@peculiar/x509": "1.10.0",
     "**/@peculiar/x509": "1.10.0",
+    "@peculiar/x509/**": "1.10.0",
     "**/resolve-url-loader/postcss": "8.5.10",
     "**/axios/form-data": "4.0.4",
     "**/jsdom/form-data": "3.0.4",
