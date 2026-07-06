@@ -12,9 +12,6 @@ export default function Settings() {
   const [f, setF] = useState({
     age_min: 18, age_max: 60,
     country: "", region: "", marital_status: "",
-    has_children: null,
-    height_min: null, height_max: null,
-    weight_min: null, weight_max: null,
     require_verified: false, require_financial: false,
   });
   const [saving, setSaving] = useState(false);
@@ -93,17 +90,6 @@ export default function Settings() {
             onChange={(r) => setF({ ...f, region: r })}
             placeholder={t("select_region") || "Select region"}
           />
-        </div>
-        <SelectField label={t("has_children")} value={f.has_children === null ? "" : (f.has_children ? "yes" : "no")} onChange={(v) => setF({ ...f, has_children: v === "" ? null : v === "yes" })} testid="set-children"
-          options={[
-            { value: "", label: "—" },
-            { value: "no", label: t("no") },
-            { value: "yes", label: t("yes") },
-          ]}
-        />
-        <div className="grid grid-cols-2 gap-3">
-          <NumField label={`${t("height")} min`} value={f.height_min} onChange={(v) => setF({ ...f, height_min: v })} testid="set-hmin" />
-          <NumField label={`${t("height")} max`} value={f.height_max} onChange={(v) => setF({ ...f, height_max: v })} testid="set-hmax" />
         </div>
 
         <Toggle label={`✓ ${t("verified")}`} value={f.require_verified} onChange={(v) => setF({ ...f, require_verified: v })} testid="set-req-verified" />

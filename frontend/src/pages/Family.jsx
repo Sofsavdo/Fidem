@@ -12,7 +12,6 @@ export default function Family() {
   const [requests, setRequests] = useState({ sent: [], received: [] });
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
-  const [relation, setRelation] = useState("parent");
   const [savingContact, setSavingContact] = useState(false);
 
   const load = async () => {
@@ -23,7 +22,6 @@ export default function Family() {
       if (c.data.family_contact) {
         setPhone(c.data.family_contact.phone || "");
         setName(c.data.family_contact.name || "");
-        setRelation(c.data.family_contact.relation || "parent");
       }
     } catch (e) { /* ignore */ }
   };
@@ -37,7 +35,7 @@ export default function Family() {
     }
     setSavingContact(true);
     try {
-      await api.patch("/family/contacts", { parent_phone: phone, parent_name: name, parent_relation: relation });
+      await api.patch("/family/contacts", { parent_phone: phone, parent_name: name });
       toast.success(t("saved_successfully"));
       load();
     } catch (e) {
@@ -94,12 +92,6 @@ export default function Family() {
           <input data-testid="fam-phone" placeholder="+998 90 123 45 67" className="px-4 py-2.5 rounded-xl border border-input bg-background text-sm" value={phone} onChange={(e) => setPhone(e.target.value)} />
           <input data-testid="fam-name" placeholder={t("name")} className="px-4 py-2.5 rounded-xl border border-input bg-background text-sm" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
-        <select data-testid="fam-relation" className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm" value={relation} onChange={(e) => setRelation(e.target.value)}>
-          <option value="parent">Parent</option>
-          <option value="sibling">Sibling</option>
-          <option value="relative">Relative</option>
-          <option value="guardian">Guardian</option>
-        </select>
         <button data-testid="fam-save" onClick={saveContact} disabled={savingContact} className="w-full py-2.5 rounded-xl bg-primary text-white font-medium text-sm disabled:opacity-50 inline-flex items-center justify-center gap-2">
           <Save className="w-4 h-4" /> {t("save_phone")}
         </button>
@@ -179,7 +171,6 @@ function FamilyRow({ request, statusBadge }) {
       {show && contact && (
         <div className="mt-2 p-3 rounded-lg bg-card border border-border text-sm">
           <p className="font-medium">{contact.family_contact.name || "Oilaviy aloqa"}</p>
-          <p className="text-muted-foreground capitalize text-xs">{contact.family_contact.relation}</p>
           <a href={`tel:${contact.family_contact.phone}`} className="mt-1 inline-flex items-center gap-1 text-foreground font-medium">
             <Phone className="w-4 h-4" /> {contact.family_contact.phone}
           </a>
