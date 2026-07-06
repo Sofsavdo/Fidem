@@ -21,7 +21,7 @@ export default function MobileTopBar() {
         {/* Unified wallet pill: shows balance and (only if > 0) coins side-by-side inside one button */}
         <button
           data-testid="topbar-balance"
-          onClick={() => nav("/premium?topup=1")}
+          onClick={() => nav("/withdrawals")}
           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-muted/60 hover:bg-muted text-xs font-medium"
           title="Wallet"
         >
