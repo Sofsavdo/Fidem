@@ -90,12 +90,12 @@ export default function Boost() {
 
           {/* Boost session */}
           <div className="mt-3 rounded-2xl bg-primary/5 border border-primary/20 p-4">
-            <p className="text-xs font-medium text-foreground mb-2">{t("profile_boost_title")} {analytics.boost.active ? `(${t("travel_active")})` : ""}</p>
+            <p className="text-xs font-medium text-foreground mb-2">{t("profile_boost_title")} {analytics?.boost?.active ? `(${t("travel_active")})` : ""}</p>
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-              <StatBox icon={<Eye className="w-4 h-4" />} label={t("views_word")} value={analytics.boost.impressions} />
-              <StatBox icon={<Activity className="w-4 h-4" />} label={t("views_word")} value={analytics.boost.views} />
-              <StatBox icon={<Heart className="w-4 h-4" />} label="Likes" value={analytics.boost.likes} />
-              <StatBox icon={<MessageSquare className="w-4 h-4" />} label="Msg" value={analytics.boost.messages} />
+              <StatBox icon={<Eye className="w-4 h-4" />} label={t("views_word")} value={analytics?.boost?.impressions || 0} />
+              <StatBox icon={<Activity className="w-4 h-4" />} label={t("views_word")} value={analytics?.boost?.views || 0} />
+              <StatBox icon={<Heart className="w-4 h-4" />} label="Likes" value={analytics?.boost?.likes || 0} />
+              <StatBox icon={<MessageSquare className="w-4 h-4" />} label="Msg" value={analytics?.boost?.messages || 0} />
             </div>
           </div>
 
@@ -103,10 +103,10 @@ export default function Boost() {
           <div className="mt-3">
             <p className="text-xs font-medium text-muted-foreground mb-2">Total</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <StatBox icon={<Eye className="w-4 h-4" />} label={t("views_word")} value={analytics.lifetime.total_impressions} />
-              <StatBox icon={<Activity className="w-4 h-4" />} label={t("views_word")} value={analytics.lifetime.total_views} />
-              <StatBox icon={<Heart className="w-4 h-4" />} label="Likes" value={analytics.lifetime.total_likes} />
-              <StatBox icon={<Sparkles className="w-4 h-4" />} label="Gifts" value={(analytics.lifetime.gifts_received || 0).toLocaleString() + " " + t("sum_word")} />
+              <StatBox icon={<Eye className="w-4 h-4" />} label={t("views_word")} value={analytics?.lifetime?.total_impressions || 0} />
+              <StatBox icon={<Activity className="w-4 h-4" />} label={t("views_word")} value={analytics?.lifetime?.total_views || 0} />
+              <StatBox icon={<Heart className="w-4 h-4" />} label="Likes" value={analytics?.lifetime?.total_likes || 0} />
+              <StatBox icon={<Sparkles className="w-4 h-4" />} label="Gifts" value={(analytics?.lifetime?.gifts_received || 0).toLocaleString() + " " + t("sum_word")} />
             </div>
           </div>
         </div>
