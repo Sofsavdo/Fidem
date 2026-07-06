@@ -469,7 +469,6 @@ const dict = {
     voice_answer: "Ovozli javob",
     record_voice: "Yozish",
     stop_recording: "To'xtatish",
-    // Quiz
     no_more_candidates: "Hozircha boshqa nomzod yo'q",
     // Saved
     saved_title: "Saqlangan nomzodlar",
@@ -1081,9 +1080,6 @@ const dict = {
     voice_answer: "Голосовой ответ",
     record_voice: "Записать",
     stop_recording: "Остановить",
-    // Quiz
-    quiz_title: "Тест совместимости",
-    quiz_subtitle: "Короткий тест для лучшего матча",
     no_more_candidates: "Кандидатов пока нет",
     // Saved
     saved_title: "Сохранённые",
@@ -1418,7 +1414,6 @@ const dict = {
     report: "Report",
     reported: "Reported",
     report_reason: "Tell us the reason:",
-    quiz_short: "Quiz",
     boost: "Boost",
     invite_friends: "Invite Friends",
     share_telegram: "Share via Telegram",

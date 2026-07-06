@@ -9,7 +9,6 @@ const tabs = [
   { to: "/", icon: Users, key: "candidates", testid: "nav-candidates" },
   { to: "/messages", icon: MessageCircle, key: "messages", testid: "nav-messages" },
   { to: "/saved", icon: Bookmark, key: "saved", testid: "nav-saved" },
-  { to: "/quiz", icon: Sparkles, key: "quiz_short", testid: "nav-quiz" },
   { to: "/me", icon: User, key: "me", testid: "nav-me" },
 ];
 

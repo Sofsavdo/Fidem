@@ -257,18 +257,6 @@ async def candidates(
         else:
             score, reasons = compute_match(me_doc, d, lang=match_lang)
 
-        my_quiz = me_doc.get("quiz_answers") or {}
-        their_quiz = d.get("quiz_answers") or {}
-
-        if my_quiz and their_quiz:
-            common = set(my_quiz) & set(their_quiz)
-            if common:
-                agree = sum(1 for k in common if my_quiz[k] == their_quiz[k])
-                bonus = round(10 * agree / max(len(common), 1))
-                score = min(100, score + bonus)
-                if bonus >= 5:
-                    reasons.append(f"Quiz mosligi (+{bonus})")
-
         pub = user_public_minimal(d)
         pub["match_score"] = score
         pub["match_reasons"] = reasons
