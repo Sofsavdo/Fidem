@@ -1,5 +1,5 @@
 // Lightweight WebSocket client with auto-reconnect.
-const BACKEND = process.env.REACT_APP_BACKEND_URL || window.location.origin.replace(':3000', ':8080').replace('https://fidem-frontend', 'https://fidem');
+const BACKEND = process.env.REACT_APP_BACKEND_URL || "";
 
 export class WS {
   constructor({ onMessage, onOpen, onClose }) {
