@@ -7,6 +7,6 @@
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10,
-    "startCommand": "serve -s build --single --listen tcp://0.0.0.0:${PORT:-3000}"
+    "startCommand": "node server.js"
   }
 }
