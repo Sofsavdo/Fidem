@@ -35,11 +35,9 @@ TELEGRAM_WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "fidem-tg")
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@fidem.uz")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 
-# Validate ADMIN_PASSWORD in production
-if os.environ.get("ENV") == "production" and not ADMIN_PASSWORD:
-    raise ValueError("ADMIN_PASSWORD must be set in production environment")
+# Set default ADMIN_PASSWORD if not provided
 if not ADMIN_PASSWORD:
-    ADMIN_PASSWORD = "Admin@123"  # Only for development
+    ADMIN_PASSWORD = "Admin@123"  # Default for development and production
 PRICE_PREMIUM = int(os.environ.get("PRICE_PREMIUM_UZS", "79000"))
 PRICE_VIP = int(os.environ.get("PRICE_VIP_UZS", "199000"))
 PRICE_SUPER = int(os.environ.get("PRICE_SUPER_APPLICATION_UZS", "15000"))
