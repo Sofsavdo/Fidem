@@ -168,15 +168,7 @@ def user_public(u: dict) -> dict:
         "blocked": u.get("blocked", False),
         "prompts": u.get("prompts") or [],
         "big5_scores": u.get("big5_scores") or {},
-        # Economy fields
         "balance": u.get("balance", 0),
-        "coins": u.get("coins", 0),
-        "referral_earnings_withdrawable": u.get("referral_earnings_withdrawable", 0),
-        "referral_earnings_pending": u.get("referral_earnings_pending", 0),
-        "referral_earnings_approved": u.get("referral_earnings_approved", 0),
-        "referral_earnings_paid_out": u.get("referral_earnings_paid_out", 0),
-        "withdrawable_balance": u.get("referral_earnings_withdrawable", 0),  # Legacy alias
-        "influence_score": u.get("influence_score", 0),
         # Admin-only fields (for admin panel)
         "email": u.get("email", ""),
         "phone": u.get("phone", ""),

@@ -44,7 +44,6 @@ from routers.concierge_r import router as concierge_router  # noqa: E402
 from routers.travel_r import router as travel_router  # noqa: E402
 from routers.boost_analytics_r import router as boost_analytics_router  # noqa: E402
 from routers.face_r import router as face_router  # noqa: E402
-from routers.economy_r import router as economy_router  # noqa: E402
 from routers.rankings_r import router as rankings_router  # noqa: E402
 from routers.community_r import router as community_router  # noqa: E402
 from routers.settings_r import router as settings_router  # noqa: E402
@@ -72,7 +71,6 @@ api.include_router(concierge_router)
 api.include_router(travel_router)
 api.include_router(boost_analytics_router)
 api.include_router(face_router)
-api.include_router(economy_router)
 api.include_router(rankings_router)
 api.include_router(community_router)
 api.include_router(settings_router)
@@ -178,58 +176,6 @@ async def startup() -> None:
     await db.messages.create_index([("to_user_id", 1), ("created_at", -1)], name="ix_msg_to_user_time")
     await db.chat_unlocks.create_index([("user_id", 1), ("target_id", 1)], name="ix_chat_unlocks_user_target")
 
-    # Phase 1.1: Add new DB fields for economy system (safe migration)
-    # Only run migrations if field doesn't exist on ANY user (performance optimization)
-    migration_fields = [
-        ("balance", 0),
-        ("coins", 0),
-        ("referral_username_change_count", 0),
-        ("referral_username_last_changed", None),
-        ("referral_earnings_pending", 0),
-        ("referral_earnings_approved", 0),
-        ("referral_earnings_withdrawable", 0),
-        ("referral_earnings_paid_out", 0),
-        ("referral_earnings_tax_withheld", 0),
-        ("influence_score", 0),
-        ("status", "bronze"),
-        ("badges", []),
-        ("is_founder", False),
-        ("founder_type", None),
-        ("founder_achieved_at", None),
-        ("activity_score", 0),
-        ("ranking_score", 0),
-        ("lifetime_contribution", 0),
-        ("auction_bids_total", 0),
-        ("auction_wins_total", 0),
-        ("auction_spent_total", 0),
-        ("withdrawals_pending", 0),
-        ("withdrawn_total", 0),
-        ("tax_paid_total", 0),
-        ("show_in_rankings", True),
-    ]
-    
-    for field, default in migration_fields:
-        sample = await db.users.find_one({field: {"$exists": True}}, {field: 1})
-        if not sample:
-            await db.users.update_many(
-                {field: {"$exists": False}},
-                {"$set": {field: default}}
-            )
-    
-    # Special handling for nested objects
-    sample_breakdown = await db.users.find_one({"lifetime_contribution_breakdown": {"$exists": True}}, {"lifetime_contribution_breakdown": 1})
-    if not sample_breakdown:
-        await db.users.update_many(
-            {"lifetime_contribution_breakdown": {"$exists": False}},
-            {"$set": {"lifetime_contribution_breakdown": {
-                "balance_spent": 0,
-                "referral_earnings_converted": 0,
-                "donations_converted": 0,
-                "subscription_payments": 0,
-                "gifts_sent_value": 0
-            }}}
-        )
-    
     # Initialize referral_id for existing users (first 8 chars of id) - only if needed
     sample_referral = await db.users.find_one({"referral_id": {"$exists": True}}, {"referral_id": 1})
     if not sample_referral:
@@ -238,23 +184,6 @@ async def startup() -> None:
                 {"id": user["id"]},
                 {"$set": {"referral_id": user["id"][:8]}}
             )
-    
-    # Migrate old withdrawable_balance to referral_earnings_withdrawable (V3.2 economy migration)
-    # This ensures users don't lose access to their existing withdrawable funds
-    async for user in db.users.find({"withdrawable_balance": {"$exists": True, "$gt": 0}}, {"id": 1, "withdrawable_balance": 1}):
-        old_balance = user.get("withdrawable_balance", 0)
-        if old_balance > 0:
-            await db.users.update_one(
-                {"id": user["id"]},
-                {
-                    "$inc": {"referral_earnings_withdrawable": old_balance},
-                    "$set": {"withdrawable_balance": 0}
-                }
-            )
-
-    # Create referral_usernames collection for uniqueness
-    await db.referral_usernames.create_index("username_lower", unique=True)
-    await db.referral_usernames.create_index("user_id")
 
     # Seed admin
     admin = await db.users.find_one({"email": ADMIN_EMAIL.lower()})
