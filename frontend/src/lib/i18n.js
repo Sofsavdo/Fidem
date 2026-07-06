@@ -383,8 +383,8 @@ const dict = {
     sum_word: "so'm",
     coins_word: "tanga",
     views_word: "ko'rinish",
-    // Boost & Spotlight
-    boost_title: "Boost va Spotlight",
+    // Boost
+    boost_title: "Boost",
     boost_subtitle: "Profilingizni ko'proq odamlar ko'rsin",
     daily_bonus: "Kunlik bonus",
     profile_boost_title: "Profile Boost",
@@ -995,8 +995,8 @@ const dict = {
     sum_word: "сум",
     coins_word: "монет",
     views_word: "просм.",
-    // Boost & Spotlight
-    boost_title: "Boost и Spotlight",
+    // Boost
+    boost_title: "Boost",
     boost_subtitle: "Чтобы вас увидело больше людей",
     daily_bonus: "Ежедневный бонус",
     profile_boost_title: "Profile Boost",
@@ -1603,8 +1603,8 @@ const dict = {
     sum_word: "UZS",
     coins_word: "coins",
     views_word: "views",
-    // Boost & Spotlight
-    boost_title: "Boost & Spotlight",
+    // Boost
+    boost_title: "Boost",
     boost_subtitle: "Get seen by more people",
     daily_bonus: "Daily bonus",
     profile_boost_title: "Profile Boost",
@@ -1612,12 +1612,6 @@ const dict = {
     bullet_top_feed: "Top of feed",
     bullet_views_3_5x: "3-5x more profile views",
     bullet_faster_messages: "Faster message flow",
-    spotlight_title: "Spotlight",
-    spotlight_desc: "Top of your region's feed for a whole week",
-    bullet_region_top: "Top of region",
-    bullet_spotlight_badge: "Spotlight badge",
-    bullet_constant_visibility: "Constant visibility",
-    current_session: "Current session (active)",
     leaderboard_title: "Leaderboard",
     leaderboard_desc: "Who's getting the most views among active boosters right now",
     activate_with_balance: "Activate with balance",
