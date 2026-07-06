@@ -1,6 +1,6 @@
 """Gamification — XP, levels, badges, progression.
 
-XP sources: profile completion, Big5, daily check-in, sending roses/gifts, photos, referrals.
+XP sources: profile completion, Big5, daily check-in, sending gifts, photos, referrals.
 Levels: square-root scaling (xp / 100). Badges: milestone achievements.
 """
 from __future__ import annotations
@@ -55,16 +55,6 @@ DAILY_QUESTS = {
         "xp_reward": 50,
         "coins_reward": 15,
     },
-    "send_rose": {
-        "id": "send_rose",
-        "icon": "🌹",
-        "uz": "1 ta atirgul yuborish",
-        "ru": "Отправить 1 розу",
-        "en": "Send 1 rose",
-        "target": 1,
-        "xp_reward": 40,
-        "coins_reward": 12,
-    },
 }
 
 # Level titles
@@ -100,12 +90,6 @@ BADGES = [
     {"id": "b_vip", "icon": "👑",
      "uz": "VIP", "ru": "VIP", "en": "VIP",
      "check": lambda u: u.get("plan") == "vip"},
-    {"id": "b_first_rose", "icon": "🌹",
-     "uz": "Birinchi atirgul", "ru": "Первая роза", "en": "First Rose",
-     "check": lambda u: u.get("roses_sent_total", 0) > 0},
-    {"id": "b_rose_giver", "icon": "🌷",
-     "uz": "Saxiy yurakli", "ru": "Щедрое сердце", "en": "Generous Heart",
-     "check": lambda u: u.get("roses_sent_total", 0) >= 5},
     {"id": "b_prompts", "icon": "✍️",
      "uz": "Hikoyalovchi", "ru": "Рассказчик", "en": "Storyteller",
      "check": lambda u: len(u.get("prompts") or []) >= 3},
@@ -186,7 +170,6 @@ def _backfill_xp(user: dict) -> int:
         xp += 200
     streak = user.get("daily_streak", 0)
     xp += min(streak * 20, 600)
-    xp += int(user.get("roses_sent_total", 0)) * 10
     xp += int(user.get("invited_count", 0)) * 100
     if user.get("verified_identity"): xp += 30
     if user.get("verified_selfie"): xp += 40

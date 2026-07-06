@@ -111,7 +111,6 @@ async def boost_activate(use_balance: bool = Body(True, embed=True), uid: str = 
                 "boost_metrics.views": 0,
                 "boost_metrics.likes": 0,
                 "boost_metrics.messages": 0,
-                "boost_metrics.roses": 0,
             },
             "$inc": {"balance": -BOOST_PRICE},
         },
