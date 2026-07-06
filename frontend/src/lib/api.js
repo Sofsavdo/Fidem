@@ -32,7 +32,6 @@ const cacheableUrls = [
   '/gifts/catalog',
   '/me/progress',
   '/invites/status',
-  '/economy/status',
   '/daily/status',
   '/rankings',
   '/referral/mine',

@@ -289,10 +289,6 @@ export default function Me() {
           <span className="flex items-center gap-3 text-sm"><Wallet className="w-4 h-4 text-foreground" /> {t("withdraw_money")} ({(user.withdrawable_balance || 0).toLocaleString()} {t("sum")})</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
-        <Link to="/economy" data-testid="link-economy" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><TrendingUp className="w-4 h-4 text-secondary" /> {t("economy")}</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
         <Link to="/rankings" data-testid="link-rankings" className="flex items-center justify-between p-4">
           <span className="flex items-center gap-3 text-sm"><Award className="w-4 h-4 text-gold-dark" /> {t("rankings")}</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
