@@ -1507,7 +1507,6 @@ const dict = {
     age_max: "Max age",
     only_verified: "Verified",
     only_financial: "Financial",
-    swipe_mode: "Swipe mode",
     // Photo / Face verification
     photo_required: "Profile photo is required",
     photo_required_hint: "Upload a clear photo of your face to continue",

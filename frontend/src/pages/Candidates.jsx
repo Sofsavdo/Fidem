@@ -62,14 +62,6 @@ export default function Candidates() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link
-            to="/swipe"
-            data-testid="open-swipe"
-            className="rounded-full bg-gradient-to-br from-primary to-secondary text-white px-3 py-2 text-xs font-medium inline-flex items-center gap-1.5 hover:scale-105 transition shadow"
-            title="Swipe rejimi"
-          >
-            ❤️ Swipe
-          </Link>
           <button
             data-testid="open-filter"
             onClick={() => setShowFilter(true)}
