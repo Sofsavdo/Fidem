@@ -82,7 +82,12 @@ export default function Premium() {
         toast.success(t("payment_success"));
         refresh();
       } else {
-        toast.success(t("pay_with_click"));
+        // Show balance usage info if applicable
+        if (r.data.balance_used > 0) {
+          toast.success(`${t("balance_used")}: ${r.data.balance_used.toLocaleString()} ${t("sum")}. ${t("pay_with_click")}: ${r.data.click_amount.toLocaleString()} ${t("sum")}`);
+        } else {
+          toast.success(t("pay_with_click"));
+        }
         window.open(r.data.payment_link, "_blank");
       }
       setPayments((p) => [{ ...r.data, purpose, amount, user_id: user.id, created_at: new Date() }, ...p]);
@@ -98,7 +103,12 @@ export default function Premium() {
         toast.success(t("payment_success"));
         refresh();
       } else {
-        toast.success(t("pay_with_click"));
+        // Show balance usage info if applicable
+        if (r.data.balance_used > 0) {
+          toast.success(`${t("balance_used")}: ${r.data.balance_used.toLocaleString()} ${t("sum")}. ${t("pay_with_click")}: ${r.data.click_amount.toLocaleString()} ${t("sum")}`);
+        } else {
+          toast.success(t("pay_with_click"));
+        }
         window.open(r.data.payment_link, "_blank");
       }
       setPayments((p) => [{ ...r.data, purpose: "balance_topup", amount: topupAmount }, ...p]);

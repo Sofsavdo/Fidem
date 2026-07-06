@@ -181,6 +181,7 @@ const dict = {
     buy: "Sotib olish",
     buy_super: "Super murojaat sotib olish",
     pay_with_click: "CLICK bilan to'lash",
+    balance_used: "Balansdan foydalanildi",
     payment_pending: "Kutilmoqda",
     payment_success: "Muvaffaqiyatli",
     payment_failed: "Muvaffaqiyatsiz",
