@@ -62,7 +62,7 @@
     "zod": "3.24.4"
   },
   "scripts": {
-    "start": "npx serve -s build --single --listen tcp://0.0.0.0:${PORT:-3000}",
+    "start": "serve -s build --single --listen tcp://0.0.0.0:${PORT:-3000}",
     "build": "craco build",
     "test": "craco test"
   },
