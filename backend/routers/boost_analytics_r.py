@@ -1,4 +1,4 @@
-"""Boost & Spotlight analytics + Leaderboard.
+"""Boost analytics + Leaderboard.
 Lightweight tracking: counters on user doc per boost session.
 """
 from __future__ import annotations
@@ -15,10 +15,8 @@ router = APIRouter(prefix="/boost", tags=["boost-analytics"])
 async def boost_analytics(uid: str = Depends(get_current_user_id)):
     me = await get_user(uid)
     boost_until = me.get("boost_until")
-    spotlight_until = me.get("spotlight_until")
     now = now_utc()
     boost_active = bool(boost_until and parse_dt(boost_until) > now)
-    spotlight_active = bool(spotlight_until and parse_dt(spotlight_until) > now)
 
     metrics = me.get("boost_metrics") or {}
     return {
@@ -29,15 +27,7 @@ async def boost_analytics(uid: str = Depends(get_current_user_id)):
             "views": int(metrics.get("views", 0) or 0),
             "likes": int(metrics.get("likes", 0) or 0),
             "messages": int(metrics.get("messages", 0) or 0),
-            "roses": int(metrics.get("roses", 0) or 0),
             "started_at": metrics.get("started_at"),
-        },
-        "spotlight": {
-            "active": spotlight_active,
-            "until": spotlight_until,
-            "impressions": int(metrics.get("sp_impressions", 0) or 0),
-            "views": int(metrics.get("sp_views", 0) or 0),
-            "started_at": metrics.get("sp_started_at"),
         },
         "lifetime": {
             "total_impressions": int(me.get("impressions_total", 0) or 0),

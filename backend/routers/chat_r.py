@@ -13,7 +13,6 @@ from core import (
     CHAT_UNLOCK_COINS,
     PAID_PLANS,
     PRICE_CHAT_UNLOCK,
-    PRICE_SUPER,
     chat_id_for,
     db,
     get_user,
@@ -287,16 +286,8 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
     elif is_video:
         kind = "video"
     else:
-        kind = "super" if req.is_super else "text"
+        kind = "text"
     status = "chat"
-
-    if req.is_super:
-        if sender.get("plan") not in ("premium", "vip"):
-            raise HTTPException(402, "Video messages are premium only")
-        if sender.get("balance", 0) < PRICE_SUPER:
-            raise HTTPException(402, "Insufficient balance for super application")
-        await db.users.update_one({"id": uid}, {"$inc": {"balance": -PRICE_SUPER}})
-        status = "application"
 
     msg = {
         "id": new_id(),
@@ -323,24 +314,24 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
     msg.pop("_id", None)
     
     # Background operations - don't block response
-    asyncio.create_task(_background_message_ops(uid, req.to_user_id, cid, req.is_super, req.text, sender))
+    asyncio.create_task(_background_message_ops(uid, req.to_user_id, cid, req.text, sender))
     
     return msg
 
 
-async def _background_message_ops(uid: str, to_user_id: str, cid: str, is_super: bool, text: str, sender: dict):
+async def _background_message_ops(uid: str, to_user_id: str, cid: str, text: str, sender: dict):
     """Background operations after message send - don't block response"""
     try:
         existing_msgs = await db.messages.count_documents({"chat_id": cid})
         is_first = existing_msgs == 1
         is_reply = (await _incoming_count(uid, to_user_id)) > 0
         
-        if is_first or is_super:
+        if is_first:
             await db.applications.update_one(
                 {"from_user_id": uid, "to_user_id": to_user_id},
                 {"$set": {
                     "id": new_id(), "from_user_id": uid, "to_user_id": to_user_id,
-                    "is_super": is_super, "status": "pending",
+                    "status": "pending",
                     "created_at": iso(now_utc()), "text": text,
                 }},
                 upsert=True,

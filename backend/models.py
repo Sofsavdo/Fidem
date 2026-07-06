@@ -152,7 +152,6 @@ class MessageFilters(BaseModel):
 class SendMessageRequest(BaseModel):
     to_user_id: str
     text: str
-    is_super: bool = False
     kind: Literal["text", "voice", "video"] = "text"
     voice_url: Optional[str] = None
     voice_duration: Optional[int] = None  # seconds
@@ -168,7 +167,7 @@ class MessageOut(BaseModel):
     to_user_id: str
     text: str
     created_at: datetime
-    kind: Literal["text", "gift", "photo_request", "photo_grant", "super", "rose", "voice", "video"] = "text"
+    kind: Literal["text", "gift", "photo_request", "photo_grant", "voice", "video"] = "text"
     meta: dict = {}
 
 
@@ -197,9 +196,9 @@ PlanType = Literal["premium", "vip"]
 
 
 class CreatePaymentRequest(BaseModel):
-    purpose: Literal["premium", "vip", "standard", "chat_unlock", "balance_topup", "super_application", "gift", "concierge"]
-    amount: Optional[int] = None  # for balance / gift / super
-    target_user_id: Optional[str] = None  # for super application or gift
+    purpose: Literal["premium", "vip", "standard", "chat_unlock", "balance_topup", "gift", "concierge"]
+    amount: Optional[int] = None  # for balance / gift
+    target_user_id: Optional[str] = None  # for gift
     gift_kind: Optional[str] = None
     order_id: Optional[str] = None  # for concierge orders
 

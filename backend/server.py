@@ -140,9 +140,8 @@ async def startup() -> None:
     )
     # For sort by activity / new
     await db.users.create_index([("last_active", -1)], name="ix_last_active")
-    # For boost/spotlight float-to-top
+    # For boost float-to-top
     await db.users.create_index([("boost_until", -1)], name="ix_boost_until", sparse=True)
-    await db.users.create_index([("spotlight_until", -1)], name="ix_spotlight_until", sparse=True)
     # For verification & financial filters
     await db.users.create_index([("verified_selfie", 1)], name="ix_verified_selfie", sparse=True)
     await db.users.create_index([("verified_financial", 1)], name="ix_verified_financial", sparse=True)
