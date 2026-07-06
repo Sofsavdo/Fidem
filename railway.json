@@ -7,6 +7,6 @@
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10,
-    "startCommand": "yarn start"
+    "startCommand": "node server.js"
   }
 }
