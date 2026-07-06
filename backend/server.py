@@ -81,6 +81,11 @@ api.include_router(settings_router)
 app.include_router(api)
 
 
+@app.get("/")
+async def root():
+    return {"status": "ok", "service": "fidem-backend"}
+
+
 @app.on_event("startup")
 async def startup() -> None:
     try:
