@@ -1,5 +1,5 @@
 // Lightweight WebSocket client with auto-reconnect.
-const BACKEND = process.env.REACT_APP_BACKEND_URL || "";
+const BACKEND = process.env.REACT_APP_BACKEND_URL || "https://fidem-backend-production.up.railway.app";
 
 export class WS {
   constructor({ onMessage, onOpen, onClose }) {
