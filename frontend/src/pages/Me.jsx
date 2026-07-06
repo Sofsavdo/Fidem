@@ -277,10 +277,6 @@ export default function Me() {
           <span className="flex items-center gap-3 text-sm"><Crown className="w-4 h-4 text-secondary" /> {t("concierge_title")} (199,000 {t("sum")})</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
-        <Link to="/travel" data-testid="link-travel" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><Plane className="w-4 h-4 text-secondary" /> {t("travel_mode")}</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
         <Link to="/family" data-testid="link-family" className="flex items-center justify-between p-4">
           <span className="flex items-center gap-3 text-sm"><Phone className="w-4 h-4 text-foreground" /> {t("family_contact")}</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
