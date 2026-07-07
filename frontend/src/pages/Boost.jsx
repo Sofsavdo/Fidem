@@ -77,7 +77,7 @@ export default function Boost() {
           </ul>
           <p className="font-heading text-xl mt-4">5,000 {t("sum_word")}</p>
           {status?.active && (
-            <p className="text-xs text-secondary mt-2">{t("travel_active")} — {new Date(status.until).toLocaleString()}</p>
+            <p className="text-xs text-secondary mt-2">Active — {new Date(status.until).toLocaleString()}</p>
           )}
           <button
             data-testid="buy-boost"
@@ -99,7 +99,7 @@ export default function Boost() {
 
           {/* Boost session */}
           <div className="mt-3 rounded-2xl bg-primary/5 border border-primary/20 p-4">
-            <p className="text-xs font-medium text-foreground mb-2">{t("profile_boost_title")} {analytics?.boost?.active ? `(${t("travel_active")})` : ""}</p>
+            <p className="text-xs font-medium text-foreground mb-2">{t("profile_boost_title")} {analytics?.boost?.active ? "(Active)" : ""}</p>
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
               <StatBox icon={<Eye className="w-4 h-4" />} label={t("views_word")} value={analytics?.boost?.impressions || 0} />
               <StatBox icon={<Activity className="w-4 h-4" />} label={t("views_word")} value={analytics?.boost?.views || 0} />

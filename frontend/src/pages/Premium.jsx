@@ -25,7 +25,7 @@ const PLANS = [
   },
   {
     key: "vip", title: "VIP", price: 199000,
-    features: ["max_visibility", "stealth_view", "priority", "vip_badge", "travel_mode", "family_share"],
+    features: ["max_visibility", "stealth_view", "priority", "vip_badge", "family_share"],
     style: "bg-ink text-white border border-white/10",
     badge: "👑",
   },
@@ -36,19 +36,19 @@ const FEATURE_LABELS = {
     profile: "Profil", candidates: "Nomzodlar", saved: "Saqlash", likes: "Yoqtirishlar", matches: "Moslashuvlar", chat_replies: "Javob yozish",
     chat_unlimited: "Cheksiz yozishish",
     who_viewed: "Kim ko'rdi", who_saved: "Kim saqladi", who_interested: "Kim qiziqdi", more_filters: "Ko'proq filtrlar", boost_visibility: "Ko'rinishni oshirish",
-    max_visibility: "Maksimal ko'rinish", stealth_view: "Maxfiy ko'rish", priority: "Priority", vip_badge: "VIP badge", travel_mode: "Sayohat rejimi", family_share: "Oila ulashish",
+    max_visibility: "Maksimal ko'rinish", stealth_view: "Maxfiy ko'rish", priority: "Priority", vip_badge: "VIP badge", family_share: "Oila ulashim",
   },
   ru: {
     profile: "Профиль", candidates: "Кандидаты", saved: "Сохранять", likes: "Лайки", matches: "Совпадения", chat_replies: "Ответы в чате",
     chat_unlimited: "Безлимитные сообщения",
     who_viewed: "Кто видел", who_saved: "Кто сохранил", who_interested: "Кто интересуется", more_filters: "Больше фильтров", boost_visibility: "Увеличение видимости",
-    max_visibility: "Максимум видимости", stealth_view: "Скрытый просмотр", priority: "Приоритет", vip_badge: "VIP badge", travel_mode: "Режим путешествия", family_share: "Семейный доступ",
+    max_visibility: "Максимум видимости", stealth_view: "Скрытый просмотр", priority: "Приоритет", vip_badge: "VIP badge", family_share: "Семейный доступ",
   },
   en: {
     profile: "Profile", candidates: "Candidates", saved: "Save", likes: "Likes", matches: "Matches", chat_replies: "Chat replies",
     chat_unlimited: "Unlimited messaging",
     who_viewed: "Who viewed", who_saved: "Who saved", who_interested: "Who interested", more_filters: "More filters", boost_visibility: "Boost visibility",
-    max_visibility: "Max visibility", stealth_view: "Stealth view", priority: "Priority", vip_badge: "VIP badge", travel_mode: "Travel mode", family_share: "Family share",
+    max_visibility: "Max visibility", stealth_view: "Stealth view", priority: "Priority", vip_badge: "VIP badge", family_share: "Family share",
   },
 };
 

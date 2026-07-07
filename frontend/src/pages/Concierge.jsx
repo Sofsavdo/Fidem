@@ -41,7 +41,7 @@ export default function Concierge() {
   const statusLabel = (s) => ({
     awaiting_payment: t("concierge_status_awaiting_payment"),
     in_progress: t("concierge_status_in_progress"),
-    active: t("travel_active"),
+    active: "Active",
     completed: t("concierge_status_completed"),
     expired: "—",
   })[s] || s;
