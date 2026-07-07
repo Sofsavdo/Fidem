@@ -406,12 +406,15 @@ async def process_completed_payment(uid: str, purpose: str, amount: int, balance
 
     if purpose == "premium":
         await db.users.update_one({"id": uid}, {"$set": {"plan": "premium", "plan_until": expiry_iso}})
+        # Auto-activate Boost for 30 days with Premium
+        boost_until = iso(now_utc() + timedelta(days=30))
+        await db.users.update_one({"id": uid}, {"$set": {"boost_until": boost_until}})
         # Add to lifetime contribution
         await db.users.update_one(
             {"id": uid},
             {"$inc": {"lifetime_contribution": amount, "lifetime_contribution_breakdown.subscription_payments": amount}}
         )
-        await push_notif(uid, "premium", "Premium tarif faollashtirildi 💎")
+        await push_notif(uid, "premium", "Premium tarif faollashtirildi. Boost 30 kun aktiv 💎")
     elif purpose == "standard":
         await db.users.update_one({"id": uid}, {"$set": {"plan": "standard", "plan_until": expiry_iso}})
         # Add to lifetime contribution
@@ -422,12 +425,15 @@ async def process_completed_payment(uid: str, purpose: str, amount: int, balance
         await push_notif(uid, "premium", "Standard tarif faollashtirildi ✅")
     elif purpose == "vip":
         await db.users.update_one({"id": uid}, {"$set": {"plan": "vip", "plan_until": expiry_iso}})
+        # Auto-activate Boost for 30 days with VIP
+        boost_until = iso(now_utc() + timedelta(days=30))
+        await db.users.update_one({"id": uid}, {"$set": {"boost_until": boost_until}})
         # Add to lifetime contribution
         await db.users.update_one(
             {"id": uid},
             {"$inc": {"lifetime_contribution": amount, "lifetime_contribution_breakdown.subscription_payments": amount}}
         )
-        await push_notif(uid, "premium", "VIP tarif faollashtirildi 👑")
+        await push_notif(uid, "premium", "VIP tarif faollashtirildi. Boost 30 kun aktiv 👑")
     elif purpose == "chat_unlock":
         target_id = target_user_id
         if target_id:

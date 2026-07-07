@@ -18,7 +18,6 @@ const Premium = lazy(() => import("@/pages/Premium"));
 const Admin = lazy(() => import("@/pages/Admin"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Notifications = lazy(() => import("@/pages/Notifications"));
-const Boost = lazy(() => import("@/pages/Boost"));
 const Personality = lazy(() => import("@/pages/Personality"));
 const Prompts = lazy(() => import("@/pages/Prompts"));
 const Stories = lazy(() => import("@/pages/Stories"));
@@ -142,7 +141,6 @@ function Inner() {
           <Route path="/family" element={<Family />} />
           <Route path="/concierge" element={<Concierge />} />
           <Route path="/verification" element={<Verification />} />
-          <Route path="/boost" element={<Boost />} />
           <Route path="/referral" element={<Referral />} />
           <Route path="/rankings" element={<Rankings />} />
           <Route path="/gifts" element={<Gifts />} />
