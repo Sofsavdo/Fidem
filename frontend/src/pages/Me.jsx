@@ -35,14 +35,6 @@ export default function Me() {
 
   const [daily, setDaily] = useState(null);
 
-  const shareTelegram = (link) => {
-    const text = encodeURIComponent("FIDEM");
-    const url = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${text}`;
-    window.open(url, "_blank");
-  };
-  // keep helper available even if not used directly here
-  void shareTelegram;
-
   // Increment unread on WS notification
   useEffect(() => {
     if (wsEvent?.type === "notification") {
@@ -149,7 +141,7 @@ export default function Me() {
           <p className="font-heading text-lg mt-2">{(user.balance || 0).toLocaleString()} {t("sum")}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{t("balance")}</p>
         </Link>
-        <Link to="/boost" data-testid="link-boost" className="rounded-3xl bg-gradient-to-br from-primary/10 to-card border border-primary/30 p-4 hover:-translate-y-0.5 transition-transform col-span-2 md:col-span-1">
+        <Link to="/premium?tab=plans" data-testid="link-boost" className="rounded-3xl bg-gradient-to-br from-primary/10 to-card border border-primary/30 p-4 hover:-translate-y-0.5 transition-transform col-span-2 md:col-span-1">
           <Trophy className="w-5 h-5 text-foreground" />
           <p className="font-heading text-lg mt-2">{t("boost_title")}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{t("boost_subtitle")} →</p>

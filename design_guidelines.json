@@ -117,12 +117,5 @@
       }
     ],
     "icons": "Use lucide-react for standard icons. Use native emojis (🌹 🎁 💎 👑) for gifts as specified in requirements."
-  },
-  "instructions_to_main_agent": [
-    "Prioritize mobile-first view (max-w-md mx-auto for web view) to simulate Telegram Mini App constraints.",
-    "Always apply `data-testid` to interactive elements.",
-    "Photos must default to blurred on Candidate cards using Tailwind `blur-2xl`. Emphasize the blurred overlay treatment.",
-    "Do NOT use Inter or Roboto. Use Outfit for headings and Manrope for body text.",
-    "Keep the aesthetic warm and premium (Terracotta/Gold/Forest Green); avoid neon or typical dating app pinks."
-  ]
+  }
 }

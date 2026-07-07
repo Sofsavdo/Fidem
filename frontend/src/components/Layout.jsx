@@ -1,6 +1,5 @@
 import React from "react";
 import BottomNav from "@/components/BottomNav";
-import Sidebar from "@/components/Sidebar";
 import DailyCheckIn from "@/components/DailyCheckIn";
 import MobileTopBar from "@/components/MobileTopBar";
 import OfflineBanner from "@/components/OfflineBanner";

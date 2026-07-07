@@ -20,6 +20,7 @@ from core import (
     check_pw,
     db,
     get_user,
+    get_webapp_url,
     hash_pw,
     iso,
     log,
@@ -80,13 +81,6 @@ async def _may_access_file(uid: str, is_admin: bool, rec: dict) -> bool:
         if shared:
             return True
     return False
-
-
-def get_webapp_url() -> str:
-    return os.environ.get(
-        "WEBAPP_URL",
-        "https://fidem-frontend-production.up.railway.app",
-    ).rstrip("/")
 
 
 async def notify_new_profile_to_relevant_users(new_user: dict) -> None:
@@ -309,7 +303,7 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request):
 @router.get("/auth/me")
 async def me(uid: str = Depends(get_current_user_id)):
     user = await get_user(uid)
-    pub = user_public(user)
+    pub = user_public(user, include_private=True)
     pub["email"] = user.get("email")
     pub["telegram_id"] = user.get("telegram_id")
     pub["telegram_username"] = user.get("telegram_username")

@@ -98,13 +98,19 @@ async def compatibility(target_id: str, lang: str = "uz", uid: str = Depends(get
 async def compatibility_unlock(target_id: str, uid: str = Depends(get_current_user_id)):
     """Pay 20,000 from balance to unlock detailed AI report."""
     PRICE = 20000
-    me = await get_user(uid)
-    if me.get("balance", 0) < PRICE:
+    if await db.compat_unlocks.find_one({"user_id": uid, "target_id": target_id}):
+        me = await get_user(uid)
+        return {"ok": True, "balance_after": me.get("balance", 0), "note": "already_unlocked"}
+    res = await db.users.update_one(
+        {"id": uid, "balance": {"$gte": PRICE}},
+        {"$inc": {"balance": -PRICE}},
+    )
+    if res.modified_count == 0:
         raise HTTPException(402, f"Balansda {PRICE:,} so'm bo'lishi kerak")
-    await db.users.update_one({"id": uid}, {"$inc": {"balance": -PRICE}})
     await db.compat_unlocks.update_one(
         {"user_id": uid, "target_id": target_id},
         {"$set": {"user_id": uid, "target_id": target_id, "unlocked_at": iso(now_utc()), "price": PRICE}},
         upsert=True,
     )
-    return {"ok": True, "balance_after": me.get("balance", 0) - PRICE}
+    me = await get_user(uid)
+    return {"ok": True, "balance_after": me.get("balance", 0)}

@@ -100,7 +100,6 @@ async def startup() -> None:
     await db.users.create_index("gender")
     await db.users.create_index("last_active")
     await db.users.create_index("created_at")
-    await db.users.create_index("referred_by")
     await db.messages.create_index([("chat_id", 1), ("created_at", 1)])
     await db.saved.create_index([("owner_id", 1), ("target_id", 1)], unique=True)
     await db.profile_views.create_index([("viewer_id", 1), ("target_id", 1)], unique=True)
@@ -337,7 +336,7 @@ async def shutdown() -> None:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
+    allow_credentials=False,  # auth is Bearer-token only, no cookies used anywhere
     allow_origins=["*"],  # Allow all origins for development and production
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],

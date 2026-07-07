@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 
 from auth import get_current_user_id
 from core import db, get_user, iso, now_utc, parse_dt, push_notif, user_public
@@ -91,12 +91,12 @@ async def boost_status(uid: str = Depends(get_current_user_id)):
 
 
 @router.post("/boost/activate")
-async def boost_activate(use_balance: bool = Body(True, embed=True), uid: str = Depends(get_current_user_id)):
+async def boost_activate(request: Request, use_balance: bool = Body(True, embed=True), uid: str = Depends(get_current_user_id)):
     """Activate 24h boost. If use_balance=True, deduct from balance; otherwise client should redirect to CLICK payment."""
     if not use_balance:
         from routers.payments_r import create_payment
         from models import CreatePaymentRequest
-        return await create_payment(CreatePaymentRequest(purpose="balance_topup", amount=BOOST_PRICE), uid=uid)
+        return await create_payment(CreatePaymentRequest(purpose="balance_topup", amount=BOOST_PRICE), request, uid=uid)
     me = await get_user(uid)
     if me.get("balance", 0) < BOOST_PRICE:
         raise HTTPException(402, f"Need {BOOST_PRICE:,} so'm balance")
@@ -374,12 +374,26 @@ async def set_username(
     # Check if user already has this username
     if me.get("referral_username_lower") == username.lower():
         raise HTTPException(400, "You already have this username")
-    
-    # Atomic update: delete old and insert new in one operation
+
+    username_lower = username.lower()
+
+    # Charge for subsequent changes (10,000 so'm)
+    if change_count > 0:
+        balance = me.get("balance", 0)
+        if balance < 10000:
+            raise HTTPException(400, "Insufficient balance. Username change costs 10,000 so'm")
+
+        # Deduct balance
+        await db.users.update_one(
+            {"id": uid, "balance": {"$gte": 10000}},
+            {"$inc": {"balance": -10000}}
+        )
+
+    # Atomic swap: remove old reservation, claim new one
     try:
         if me.get("referral_username_lower"):
             await db.referral_usernames.delete_one({"username_lower": me["referral_username_lower"]})
-        
+
         await db.referral_usernames.update_one(
             {"user_id": uid},
             {"$set": {"username_lower": username_lower}},
@@ -388,33 +402,7 @@ async def set_username(
     except Exception:
         # Handle duplicate key error from race condition
         raise HTTPException(400, "Username already taken")
-    
-    # Charge for subsequent changes (10,000 so'm)
-    if change_count > 0:
-        balance = me.get("balance", 0)
-        if balance < 10000:
-            raise HTTPException(400, "Insufficient balance. Username change costs 10,000 so'm")
-        
-        # Deduct balance
-        await db.users.update_one(
-            {"id": uid, "balance": {"$gte": 10000}},
-            {"$inc": {"balance": -10000}}
-        )
-    
-    # Update username
-    username_lower = username.lower()
-    
-    # Remove old username from referral_usernames collection if exists
-    if me.get("referral_username_lower"):
-        await db.referral_usernames.delete_one({"username_lower": me["referral_username_lower"]})
-    
-    # Add new username to referral_usernames collection
-    await db.referral_usernames.update_one(
-        {"user_id": uid},
-        {"$set": {"username_lower": username_lower}},
-        upsert=True
-    )
-    
+
     # Update user document
     await db.users.update_one(
         {"id": uid},

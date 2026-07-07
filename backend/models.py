@@ -261,7 +261,7 @@ class AdminUpdateUserRequest(BaseModel):
     verified_identity: Optional[bool] = None
     verified_selfie: Optional[bool] = None
     verified_financial: Optional[bool] = None
-    plan: Optional[Literal["free", "premium", "vip"]] = None
+    plan: Optional[Literal["free", "standard", "premium", "vip"]] = None
     balance: Optional[int] = None
     blocked: Optional[bool] = None
     add_balance: Optional[int] = None

@@ -1,6 +1,7 @@
 """Telegram bot webhook + setup helper."""
 from __future__ import annotations
 
+import hmac
 import logging
 import os
 from typing import Optional
@@ -13,6 +14,7 @@ from core import (
     TELEGRAM_BOT_USERNAME,
     TELEGRAM_WEBHOOK_SECRET,
     db,
+    get_webapp_url,
     iso,
     now_utc,
     push_notif,
@@ -21,13 +23,6 @@ from services import send_telegram_message
 
 log = logging.getLogger("fidem.telegram")
 router = APIRouter(tags=["telegram"])
-
-
-def get_webapp_url() -> str:
-    return os.environ.get(
-        "WEBAPP_URL",
-        "https://fidem-frontend-production.up.railway.app",
-    ).rstrip("/")
 
 
 def get_backend_url() -> str:
@@ -81,7 +76,7 @@ async def setup_telegram_webhook() -> None:
 
 @router.post("/telegram/webhook")
 async def telegram_webhook(request: Request, secret: Optional[str] = Query(None)):
-    if secret != TELEGRAM_WEBHOOK_SECRET:
+    if not secret or not hmac.compare_digest(secret, TELEGRAM_WEBHOOK_SECRET):
         raise HTTPException(403, "bad secret")
 
     body = await request.json()

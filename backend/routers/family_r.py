@@ -127,17 +127,20 @@ async def my_family_requests(uid: str = Depends(get_current_user_id)):
     sent = await db.family_requests.find({"from_user_id": uid}, {"_id": 0}).sort("created_at", -1).to_list(100)
     received = await db.family_requests.find({"to_user_id": uid}, {"_id": 0}).sort("created_at", -1).to_list(100)
 
-    async def enrich(rows: list, peer_key: str):
-        out = []
+    peer_ids = {r["to_user_id"] for r in sent} | {r["from_user_id"] for r in received}
+    peers = await db.users.find(
+        {"id": {"$in": list(peer_ids)}}, {"_id": 0, "name": 1, "photo_url": 1, "id": 1, "plan": 1}
+    ).to_list(len(peer_ids))
+    peers_by_id = {p["id"]: p for p in peers}
+
+    def enrich(rows: list, peer_key: str):
         for r in rows:
-            peer = await db.users.find_one({"id": r[peer_key]}, {"_id": 0, "name": 1, "photo_url": 1, "id": 1, "plan": 1})
-            r["peer"] = peer
-            out.append(r)
-        return out
+            r["peer"] = peers_by_id.get(r[peer_key])
+        return rows
 
     return {
-        "sent": await enrich(sent, "to_user_id"),
-        "received": await enrich(received, "from_user_id"),
+        "sent": enrich(sent, "to_user_id"),
+        "received": enrich(received, "from_user_id"),
     }
 
 

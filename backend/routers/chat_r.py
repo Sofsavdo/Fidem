@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone, timedelta
+from typing import Optional
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
 
@@ -147,15 +148,21 @@ async def chat_unlock(
     await get_user(target_id)  # ensure target exists (404 otherwise)
 
     if method == "balance":
-        if int(me.get("balance", 0) or 0) < PRICE_CHAT_UNLOCK:
+        res = await db.users.update_one(
+            {"id": uid, "balance": {"$gte": PRICE_CHAT_UNLOCK}},
+            {"$inc": {"balance": -PRICE_CHAT_UNLOCK}},
+        )
+        if res.modified_count == 0:
             raise HTTPException(402, "Insufficient balance")
-        await db.users.update_one({"id": uid}, {"$inc": {"balance": -PRICE_CHAT_UNLOCK}})
         await _create_unlock(uid, target_id, "one_time", guarantee=True)
         return {"ok": True, "can_message": True, "method": "balance"}
     if method == "coins":
-        if int(me.get("coins", 0) or 0) < CHAT_UNLOCK_COINS:
+        res = await db.users.update_one(
+            {"id": uid, "coins": {"$gte": CHAT_UNLOCK_COINS}},
+            {"$inc": {"coins": -CHAT_UNLOCK_COINS}},
+        )
+        if res.modified_count == 0:
             raise HTTPException(402, "Insufficient coins")
-        await db.users.update_one({"id": uid}, {"$inc": {"coins": -CHAT_UNLOCK_COINS}})
         await _create_unlock(uid, target_id, "coins", guarantee=False)
         return {"ok": True, "can_message": True, "method": "coins"}
     if method == "credit":
@@ -191,15 +198,26 @@ async def list_chats(uid: str = Depends(get_current_user_id)):
         {"_id": 0, "target_id": 1},
     ).to_list(500) if other_ids else []
     unlocked_set = {p["target_id"] for p in unlocks}
+
+    users = await db.users.find(
+        {"id": {"$in": other_ids}}, {"_id": 0, "password_hash": 0}
+    ).to_list(len(other_ids)) if other_ids else []
+    users_by_id = {u["id"]: u for u in users}
+
+    chat_ids = [row["_id"] for row in rows_data]
+    unread_agg = await db.messages.aggregate([
+        {"$match": {"chat_id": {"$in": chat_ids}, "to_user_id": uid, "read": {"$ne": True}}},
+        {"$group": {"_id": "$chat_id", "count": {"$sum": 1}}},
+    ]).to_list(len(chat_ids)) if chat_ids else []
+    unread_by_chat = {a["_id"]: a["count"] for a in unread_agg}
+
     for row in rows_data:
         last = row["last"]
         other_id = last["to_user_id"] if last["from_user_id"] == uid else last["from_user_id"]
-        u = await db.users.find_one({"id": other_id}, {"_id": 0, "password_hash": 0})
+        u = users_by_id.get(other_id)
         if not u:
             continue
-        unread = await db.messages.count_documents(
-            {"chat_id": row["_id"], "to_user_id": uid, "read": {"$ne": True}}
-        )
+        unread = unread_by_chat.get(row["_id"], 0)
         pub = user_public(u)
         pub["photo_unlocked"] = other_id in unlocked_set
         items.append({
@@ -221,9 +239,14 @@ async def list_chats(uid: str = Depends(get_current_user_id)):
 @router.get("/messages/applications")
 async def list_applications(uid: str = Depends(get_current_user_id)):
     rows = await db.applications.find({"to_user_id": uid, "status": "pending"}, {"_id": 0}).to_list(200)
+    from_ids = [r["from_user_id"] for r in rows]
+    users = await db.users.find(
+        {"id": {"$in": from_ids}}, {"_id": 0, "password_hash": 0}
+    ).to_list(len(from_ids))
+    users_by_id = {u["id"]: u for u in users}
     enriched = []
     for r in rows:
-        u = await db.users.find_one({"id": r["from_user_id"]}, {"_id": 0, "password_hash": 0})
+        u = users_by_id.get(r["from_user_id"])
         if u:
             enriched.append({"application": r, "from_user": user_public(u)})
     return enriched
@@ -577,7 +600,7 @@ async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id
 
 # ---------- Leaderboard ----------
 @router.get("/leaderboard")
-async def leaderboard(period: str = "all"):
+async def leaderboard(period: str = "all", uid: str = Depends(get_current_user_id)):
     pipeline = [
         {"$group": {"_id": "$from_user_id", "total": {"$sum": "$price"}, "count": {"$sum": 1}}},
         {"$sort": {"total": -1}},
