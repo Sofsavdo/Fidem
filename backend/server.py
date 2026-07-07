@@ -41,7 +41,6 @@ from routers.gamification_r import router as gamification_router  # noqa: E402
 from routers.withdrawals_r import router as withdrawals_router  # noqa: E402
 from routers.family_r import router as family_router  # noqa: E402
 from routers.concierge_r import router as concierge_router  # noqa: E402
-from routers.travel_r import router as travel_router  # noqa: E402
 from routers.boost_analytics_r import router as boost_analytics_router  # noqa: E402
 from routers.face_r import router as face_router  # noqa: E402
 from routers.rankings_r import router as rankings_router  # noqa: E402
@@ -68,7 +67,6 @@ api.include_router(gamification_router)
 api.include_router(withdrawals_router)
 api.include_router(family_router)
 api.include_router(concierge_router)
-api.include_router(travel_router)
 api.include_router(boost_analytics_router)
 api.include_router(face_router)
 api.include_router(rankings_router)
