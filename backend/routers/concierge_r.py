@@ -103,14 +103,19 @@ async def create_concierge_order(
 async def my_concierge(uid: str = Depends(get_current_user_id)):
     orders = await db.concierge_orders.find({"user_id": uid}, {"_id": 0}).sort("created_at", -1).to_list(20)
     # Enrich match user details
+    match_ids = {mid for o in orders for mid in (o.get("matches") or [])}
+    matched_users = await db.users.find(
+        {"id": {"$in": list(match_ids)}}, {"_id": 0, "password_hash": 0}
+    ).to_list(len(match_ids))
+    users_by_id = {u["id"]: u for u in matched_users}
+
     out = []
     for o in orders:
-        enriched_matches = []
-        for mid in (o.get("matches") or []):
-            mu = await db.users.find_one({"id": mid}, {"_id": 0, "password_hash": 0})
-            if mu:
-                enriched_matches.append(user_public(mu))
-        o["match_users"] = enriched_matches
+        o["match_users"] = [
+            user_public(users_by_id[mid])
+            for mid in (o.get("matches") or [])
+            if mid in users_by_id
+        ]
         out.append(o)
     return out
 
@@ -122,10 +127,16 @@ async def admin_list_concierge(status: str | None = None, _: str = Depends(get_c
     if status:
         q["status"] = status
     rows = await db.concierge_orders.find(q, {"_id": 0}).sort("created_at", -1).limit(200).to_list(200)
+    user_ids = [r["user_id"] for r in rows]
+    users = await db.users.find(
+        {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0}
+    ).to_list(len(user_ids))
+    users_by_id = {u["id"]: u for u in users}
+
     out = []
     for r in rows:
-        u = await db.users.find_one({"id": r["user_id"]}, {"_id": 0, "password_hash": 0})
-        r["user"] = user_public(u) if u else None
+        u = users_by_id.get(r["user_id"])
+        r["user"] = user_public(u, include_private=True) if u else None
         out.append(r)
     return out
 

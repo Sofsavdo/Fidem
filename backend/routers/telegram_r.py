@@ -14,6 +14,7 @@ from core import (
     TELEGRAM_BOT_USERNAME,
     TELEGRAM_WEBHOOK_SECRET,
     db,
+    get_webapp_url,
     iso,
     now_utc,
     push_notif,
@@ -22,13 +23,6 @@ from services import send_telegram_message
 
 log = logging.getLogger("fidem.telegram")
 router = APIRouter(tags=["telegram"])
-
-
-def get_webapp_url() -> str:
-    return os.environ.get(
-        "WEBAPP_URL",
-        "https://fidem-frontend-production.up.railway.app",
-    ).rstrip("/")
 
 
 def get_backend_url() -> str:

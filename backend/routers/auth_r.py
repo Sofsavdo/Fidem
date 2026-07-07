@@ -20,6 +20,7 @@ from core import (
     check_pw,
     db,
     get_user,
+    get_webapp_url,
     hash_pw,
     iso,
     log,
@@ -80,13 +81,6 @@ async def _may_access_file(uid: str, is_admin: bool, rec: dict) -> bool:
         if shared:
             return True
     return False
-
-
-def get_webapp_url() -> str:
-    return os.environ.get(
-        "WEBAPP_URL",
-        "https://fidem-frontend-production.up.railway.app",
-    ).rstrip("/")
 
 
 async def notify_new_profile_to_relevant_users(new_user: dict) -> None:

@@ -431,13 +431,17 @@ async def list_photo_unlock_requests(uid: str = Depends(get_current_user_id)):
         {"_id": 0},
     ).to_list(200)
 
+    requester_ids = [r["requester_id"] for r in rows]
+    users = await db.users.find(
+        {"id": {"$in": requester_ids}},
+        {"_id": 0, "password_hash": 0},
+    ).to_list(len(requester_ids))
+    users_by_id = {u["id"]: u for u in users}
+
     enriched = []
 
     for r in rows:
-        u = await db.users.find_one(
-            {"id": r["requester_id"]},
-            {"_id": 0, "password_hash": 0},
-        )
+        u = users_by_id.get(r["requester_id"])
 
         if u:
             enriched.append({"request": r, "requester": user_public(u)})
@@ -533,13 +537,16 @@ async def saved_mine(uid: str = Depends(get_current_user_id)):
     ).to_list(500)
     unlocked_set = {p["target_id"] for p in unlocks}
 
+    users = await db.users.find(
+        {"id": {"$in": target_ids}},
+        {"_id": 0, "password_hash": 0},
+    ).to_list(len(target_ids))
+    users_by_id = {u["id"]: u for u in users}
+
     result = []
 
     for r in rows:
-        u = await db.users.find_one(
-            {"id": r["target_id"]},
-            {"_id": 0, "password_hash": 0},
-        )
+        u = users_by_id.get(r["target_id"])
 
         if u:
             pub = user_public(u)
@@ -558,13 +565,17 @@ async def saved_by_others(uid: str = Depends(get_current_user_id)):
 
     rows = await db.saved.find({"target_id": uid}, {"_id": 0}).sort("at", -1).to_list(500)
 
+    owner_ids = [r["owner_id"] for r in rows]
+    users = await db.users.find(
+        {"id": {"$in": owner_ids}},
+        {"_id": 0, "password_hash": 0},
+    ).to_list(len(owner_ids))
+    users_by_id = {u["id"]: u for u in users}
+
     result = []
 
     for r in rows:
-        u = await db.users.find_one(
-            {"id": r["owner_id"]},
-            {"_id": 0, "password_hash": 0},
-        )
+        u = users_by_id.get(r["owner_id"])
 
         if u:
             pub = user_public(u)
@@ -589,7 +600,7 @@ async def viewers(uid: str = Depends(get_current_user_id)):
 
     rows = await db.profile_views.find({"target_id": uid}, {"_id": 0}).sort("at", -1).to_list(500)
 
-    result = []
+    ordered_ids = []
     seen = set()
 
     for r in rows:
@@ -599,11 +610,18 @@ async def viewers(uid: str = Depends(get_current_user_id)):
             continue
 
         seen.add(vid)
+        ordered_ids.append(vid)
 
-        u = await db.users.find_one(
-            {"id": vid},
-            {"_id": 0, "password_hash": 0},
-        )
+    users = await db.users.find(
+        {"id": {"$in": ordered_ids}},
+        {"_id": 0, "password_hash": 0},
+    ).to_list(len(ordered_ids))
+    users_by_id = {u["id"]: u for u in users}
+
+    result = []
+
+    for vid in ordered_ids:
+        u = users_by_id.get(vid)
 
         if u:
             pub = user_public(u)
@@ -629,14 +647,18 @@ async def interested_in_me(uid: str = Depends(get_current_user_id)):
 
     user_ids = {r["owner_id"] for r in saved_rows} | {m["from_user_id"] for m in msg_rows}
     user_ids.discard(uid)
+    user_ids = list(user_ids)
+
+    users = await db.users.find(
+        {"id": {"$in": user_ids}},
+        {"_id": 0, "password_hash": 0},
+    ).to_list(len(user_ids))
+    users_by_id = {u["id"]: u for u in users}
 
     result = []
 
     for vid in user_ids:
-        u = await db.users.find_one(
-            {"id": vid},
-            {"_id": 0, "password_hash": 0},
-        )
+        u = users_by_id.get(vid)
 
         if u:
             pub = user_public(u)
