@@ -1,12 +1,12 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
-import { Users, MessageCircle, Bookmark, User, Sparkles } from "lucide-react";
+import { Users, MessageCircle, Bookmark, User, Wallet, Gift } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 
 const tabs = [
   { to: "/", icon: Users, key: "candidates", testid: "nav-candidates" },
   { to: "/messages", icon: MessageCircle, key: "messages", testid: "nav-messages" },
-  { to: "/boost", icon: Sparkles, key: "boost", testid: "nav-boost" },
+  { to: "/premium", icon: Wallet, key: "balance", testid: "nav-balance" },
   { to: "/saved", icon: Bookmark, key: "saved", testid: "nav-saved" },
   { to: "/me", icon: User, key: "me", testid: "nav-me" },
 ];
