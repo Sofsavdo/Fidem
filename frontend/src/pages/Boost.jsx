@@ -14,9 +14,18 @@ export default function Boost() {
   const [busy, setBusy] = useState(false);
 
   const load = () => Promise.all([
-    api.get("/boost/status").then((r) => setStatus(r.data)),
-    api.get("/boost/analytics").then((r) => setAnalytics(r.data)).catch(() => {}),
-    api.get("/rankings/global").then((r) => setLeaderboard(r.data?.rankings || [])).catch(() => {}),
+    api.get("/boost/status").then((r) => setStatus(r.data)).catch((e) => {
+      console.error("Boost status error:", e);
+      setStatus({ active: false, until: null, price: 5000 });
+    }),
+    api.get("/boost/analytics").then((r) => setAnalytics(r.data)).catch((e) => {
+      console.error("Boost analytics error:", e);
+      setAnalytics(null);
+    }),
+    api.get("/rankings/global").then((r) => setLeaderboard(r.data?.rankings || [])).catch((e) => {
+      console.error("Rankings error:", e);
+      setLeaderboard([]);
+    }),
   ]);
   useEffect(() => { load(); }, []);
 
