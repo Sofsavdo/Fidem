@@ -6,7 +6,7 @@ import { useApp } from "@/contexts/AppContext";
 const tabs = [
   { to: "/", icon: Users, key: "candidates", testid: "nav-candidates" },
   { to: "/messages", icon: MessageCircle, key: "messages", testid: "nav-messages" },
-  { to: "/premium", icon: Wallet, key: "balance", testid: "nav-balance" },
+  { to: "/withdrawals", icon: Wallet, key: "balance", testid: "nav-balance" },
   { to: "/saved", icon: Bookmark, key: "saved", testid: "nav-saved" },
   { to: "/me", icon: User, key: "me", testid: "nav-me" },
 ];
