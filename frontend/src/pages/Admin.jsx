@@ -21,6 +21,17 @@ const menuItems = [
   { id: "reports", icon: Settings, label: "Reports" },
 ];
 
+function AdminPagination({ page, setPage, total, limit }) {
+  if (total <= limit) return null;
+  return (
+    <div className="flex justify-center gap-2 mt-4">
+      <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
+      <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
+      <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
+    </div>
+  );
+}
+
 export default function Admin() {
   const { user, t } = useApp();
   const [stats, setStats] = useState(null);
@@ -348,13 +359,7 @@ function AdminUsers() {
       </div>
 
       {/* Pagination */}
-      {total > limit && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
-          <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
-          <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
-        </div>
-      )}
+      <AdminPagination page={page} setPage={setPage} total={total} limit={limit} />
 
       {/* User Detail Modal */}
       {selectedUser && (
@@ -521,13 +526,7 @@ function AdminPayments() {
           </div>
         </div>
       ))}
-      {total > limit && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
-          <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
-          <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
-        </div>
-      )}
+      <AdminPagination page={page} setPage={setPage} total={total} limit={limit} />
     </div>
   );
 }
@@ -561,13 +560,7 @@ function AdminVerifications() {
           </div>
         </div>
       ))}
-      {total > limit && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
-          <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
-          <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
-        </div>
-      )}
+      <AdminPagination page={page} setPage={setPage} total={total} limit={limit} />
     </div>
   );
 }
@@ -638,13 +631,7 @@ function AdminWithdrawals() {
           </div>
         ))}
       </div>
-      {total > limit && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
-          <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
-          <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
-        </div>
-      )}
+      <AdminPagination page={page} setPage={setPage} total={total} limit={limit} />
 
       {/* Withdrawal Detail Modal */}
       {selectedWithdrawal && (
@@ -863,13 +850,7 @@ function AdminMessages() {
           </div>
         </div>
       ))}
-      {total > limit && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
-          <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
-          <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
-        </div>
-      )}
+      <AdminPagination page={page} setPage={setPage} total={total} limit={limit} />
     </div>
   );
 }
@@ -921,13 +902,7 @@ function AdminFraud() {
           </div>
         ))}
       </div>
-      {total > limit && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
-          <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
-          <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
-        </div>
-      )}
+      <AdminPagination page={page} setPage={setPage} total={total} limit={limit} />
     </div>
   );
 }
