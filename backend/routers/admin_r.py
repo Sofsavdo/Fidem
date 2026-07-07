@@ -133,17 +133,21 @@ async def admin_list_users(q: str = "", page: int = 1, limit: int = 20, gender: 
     if marital_status:
         query["marital_status"] = marital_status
     if age_min is not None or age_max is not None:
-        age_query = {}
+        # users.age is not a stored field (age is derived from birth_date at
+        # read time, see services.age_from_birth) - translate the bounds into
+        # a birth_date range instead of filtering on a field that never exists.
+        today = now_utc().date()
+        bd_query = {}
         if age_min is not None:
-            age_query["$gte"] = age_min
+            bd_query["$lte"] = today.replace(year=today.year - age_min).isoformat()
         if age_max is not None:
-            age_query["$lte"] = age_max
-        if age_query:
-            query["age"] = age_query
+            bd_query["$gt"] = today.replace(year=today.year - age_max - 1).isoformat()
+        if bd_query:
+            query["birth_date"] = bd_query
     skip = (page - 1) * limit
     total = await db.users.count_documents(query)
     rows = await db.users.find(query, {"_id": 0, "password_hash": 0}).skip(skip).limit(limit).to_list(limit)
-    return {"users": [user_public(u) for u in rows], "total": total, "page": page, "limit": limit}
+    return {"users": [user_public(u, include_private=True) for u in rows], "total": total, "page": page, "limit": limit}
 
 
 @router.patch("/users/{target_id}")
@@ -327,7 +331,7 @@ async def admin_fraud_detection(min_score: int = 50, page: int = 1, limit: int =
         {"fraud_score": {"$gte": min_score}},
         {"_id": 0, "password_hash": 0}
     ).sort("fraud_score", -1).skip(skip).limit(limit).to_list(limit)
-    return {"users": [user_public(u) for u in rows], "total": total, "page": page, "limit": limit}
+    return {"users": [user_public(u, include_private=True) for u in rows], "total": total, "page": page, "limit": limit}
 
 
 @router.post("/users/{uid}/mark-safe")

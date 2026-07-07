@@ -261,11 +261,13 @@ async def click_callback(request: Request):
     pid = form.get("merchant_trans_id", "")
     payment = await db.payments.find_one({"id": pid})
 
-    sign_ok = True
-    if CLICK_SECRET_KEY:
-        sign_ok = verify_click_sign(form, action)
-
-    if not sign_ok:
+    if not CLICK_SECRET_KEY:
+        # Fail closed: with no secret configured we cannot verify the caller
+        # is actually CLICK, so no callback can be trusted (previously this
+        # defaulted to accepting every unsigned request).
+        log.error("CLICK_SECRET_KEY is not configured - rejecting payment callback")
+        return JSONResponse({"error": -1, "error_note": "SIGN CHECK FAILED"})
+    if not verify_click_sign(form, action):
         return JSONResponse({"error": -1, "error_note": "SIGN CHECK FAILED"})
     if not payment:
         return JSONResponse({"error": -5, "error_note": "Order not found"})
@@ -303,6 +305,10 @@ async def click_callback(request: Request):
             payment.get("balance_used", 0),
             payment.get("target_user_id"),
             payment.get("order_id")
+        )
+        await db.payments.update_one(
+            {"id": pid},
+            {"$set": {"status": "success", "click_trans_id": form.get("click_trans_id")}},
         )
         return JSONResponse({
             "error": 0,

@@ -10,8 +10,7 @@ from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
 from auth import get_current_user_id
 from core import db, get_user, iso, now_utc
 from models import new_id
-from storage import MIME, put_object, get_object
-from starlette.responses import Response
+from storage import MIME, put_object
 
 router = APIRouter(tags=["prompts"])
 
@@ -162,18 +161,3 @@ async def upload_voice(file: UploadFile = File(...), uid: str = Depends(get_curr
     }
     await db.files.insert_one(rec)
     return {"id": rec["id"], "path": storage_path, "url": f"/api/files/{storage_path}"}
-
-
-@router.get("/files/{path:path}")
-async def get_file_passthrough(path: str):
-    """Convenience proxy if frontend wants to fetch via /api/files/... (existing /files/* also works)."""
-    try:
-        rec = await db.files.find_one({"path": path})
-        if not rec:
-            raise HTTPException(404, "Not found")
-        data, ct = await get_object(path)
-        return Response(content=data, media_type=ct)
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(404, "Not found")

@@ -148,15 +148,21 @@ async def chat_unlock(
     await get_user(target_id)  # ensure target exists (404 otherwise)
 
     if method == "balance":
-        if int(me.get("balance", 0) or 0) < PRICE_CHAT_UNLOCK:
+        res = await db.users.update_one(
+            {"id": uid, "balance": {"$gte": PRICE_CHAT_UNLOCK}},
+            {"$inc": {"balance": -PRICE_CHAT_UNLOCK}},
+        )
+        if res.modified_count == 0:
             raise HTTPException(402, "Insufficient balance")
-        await db.users.update_one({"id": uid}, {"$inc": {"balance": -PRICE_CHAT_UNLOCK}})
         await _create_unlock(uid, target_id, "one_time", guarantee=True)
         return {"ok": True, "can_message": True, "method": "balance"}
     if method == "coins":
-        if int(me.get("coins", 0) or 0) < CHAT_UNLOCK_COINS:
+        res = await db.users.update_one(
+            {"id": uid, "coins": {"$gte": CHAT_UNLOCK_COINS}},
+            {"$inc": {"coins": -CHAT_UNLOCK_COINS}},
+        )
+        if res.modified_count == 0:
             raise HTTPException(402, "Insufficient coins")
-        await db.users.update_one({"id": uid}, {"$inc": {"coins": -CHAT_UNLOCK_COINS}})
         await _create_unlock(uid, target_id, "coins", guarantee=False)
         return {"ok": True, "can_message": True, "method": "coins"}
     if method == "credit":
@@ -578,7 +584,7 @@ async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id
 
 # ---------- Leaderboard ----------
 @router.get("/leaderboard")
-async def leaderboard(period: str = "all"):
+async def leaderboard(period: str = "all", uid: str = Depends(get_current_user_id)):
     pipeline = [
         {"$group": {"_id": "$from_user_id", "total": {"$sum": "$price"}, "count": {"$sum": 1}}},
         {"$sort": {"total": -1}},

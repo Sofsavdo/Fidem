@@ -1,6 +1,7 @@
 """Telegram bot webhook + setup helper."""
 from __future__ import annotations
 
+import hmac
 import logging
 import os
 from typing import Optional
@@ -81,7 +82,7 @@ async def setup_telegram_webhook() -> None:
 
 @router.post("/telegram/webhook")
 async def telegram_webhook(request: Request, secret: Optional[str] = Query(None)):
-    if secret != TELEGRAM_WEBHOOK_SECRET:
+    if not secret or not hmac.compare_digest(secret, TELEGRAM_WEBHOOK_SECRET):
         raise HTTPException(403, "bad secret")
 
     body = await request.json()

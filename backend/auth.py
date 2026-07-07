@@ -16,8 +16,10 @@ JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret")
 JWT_ALGORITHM = os.environ.get("JWT_ALGORITHM", "HS256")
 JWT_EXPIRE_HOURS = int(os.environ.get("JWT_EXPIRE_HOURS", "720"))
 
-# Validate JWT_SECRET in production
-if os.environ.get("ENV") == "production" and JWT_SECRET == "dev-secret":
+# Validate JWT_SECRET in production. Accept both ENV and ENVIRONMENT since
+# deploy docs have historically disagreed on which var name to set.
+_is_production = os.environ.get("ENV", os.environ.get("ENVIRONMENT", "")).lower() == "production"
+if _is_production and JWT_SECRET == "dev-secret":
     raise ValueError("JWT_SECRET must be set in production environment")
 
 

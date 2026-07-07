@@ -309,7 +309,7 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request):
 @router.get("/auth/me")
 async def me(uid: str = Depends(get_current_user_id)):
     user = await get_user(uid)
-    pub = user_public(user)
+    pub = user_public(user, include_private=True)
     pub["email"] = user.get("email")
     pub["telegram_id"] = user.get("telegram_id")
     pub["telegram_username"] = user.get("telegram_username")

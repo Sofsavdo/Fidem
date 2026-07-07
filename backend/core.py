@@ -37,7 +37,13 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 
 # Set default ADMIN_PASSWORD if not provided
 if not ADMIN_PASSWORD:
-    ADMIN_PASSWORD = "Admin@123"  # Default for development and production
+    ADMIN_PASSWORD = "Admin@123"  # Default for development only
+    log.warning(
+        "ADMIN_PASSWORD is not set - falling back to a well-known default "
+        "('Admin@123'). Set ADMIN_PASSWORD in the environment before exposing "
+        "this deployment to real users; the default is public (audit docs, "
+        "test fixtures) and grants full admin access."
+    )
 PRICE_PREMIUM = int(os.environ.get("PRICE_PREMIUM_UZS", "79000"))
 PRICE_VIP = int(os.environ.get("PRICE_VIP_UZS", "199000"))
 PRICE_STANDARD = int(os.environ.get("PRICE_STANDARD_UZS", "19900"))
@@ -131,10 +137,16 @@ def strip_locked_photo(pub: dict) -> dict:
     return out
 
 
-def user_public(u: dict) -> dict:
+def user_public(u: dict, include_private: bool = False) -> dict:
+    """Public-safe view of a user document.
+
+    include_private=True must only be passed for the account's own owner
+    (e.g. /auth/me) or an admin - it adds contact info, device/IP data and
+    fraud-review fields that must never be visible to other end users.
+    """
     age = age_from_birth(u.get("birth_date", "2000-01-01"))
     la = parse_dt(u.get("last_active"))
-    return {
+    out = {
         "id": u["id"],
         "name": u.get("name", ""),
         "gender": u.get("gender", "male"),
@@ -169,18 +181,23 @@ def user_public(u: dict) -> dict:
         "prompts": u.get("prompts") or [],
         "big5_scores": u.get("big5_scores") or {},
         "balance": u.get("balance", 0),
-        # Admin-only fields (for admin panel)
-        "email": u.get("email", ""),
-        "phone": u.get("phone", ""),
-        "telegram_id": u.get("telegram_id", ""),
-        "telegram_username": u.get("telegram_username", ""),
-        "ip_address": u.get("ip_address", ""),
-        "user_agent": u.get("user_agent", ""),
-        "created_at": u.get("created_at", ""),
-        "fraud_score": u.get("fraud_score", 0),
-        "fraud_reasons": u.get("fraud_reasons", []),
-        "flagged_as_bot": u.get("flagged_as_bot", False),
     }
+    if include_private:
+        # Contact info, device/IP data and fraud-review fields - only for the
+        # account owner (self) or an admin, never for other end users.
+        out.update({
+            "email": u.get("email", ""),
+            "phone": u.get("phone", ""),
+            "telegram_id": u.get("telegram_id", ""),
+            "telegram_username": u.get("telegram_username", ""),
+            "ip_address": u.get("ip_address", ""),
+            "user_agent": u.get("user_agent", ""),
+            "created_at": u.get("created_at", ""),
+            "fraud_score": u.get("fraud_score", 0),
+            "fraud_reasons": u.get("fraud_reasons", []),
+            "flagged_as_bot": u.get("flagged_as_bot", False),
+        })
+    return out
 
 
 def user_public_minimal(u: dict) -> dict:
