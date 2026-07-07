@@ -7,6 +7,22 @@ const client = axios.create({ baseURL: API });
 
 const cache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const MAX_CACHE_SIZE = 100;
+
+// Cache invalidation function
+export const invalidateCache = (url) => {
+  for (const key of cache.keys()) {
+    if (key.includes(url)) cache.delete(key);
+  }
+};
+
+// Cache size limit check
+const checkCacheSize = () => {
+  if (cache.size > MAX_CACHE_SIZE) {
+    const oldestKey = cache.keys().next().value;
+    if (oldestKey) cache.delete(oldestKey);
+  }
+};
 
 const perfLog = process.env.NODE_ENV === 'development' ? {
   requests: {},
@@ -68,6 +84,7 @@ client.interceptors.response.use(
     } else if (r.config.method === 'get' && cacheableUrls.some(u => r.config.url.includes(u))) {
       const cacheKey = `${r.config.url}_${JSON.stringify(r.config.params || {})}`;
       cache.set(cacheKey, { data: r.data, timestamp: Date.now() });
+      checkCacheSize();
     }
     
     if (perfLog) perfLog.log(r.config.url, Math.round(duration), size, cached);

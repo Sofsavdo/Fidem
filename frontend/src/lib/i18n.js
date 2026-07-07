@@ -363,7 +363,7 @@ const dict = {
     land_about: "Biz haqimizda",
     land_faq: "FAQ",
     land_signin: "Kirish",
-    // === Sprint 1 — extended i18n (Boost, Withdraw, Verify, Premium, Family, Stories, Personality, Concierge, Prompts, Swipe, etc) ===
+    // === Sprint 1 — extended i18n (Boost, Withdraw, Verify, Premium, Family, Stories, Personality, Concierge, Prompts, etc) ===
     loading_word: "Yuklanmoqda...",
     save_word: "Saqlash",
     cancel_word: "Bekor qilish",

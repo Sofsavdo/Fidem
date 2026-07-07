@@ -38,15 +38,44 @@ const server = http.createServer((req, res) => {
     const extname = path.extname(filePath);
     const contentType = mimeTypes[extname] || 'application/octet-stream';
     
-    fs.readFile(filePath, (err, content) => {
-      if (err) {
+    // Cache headers
+    let cacheControl = 'public, max-age=31536000, immutable'; // 1 year for static assets
+    if (filePath.endsWith('index.html')) {
+      cacheControl = 'no-cache, no-store, must-revalidate'; // Never cache HTML
+    }
+    
+    // Get file stats for ETag
+    fs.stat(filePath, (statErr, stats) => {
+      if (statErr) {
         res.writeHead(500);
         res.end('Server Error');
         return;
       }
       
-      res.writeHead(200, { 'Content-Type': contentType });
-      res.end(content);
+      const etag = `"${stats.mtime.getTime()}"`;
+      
+      // Check if client has cached version
+      const ifNoneMatch = req.headers['if-none-match'];
+      if (ifNoneMatch === etag) {
+        res.writeHead(304, { 'ETag': etag });
+        res.end();
+        return;
+      }
+      
+      fs.readFile(filePath, (readErr, content) => {
+        if (readErr) {
+          res.writeHead(500);
+          res.end('Server Error');
+          return;
+        }
+        
+        res.writeHead(200, { 
+          'Content-Type': contentType,
+          'Cache-Control': cacheControl,
+          'ETag': etag
+        });
+        res.end(content);
+      });
     });
   });
 });
