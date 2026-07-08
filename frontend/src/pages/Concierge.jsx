@@ -1,42 +1,37 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { Sparkles, Crown, CheckCircle2, Clock, Heart } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
 import { Link } from "react-router-dom";
+import { useConciergeInfo, useConciergeMine, QK } from "@/hooks/queries";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function Concierge() {
   const { t } = useApp();
-  const [info, setInfo] = useState(null);
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
 
-  const load = async () => {
-    try {
-      const [i, o] = await Promise.all([api.get("/concierge/info"), api.get("/concierge/mine")]);
-      setInfo(i.data);
-      setOrders(o.data || []);
-    } catch (e) { /* ignore */ }
-  };
+  const { data: info } = useConciergeInfo();
+  const { data: orders = [] } = useConciergeMine();
 
-  useEffect(() => { load(); }, []);
-
-  const order = async (method) => {
-    setLoading(true);
-    try {
-      const r = await api.post("/concierge/order", { payment_method: method });
+  const orderMutation = useMutation({
+    mutationFn: (method) => api.post("/concierge/order", { payment_method: method }),
+    onSuccess: (r) => {
       if (r.data.payment_link) {
         toast.info(t("redirecting_payment"));
         setTimeout(() => { window.open(r.data.payment_link, "_blank"); }, 600);
       } else {
         toast.success("🎉 " + t("order_concierge"));
       }
-      load();
-    } catch (e) {
-      toast.error(t("error_generic"));
-    } finally { setLoading(false); }
-  };
+      queryClient.invalidateQueries({ queryKey: QK.conciergeInfo });
+      queryClient.invalidateQueries({ queryKey: QK.conciergeMine });
+    },
+    onError: () => toast.error(t("error_generic")),
+  });
+
+  const order = (method) => orderMutation.mutate(method);
+  const loading = orderMutation.isPending;
 
   const statusLabel = (s) => ({
     awaiting_payment: t("concierge_status_awaiting_payment"),

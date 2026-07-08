@@ -14,6 +14,10 @@ export const QK = {
   withdrawalsHistory: ["withdrawals", "history"],
   payments: ["payments", "mine"],
   giftsCatalog: ["gifts", "catalog"],
+  conciergeInfo: ["concierge", "info"],
+  conciergeMine: ["concierge", "mine"],
+  personalityQuestions: (lang) => ["personality", "questions", lang],
+  personalityMine: ["personality", "mine"],
 };
 
 export function useReferral() {
@@ -107,6 +111,35 @@ export function useGiftsCatalog() {
     queryKey: QK.giftsCatalog,
     queryFn: () => api.get("/gifts/catalog").then((r) => r.data),
     staleTime: 10 * 60 * 1000, // catalog changes rarely
+  });
+}
+
+export function useConciergeInfo() {
+  return useQuery({
+    queryKey: QK.conciergeInfo,
+    queryFn: () => api.get("/concierge/info").then((r) => r.data),
+  });
+}
+
+export function useConciergeMine() {
+  return useQuery({
+    queryKey: QK.conciergeMine,
+    queryFn: () => api.get("/concierge/mine").then((r) => r.data || []),
+  });
+}
+
+export function usePersonalityQuestions(lang) {
+  return useQuery({
+    queryKey: QK.personalityQuestions(lang),
+    queryFn: () => api.get(`/personality/questions?lang=${lang}`).then((r) => r.data),
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
+export function usePersonalityMine() {
+  return useQuery({
+    queryKey: QK.personalityMine,
+    queryFn: () => api.get("/personality/mine").then((r) => r.data),
   });
 }
 
