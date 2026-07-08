@@ -273,53 +273,40 @@ export default function Me() {
         </div>
       </div>
 
-      {/* Admin & settings */}
-      <div className="rounded-3xl bg-card border border-border divide-y">
-        <Link to="/personality" data-testid="link-personality" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><Brain className="w-4 h-4 text-secondary" /> {t("personality_test")}</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
-        <Link to="/prompts" data-testid="link-prompts" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><Pen className="w-4 h-4 text-secondary" /> {t("profile_prompts")}</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
-        <Link to="/stories" data-testid="link-stories" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><BookOpen className="w-4 h-4 text-foreground" /> {t("success_stories")}</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
-        <Link to="/concierge" data-testid="link-concierge" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><Crown className="w-4 h-4 text-secondary" /> {t("concierge_title")} (199,000 {t("sum")})</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
-        <Link to="/family" data-testid="link-family" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><Phone className="w-4 h-4 text-foreground" /> {t("family_contact")}</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
-        <Link to="/withdrawals" data-testid="link-withdrawals" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><Wallet className="w-4 h-4 text-foreground" /> {t("withdraw_money")} ({(user.withdrawable_balance || 0).toLocaleString()} {t("sum")})</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
-        <Link to="/rankings" data-testid="link-rankings" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><Award className="w-4 h-4 text-gold-dark" /> {t("rankings")}</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
-        <Link to="/verification" data-testid="link-verification" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><ShieldCheck className="w-4 h-4 text-foreground" /> {t("profile_verification")}</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
-        <Link to="/settings" data-testid="link-settings" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><SlidersHorizontal className="w-4 h-4" /> {t("who_can_message_me")}</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
-        {user.is_admin && (
-          <Link to="/admin" data-testid="link-admin" className="flex items-center justify-between p-4">
-            <span className="flex items-center gap-3 text-sm"><SettingsIcon className="w-4 h-4" /> {t("admin_panel")}</span>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </Link>
-        )}
-        <button data-testid="btn-logout" onClick={logout} className="flex items-center justify-between p-4 w-full text-left">
-          <span className="flex items-center gap-3 text-sm text-foreground"><LogOut className="w-4 h-4" /> {t("logout")}</span>
-        </button>
+      {/* Profil */}
+      <div>
+        <p className="field-label mb-2 px-1">{t("me_group_profile")}</p>
+        <div className="rounded-3xl bg-card border border-border divide-y">
+          <NavRow to="/personality" testid="link-personality" icon={<Brain className="w-4 h-4 text-secondary" />} label={t("personality_test")} />
+          <NavRow to="/prompts" testid="link-prompts" icon={<Pen className="w-4 h-4 text-secondary" />} label={t("profile_prompts")} />
+          <NavRow to="/family" testid="link-family" icon={<Phone className="w-4 h-4 text-foreground" />} label={t("family_contact")} />
+          <NavRow to="/verification" testid="link-verification" icon={<ShieldCheck className="w-4 h-4 text-foreground" />} label={t("profile_verification")} />
+        </div>
+      </div>
+
+      {/* Pul va imkoniyatlar */}
+      <div>
+        <p className="field-label mb-2 px-1">{t("me_group_money")}</p>
+        <div className="rounded-3xl bg-card border border-border divide-y">
+          <NavRow to="/concierge" testid="link-concierge" icon={<Crown className="w-4 h-4 text-secondary" />} label={`${t("concierge_title")} (199,000 ${t("sum")})`} />
+          <NavRow to="/withdrawals" testid="link-withdrawals" icon={<Wallet className="w-4 h-4 text-foreground" />} label={`${t("withdraw_money")} (${(user.withdrawable_balance || 0).toLocaleString()} ${t("sum")})`} />
+          <NavRow to="/rankings" testid="link-rankings" icon={<Award className="w-4 h-4 text-gold-dark" />} label={t("rankings")} />
+        </div>
+      </div>
+
+      {/* Ilova */}
+      <div>
+        <p className="field-label mb-2 px-1">{t("me_group_app")}</p>
+        <div className="rounded-3xl bg-card border border-border divide-y">
+          <NavRow to="/stories" testid="link-stories" icon={<BookOpen className="w-4 h-4 text-foreground" />} label={t("success_stories")} />
+          <NavRow to="/settings" testid="link-settings" icon={<SlidersHorizontal className="w-4 h-4" />} label={t("who_can_message_me")} />
+          {user.is_admin && (
+            <NavRow to="/admin" testid="link-admin" icon={<SettingsIcon className="w-4 h-4" />} label={t("admin_panel")} />
+          )}
+          <button data-testid="btn-logout" onClick={logout} className="flex items-center justify-between p-4 w-full text-left">
+            <span className="flex items-center gap-3 text-sm text-foreground"><LogOut className="w-4 h-4" /> {t("logout")}</span>
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -331,5 +318,14 @@ const Row = React.memo(function Row({ icon, label, right }) {
       <span className="flex items-center gap-3 text-sm">{icon} {label}</span>
       <div>{right}</div>
     </div>
+  );
+});
+
+const NavRow = React.memo(function NavRow({ to, testid, icon, label }) {
+  return (
+    <Link to={to} data-testid={testid} className="flex items-center justify-between p-4">
+      <span className="flex items-center gap-3 text-sm">{icon} {label}</span>
+      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+    </Link>
   );
 });
