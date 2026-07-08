@@ -152,6 +152,11 @@ async def startup() -> None:
     # Referral lookup
     await db.users.create_index("referred_by", sparse=True, name="ix_referred_by")
     await db.users.create_index("referral_code", sparse=True, unique=False, name="ix_referral_code")
+    # referral_id is the actual field looked up on every referral signup
+    # (db.users.find_one({"referral_id": ref_code}) in auth_r.py, payments_r.py,
+    # telegram_r.py) but had no index at all - every signup with a referral
+    # code did a full collection scan of users.
+    await db.users.create_index("referral_id", sparse=True, name="ix_referral_id")
     # Drop any existing index on referral_username_lower and recreate with sparse=True
     try:
         existing_indexes = await db.users.list_indexes().to_list(length=None)
