@@ -8,14 +8,22 @@ import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL")
 if not BASE_URL:
-    # fallback read from frontend/.env
+    # fallback read from frontend/.env, if present
     import pathlib
-    env = pathlib.Path("/app/frontend/.env").read_text()
-    for line in env.splitlines():
-        if line.startswith("REACT_APP_BACKEND_URL="):
-            BASE_URL = line.split("=", 1)[1].strip()
+    env_path = pathlib.Path(__file__).resolve().parents[2] / "frontend" / ".env"
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            if line.startswith("REACT_APP_BACKEND_URL="):
+                BASE_URL = line.split("=", 1)[1].strip()
 BASE_URL = (BASE_URL or "").rstrip("/")
 API = f"{BASE_URL}/api"
+
+if not BASE_URL:
+    pytest.skip(
+        "REACT_APP_BACKEND_URL not set — this suite hits a live deployed backend "
+        "and needs a real URL to run against; skipping in environments without one.",
+        allow_module_level=True,
+    )
 
 ADMIN_EMAIL = "admin@fidem.uz"
 ADMIN_PASSWORD = "Admin@123"
