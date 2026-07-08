@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { toast } from "sonner";
-import { X, Gift as GiftIcon, Sparkles } from "lucide-react";
+import { X, Gift as GiftIcon, Sparkles, Plus } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 
 const TIER_META = {
@@ -72,10 +73,20 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
           </button>
         </div>
 
-        {/* Balance info */}
+        {/* Balance info — balance is now a tappable top-up affordance */}
         <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-muted/40 text-xs">
-          <span className="text-muted-foreground">{t("gift_balance_label")}: <b className="text-foreground">{balance.toLocaleString()} {t("sum")}</b></span>
-          <span className="inline-flex items-center gap-1 text-emerald-700">
+          <Link
+            to="/premium?tab=balance"
+            data-testid="gift-topup-link"
+            onClick={onClose}
+            className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition"
+          >
+            {t("gift_balance_label")}: <b className="text-foreground">{balance.toLocaleString()} {t("sum")}</b>
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 text-primary px-1.5 py-0.5 font-medium">
+              <Plus className="w-3 h-3" /> {t("topup_balance")}
+            </span>
+          </Link>
+          <span className="inline-flex items-center gap-1 text-emerald-700 shrink-0">
             <Sparkles className="w-3 h-3" /> {t("gift_free_remaining")}: {freeRemaining} / {catalog?.free_quota_per_week || 1}
           </span>
         </div>
@@ -105,20 +116,19 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
           {!catalog && <p className="col-span-3 text-center text-sm text-muted-foreground py-6">{t("loading")}</p>}
           {(groups[activeTier] || []).map((g) => {
             const cannotAfford = balance < g.price;
-            const tier = TIER_META[g.tier];
             return (
               <button
                 key={g.kind}
                 data-testid={`gift-${g.kind}`}
-                onClick={() => send(g)}
-                disabled={cannotAfford || sending !== null}
+                onClick={() => cannotAfford ? toast.info(t("gift_need_topup")) : send(g)}
+                disabled={sending !== null}
                 className={`relative rounded-2xl border p-3 transition flex flex-col items-center gap-1 ${
-                  cannotAfford ? "border-border bg-muted/20 opacity-50" : "border-border bg-card hover:-translate-y-1 hover:shadow-lg active:scale-95"
+                  cannotAfford ? "border-dashed border-border bg-muted/20" : "border-border bg-card hover:-translate-y-1 hover:shadow-lg active:scale-95"
                 }`}
               >
-                <span className="text-4xl leading-none">{g.emoji}</span>
-                <span className="text-[11px] font-medium text-center leading-tight mt-1">{g[labelKey]}</span>
-                <span className="text-[10px] text-muted-foreground">
+                <span className={`text-4xl leading-none ${cannotAfford ? "opacity-40 grayscale" : ""}`}>{g.emoji}</span>
+                <span className={`text-[11px] font-medium text-center leading-tight mt-1 ${cannotAfford ? "opacity-60" : ""}`}>{g[labelKey]}</span>
+                <span className={`text-[10px] ${cannotAfford ? "text-primary font-medium" : "text-muted-foreground"}`}>
                   {g.price >= 1000 ? `${(g.price / 1000).toFixed(g.price >= 10000 ? 0 : 1)}K` : g.price} {t("sum")}
                 </span>
                 {sending === g.kind && <span className="absolute inset-0 grid place-items-center bg-card/80 rounded-2xl text-foreground text-xs">{t("gift_sending")}</span>}

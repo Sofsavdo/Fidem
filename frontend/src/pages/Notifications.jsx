@@ -6,6 +6,7 @@ import { ArrowLeft, Bell, Eye, Heart, Gift, MessageCircle, ShieldCheck, Trophy, 
 import { useNotifications } from "@/hooks/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { QK } from "@/hooks/queries";
+import { Skeleton, EmptyState } from "@/components/kit";
 
 const ICONS = {
   view: Eye, saved: Heart, gift: Gift, message: MessageCircle, photo_request: ShieldCheck,
@@ -49,8 +50,22 @@ export default function Notifications() {
         <h1 className="font-heading text-2xl font-semibold tracking-tight">{t("notifications")}</h1>
       </div>
 
-      {isLoading && <div className="text-center py-6 text-muted-foreground">{t("loading")}</div>}
-      {!isLoading && items.length === 0 && <div className="text-center py-12 text-muted-foreground">{t("no_data")}</div>}
+      {isLoading && (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="rounded-2xl border border-border p-3 flex items-start gap-3">
+              <Skeleton className="w-9 h-9 rounded-full" />
+              <div className="flex-1 space-y-1.5">
+                <Skeleton className="h-3.5 w-3/4 rounded" />
+                <Skeleton className="h-2.5 w-1/3 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {!isLoading && items.length === 0 && (
+        <EmptyState icon={<Bell className="w-6 h-6" />} title={t("no_data")} hint={t("notifications_empty_hint")} />
+      )}
 
       <div className="space-y-2">
         {items.map((n) => {

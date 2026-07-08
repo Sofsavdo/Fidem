@@ -1,279 +1,221 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
-import { Crown, Check, Wallet } from "lucide-react";
+import { Crown, Check, Wallet, ArrowUpRight, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { usePayments, QK } from "@/hooks/queries";
 import { useQueryClient } from "@tanstack/react-query";
+import { PageHead, Segmented, Price, SectionLabel } from "@/components/kit";
+import { tapMedium, notify } from "@/lib/haptics";
 
-// Mirrors backend core.PRICE_CHAT_UNLOCK_UZS — used only for the illustrative
-// "N unlocks vs Standard" value comparison, not for charging.
-const CHAT_UNLOCK_PRICE = 9900;
+const CHAT_UNLOCK_PRICE = 9900; // mirrors backend PRICE_CHAT_UNLOCK_UZS (comparison only)
 
 const PLANS = [
-  {
-    key: "free", title: "Free", price: 0,
-    features: ["profile", "candidates", "saved", "likes", "matches", "chat_replies"],
-    style: "bg-card border border-border",
-  },
-  {
-    key: "standard", title: "Standard", price: 34900,
-    features: ["chat_unlimited", "candidates", "saved", "more_filters"],
-    style: "bg-card border-2 border-secondary",
-    badge: "✅",
-  },
-  {
-    key: "premium", title: "Premium", price: 79000,
-    features: ["chat_unlimited", "who_viewed", "who_saved", "who_interested", "more_filters", "boost_visibility"],
-    style: "bg-card border-2 border-gold shadow-premium",
-    badge: "💎",
-  },
-  {
-    key: "vip", title: "VIP", price: 199000,
-    features: ["max_visibility", "stealth_view", "priority", "vip_badge", "family_share"],
-    style: "bg-ink text-white border border-white/10",
-    badge: "👑",
-  },
+  { key: "free", title: "Free", price: 0, accent: "border-border",
+    perks: ["profile", "candidates", "likes_matches", "chat_replies"] },
+  { key: "standard", title: "Standard", price: 34900, badge: "✅", accent: "border-secondary/50",
+    perks: ["chat_unlimited", "more_filters", "chat_free_weekly_perk"] },
+  { key: "premium", title: "Premium", price: 79000, badge: "💎", popular: true, accent: "border-gold",
+    perks: ["chat_unlimited", "who_viewed", "who_saved", "boost_visibility"] },
+  { key: "vip", title: "VIP", price: 199000, badge: "👑", dark: true, accent: "border-white/10",
+    perks: ["max_visibility", "stealth_view", "priority", "family_share"] },
 ];
 
-const FEATURE_LABELS = {
-  uz: {
-    profile: "Profil", candidates: "Nomzodlar", saved: "Saqlash", likes: "Yoqtirishlar", matches: "Moslashuvlar", chat_replies: "Javob yozish",
-    chat_unlimited: "Cheksiz yozishish",
-    who_viewed: "Kim ko'rdi", who_saved: "Kim saqladi", who_interested: "Kim qiziqdi", more_filters: "Ko'proq filtrlar", boost_visibility: "Ko'rinishni oshirish",
-    max_visibility: "Maksimal ko'rinish", stealth_view: "Maxfiy ko'rish", priority: "Priority", vip_badge: "VIP badge", family_share: "Oila ulashim",
-  },
-  ru: {
-    profile: "Профиль", candidates: "Кандидаты", saved: "Сохранять", likes: "Лайки", matches: "Совпадения", chat_replies: "Ответы в чате",
-    chat_unlimited: "Безлимитные сообщения",
-    who_viewed: "Кто видел", who_saved: "Кто сохранил", who_interested: "Кто интересуется", more_filters: "Больше фильтров", boost_visibility: "Увеличение видимости",
-    max_visibility: "Максимум видимости", stealth_view: "Скрытый просмотр", priority: "Приоритет", vip_badge: "VIP badge", family_share: "Семейный доступ",
-  },
-  en: {
-    profile: "Profile", candidates: "Candidates", saved: "Save", likes: "Likes", matches: "Matches", chat_replies: "Chat replies",
-    chat_unlimited: "Unlimited messaging",
-    who_viewed: "Who viewed", who_saved: "Who saved", who_interested: "Who interested", more_filters: "More filters", boost_visibility: "Boost visibility",
-    max_visibility: "Max visibility", stealth_view: "Stealth view", priority: "Priority", vip_badge: "VIP badge", family_share: "Family share",
-  },
+const PERK = {
+  uz: { profile: "Profil", candidates: "Nomzodlar", likes_matches: "Yoqtirish va moslik", chat_replies: "Kelgan xabarga bepul javob",
+    chat_unlimited: "Cheksiz yozishish", chat_free_weekly_perk: "Haftada 1 bepul suhbat", more_filters: "Ko'proq filtrlar",
+    who_viewed: "Kim ko'rdi", who_saved: "Kim saqladi", boost_visibility: "Ko'rinish oshadi",
+    max_visibility: "Maksimal ko'rinish", stealth_view: "Maxfiy ko'rish", priority: "Ustuvorlik", family_share: "Oila ulashish" },
+  ru: { profile: "Профиль", candidates: "Кандидаты", likes_matches: "Лайки и совпадения", chat_replies: "Бесплатный ответ на входящие",
+    chat_unlimited: "Безлимит сообщений", chat_free_weekly_perk: "1 бесплатный чат в неделю", more_filters: "Больше фильтров",
+    who_viewed: "Кто смотрел", who_saved: "Кто сохранил", boost_visibility: "Больше видимости",
+    max_visibility: "Максимум видимости", stealth_view: "Скрытый просмотр", priority: "Приоритет", family_share: "Семейный доступ" },
+  en: { profile: "Profile", candidates: "Candidates", likes_matches: "Likes & matches", chat_replies: "Free reply to incoming",
+    chat_unlimited: "Unlimited messaging", chat_free_weekly_perk: "1 free chat / week", more_filters: "More filters",
+    who_viewed: "Who viewed", who_saved: "Who saved", boost_visibility: "More visibility",
+    max_visibility: "Max visibility", stealth_view: "Stealth view", priority: "Priority", family_share: "Family sharing" },
 };
+
+const TOPUP_PACKAGES = [10000, 30000, 50000, 100000, 200000, 500000];
 
 export default function Premium() {
   const { t, lang, user, refresh } = useApp();
   const queryClient = useQueryClient();
   const [sp, setSearchParams] = useSearchParams();
   const tab = sp.get("tab") || "plans";
-  const showTopup = sp.get("topup") === "1";
   const [topupAmount, setTopupAmount] = useState(50000);
   const [creating, setCreating] = useState(false);
+  const perk = PERK[lang] || PERK.uz;
 
   const { data: payments = [] } = usePayments();
 
-  useEffect(() => {
-    if (tab) {
-      const element = document.getElementById(`premium-${tab}`);
-      if (element) {
-        element.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-    }
-  }, [tab]);
-
-  const buy = async (purpose, amount) => {
+  const runPayment = async (purpose, amount) => {
     setCreating(true);
+    tapMedium();
     try {
       const r = await api.post("/payments/create", { purpose, amount });
       if (r.data.status === "paid") {
+        notify("success");
         toast.success(t("payment_success"));
         refresh();
       } else {
-        // Show balance usage info if applicable
         if (r.data.balance_used > 0) {
-          toast.success(`${t("balance_used")}: ${r.data.balance_used.toLocaleString()} ${t("sum")}. ${t("pay_with_click")}: ${r.data.click_amount.toLocaleString()} ${t("sum")}`);
+          toast.success(`${t("balance_used")}: ${Number(r.data.balance_used).toLocaleString()} ${t("sum")} · ${t("pay_with_click")}: ${Number(r.data.click_amount).toLocaleString()} ${t("sum")}`);
         } else {
           toast.success(t("pay_with_click"));
         }
-        window.open(r.data.payment_link, "_blank");
+        if (r.data.payment_link) window.open(r.data.payment_link, "_blank");
       }
       queryClient.invalidateQueries({ queryKey: QK.payments });
     } catch (e) {
       toast.error(t("error_generic"));
     } finally { setCreating(false); }
   };
-  const topup = async () => {
-    setCreating(true);
-    try {
-      const r = await api.post("/payments/create", { purpose: "balance_topup", amount: topupAmount });
-      if (r.data.status === "paid") {
-        toast.success(t("payment_success"));
-        refresh();
-      } else {
-        // Show balance usage info if applicable
-        if (r.data.balance_used > 0) {
-          toast.success(`${t("balance_used")}: ${r.data.balance_used.toLocaleString()} ${t("sum")}. ${t("pay_with_click")}: ${r.data.click_amount.toLocaleString()} ${t("sum")}`);
-        } else {
-          toast.success(t("pay_with_click"));
-        }
-        window.open(r.data.payment_link, "_blank");
-      }
-      queryClient.invalidateQueries({ queryKey: QK.payments });
-    } catch (e) {
-      toast.error(t("error_generic"));
-    } finally { setCreating(false); }
-  };
-
-  const labels = FEATURE_LABELS[lang] || FEATURE_LABELS.uz;
 
   return (
-    <div className="px-4 md:px-8 pt-6 pb-8 space-y-6">
-      <div>
-        <h1 className="font-heading text-3xl font-semibold tracking-tight">{t("premium")}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{t("tagline")}</p>
-      </div>
+    <div className="px-4 md:px-8 pt-6 pb-10 space-y-5">
+      <PageHead title={t("premium")} subtitle={t("tagline")} />
 
-      {/* Tabs */}
-      <div className="flex gap-2 border-b border-border pb-3">
-        {["plans", "balance"].map((tabKey) => (
-          <button
-            key={tabKey}
-            onClick={() => setSearchParams({ tab: tabKey })}
-            className={`px-4 py-2 rounded-full text-sm font-medium capitalize ${
-              tab === tabKey ? "bg-primary text-white" : "bg-muted/30 text-muted-foreground"
-            }`}
-          >
-            {t(`premium_tab_${tabKey}`)}
-          </button>
-        ))}
-      </div>
+      <Segmented
+        value={tab}
+        onChange={(k) => setSearchParams({ tab: k })}
+        options={[{ key: "plans", label: t("premium_tab_plans") }, { key: "balance", label: t("premium_tab_balance") }]}
+      />
 
-      {/* Subscription Plans - Recurring Monthly Access */}
       {tab === "plans" && (
-        <div id="premium-plans">
-          <div className="flex items-center gap-2 mb-2">
-            <Crown className="w-5 h-5 text-gold" />
-            <p className="text-sm uppercase tracking-wider text-muted-foreground font-medium">{t("premium_section_plans")}</p>
-          </div>
-          <p className="text-xs text-muted-foreground mb-3">{t("premium_section_plans_desc")}</p>
-          <div className="space-y-3 stagger">
-            {PLANS.map((p) => {
-              const isCurrent = user?.plan === p.key;
-              return (
-                <div
-                  key={p.key}
-                  data-testid={`plan-${p.key}`}
-                  className={`rounded-3xl p-5 ${p.style} ${isCurrent ? "ring-2 ring-primary" : ""}`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-heading text-2xl font-semibold flex items-center gap-2">
-                        {p.title} {p.badge}
-                      </p>
-                      <p className="text-xs opacity-70 mt-0.5">
-                        {p.price === 0 ? t("plan_free_desc") : t(`plan_${p.key}_desc`)}
-                      </p>
-                    </div>
-                    <p className="font-heading text-xl">
-                      {p.price === 0 ? t("plan_free_title") : `${Number(p.price).toLocaleString()} ${t("sum")}`}
-                    </p>
-                  </div>
-                  <ul className="mt-3 space-y-1.5">
-                    {p.features.map((f) => (
-                      <li key={f} className="text-sm flex items-center gap-2">
-                        <Check className="w-3.5 h-3.5 opacity-70" /> {labels[f]}
-                      </li>
-                    ))}
-                  </ul>
-                  {p.key !== "free" && !isCurrent && (
-                    <button
-                      data-testid={`buy-${p.key}`}
-                      onClick={() => buy(p.key, p.price)}
-                      disabled={creating}
-                      className={`mt-4 w-full rounded-2xl py-3 font-medium ${
-                        p.key === "vip" ? "bg-ink text-gold border border-gold/30" : "bg-primary text-white"
-                      }`}
-                    >
-                      {t("buy")} · {Number(p.price).toLocaleString()} {t("sum")}
-                    </button>
-                  )}
-                  {isCurrent && <p className="mt-3 text-sm font-medium text-secondary">— {t("current_plan")} —</p>}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Value comparison — separate chat unlocks vs Standard (Taskin-style) */}
-          {(() => {
-            const standardPrice = PLANS.find((p) => p.key === "standard")?.price || 34900;
-            const n = Math.ceil(standardPrice / CHAT_UNLOCK_PRICE); // chats where Standard breaks even
-            const separateTotal = n * CHAT_UNLOCK_PRICE;
+        <div className="space-y-3" id="premium-plans">
+          {PLANS.map((p) => {
+            const isCurrent = (user?.plan || "free") === p.key;
             return (
-              <div className="mt-4 rounded-3xl border border-gold/40 bg-gold-light/30 p-4" data-testid="plan-value-compare">
-                <p className="text-xs uppercase tracking-wider text-gold-dark font-semibold">{t("plan_compare_title")}</p>
-                <div className="mt-3 flex items-stretch gap-3">
-                  <div className="flex-1 rounded-2xl bg-card/70 border border-border p-3 text-center">
-                    <p className="text-sm font-semibold line-through decoration-primary/60 tabular-nums">{separateTotal.toLocaleString()} {t("sum")}</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">{t("plan_compare_separate").replace("{n}", n)}</p>
+              <div
+                key={p.key}
+                data-testid={`plan-${p.key}`}
+                className={`relative rounded-3xl border-2 p-4 transition ${p.accent} ${
+                  p.dark ? "bg-ink text-white" : p.popular ? "bg-gradient-to-b from-gold-light/30 to-card" : "bg-card"
+                } ${isCurrent ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}
+              >
+                {p.popular && (
+                  <span className="absolute -top-2.5 left-4 inline-flex items-center gap-1 rounded-full bg-gold text-ink text-[10px] font-bold px-2.5 py-0.5 shadow-sm">
+                    <Sparkles className="w-3 h-3" /> {t("plan_most_popular")}
+                  </span>
+                )}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-heading text-lg font-semibold">{p.title}</span>
+                    {p.badge && <span className="text-base">{p.badge}</span>}
                   </div>
-                  <div className="grid place-items-center text-muted-foreground text-xs font-medium">vs</div>
-                  <div className="flex-1 rounded-2xl bg-secondary/10 border border-secondary/30 p-3 text-center">
-                    <p className="text-sm font-semibold text-secondary tabular-nums">{standardPrice.toLocaleString()} {t("sum")}</p>
-                    <p className="text-[11px] text-secondary/90 mt-0.5">{t("plan_compare_unlimited")}</p>
+                  <div className="text-right leading-none">
+                    {p.price === 0 ? (
+                      <span className="font-heading text-lg font-semibold">{t("plan_free_title")}</span>
+                    ) : (
+                      <span className="font-heading text-lg font-semibold tabular-nums">
+                        {p.price.toLocaleString()}<span className="text-xs font-medium opacity-60"> {t("sum")}{t("plan_per_month")}</span>
+                      </span>
+                    )}
                   </div>
                 </div>
-                <p className="text-[11px] text-muted-foreground mt-2 text-center">{t("plan_compare_note").replace("{n}", n)}</p>
+
+                <ul className="mt-3 grid grid-cols-1 gap-1.5">
+                  {p.perks.map((k) => (
+                    <li key={k} className={`text-[13px] flex items-center gap-2 ${p.dark ? "text-white/90" : "text-foreground/90"}`}>
+                      <Check className={`w-3.5 h-3.5 shrink-0 ${p.dark ? "text-gold" : "text-secondary"}`} /> {perk[k] || k}
+                    </li>
+                  ))}
+                </ul>
+
+                {p.key !== "free" && !isCurrent && (
+                  <button
+                    data-testid={`buy-${p.key}`}
+                    onClick={() => runPayment(p.key, p.price)}
+                    disabled={creating}
+                    className={`mt-3.5 w-full rounded-2xl py-2.5 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-50 ${
+                      p.dark ? "bg-gold text-ink" : p.popular ? "bg-gradient-to-r from-gold-dark to-gold text-ink" : "bg-primary text-white"
+                    }`}
+                  >
+                    {t("plan_choose_cta")} · {p.price.toLocaleString()} {t("sum")}
+                  </button>
+                )}
+                {isCurrent && (
+                  <p className={`mt-3 text-xs font-semibold text-center ${p.dark ? "text-gold" : "text-secondary"}`}>
+                    ✓ {t("current_plan")}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Value comparison — compact */}
+          {(() => {
+            const n = Math.ceil(34900 / CHAT_UNLOCK_PRICE);
+            return (
+              <div className="rounded-3xl border border-gold/30 bg-gold-light/20 p-3.5" data-testid="plan-value-compare">
+                <SectionLabel className="text-gold-dark">{t("plan_compare_title")}</SectionLabel>
+                <div className="mt-2.5 flex items-stretch gap-2">
+                  <div className="flex-1 rounded-2xl bg-card/70 border border-border p-2.5 text-center">
+                    <p className="text-sm font-semibold line-through decoration-primary/50 tabular-nums">{(n * CHAT_UNLOCK_PRICE).toLocaleString()}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{t("plan_compare_separate").replace("{n}", n)}</p>
+                  </div>
+                  <div className="grid place-items-center text-muted-foreground text-[11px] font-medium">vs</div>
+                  <div className="flex-1 rounded-2xl bg-secondary/10 border border-secondary/30 p-2.5 text-center">
+                    <p className="text-sm font-semibold text-secondary tabular-nums">34,900</p>
+                    <p className="text-[10px] text-secondary/90 mt-0.5">{t("plan_compare_unlimited")}</p>
+                  </div>
+                </div>
               </div>
             );
           })()}
 
-          {/* Concierge — premium manual matching */}
-          <div className="rounded-3xl bg-gradient-to-br from-secondary/10 via-primary/5 to-gold-light/30 border-2 border-secondary/40 p-5" data-testid="concierge-section">
-            <p className="font-heading text-xl font-semibold flex items-center gap-2">👑 {t("concierge_title")}</p>
-            <p className="text-sm mt-1 text-muted-foreground">{t("concierge_desc")}</p>
-            <ul className="text-xs mt-3 space-y-1 text-foreground/80">
-              <li>✓ {t("premium_section_concierge_features_1")}</li>
-              <li>✓ {t("premium_section_concierge_features_2")}</li>
-              <li>✓ {t("premium_section_concierge_features_3")}</li>
-            </ul>
-            <Link
-              to="/concierge"
-              data-testid="concierge-link"
-              className="mt-3 block w-full text-center rounded-2xl bg-secondary text-white py-3 font-medium"
-            >
-              {t("premium_section_concierge_btn").replace("{price}", "199,000").replace("{currency}", t("sum"))}
-            </Link>
-          </div>
+          {/* Concierge — compact */}
+          <Link to="/concierge" data-testid="concierge-link" className="block rounded-3xl border border-secondary/30 bg-gradient-to-br from-secondary/8 to-card p-4 active:scale-[0.99] transition">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-heading text-base font-semibold flex items-center gap-1.5">👑 {t("concierge_title")}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{t("concierge_desc")}</p>
+              </div>
+              <span className="shrink-0 text-xs font-semibold text-secondary inline-flex items-center gap-0.5">199,000 <ArrowUpRight className="w-3.5 h-3.5" /></span>
+            </div>
+          </Link>
         </div>
       )}
 
-      {/* Internal Balance - For Gifts, Boost, AI Features */}
       {tab === "balance" && (
-        <div id="premium-balance">
-          {/* Current Balance Display */}
-          <div className="rounded-3xl bg-gradient-to-br from-secondary/10 to-card border border-secondary/30 p-5 mb-4">
+        <div className="space-y-4" id="premium-balance">
+          {/* App balance — for purchases */}
+          <div className="rounded-3xl bg-gradient-to-br from-secondary/12 to-card border border-secondary/25 p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("balance")}</p>
-                <p className="font-heading text-3xl font-semibold mt-1">{(user.balance || 0).toLocaleString()} {t("sum")}</p>
+                <SectionLabel>{t("app_balance_title")}</SectionLabel>
+                <p className="font-heading text-3xl font-semibold mt-1 tabular-nums">{(user.balance || 0).toLocaleString()} <span className="text-base font-medium opacity-60">{t("sum")}</span></p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{t("app_balance_hint")}</p>
               </div>
-              <Wallet className="w-8 h-8 text-secondary" />
+              <div className="w-11 h-11 rounded-2xl bg-secondary/15 grid place-items-center shrink-0"><Wallet className="w-5 h-5 text-secondary" /></div>
             </div>
           </div>
 
-          {/* Topup Section */}
-          <div className="rounded-3xl bg-card border border-border p-5" data-testid="topup-section">
-            <div className="flex items-center gap-2 mb-3">
-              <Wallet className="w-5 h-5 text-foreground" />
-              <p className="font-heading text-xl font-semibold">{t("topup_balance")}</p>
+          {/* Referral earnings — withdrawable, clearly separated */}
+          <Link to="/withdrawals" data-testid="ref-earnings-card" className="block rounded-3xl bg-card border border-border p-4 active:scale-[0.99] transition">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <SectionLabel>{t("ref_earnings_title")}</SectionLabel>
+                <p className="font-heading text-xl font-semibold mt-1 tabular-nums">{(user.withdrawable_balance || 0).toLocaleString()} <span className="text-sm font-medium opacity-60">{t("sum")}</span></p>
+                <p className="text-[11px] text-secondary mt-0.5">{t("ref_earnings_hint")}</p>
+              </div>
+              <span className="shrink-0 text-xs font-semibold text-primary inline-flex items-center gap-0.5">{t("withdraw_cta")} <ArrowUpRight className="w-3.5 h-3.5" /></span>
             </div>
-            <p className="text-xs text-muted-foreground mb-3">{t("premium_section_balance_hint")}</p>
-            <p className="text-xs text-secondary mb-3">{t("premium_section_balance_usage")}</p>
-            <div className="flex gap-2 mb-3">
-              {[10000, 50000, 100000, 200000].map((v) => (
+          </Link>
+
+          {/* Top-up */}
+          <div className="rounded-3xl bg-card border border-border p-4" data-testid="topup-section">
+            <SectionLabel>{t("topup_choose")}</SectionLabel>
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              {TOPUP_PACKAGES.map((v) => (
                 <button
                   key={v}
                   data-testid={`topup-${v}`}
                   onClick={() => setTopupAmount(v)}
-                  className={`flex-1 rounded-xl border py-2 text-sm ${
-                    topupAmount === v ? "bg-primary text-white border-primary" : "bg-card border-border"
+                  className={`rounded-2xl border py-2.5 text-sm font-semibold tabular-nums transition active:scale-[0.97] ${
+                    topupAmount === v ? "bg-primary text-white border-primary shadow-sm" : "bg-card border-border hover:border-primary/40"
                   }`}
                 >
                   {(v / 1000).toFixed(0)}k
@@ -282,42 +224,37 @@ export default function Premium() {
             </div>
             <button
               data-testid="topup-pay"
-              onClick={topup}
+              onClick={() => runPayment("balance_topup", topupAmount)}
               disabled={creating}
-              className="w-full rounded-2xl bg-secondary text-white py-3 font-medium"
+              className="btn-primary mt-3.5"
             >
-              {t("pay_with_click")} · {Number(topupAmount).toLocaleString()} {t("sum")}
+              {t("pay_with_click")} · {topupAmount.toLocaleString()} {t("sum")}
             </button>
-          </div>
-
-          {/* Spending System Explanation - reduced to tooltip */}
-          <div className="flex items-center gap-2 mt-4 text-xs text-muted-foreground">
-            <span title={t("premium_balance_label") + ": " + t("premium_balance_desc") + " • " + t("premium_referral_label") + ": " + t("premium_referral_desc")} className="cursor-help">ℹ️</span>
-            <span>{t("premium_spending_system")}</span>
           </div>
         </div>
       )}
 
       {/* Payments history */}
-      <div>
-        <p className="font-heading text-lg font-semibold mb-2">{t("payments")}</p>
-        <div className="space-y-2">
-          {payments.length === 0 && <p className="text-sm text-muted-foreground">{t("no_data")}</p>}
-          {(payments || []).map((p) => (
-            <div key={p.id} className="rounded-2xl bg-card border border-border p-3 flex items-center justify-between" data-testid={`payment-${p.id}`}>
-              <div>
-                <p className="text-sm font-medium">{p.purpose}</p>
-                <p className="text-xs text-muted-foreground">{Number(p.amount || 0).toLocaleString()} {t("sum")}</p>
+      {payments.length > 0 && (
+        <div>
+          <SectionLabel className="mb-2">{t("payments")}</SectionLabel>
+          <div className="space-y-2">
+            {payments.slice(0, 8).map((p) => (
+              <div key={p.id} className="rounded-2xl bg-card border border-border p-3 flex items-center justify-between" data-testid={`payment-${p.id}`}>
+                <div>
+                  <p className="text-sm font-medium capitalize">{p.purpose?.replace(/_/g, " ")}</p>
+                  <p className="text-xs text-muted-foreground tabular-nums">{Number(p.amount || 0).toLocaleString()} {t("sum")}</p>
+                </div>
+                <span className={`text-[11px] font-medium px-2 py-1 rounded-full ${
+                  p.status === "success" ? "bg-secondary/10 text-secondary" : p.status === "failed" ? "bg-red-50 text-red-700" : "bg-gold-light text-yellow-900"
+                }`}>
+                  {t(`payment_${p.status}`)}
+                </span>
               </div>
-              <span className={`text-xs px-2 py-1 rounded-full ${
-                p.status === "success" ? "bg-secondary/10 text-secondary" : p.status === "failed" ? "bg-red-50 text-red-700" : "bg-gold-light text-yellow-900"
-              }`}>
-                {t(`payment_${p.status}`)}
-              </span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

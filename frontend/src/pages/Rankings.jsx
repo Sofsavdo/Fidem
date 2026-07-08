@@ -4,6 +4,7 @@ import { ChevronLeft, Trophy, Medal, Gift } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { useLeaderboard } from "@/hooks/queries";
 import { photoSrc } from "@/lib/photo";
+import { Skeleton, EmptyState } from "@/components/kit";
 
 export default function Rankings() {
   const { t } = useApp();
@@ -50,9 +51,21 @@ export default function Rankings() {
 
         <section className="rounded-3xl border border-border bg-card p-6">
           {isLoading ? (
-            <div className="text-center text-sm text-muted-foreground py-8">{t("loading")}</div>
+            <div className="space-y-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 p-3">
+                  <Skeleton className="w-8 h-5 rounded-lg" />
+                  <Skeleton className="w-10 h-10 rounded-full" />
+                  <div className="flex-1 space-y-1.5">
+                    <Skeleton className="h-3.5 w-1/2 rounded" />
+                    <Skeleton className="h-2.5 w-1/4 rounded" />
+                  </div>
+                  <Skeleton className="h-4 w-16 rounded" />
+                </div>
+              ))}
+            </div>
           ) : leaders.length === 0 ? (
-            <div className="text-center text-sm text-muted-foreground py-8">{t("no_data")}</div>
+            <EmptyState icon={<Trophy className="w-6 h-6" />} title={t("no_data")} hint={t("rankings_empty_hint")} />
           ) : (
             <div className="space-y-3">
               {leaders.map((row, i) => {
