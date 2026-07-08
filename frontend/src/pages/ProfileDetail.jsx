@@ -2,7 +2,7 @@ import React, { useState, useCallback, memo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
-import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot } from "@/components/Badges";
+import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot, LocationBadge } from "@/components/Badges";
 import CompatibilityCard from "@/components/CompatibilityCard";
 import { photoSrc } from "@/lib/photo";
 import { formatLastActive } from "@/lib/time";
@@ -138,17 +138,18 @@ export default function ProfileDetail() {
             <h1 className="font-heading text-3xl font-semibold flex items-center gap-2">
               {c.name}, {c.age} <OnlineDot online={c.online} />
             </h1>
-            <p className="text-sm text-white/85">{c.region} · {c.district} · {formatLastActive(c.last_active_minutes, t, c.online)}</p>
+            <p className="text-sm text-white/85">{c.region} · {c.district}{c.distance_bucket ? ` · ${c.distance_bucket} ${t("away")}` : ""} · {formatLastActive(c.last_active_minutes, t, c.online)}</p>
           </div>
         </div>
       </div>
 
       <div className="px-5 pt-5 space-y-4">
         {/* Verification badges row */}
-        {(c.verified_selfie || c.verified_financial || c.verified_identity) && (
+        {(c.verified_selfie || c.verified_financial || c.verified_identity || c.location_verified) && (
           <div className="flex gap-2 flex-wrap" data-testid="profile-badges">
             <VerifiedBadge verified={c.verified_selfie} />
             <FinancialBadge verified={c.verified_financial} />
+            <LocationBadge verified={c.location_verified} />
             {c.verified_identity && (
               <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 px-2 py-1 text-[11px] font-medium">
                 <Shield className="w-3 h-3" /> {t("identity_badge")}

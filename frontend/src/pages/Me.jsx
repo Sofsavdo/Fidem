@@ -8,6 +8,7 @@ import { ChevronRight, Crown, Gem, Wallet, Share2, Settings as SettingsIcon, Log
 import ProgressCard from "@/components/ProgressCard";
 import LangSwitch from "@/components/LangSwitch";
 import BoostModal from "@/components/BoostModal";
+import LocationVerifyCard from "@/components/LocationVerifyCard";
 import { photoSrc } from "@/lib/photo";
 import { toast } from "sonner";
 import { useReferral, useNotifications, useDailyStatus, useLeaderboard, useSaved, QK } from "@/hooks/queries";
@@ -142,6 +143,9 @@ export default function Me() {
           </div>
         </Link>
       )}
+
+      {/* Location verification (Map M1) */}
+      <LocationVerifyCard />
 
       {/* Completeness */}
       <div className="rounded-3xl bg-card border border-border p-4">

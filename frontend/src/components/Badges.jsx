@@ -1,5 +1,17 @@
 import React from "react";
-import { ShieldCheck, Gem } from "lucide-react";
+import { ShieldCheck, Gem, MapPin } from "lucide-react";
+
+export function LocationBadge({ verified }) {
+  if (!verified) return null;
+  return (
+    <span
+      data-testid="badge-location"
+      className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 text-[10px] font-medium tracking-wide"
+    >
+      <MapPin className="w-3 h-3" /> Location
+    </span>
+  );
+}
 
 export function VerifiedBadge({ verified }) {
   if (!verified) return null;

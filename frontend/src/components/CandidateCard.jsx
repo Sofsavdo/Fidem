@@ -1,7 +1,7 @@
 import React, { memo } from "react";
 import { Link } from "react-router-dom";
 import { Bookmark, MessageCircle, Lock } from "lucide-react";
-import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot } from "@/components/Badges";
+import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot, LocationBadge } from "@/components/Badges";
 import { useApp } from "@/contexts/AppContext";
 import { photoSrc } from "@/lib/photo";
 import { formatLastActive } from "@/lib/time";
@@ -40,6 +40,7 @@ function CandidateCardInner({ c, onSave, saved }) {
             <div className="flex flex-col gap-1 items-end">
               <VerifiedBadge verified={c.verified_selfie} />
               <FinancialBadge verified={c.verified_financial} />
+              <LocationBadge verified={c.location_verified} />
             </div>
           </div>
 
@@ -61,7 +62,9 @@ function CandidateCardInner({ c, onSave, saved }) {
               <OnlineDot online={c.online} />
             </div>
             <p className="text-xs text-white/85 mt-0.5">
-              {c.region} · {formatLastActive(c.last_active_minutes, t, c.online)}
+              {c.region}
+              {c.distance_bucket ? ` · ${c.distance_bucket} ${t("away")}` : ""}
+              {" · "}{formatLastActive(c.last_active_minutes, t, c.online)}
             </p>
           </div>
         </div>

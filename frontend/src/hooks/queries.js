@@ -88,6 +88,14 @@ export function useBoostAnalytics(enabled = true) {
   });
 }
 
+// Map M1: post the device GPS point to be verified against the claimed
+// region. The coordinate is used once and stored server-side only.
+export function useVerifyLocation() {
+  return useMutation({
+    mutationFn: ({ lat, lng }) => api.post("/location/verify", { lat, lng }).then((r) => r.data),
+  });
+}
+
 export function useActivateBoost() {
   const queryClient = useQueryClient();
   return useMutation({
