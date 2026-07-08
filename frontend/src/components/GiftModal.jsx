@@ -42,9 +42,9 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
       const r = await api.post("/gifts/send", { to_user_id: targetId, gift_kind: item.kind });
       const isFree = r.data?.gift?.is_free;
       toast.success(isFree ? t("gift_sent_free").replace("{emoji}", item.emoji).replace("{label}", item[labelKey]) : t("gift_sent_paid").replace("{emoji}", item.emoji));
-      await refresh();
       onSent?.(item.kind);
       onClose();
+      refresh(); // balance sync happens in the background — don't make the user wait a 2nd round-trip to see the modal close
     } catch (e) {
       toast.error(t("error_generic"));
     } finally {

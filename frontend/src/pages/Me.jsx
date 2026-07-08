@@ -9,7 +9,7 @@ import ProgressCard from "@/components/ProgressCard";
 import LangSwitch from "@/components/LangSwitch";
 import { photoSrc } from "@/lib/photo";
 import { toast } from "sonner";
-import { useReferral, useNotifications, useDailyStatus, useRankings, QK } from "@/hooks/queries";
+import { useReferral, useNotifications, useDailyStatus, useRankings, useSaved, QK } from "@/hooks/queries";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 
 export default function Me() {
@@ -21,6 +21,8 @@ export default function Me() {
   const { data: notifications = [] } = useNotifications();
   const { data: daily, refetch: refetchDaily } = useDailyStatus();
   const { data: leaders = [] } = useRankings("global");
+  const { data: profileViewers = [] } = useSaved("viewers");
+  const { data: profileSavers = [] } = useSaved("by_others");
 
   const unread = notifications.filter((x) => !x.read).length;
 
@@ -33,6 +35,15 @@ export default function Me() {
 
   const claimDailyMutation = useMutation({
     mutationFn: () => api.post("/daily/claim"),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: QK.dailyStatus });
+      const previous = queryClient.getQueryData(QK.dailyStatus);
+      queryClient.setQueryData(QK.dailyStatus, (old) => old ? { ...old, claimed_today: true } : old);
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(QK.dailyStatus, context.previous);
+    },
     onSuccess: (r) => {
       toast.success(`+${r.data.bonus} ${r.data.currency === "coins" ? t("coin") : t("sum")}`);
       queryClient.invalidateQueries({ queryKey: QK.dailyStatus });
@@ -109,6 +120,26 @@ export default function Me() {
           )}
         </div>
       </div>
+
+      {/* Contextual upsell — surfaces existing profile_views/saved-by-others data instead of burying it in a tab */}
+      {!["premium", "vip"].includes(user.plan) && (profileViewers.length > 0 || profileSavers.length > 0) && (
+        <Link
+          to="/premium?tab=plans"
+          data-testid="profile-teaser-banner"
+          className="block rounded-3xl bg-gradient-to-r from-primary/10 to-card border border-primary/30 p-4 hover:-translate-y-0.5 transition-transform"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium leading-snug">
+              {profileViewers.length > 0 && profileSavers.length > 0
+                ? t("profile_teaser_both").replace("{n}", profileViewers.length).replace("{m}", profileSavers.length)
+                : profileViewers.length > 0
+                ? t("profile_teaser_views_only").replace("{n}", profileViewers.length)
+                : t("profile_teaser_saves_only").replace("{m}", profileSavers.length)}
+            </p>
+            <span className="shrink-0 text-xs font-semibold text-primary whitespace-nowrap">{t("profile_teaser_cta")} →</span>
+          </div>
+        </Link>
+      )}
 
       {/* Completeness */}
       <div className="rounded-3xl bg-card border border-border p-4">
