@@ -325,3 +325,30 @@ def test_can_initiate_chat_free_plan_allowed_on_mutual_match(monkeypatch):
     _patch_db(monkeypatch, messages_count=0, unlock=None, saved_find_one_results=[{"owner_id": "u1"}, {"owner_id": "u2"}])
     sender = {"id": "u1", "plan": "free"}
     assert asyncio.run(chat_r.can_initiate_chat(sender, "u2")) is True
+
+
+# ---------- free_weekly_left() — the freemium initiation allowance ----------
+def test_free_weekly_left_fresh_free_user(monkeypatch):
+    monkeypatch.setattr(chat_r, "FREE_WEEKLY_INITIATIONS", 1)
+    # no free_init_week set -> full allowance
+    assert chat_r.free_weekly_left({"plan": "free"}) == 1
+
+
+def test_free_weekly_left_spent_this_week(monkeypatch):
+    monkeypatch.setattr(chat_r, "FREE_WEEKLY_INITIATIONS", 1)
+    user = {"plan": "free", "free_init_week": chat_r._week_id(), "free_init_used": 1}
+    assert chat_r.free_weekly_left(user) == 0
+
+
+def test_free_weekly_left_resets_next_week(monkeypatch):
+    monkeypatch.setattr(chat_r, "FREE_WEEKLY_INITIATIONS", 1)
+    # a stale week id means the counter is treated as reset
+    user = {"plan": "free", "free_init_week": "2000-W01", "free_init_used": 5}
+    assert chat_r.free_weekly_left(user) == 1
+
+
+def test_free_weekly_left_zero_for_paid_and_when_disabled(monkeypatch):
+    monkeypatch.setattr(chat_r, "FREE_WEEKLY_INITIATIONS", 1)
+    assert chat_r.free_weekly_left({"plan": "premium"}) == 0
+    monkeypatch.setattr(chat_r, "FREE_WEEKLY_INITIATIONS", 0)
+    assert chat_r.free_weekly_left({"plan": "free"}) == 0

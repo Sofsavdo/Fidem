@@ -352,6 +352,12 @@ export default function Chat() {
               </div>
             </div>
           )}
+          {/* Free weekly conversation hint — the composer is already open; this
+              just tells the free user this one is on the house, so they notice
+              when it's spent and understand the upgrade. */}
+          {access?.uses_free_weekly && (
+            <p data-testid="chat-free-weekly-hint" className="text-[11px] text-secondary text-center">{t("chat_free_weekly_hint")}</p>
+          )}
           {/* Always-visible message composer (disabled when locked) */}
           <div className="flex items-end gap-1.5 min-w-0">
             <button data-testid="gift-open" onClick={() => setGiftOpen(true)} disabled={access?.requires_unlock} className="shrink-0 w-10 h-10 grid place-items-center rounded-full bg-muted hover:bg-border disabled:opacity-40" title={t("send_gift")}>

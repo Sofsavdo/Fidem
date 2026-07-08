@@ -50,6 +50,10 @@ PRICE_STANDARD = int(os.environ.get("PRICE_STANDARD_UZS", "34900"))
 PRICE_CHAT_UNLOCK = int(os.environ.get("PRICE_CHAT_UNLOCK_UZS", "9900"))
 CHAT_UNLOCK_COINS = int(os.environ.get("CHAT_UNLOCK_COINS", "100"))
 CHAT_GUARANTEE_HOURS = int(os.environ.get("CHAT_GUARANTEE_HOURS", "48"))
+# Free users may start this many NEW conversations per week at no cost — a
+# freemium "taste" that seeds marketplace liquidity and converts better than a
+# hard wall, without weakening the paid tiers (set to 0 to disable entirely).
+FREE_WEEKLY_INITIATIONS = int(os.environ.get("FREE_WEEKLY_INITIATIONS", "1"))
 PAID_PLANS = ("standard", "premium", "vip")
 
 

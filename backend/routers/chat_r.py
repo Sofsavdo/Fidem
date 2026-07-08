@@ -12,6 +12,7 @@ from ai_service import quick_moderation
 from core import (
     CHAT_GUARANTEE_HOURS,
     CHAT_UNLOCK_COINS,
+    FREE_WEEKLY_INITIATIONS,
     PAID_PLANS,
     PRICE_CHAT_UNLOCK,
     chat_id_for,
@@ -46,6 +47,38 @@ router = APIRouter(tags=["chat"])
 # ---------- Chat access / monetization ----------
 def _plan_active(user: dict) -> bool:
     return user.get("plan", "free") in PAID_PLANS
+
+
+def _week_id() -> str:
+    return now_utc().strftime("%G-W%V")
+
+
+def free_weekly_left(user: dict) -> int:
+    """Free first-conversation allowance remaining this week (read-only)."""
+    if FREE_WEEKLY_INITIATIONS <= 0 or _plan_active(user):
+        return 0
+    used = user.get("free_init_used", 0) if user.get("free_init_week") == _week_id() else 0
+    return max(0, FREE_WEEKLY_INITIATIONS - int(used or 0))
+
+
+async def _consume_free_initiation(uid: str) -> bool:
+    """Atomically spend one weekly free initiation. Returns True if one was
+    available and consumed. Uses the same $-guarded conditional-update pattern
+    as every other balance/quota deduction so concurrent sends can't over-spend.
+    """
+    if FREE_WEEKLY_INITIATIONS <= 0:
+        return False
+    week = _week_id()
+    # Idempotent weekly reset — only rewrites when the stored week is stale.
+    await db.users.update_one(
+        {"id": uid, "free_init_week": {"$ne": week}},
+        {"$set": {"free_init_week": week, "free_init_used": 0}},
+    )
+    res = await db.users.update_one(
+        {"id": uid, "free_init_week": week, "free_init_used": {"$lt": FREE_WEEKLY_INITIATIONS}},
+        {"$inc": {"free_init_used": 1}},
+    )
+    return res.modified_count == 1
 
 
 async def _incoming_count(uid: str, target_id: str) -> int:
@@ -100,7 +133,12 @@ async def chat_access(target_id: str, uid: str = Depends(get_current_user_id)):
     is_reply = (await _incoming_count(uid, target_id)) > 0
     unlocked = bool(await _unlock_doc(uid, target_id))
     plan_ok = _plan_active(me)
-    can = await can_initiate_chat(me, target_id)
+    can_hard = await can_initiate_chat(me, target_id)
+    fwl = free_weekly_left(me)
+    # A free-weekly allowance also opens the composer (consumed on actual send),
+    # but only when this isn't already covered by a plan/unlock/match/reply.
+    uses_free_weekly = (not can_hard) and fwl > 0
+    can = can_hard or uses_free_weekly
     return {
         "can_message": can,
         "is_reply": is_reply,
@@ -113,6 +151,8 @@ async def chat_access(target_id: str, uid: str = Depends(get_current_user_id)):
         "balance": int(me.get("balance", 0) or 0),
         "coins": int(me.get("coins", 0) or 0),
         "free_credits": int(me.get("free_chat_credits", 0) or 0),
+        "free_weekly_left": fwl,
+        "uses_free_weekly": uses_free_weekly,
         "guarantee_hours": CHAT_GUARANTEE_HOURS,
     }
 
@@ -281,7 +321,13 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
 
     sender_doc = await get_user(uid)
     if not await can_initiate_chat(sender_doc, req.to_user_id):
-        raise HTTPException(402, "Chat locked - unlock required")
+        # Free-weekly allowance: a free user may open a limited number of new
+        # conversations per week. Consume atomically, then record a free unlock
+        # for this target so their follow-up messages here don't re-charge it.
+        if await _consume_free_initiation(uid):
+            await _create_unlock(uid, req.to_user_id, source="free_weekly", guarantee=False)
+        else:
+            raise HTTPException(402, "Chat locked - unlock required")
 
     is_voice = req.kind == "voice"
     is_video = req.kind == "video"
