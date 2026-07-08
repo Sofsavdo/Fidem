@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { MessageCircle, Inbox, Sparkles } from "lucide-react";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { photoSrc } from "@/lib/photo";
 import { useMessagesChats, useMessagesApplications, QK } from "@/hooks/queries";
 import { useQueryClient } from "@tanstack/react-query";
+import { EmptyState, Skeleton } from "@/components/kit";
 
 export default function Messages() {
   const { t } = useApp();
@@ -44,24 +46,40 @@ export default function Messages() {
         ))}
       </div>
 
-      {loading ? <div className="text-muted-foreground py-6 text-center">{t("loading")}</div> : null}
+      {loading && (
+        <div className="space-y-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 bg-card rounded-2xl p-3 border border-border">
+              <Skeleton className="w-12 h-12 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3.5 w-1/3 rounded" />
+                <Skeleton className="h-2.5 w-2/3 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
-      {tab === "chats" && (
+      {tab === "chats" && !loading && (
         <div className="space-y-2" data-testid="chat-list">
-          {chats.length === 0 && !loading && <Empty label={t("no_data")} />}
-          {chats.map((c) => <ChatRowMemo key={c.chat_id} c={c} />)}
+          {chats.length === 0 ? (
+            <EmptyState icon={<MessageCircle className="w-6 h-6" />} title={t("messages_empty_title")} hint={t("messages_empty_hint")}
+              action={<Link to="/" className="text-sm font-semibold text-primary">{t("candidates")} →</Link>} />
+          ) : chats.map((c) => <ChatRowMemo key={c.chat_id} c={c} />)}
         </div>
       )}
-      {tab === "applications" && (
+      {tab === "applications" && !loading && (
         <div className="space-y-2" data-testid="app-list">
-          {apps.length === 0 && !loading && <Empty label={t("no_data")} />}
-          {apps.map((a) => <ApplicationRowMemo key={a.application.id} a={a} onChange={reload} />)}
+          {apps.length === 0 ? (
+            <EmptyState icon={<Inbox className="w-6 h-6" />} title={t("applications_empty_title")} hint={t("applications_empty_hint")} />
+          ) : apps.map((a) => <ApplicationRowMemo key={a.application.id} a={a} onChange={reload} />)}
         </div>
       )}
-      {tab === "matches" && (
+      {tab === "matches" && !loading && (
         <div className="space-y-2" data-testid="matches-list">
-          {matches.length === 0 && !loading && <Empty label={t("no_data")} />}
-          {matches.map((c) => <ChatRowMemo key={c.chat_id} c={c} />)}
+          {matches.length === 0 ? (
+            <EmptyState icon={<Sparkles className="w-6 h-6" />} title={t("matches_empty_title")} hint={t("matches_empty_hint")} />
+          ) : matches.map((c) => <ChatRowMemo key={c.chat_id} c={c} />)}
         </div>
       )}
     </div>
@@ -106,6 +124,7 @@ function ChatRow({ c }) {
 const ChatRowMemo = React.memo(ChatRow);
 
 function ApplicationRow({ a, onChange }) {
+  const { t } = useApp();
   const decide = async (approve) => {
     await api.post(`/messages/applications/${a.application.id}/decide`, { approve });
     onChange();
@@ -121,15 +140,11 @@ function ApplicationRow({ a, onChange }) {
       </div>
       <p className="mt-2 text-sm">{a.application.text}</p>
       <div className="flex gap-2 mt-2">
-        <button data-testid={`app-approve-${a.application.id}`} onClick={() => decide(true)} className="flex-1 rounded-xl bg-secondary text-white text-sm py-2">Qabul</button>
-        <button data-testid={`app-reject-${a.application.id}`} onClick={() => decide(false)} className="flex-1 rounded-xl border border-border text-sm py-2">Rad</button>
+        <button data-testid={`app-approve-${a.application.id}`} onClick={() => decide(true)} className="flex-1 rounded-xl bg-secondary text-white text-sm py-2 font-medium active:scale-[0.98] transition">{t("approve")}</button>
+        <button data-testid={`app-reject-${a.application.id}`} onClick={() => decide(false)} className="flex-1 rounded-xl border border-border text-sm py-2 font-medium active:scale-[0.98] transition">{t("reject")}</button>
       </div>
     </div>
   );
 }
 
 const ApplicationRowMemo = React.memo(ApplicationRow);
-
-function Empty({ label }) {
-  return <div className="py-16 text-center text-muted-foreground" data-testid="empty">{label}</div>;
-}

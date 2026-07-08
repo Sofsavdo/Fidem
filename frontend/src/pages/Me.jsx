@@ -98,7 +98,7 @@ export default function Me() {
               <VerifiedBadge verified={user.verified_selfie} />
               <FinancialBadge verified={user.verified_financial} />
               {user.verified_identity && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 text-[10px]">
+                <span className="inline-flex items-center gap-1 rounded-full bg-secondary/10 text-secondary border border-secondary/25 px-2 py-0.5 text-[10px]">
                   <ShieldCheck className="w-3 h-3" /> ID
                 </span>
               )}
@@ -171,10 +171,10 @@ export default function Me() {
           <p className="font-heading text-lg mt-2">{t("premium")}</p>
           <p className="text-xs text-white/70 mt-0.5">{t("premium_subtitle")} →</p>
         </Link>
-        <Link to="/withdrawals" data-testid="link-balance" className="rounded-3xl bg-card border border-border p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform">
-          <Wallet className="w-5 h-5 text-foreground" />
+        <Link to="/premium?tab=balance" data-testid="link-balance" className="rounded-3xl bg-card border border-border p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform">
+          <Wallet className="w-5 h-5 text-secondary" />
           <p className="font-heading text-lg mt-2">{(user.balance || 0).toLocaleString()} {t("sum")}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{t("balance")}</p>
+          <p className="text-xs text-secondary mt-0.5">{t("app_balance_title")} →</p>
         </Link>
         <button
           type="button"

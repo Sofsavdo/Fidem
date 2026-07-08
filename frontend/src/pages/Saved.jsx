@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
-import { Lock } from "lucide-react";
+import { Lock, Bookmark } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
 import { useSaved } from "@/hooks/queries";
+import { EmptyState } from "@/components/kit";
 
 const TABS = [
   { k: "mine", labelKey: "saved_by_me" },
@@ -58,7 +59,11 @@ export default function Saved() {
           ))}
         </div>
       )}
-      {!isLoading && items.length === 0 && <div className="text-center py-12 text-muted-foreground" data-testid="saved-empty">{t("no_data")}</div>}
+      {!isLoading && items.length === 0 && (
+        <div data-testid="saved-empty">
+          <EmptyState icon={<Bookmark className="w-6 h-6" />} title={t("saved_empty_title")} hint={t("saved_empty_hint")} />
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 stagger" data-testid="saved-grid">
         {items.map((c, idx) => {

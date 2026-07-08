@@ -10,6 +10,7 @@ import RegionSelect from "@/components/RegionSelect";
 import { useCandidates, useSaved, useToggleSave } from "@/hooks/queries";
 import { MATCH_EVENT } from "@/components/MatchCelebration";
 import { tapMedium } from "@/lib/haptics";
+import { EmptyState } from "@/components/kit";
 
 export default function Candidates() {
   const { t } = useApp();
@@ -134,8 +135,17 @@ export default function Candidates() {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground" data-testid="no-candidates">
-          {t("no_data")}
+        <div data-testid="no-candidates">
+          <EmptyState
+            icon={<SlidersHorizontal className="w-6 h-6" />}
+            title={t("candidates_empty_title")}
+            hint={t("candidates_empty_hint")}
+            action={
+              <button onClick={() => setFilters({ sort: "match" })} className="text-sm font-semibold text-primary">
+                {t("reset")}
+              </button>
+            }
+          />
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 stagger" data-testid="candidates-grid">

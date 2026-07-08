@@ -6,9 +6,9 @@ import { X, Gift as GiftIcon, Sparkles, Plus } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 
 const TIER_META = {
-  care:   { label_uz: "Atash",        label_ru: "Знаки",       label_en: "Cares",     cls: "bg-rose-100 text-rose-700" },
-  love:   { label_uz: "Sevish",      label_ru: "Любовь",      label_en: "Love",      cls: "bg-pink-100 text-pink-700" },
-  luxury: { label_uz: "Hashamat",    label_ru: "Люкс",        label_en: "Luxury",    cls: "bg-gold-light text-gold-dark" },
+  care:   { label_uz: "Atash",     label_ru: "Знаки",  label_en: "Cares",  cls: "bg-secondary/10 text-secondary border-secondary/30" },
+  love:   { label_uz: "Sevish",    label_ru: "Любовь", label_en: "Love",   cls: "bg-primary/10 text-primary border-primary/30" },
+  luxury: { label_uz: "Hashamat",  label_ru: "Люкс",   label_en: "Luxury", cls: "bg-gold-light/50 text-gold-dark border-gold/40" },
 };
 
 const TIER_ORDER = ["care", "love", "luxury"];
@@ -86,7 +86,7 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
               <Plus className="w-3 h-3" /> {t("topup_balance")}
             </span>
           </Link>
-          <span className="inline-flex items-center gap-1 text-emerald-700 shrink-0">
+          <span className="inline-flex items-center gap-1 text-secondary shrink-0">
             <Sparkles className="w-3 h-3" /> {t("gift_free_remaining")}: {freeRemaining} / {catalog?.free_quota_per_week || 1}
           </span>
         </div>
@@ -102,7 +102,7 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
                 data-testid={`gift-tier-${tk}`}
                 onClick={() => setActiveTier(tk)}
                 className={`whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-medium border transition ${
-                  active ? "bg-foreground text-background border-foreground" : "bg-card border-border"
+                  active ? tm.cls : "bg-card border-border text-muted-foreground"
                 }`}
               >
                 {tm[labelKey]} <span className="opacity-60">({(groups[tk] || []).length})</span>

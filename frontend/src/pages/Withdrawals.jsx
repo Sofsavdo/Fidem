@@ -1,8 +1,9 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
-import { Wallet, ArrowDownToLine, Clock, CheckCircle2, XCircle, Info } from "lucide-react";
+import { Wallet, ArrowDownToLine, Clock, CheckCircle2, XCircle, Info, ChevronLeft } from "lucide-react";
 import { useWithdrawalsStatus, useWithdrawalsHistory, QK } from "@/hooks/queries";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -61,11 +62,15 @@ export default function Withdrawals() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-4 md:p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-heading font-semibold">{t("withdraw_title")}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{t("withdraw_explainer")}</p>
-      </div>
+    <div>
+      <header className="sticky top-0 z-30 glass border-b border-border/40 px-4 py-3 flex items-center gap-3">
+        <Link to="/me" className="p-2 -ml-2 rounded-full hover:bg-muted" data-testid="withdraw-back">
+          <ChevronLeft className="w-5 h-5" />
+        </Link>
+        <span className="font-heading font-semibold text-lg">{t("withdraw_title")}</span>
+      </header>
+      <div className="max-w-2xl mx-auto p-4 md:p-6 space-y-6">
+      <p className="text-sm text-muted-foreground">{t("withdraw_explainer")}</p>
 
       {/* Balance card */}
       <div className="rounded-3xl border border-border bg-gradient-to-br from-primary/10 to-secondary/10 p-6">
@@ -193,6 +198,7 @@ export default function Withdrawals() {
             ))}
           </div>
         )}
+      </div>
       </div>
     </div>
   );
