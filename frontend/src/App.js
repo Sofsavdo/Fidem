@@ -109,8 +109,6 @@ function Inner() {
       if (tg.setHeaderColor) tg.setHeaderColor("#ffffff");
       if (tg.setBackgroundColor) tg.setBackgroundColor("#ffffff");
       if (tg.enableClosingConfirmation) tg.enableClosingConfirmation();
-      
-      console.log("Telegram WebApp initialized successfully");
     } catch (e) {
       console.error("Telegram WebApp init error:", e);
     }
