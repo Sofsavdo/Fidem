@@ -114,9 +114,6 @@ async def startup() -> None:
     await db.payments.create_index("status")
     await db.payments.create_index("created_at")
     await db.payments.create_index("purpose")
-    await db.chaperones.create_index([("owner_id", 1), ("wali_id", 1)], unique=True)
-    await db.chaperone_invites.create_index("code", unique=True)
-    await db.daily_quests.create_index([("user_id", 1), ("date", 1)], unique=True)
     await db.compat_unlocks.create_index([("user_id", 1), ("target_id", 1)], unique=True)
     await db.success_stories.create_index("created_at")
     # serve_file() (GET /api/files/{path}) queries by storage_path, not path -

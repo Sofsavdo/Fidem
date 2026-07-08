@@ -390,19 +390,7 @@ async def _background_message_ops(uid: str, to_user_id: str, cid: str, text: str
         if msg:
             ws_payload = {"type": "message", "data": {**msg, "created_at": iso(parse_dt(msg["created_at"]))}}
             await manager.broadcast_chat([uid, to_user_id], ws_payload)
-            
-            # Also notify chaperones
-            try:
-                chap_rows = await db.chaperones.find(
-                    {"$or": [{"owner_id": uid}, {"owner_id": to_user_id}], "status": "active"},
-                    {"_id": 0, "wali_id": 1},
-                ).to_list(50)
-                chaperone_ids = list({c["wali_id"] for c in chap_rows})
-                if chaperone_ids:
-                    await manager.broadcast_chat(chaperone_ids, {"type": "chaperone_message", "data": ws_payload["data"]})
-            except Exception:
-                pass
-        
+
         await push_notif(to_user_id, "message", f"Yangi xabar: {sender.get('name','')}")
     except Exception:
         pass
