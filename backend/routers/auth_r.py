@@ -551,4 +551,15 @@ async def serve_file(
     except Exception:
         raise HTTPException(500, "Storage read failed")
 
-    return Response(content=data, media_type=rec.get("content_type", content_type))
+    # Each upload gets a fresh UUID-based storage_path (see /files/upload), so
+    # a given path's bytes never change - safe to cache aggressively. This is
+    # the single biggest win for perceived speed on photo-heavy pages
+    # (candidates grid, saved, chat avatars): without it every photo re-fetches
+    # from GridFS on every render, even the same photo seen seconds earlier.
+    # `private` (not `public`) because access is per-user authorized above -
+    # only the requesting browser may cache it, not shared/proxy caches.
+    return Response(
+        content=data,
+        media_type=rec.get("content_type", content_type),
+        headers={"Cache-Control": "private, max-age=31536000, immutable"},
+    )

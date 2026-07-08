@@ -120,7 +120,12 @@ async def startup() -> None:
     await db.daily_quests.create_index([("user_id", 1), ("date", 1)], unique=True)
     await db.compat_unlocks.create_index([("user_id", 1), ("target_id", 1)], unique=True)
     await db.success_stories.create_index("created_at")
-    await db.files.create_index("path")
+    # serve_file() (GET /api/files/{path}) queries by storage_path, not path -
+    # the old index on "path" indexed a field no record actually has, so
+    # every single photo/file request did a full collection scan. This hits
+    # every photo render across the whole app (candidates grid, saved,
+    # chat avatars, profile), so it compounds fast as the collection grows.
+    await db.files.create_index("storage_path")
     await db.withdrawals.create_index([("user_id", 1), ("created_at", -1)])
     await db.withdrawals.create_index("status")
     await db.family_requests.create_index([("from_user_id", 1), ("to_user_id", 1)])
