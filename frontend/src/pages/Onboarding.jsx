@@ -58,10 +58,16 @@ export default function Onboarding() {
     setPhotoStatus({ state: "verifying", code: "", reason: "" });
     try {
       const r = await api.post("/face/verify", { photo_url: url });
+      const code = r.data?.code || "other";
       if (r.data?.valid) {
         setPhotoStatus({ state: "ok", code: "ok", reason: "" });
+      } else if (code === "verification_unavailable") {
+        // AI verification itself is down (rate limit/outage), not a problem
+        // with the photo - don't block onboarding on a third-party hiccup.
+        // Matches the backend's /profile/onboard, which also lets this
+        // specific code through unverified instead of rejecting.
+        setPhotoStatus({ state: "unavailable", code, reason: r.data?.reason || "" });
       } else {
-        const code = r.data?.code || "other";
         const key = `photo_invalid_${code}`;
         const localized = t(key);
         const reason = localized && localized !== key ? localized : (r.data?.reason || t("photo_invalid"));
@@ -88,6 +94,11 @@ export default function Onboarding() {
       payload.looking_for = payload.looking_for || "";
       await api.post("/profile/onboard", payload);
       toast.success(t("onboard_complete"));
+      // Let the brand-new user actually see their first candidates screen
+      // before DailyCheckIn's gamification modal covers it - it fires on
+      // any page mount once/day, which without this would stack directly
+      // on top of the "profile ready" moment.
+      try { sessionStorage.setItem("fidem_just_onboarded", "1"); } catch { /* ignore */ }
       await refresh();
       nav("/", { replace: true });
     } catch (e) {
@@ -350,6 +361,11 @@ export default function Onboarding() {
                   {photoStatus.state === "invalid" && (
                     <div className="mt-3 rounded-2xl bg-red-50 border border-red-300 text-red-800 p-3 text-xs" data-testid="ob-photo-invalid">
                       {photoStatus.reason || t("photo_invalid")}
+                    </div>
+                  )}
+                  {photoStatus.state === "unavailable" && (
+                    <div className="mt-3 rounded-2xl bg-gold-light/50 border border-gold/40 p-3 text-xs" data-testid="ob-photo-unavailable">
+                      {t("photo_verification_pending")}
                     </div>
                   )}
                 </Field>

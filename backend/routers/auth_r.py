@@ -346,28 +346,38 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
         from ai_service import verify_face_photo
 
         result = await verify_face_photo(image_url=photo_url)
+        code = result.get("code") or "other"
         if not result.get("valid"):
             await db.users.update_one(
                 {"id": uid},
                 {
                     "$set": {
                         "photo_verified": False,
-                        "photo_verification_code": result.get("code"),
+                        "photo_verification_code": code,
                     }
                 },
             )
-            raise HTTPException(400, f"photo_invalid:{result.get('code') or 'other'}")
-
-        await db.users.update_one(
-            {"id": uid},
-            {
-                "$set": {
-                    "photo_verified": True,
-                    "photo_verified_at": iso(now_utc()),
-                    "photo_verification_code": "ok",
-                }
-            },
-        )
+            # "verification_unavailable" means the AI vision call itself
+            # failed (rate limit, timeout, outage) - it says nothing about
+            # the photo. Blocking signup on a third-party API hiccup would
+            # take down the entire registration funnel; let the user
+            # through unverified instead, re-checked next time they touch
+            # their photo. Only genuine content rejections (no_face,
+            # multiple_faces, minor, cartoon, celebrity, too_blurry, ...)
+            # actually block onboarding.
+            if code != "verification_unavailable":
+                raise HTTPException(400, f"photo_invalid:{code}")
+        else:
+            await db.users.update_one(
+                {"id": uid},
+                {
+                    "$set": {
+                        "photo_verified": True,
+                        "photo_verified_at": iso(now_utc()),
+                        "photo_verification_code": "ok",
+                    }
+                },
+            )
 
     update["onboarded"] = True
     update["last_active"] = iso(now_utc())
