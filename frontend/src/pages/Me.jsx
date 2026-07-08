@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
@@ -9,38 +9,36 @@ import ProgressCard from "@/components/ProgressCard";
 import LangSwitch from "@/components/LangSwitch";
 import { photoSrc } from "@/lib/photo";
 import { toast } from "sonner";
+import { useReferral, useNotifications, useDailyStatus, useRankings, QK } from "@/hooks/queries";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
 
 export default function Me() {
   const { user, t, logout, refresh, wsEvent } = useApp();
-  const [referral, setReferral] = useState(null);
-  const [leaders, setLeaders] = useState([]);
+  const queryClient = useQueryClient();
   const [leadPeriod, setLeadPeriod] = useState("all");
-  const [unread, setUnread] = useState(0);
 
-  const loadData = useCallback(() => {
-    Promise.all([
-      api.get("/referral/mine").catch(() => ({ data: null })),
-      api.get("/notifications").catch(() => ({ data: [] })),
-      api.get("/daily/status").catch(() => ({ data: null })),
-      api.get(`/rankings/global`).catch(() => ({ data: { rankings: [] } })),
-    ]).then(([r, n, d, l]) => {
-      setReferral(r.data);
-      setUnread((n.data || []).filter((x) => !x.read).length);
-      setDaily(d.data);
-      setLeaders(l.data?.rankings || []);
-    });
-  }, []);
+  const { data: referral } = useReferral();
+  const { data: notifications = [] } = useNotifications();
+  const { data: daily, refetch: refetchDaily } = useDailyStatus();
+  const { data: leaders = [] } = useRankings("global");
 
-  useEffect(() => { loadData(); }, [loadData]);
+  const unread = notifications.filter((x) => !x.read).length;
 
-  const [daily, setDaily] = useState(null);
-
-  // Increment unread on WS notification
+  // Invalidate notifications on WS event so count stays in sync
   useEffect(() => {
     if (wsEvent?.type === "notification") {
-      setUnread((u) => u + 1);
+      queryClient.invalidateQueries({ queryKey: QK.notifications });
     }
-  }, [wsEvent]);
+  }, [wsEvent, queryClient]);
+
+  const claimDailyMutation = useMutation({
+    mutationFn: () => api.post("/daily/claim"),
+    onSuccess: (r) => {
+      toast.success(`+${r.data.bonus} ${r.data.currency === "coins" ? t("coin") : t("sum")}`);
+      queryClient.invalidateQueries({ queryKey: QK.dailyStatus });
+      refresh();
+    },
+  });
 
   if (!user) return null;
 
@@ -160,16 +158,9 @@ export default function Me() {
           ) : (
             <button
               data-testid="daily-claim-inline"
-              onClick={async () => {
-                try {
-                  const r = await api.post("/daily/claim");
-                  toast.success(`+${r.data.bonus} ${r.data.currency === "coins" ? t("coin") : t("sum")}`);
-                  const s = await api.get("/daily/status");
-                  setDaily(s.data);
-                  refresh();
-                } catch (e) { /* ignore */ }
-              }}
-              className="rounded-xl bg-gold text-ink px-4 py-2 text-sm font-medium"
+              onClick={() => claimDailyMutation.mutate()}
+              disabled={claimDailyMutation.isPending}
+              className="rounded-xl bg-gold text-ink px-4 py-2 text-sm font-medium disabled:opacity-60"
             >
               +{daily.next_bonus} {daily.currency === "coins" ? t("coin") : t("sum")}
             </button>

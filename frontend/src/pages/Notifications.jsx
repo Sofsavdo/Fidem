@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Bell, Eye, Heart, Gift, MessageCircle, ShieldCheck, Trophy, Sparkles } from "lucide-react";
+import { useNotifications } from "@/hooks/queries";
+import { useQueryClient } from "@tanstack/react-query";
+import { QK } from "@/hooks/queries";
 
 const ICONS = {
   view: Eye, saved: Heart, gift: Gift, message: MessageCircle, photo_request: ShieldCheck,
@@ -13,20 +16,15 @@ const ICONS = {
 export default function Notifications() {
   const { t } = useApp();
   const navigate = useNavigate();
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: items = [], isLoading } = useNotifications();
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const [r] = await Promise.all([
-        api.get("/notifications"),
-        api.post("/notifications/read-all").catch(() => {})
-      ]);
-      setItems(r.data || []);
-    } finally { setLoading(false); }
-  };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    api.post("/notifications/read-all")
+      .then(() => queryClient.invalidateQueries({ queryKey: QK.notifications }))
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openLink = (link) => {
     if (!link) return;
@@ -51,8 +49,8 @@ export default function Notifications() {
         <h1 className="font-heading text-2xl font-semibold tracking-tight">{t("notifications")}</h1>
       </div>
 
-      {loading && <div className="text-center py-6 text-muted-foreground">{t("loading")}</div>}
-      {!loading && items.length === 0 && <div className="text-center py-12 text-muted-foreground">{t("no_data")}</div>}
+      {isLoading && <div className="text-center py-6 text-muted-foreground">{t("loading")}</div>}
+      {!isLoading && items.length === 0 && <div className="text-center py-12 text-muted-foreground">{t("no_data")}</div>}
 
       <div className="space-y-2">
         {items.map((n) => {

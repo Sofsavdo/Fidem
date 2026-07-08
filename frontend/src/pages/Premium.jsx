@@ -4,6 +4,7 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { Crown, Check, Wallet } from "lucide-react";
 import { toast } from "sonner";
+import { usePayments } from "@/hooks/queries";
 
 const PLANS = [
   {
@@ -59,11 +60,8 @@ export default function Premium() {
   const showTopup = sp.get("topup") === "1";
   const [topupAmount, setTopupAmount] = useState(50000);
   const [creating, setCreating] = useState(false);
-  const [payments, setPayments] = useState([]);
 
-  useEffect(() => {
-    api.get("/payments/mine").then((r) => setPayments(r.data || []));
-  }, []);
+  const { data: payments = [] } = usePayments();
 
   useEffect(() => {
     if (tab) {

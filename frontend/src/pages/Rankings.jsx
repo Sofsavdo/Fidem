@@ -1,41 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, Trophy, Users, MapPin, Calendar, Crown, Medal, Award } from "lucide-react";
-import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
+import { useRankings, useMyRankings } from "@/hooks/queries";
 
 export default function Rankings() {
   const { t } = useApp();
   const [activeTab, setActiveTab] = useState("global");
-  const [rankings, setRankings] = useState([]);
-  const [myRankings, setMyRankings] = useState(null);
-  const [loading, setLoading] = useState(true);
 
-  const loadRankings = async (tab) => {
-    setLoading(true);
-    try {
-      let endpoint = "/rankings/global";
-      if (tab === "men") endpoint = "/rankings/men";
-      else if (tab === "women") endpoint = "/rankings/women";
-      else if (tab === "ambassadors") endpoint = "/rankings/ambassadors";
-
-      const r = await api.get(endpoint);
-      setRankings(r.data.rankings || []);
-    } catch {/* ignore */}
-    finally { setLoading(false); }
-  };
-
-  const loadMyRankings = async () => {
-    try {
-      const r = await api.get("/rankings/me");
-      setMyRankings(r.data.my_rankings);
-    } catch {/* ignore */}
-  };
-
-  useEffect(() => {
-    Promise.all([loadMyRankings(), loadRankings(activeTab)]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
+  const { data: rankings = [], isLoading } = useRankings(activeTab);
+  const { data: myRankings } = useMyRankings();
 
   const tabs = [
     { id: "global", label: t("rank_global"), icon: Trophy },
@@ -101,8 +75,8 @@ export default function Rankings() {
         {/* Rankings List */}
         <section className="rounded-3xl border border-border bg-card p-6">
           <h2 className="font-heading font-semibold mb-4 capitalize">{activeTab} Rankings</h2>
-          
-          {loading ? (
+
+          {isLoading ? (
             <div className="text-center text-sm text-muted-foreground py-8">{t("loading")}</div>
           ) : rankings.length === 0 ? (
             <div className="text-center text-sm text-muted-foreground py-8">No rankings yet</div>

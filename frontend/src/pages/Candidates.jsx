@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import CandidateCard from "@/components/CandidateCard";
@@ -7,50 +7,29 @@ import { X, SlidersHorizontal, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import CountrySelect from "@/components/CountrySelect";
 import RegionSelect from "@/components/RegionSelect";
+import { useCandidates, useSaved, useToggleSave } from "@/hooks/queries";
 
 export default function Candidates() {
-  const { t, user } = useApp();
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { t } = useApp();
   const [showFilter, setShowFilter] = useState(false);
   const [filters, setFilters] = useState({ sort: "match", verified_only: false, financial_only: false });
-  const [savedIds, setSavedIds] = useState(new Set());
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = { ...filters };
-      const [r, s] = await Promise.all([
-        api.get("/candidates", { params }),
-        api.get("/saved/mine").catch(() => ({ data: [] }))
-      ]);
-      setItems(r.data || []);
-      setSavedIds(new Set((s.data || []).map((x) => x.id)));
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters.sort, filters.verified_only, filters.financial_only, filters.country, filters.region, filters.district, filters.age_min, filters.age_max]);
+  const { data: items = [], isLoading } = useCandidates(filters);
+  const { data: savedList = [] } = useSaved("mine");
+  const savedIds = useMemo(() => new Set(savedList.map((x) => x.id)), [savedList]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const toggleSave = useToggleSave();
 
-  const onSave = useCallback(async (c) => {
-    try {
-      if (savedIds.has(c.id)) {
-        await api.delete(`/saved/${c.id}`);
-        setSavedIds((s) => { const n = new Set(s); n.delete(c.id); return n; });
-      } else {
-        await api.post("/saved", { user_id: c.id });
-        setSavedIds((s) => new Set(s).add(c.id));
-        toast.success(t("saved_short"));
+  const onSave = (c) => {
+    const isSaved = savedIds.has(c.id);
+    toggleSave.mutate(
+      { id: c.id, isSaved },
+      {
+        onSuccess: () => { if (!isSaved) toast.success(t("saved_short")); },
+        onError: () => toast.error(t("error")),
       }
-    } catch (e) {
-      toast.error(t("error"));
-    }
-  }, [savedIds, t]);
+    );
+  };
 
   return (
     <div className="px-4 md:px-8 pt-6 pb-4">
@@ -138,7 +117,7 @@ export default function Candidates() {
         </div>
       )}
 
-      {loading ? (
+      {isLoading ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {[...Array(6)].map((_, i) => (
             <div key={i} className="aspect-[4/5] rounded-3xl bg-muted animate-pulse" />

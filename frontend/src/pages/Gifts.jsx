@@ -1,9 +1,8 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
-import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { ArrowLeft, Gift as GiftIcon, Sparkles } from "lucide-react";
-import { toast } from "sonner";
+import { useGiftsCatalog } from "@/hooks/queries";
 
 const TIER_META = {
   care:   { label_uz: "Atash",        label_ru: "Знаки",       label_en: "Cares",     cls: "bg-rose-100 text-rose-700" },
@@ -14,13 +13,10 @@ const TIER_META = {
 const TIER_ORDER = ["care", "love", "luxury"];
 
 export default function Gifts() {
-  const { user, t, lang, refresh } = useApp();
-  const [catalog, setCatalog] = useState(null);
+  const { user, t, lang } = useApp();
   const [activeTier, setActiveTier] = useState("care");
 
-  useEffect(() => {
-    api.get("/gifts/catalog").then((r) => setCatalog(r.data)).catch(() => {});
-  }, []);
+  const { data: catalog, isLoading } = useGiftsCatalog();
 
   const groups = useMemo(() => {
     if (!catalog) return {};
@@ -78,7 +74,7 @@ export default function Gifts() {
 
       {/* Gifts grid */}
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-        {!catalog && <p className="col-span-full text-center text-sm text-muted-foreground py-6">{t("loading")}</p>}
+        {isLoading && <p className="col-span-full text-center text-sm text-muted-foreground py-6">{t("loading")}</p>}
         {(groups[activeTier] || []).map((g) => {
           const cannotAfford = balance < g.price;
           return (

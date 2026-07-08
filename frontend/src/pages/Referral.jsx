@@ -1,60 +1,49 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, Copy, Send, Users, Gift, Sparkles, Crown } from "lucide-react";
-import api from "@/lib/api";
+import { ChevronLeft, Copy, Send, Users, Gift, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/contexts/AppContext";
+import { useReferral, useReferralUsername, QK } from "@/hooks/queries";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import api from "@/lib/api";
 
 export default function Referral() {
-  const { t, refresh } = useApp();
-  const [data, setData] = useState(null);
-  const [usernameData, setUsernameData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { t } = useApp();
+  const queryClient = useQueryClient();
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [newUsername, setNewUsername] = useState("");
-  const [checkingUsername, setCheckingUsername] = useState(false);
 
-  const load = async () => {
-    try {
-      const [r, u] = await Promise.all([
-        api.get("/referral/mine"),
-        api.get("/referral/username/status")
-      ]);
-      setData(r.data);
-      setUsernameData(u.data);
-    } catch {/* ignore */}
-    finally { setLoading(false); }
-  };
+  const { data, isLoading } = useReferral();
+  const { data: usernameData } = useReferralUsername();
 
-  useEffect(() => { load(); }, []);
+  const setUsernameMutation = useMutation({
+    mutationFn: (username) => api.post("/referral/username/set", { username }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QK.referralUsername });
+      toast.success("Username updated successfully");
+      setShowUsernameModal(false);
+      setNewUsername("");
+    },
+    onError: (e) => toast.error(e.response?.data?.detail || "Failed to set username"),
+  });
 
-  const code = data?.code || "";
-  const inviteLink = data?.link || (code ? `https://t.me/Fidem_Appbot?start=${code}` : "");
-
-  const setUsername = async () => {
+  const setUsername = () => {
     if (!newUsername || newUsername.length < 3 || newUsername.length > 30) {
       toast.error("Username must be 3-30 characters");
       return;
     }
-    setCheckingUsername(true);
-    try {
-      await api.post("/referral/username/set", { username: newUsername });
-      toast.success("Username updated successfully");
-      setShowUsernameModal(false);
-      setNewUsername("");
-      load();
-    } catch (e) {
-      toast.error(e.response?.data?.detail || "Failed to set username");
-    } finally { setCheckingUsername(false); }
+    setUsernameMutation.mutate(newUsername);
   };
+
+  const code = data?.code || "";
+  const inviteLink = data?.link || (code ? `https://t.me/Fidem_Appbot?start=${code}` : "");
 
   const copy = (text, label) => {
     navigator.clipboard.writeText(text).then(() => toast.success(`${label} ${t("copied")}`)).catch(() => toast.error(t("error")));
   };
 
   const share = () => {
-    const subtitle = "🌹 FIDEM";
-    const txt = `${subtitle}\n\n${inviteLink}`;
+    const txt = `🌹 FIDEM\n\n${inviteLink}`;
     if (navigator.share) {
       navigator.share({ title: "FIDEM", text: txt }).catch(() => {});
     } else {
@@ -72,7 +61,6 @@ export default function Referral() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {/* How it works - reduced to tooltip */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span title="Referral linkingizni do'stingizga yuboring • Do'stingiz ro'yxatdan o'tadi • Do'stingiz birinchi pullik tarifni sotib olganda sizga referral mukofoti yoziladi" className="cursor-help">ℹ️</span>
           <span>{t("ref_how_it_works")}</span>
@@ -86,7 +74,7 @@ export default function Referral() {
           </p>
         </section>
 
-        {loading ? (
+        {isLoading ? (
           <div className="text-center text-sm text-muted-foreground py-8">{t("loading")}</div>
         ) : (
           <>
@@ -144,7 +132,7 @@ export default function Referral() {
                   <Copy className="w-4 h-4" />
                 </button>
               </div>
-              
+
               {/* Custom Referral Username */}
               <div className="pt-2 border-t border-border/40">
                 <div className="flex items-center justify-between mb-2">
@@ -172,7 +160,7 @@ export default function Referral() {
                   <p className="text-xs text-muted-foreground">No custom username set</p>
                 )}
               </div>
-              
+
               <div>
                 <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5">{t("ref_invite_link")}</p>
                 <div className="flex items-center gap-2">
@@ -215,7 +203,6 @@ export default function Referral() {
               </div>
             </section>
 
-            {/* Withdrawal Rules - reduced to tooltip */}
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span title="Minimal yechib olish: 100,000 • Soliq: 12% • Talab: 3 ta to'langan tavsiya" className="cursor-help">ℹ️</span>
               <span>{t("withdraw_rules")}</span>
@@ -230,7 +217,7 @@ export default function Referral() {
           <div className="bg-card rounded-3xl p-6 w-full max-w-md space-y-4">
             <h3 className="font-heading font-semibold text-lg">Set Custom Username</h3>
             <p className="text-sm text-muted-foreground">
-              {usernameData?.change_count === 0 
+              {usernameData?.change_count === 0
                 ? "First change is free. Subsequent changes cost 10,000 so'm."
                 : "Username change costs 10,000 so'm. 30-day cooldown between changes."
               }
@@ -252,10 +239,10 @@ export default function Referral() {
               </button>
               <button
                 onClick={setUsername}
-                disabled={checkingUsername || !newUsername}
+                disabled={setUsernameMutation.isPending || !newUsername}
                 className="flex-1 py-3 rounded-2xl bg-primary text-white font-medium disabled:opacity-50"
               >
-                {checkingUsername ? "..." : "Save"}
+                {setUsernameMutation.isPending ? "..." : "Save"}
               </button>
             </div>
           </div>
