@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, memo } from "react";
+import React, { useState, useCallback, memo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
@@ -8,17 +8,21 @@ import { photoSrc } from "@/lib/photo";
 import { formatLastActive } from "@/lib/time";
 import { Bookmark, MessageCircle, ArrowLeft, Lock, Clock, Shield, Share2 } from "lucide-react";
 import { toast } from "sonner";
+import { useCandidateDetail, useSaved, useToggleSave, QK } from "@/hooks/queries";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function ProfileDetail() {
   const { id } = useParams();
   const { t, user } = useApp();
   const nav = useNavigate();
-  const [c, setC] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const queryClient = useQueryClient();
   const [famSending, setFamSending] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
+
+  const { data: c, isLoading: loading } = useCandidateDetail(id);
+  const { data: savedList = [] } = useSaved("mine");
+  const saved = savedList.some((x) => x.id === id);
+  const toggleSaveMutation = useToggleSave();
+  const saving = toggleSaveMutation.isPending;
 
   const requestFamily = useCallback(async () => {
     if (user?.plan !== "vip") {
@@ -66,39 +70,20 @@ export default function ProfileDetail() {
     }
   }, [c, id, t]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [r, my] = await Promise.all([
-        api.get(`/candidates/${id}`),
-        api.get("/saved/mine").catch(() => ({ data: [] })),
-      ]);
-      setC(r.data);
-      setSaved((my.data || []).some((x) => x.id === id));
-    } catch (e) {
-      toast.error(t("error_generic"));
-    } finally {
-      setLoading(false);
-    }
-  }, [id, t]);
-
-  useEffect(() => { load(); }, [load]);
-
   const unlockPhoto = useCallback(async () => {
     try {
       const r = await api.post("/photo-unlock/request", { target_user_id: id });
       toast.success(r.data.status === "approved" ? t("photo_unlocked_toast") : t("photo_request_sent_toast"));
-      load();
+      queryClient.invalidateQueries({ queryKey: QK.candidateDetail(id) });
     } catch (e) { toast.error(t("error_generic")); }
-  }, [id, t, load]);
+  }, [id, t, queryClient]);
 
-  const toggleSave = useCallback(async () => {
-    setSaving(true);
-    try {
-      if (saved) { await api.delete(`/saved/${id}`); setSaved(false); }
-      else { await api.post("/saved", { user_id: id }); setSaved(true); toast.success(t("saved_successfully")); }
-    } finally { setSaving(false); }
-  }, [saved, id, t]);
+  const toggleSave = useCallback(() => {
+    toggleSaveMutation.mutate(
+      { id, isSaved: saved },
+      { onSuccess: () => { if (!saved) toast.success(t("saved_successfully")); } }
+    );
+  }, [saved, id, t, toggleSaveMutation]);
 
   if (loading || !c) {
     return (

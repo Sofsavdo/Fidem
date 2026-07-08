@@ -9,6 +9,7 @@ export const QK = {
   rankings: (tab) => ["rankings", tab],
   myRankings: ["rankings", "me"],
   candidates: (filters) => ["candidates", filters],
+  candidateDetail: (id) => ["candidates", "detail", id],
   saved: (tab = "mine") => ["saved", tab],
   withdrawalsStatus: ["withdrawals", "status"],
   withdrawalsHistory: ["withdrawals", "history"],
@@ -82,6 +83,14 @@ export function useCandidates(filters = {}) {
   return useQuery({
     queryKey: QK.candidates(filters),
     queryFn: () => api.get("/candidates", { params: filters }).then((r) => r.data || []),
+  });
+}
+
+export function useCandidateDetail(id) {
+  return useQuery({
+    queryKey: QK.candidateDetail(id),
+    queryFn: () => api.get(`/candidates/${id}`).then((r) => r.data),
+    enabled: !!id,
   });
 }
 
