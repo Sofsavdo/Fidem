@@ -52,7 +52,6 @@ from routers.family_r import router as family_router  # noqa: E402
 from routers.concierge_r import router as concierge_router  # noqa: E402
 from routers.boost_analytics_r import router as boost_analytics_router  # noqa: E402
 from routers.face_r import router as face_router  # noqa: E402
-from routers.community_r import router as community_router  # noqa: E402
 from routers.settings_r import router as settings_router  # noqa: E402
 from services import compute_completeness  # noqa: E402
 from storage import init_storage  # noqa: E402
@@ -77,7 +76,6 @@ api.include_router(family_router)
 api.include_router(concierge_router)
 api.include_router(boost_analytics_router)
 api.include_router(face_router)
-api.include_router(community_router)
 api.include_router(settings_router)
 app.include_router(api)
 
@@ -118,12 +116,6 @@ async def startup() -> None:
     await db.payments.create_index("purpose")
     await db.chaperones.create_index([("owner_id", 1), ("wali_id", 1)], unique=True)
     await db.chaperone_invites.create_index("code", unique=True)
-    await db.groups.create_index("id", unique=True)
-    await db.group_members.create_index([("group_id", 1), ("user_id", 1)], unique=True)
-    await db.group_posts.create_index([("group_id", 1), ("created_at", -1)])
-    await db.group_post_likes.create_index([("post_id", 1), ("user_id", 1)], unique=True)
-    await db.events.create_index("id", unique=True)
-    await db.event_rsvps.create_index([("event_id", 1), ("user_id", 1)], unique=True)
     await db.daily_quests.create_index([("user_id", 1), ("date", 1)], unique=True)
     await db.compat_unlocks.create_index([("user_id", 1), ("target_id", 1)], unique=True)
     await db.success_stories.create_index("created_at")
