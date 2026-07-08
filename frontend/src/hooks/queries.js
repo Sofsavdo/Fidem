@@ -22,6 +22,8 @@ export const QK = {
   familyRequests: ["family", "mine"],
   promptsLibrary: (lang) => ["prompts", "library", lang],
   promptsMine: ["prompts", "mine"],
+  stories: ["stories"],
+  verificationMine: ["verification", "mine"],
 };
 
 export function useReferral() {
@@ -173,6 +175,20 @@ export function usePromptsMine() {
   return useQuery({
     queryKey: QK.promptsMine,
     queryFn: () => api.get("/prompts/mine").then((r) => r.data || []),
+  });
+}
+
+export function useStories() {
+  return useQuery({
+    queryKey: QK.stories,
+    queryFn: () => api.get("/stories?limit=50").then((r) => r.data || []),
+  });
+}
+
+export function useVerificationMine() {
+  return useQuery({
+    queryKey: QK.verificationMine,
+    queryFn: () => api.get("/verification/mine").then((r) => r.data),
   });
 }
 
