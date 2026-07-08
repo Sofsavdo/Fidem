@@ -1,4 +1,4 @@
-"""Face verification — uses Claude vision (see ai_service.verify_face_photo)."""
+"""Face verification — uses OpenAI gpt-4o-mini vision via emergentintegrations."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException

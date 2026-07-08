@@ -72,10 +72,12 @@ export function AppProvider({ children }) {
       const initData = tg?.initData;
 
       if (!initData) {
+        console.log("No Telegram initData available");
         return false;
       }
 
       try {
+        console.log("Attempting Telegram auth...");
         tg.ready?.();
         tg.expand?.();
 
@@ -94,6 +96,7 @@ export function AppProvider({ children }) {
           window.history.replaceState(null, "", "/onboarding");
         }
 
+        console.log("Telegram auth successful");
         return true;
       } catch (e) {
         console.error("Telegram auto-auth failed:", e);
@@ -118,6 +121,8 @@ export function AppProvider({ children }) {
         const ok = await tryTelegramAuth();
         if (ok) return;
       }
+      
+      console.log("Telegram auth failed after retries");
     };
 
     run();
