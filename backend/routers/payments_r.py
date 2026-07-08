@@ -140,8 +140,14 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
 
     # If balance covers full amount, no Click payment needed
     if click_amount <= 0:
-        # Deduct from balance directly
-        await db.users.update_one({"id": uid}, {"$inc": {"balance": -balance_used}})
+        # Deduct from balance directly (atomic - balance may have changed
+        # since it was read above, e.g. a concurrent request)
+        res = await db.users.update_one(
+            {"id": uid, "balance": {"$gte": balance_used}},
+            {"$inc": {"balance": -balance_used}},
+        )
+        if res.modified_count == 0:
+            raise HTTPException(409, "Balance changed, please retry")
         # Record payment as completed via balance
         pid = await generate_payment_id()
         doc = {
@@ -181,9 +187,14 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
         "created_at": iso(now_utc()),
     }
 
-    # Deduct balance portion immediately
+    # Deduct balance portion immediately (atomic - see full-balance branch above)
     if balance_used > 0:
-        await db.users.update_one({"id": uid}, {"$inc": {"balance": -balance_used}})
+        res = await db.users.update_one(
+            {"id": uid, "balance": {"$gte": balance_used}},
+            {"$inc": {"balance": -balance_used}},
+        )
+        if res.modified_count == 0:
+            raise HTTPException(409, "Balance changed, please retry")
 
     link = click_pay_link(click_amount, pid)
     doc["payment_link"] = link

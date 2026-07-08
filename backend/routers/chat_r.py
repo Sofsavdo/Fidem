@@ -554,8 +554,6 @@ async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id
         quota = FREE_GIFTS_BY_PLAN.get(plan, 1)
         if week_used >= quota:
             raise HTTPException(402, f"Bu hafta uchun bepul sovg'a kvotangiz tugadi ({quota} ta). Pulli gift yuboring yoki kelasi haftani kuting.")
-    elif sender.get("balance", 0) < price:
-        raise HTTPException(402, "Balansda mablag' yetarli emas")
     await get_user(req.to_user_id)  # validates exists
     # Apply balance/quota change
     if is_free_gift:
@@ -565,9 +563,12 @@ async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id
             {"$inc": {f"free_gifts_used.{week_id}": 1, "gifts_sent_count": 1}},
         )
     else:
-        await db.users.update_one(
-            {"id": uid}, {"$inc": {"balance": -price, "gifts_sent_total": price, "gifts_sent_count": 1}}
+        res = await db.users.update_one(
+            {"id": uid, "balance": {"$gte": price}},
+            {"$inc": {"balance": -price, "gifts_sent_total": price, "gifts_sent_count": 1}},
         )
+        if res.modified_count == 0:
+            raise HTTPException(402, "Balansda mablag' yetarli emas")
         await db.users.update_one(
             {"id": req.to_user_id},
             {"$inc": {"gifts_received_total": price}},
