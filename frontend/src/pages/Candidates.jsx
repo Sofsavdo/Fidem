@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import CountrySelect from "@/components/CountrySelect";
 import RegionSelect from "@/components/RegionSelect";
 import { useCandidates, useSaved, useToggleSave } from "@/hooks/queries";
+import { MATCH_EVENT } from "@/components/MatchCelebration";
 
 export default function Candidates() {
   const { t } = useApp();
@@ -25,7 +26,14 @@ export default function Candidates() {
     toggleSave.mutate(
       { candidate: c, isSaved },
       {
-        onSuccess: () => { if (!isSaved) toast.success(t("saved_short")); },
+        onSuccess: (data) => {
+          if (isSaved) return;
+          if (data?.mutual_match) {
+            window.dispatchEvent(new CustomEvent(MATCH_EVENT, { detail: c }));
+          } else {
+            toast.success(t("saved_short"));
+          }
+        },
         onError: () => toast.error(t("error")),
       }
     );

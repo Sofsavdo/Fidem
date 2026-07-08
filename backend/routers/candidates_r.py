@@ -505,6 +505,12 @@ async def save_user(req: SaveRequest, uid: str = Depends(get_current_user_id)):
         upsert=True,
     )
 
+    # Mutual save = a match (also what unlocks free chat, see chat_r.can_initiate_chat).
+    # Only worth celebrating the instant it newly forms, not on every re-save.
+    mutual_match = False
+    if is_new:
+        mutual_match = await db.saved.find_one({"owner_id": req.user_id, "target_id": uid}) is not None
+
     if is_new:
         try:
             target = await get_user(req.user_id)
@@ -527,7 +533,7 @@ async def save_user(req: SaveRequest, uid: str = Depends(get_current_user_id)):
             link="/saved?tab=by_others",
         )
 
-    return {"ok": True}
+    return {"ok": True, "mutual_match": mutual_match}
 
 
 @router.delete("/saved/{target_id}")

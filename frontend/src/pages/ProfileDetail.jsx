@@ -10,6 +10,7 @@ import { Bookmark, MessageCircle, ArrowLeft, Lock, Clock, Shield, Share2 } from 
 import { toast } from "sonner";
 import { useCandidateDetail, useSaved, useToggleSave, QK } from "@/hooks/queries";
 import { useQueryClient } from "@tanstack/react-query";
+import { MATCH_EVENT } from "@/components/MatchCelebration";
 
 export default function ProfileDetail() {
   const { id } = useParams();
@@ -81,7 +82,16 @@ export default function ProfileDetail() {
   const toggleSave = useCallback(() => {
     toggleSaveMutation.mutate(
       { candidate: c, isSaved: saved },
-      { onSuccess: () => { if (!saved) toast.success(t("saved_successfully")); } }
+      {
+        onSuccess: (data) => {
+          if (saved) return;
+          if (data?.mutual_match) {
+            window.dispatchEvent(new CustomEvent(MATCH_EVENT, { detail: c }));
+          } else {
+            toast.success(t("saved_successfully"));
+          }
+        },
+      }
     );
   }, [saved, c, t, toggleSaveMutation]);
 

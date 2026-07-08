@@ -259,7 +259,7 @@ export function useToggleSave() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ candidate, isSaved }) =>
-      isSaved ? api.delete(`/saved/${candidate.id}`) : api.post("/saved", { user_id: candidate.id }),
+      (isSaved ? api.delete(`/saved/${candidate.id}`) : api.post("/saved", { user_id: candidate.id })).then((r) => r.data),
     // Optimistic: flip the saved state in the cache immediately on tap, so the
     // UI responds instantly instead of waiting on the network round-trip.
     // Pushes the full candidate object (not just an id) so the Saved page

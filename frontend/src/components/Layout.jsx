@@ -3,6 +3,7 @@ import BottomNav from "@/components/BottomNav";
 import DailyCheckIn from "@/components/DailyCheckIn";
 import MobileTopBar from "@/components/MobileTopBar";
 import OfflineBanner from "@/components/OfflineBanner";
+import MatchCelebration from "@/components/MatchCelebration";
 import { Outlet, useLocation } from "react-router-dom";
 
 export default function Layout({ children }) {
@@ -32,6 +33,7 @@ export default function Layout({ children }) {
       </main>
       {!isChat && <BottomNav />}
       {!isChat && <DailyCheckIn />}
+      <MatchCelebration />
     </div>
   );
 }
