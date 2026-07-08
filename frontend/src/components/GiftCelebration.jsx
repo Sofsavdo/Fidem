@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { notify } from "@/lib/haptics";
 
 // A static emoji in a chat bubble doesn't feel like it was worth 499,000 so'm.
 // Since we can't ship custom Lottie/illustration assets from here, the
@@ -21,6 +22,7 @@ export default function GiftCelebration({ gift, onDone }) {
   useEffect(() => {
     if (!gift) return;
     setVisible(true);
+    notify("success");
     const t = setTimeout(() => {
       setVisible(false);
       onDone?.();

@@ -8,6 +8,7 @@ import ChatVoiceRecorder from "@/components/ChatVoiceRecorder";
 import { ArrowLeft, Send, Gift, MoreVertical, Ban, Flag, Wand2, Play } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
 import { formatLastActive } from "@/lib/time";
+import { tapLight } from "@/lib/haptics";
 import { toast } from "sonner";
 
 export default function Chat() {
@@ -108,6 +109,7 @@ export default function Chat() {
   const send = async (txt) => {
     const finalText = txt ?? text;
     if (!finalText.trim()) return;
+    tapLight();
 
     // Optimistic UI update - show message immediately
     const tempMsg = {

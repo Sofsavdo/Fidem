@@ -9,6 +9,7 @@ import CountrySelect from "@/components/CountrySelect";
 import RegionSelect from "@/components/RegionSelect";
 import { useCandidates, useSaved, useToggleSave } from "@/hooks/queries";
 import { MATCH_EVENT } from "@/components/MatchCelebration";
+import { tapMedium } from "@/lib/haptics";
 
 export default function Candidates() {
   const { t } = useApp();
@@ -23,6 +24,7 @@ export default function Candidates() {
 
   const onSave = (c) => {
     const isSaved = savedIds.has(c.id);
+    tapMedium();
     toggleSave.mutate(
       { candidate: c, isSaved },
       {

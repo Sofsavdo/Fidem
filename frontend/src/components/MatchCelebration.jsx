@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Heart, X } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
+import { notify } from "@/lib/haptics";
 
 // Fired by any save-toggle site (Candidates, ProfileDetail) when the backend
 // reports the save just completed a mutual match. Mounted once in Layout so
@@ -13,7 +14,7 @@ export default function MatchCelebration() {
   const [candidate, setCandidate] = useState(null);
 
   useEffect(() => {
-    const onMatch = (e) => setCandidate(e.detail);
+    const onMatch = (e) => { setCandidate(e.detail); notify("success"); };
     window.addEventListener(MATCH_EVENT, onMatch);
     return () => window.removeEventListener(MATCH_EVENT, onMatch);
   }, []);
