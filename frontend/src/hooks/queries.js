@@ -14,7 +14,6 @@ export const QK = {
   withdrawalsStatus: ["withdrawals", "status"],
   withdrawalsHistory: ["withdrawals", "history"],
   payments: ["payments", "mine"],
-  giftsCatalog: ["gifts", "catalog"],
   conciergeInfo: ["concierge", "info"],
   conciergeMine: ["concierge", "mine"],
   personalityQuestions: (lang) => ["personality", "questions", lang],
@@ -146,14 +145,6 @@ export function usePayments() {
   return useQuery({
     queryKey: QK.payments,
     queryFn: () => api.get("/payments/mine").then((r) => r.data || []),
-  });
-}
-
-export function useGiftsCatalog() {
-  return useQuery({
-    queryKey: QK.giftsCatalog,
-    queryFn: () => api.get("/gifts/catalog").then((r) => r.data),
-    staleTime: 10 * 60 * 1000, // catalog changes rarely
   });
 }
 

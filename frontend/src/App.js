@@ -30,7 +30,6 @@ const About = lazy(() => import("@/pages/About"));
 const FAQ = lazy(() => import("@/pages/FAQ"));
 const Referral = lazy(() => import("@/pages/Referral"));
 const Rankings = lazy(() => import("@/pages/Rankings"));
-const Gifts = lazy(() => import("@/pages/Gifts"));
 
 function isTelegramWebApp() {
   return Boolean(window.Telegram?.WebApp?.initData);
@@ -124,7 +123,6 @@ function Inner() {
           <Route path="/verification" element={<Verification />} />
           <Route path="/referral" element={<Referral />} />
           <Route path="/rankings" element={<Rankings />} />
-          <Route path="/gifts" element={<Gifts />} />
           <Route path="/admin" element={<Admin />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
