@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { X, Rocket, Check, Clock } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
-import { useBoostStatus, useActivateBoost } from "@/hooks/queries";
+import { useBoostStatus, useActivateBoost, useBoostAnalytics } from "@/hooks/queries";
 import { toast } from "sonner";
 
 function hoursLeft(untilIso) {
@@ -15,6 +15,8 @@ export default function BoostModal({ onClose }) {
   const { t, user } = useApp();
   const { data: status } = useBoostStatus();
   const activate = useActivateBoost();
+  const { data: analytics } = useBoostAnalytics(!!status?.active);
+  const m = analytics?.boost;
 
   const price = status?.price ?? 5000;
   const balance = user?.balance || 0;
@@ -52,9 +54,28 @@ export default function BoostModal({ onClose }) {
         </ul>
 
         {status?.active ? (
-          <div className="mt-5 rounded-2xl bg-secondary/10 border border-secondary/30 p-4 flex items-center gap-2 text-sm" data-testid="boost-active-state">
-            <Clock className="w-4 h-4 text-secondary shrink-0" />
-            <span>🚀 {t("profile_boost_title")} — {t("boost_time_left").replace("{n}", hoursLeft(status.until))}</span>
+          <div className="mt-5 space-y-3" data-testid="boost-active-state">
+            <div className="rounded-2xl bg-secondary/10 border border-secondary/30 p-4 flex items-center gap-2 text-sm">
+              <Clock className="w-4 h-4 text-secondary shrink-0" />
+              <span>🚀 {t("profile_boost_title")} — {t("boost_time_left").replace("{n}", hoursLeft(status.until))}</span>
+            </div>
+            {/* Show what the paid boost is actually delivering — proves the value */}
+            <div data-testid="boost-results">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-2">{t("boost_results_title")}</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  ["impressions", t("boost_metric_impressions")],
+                  ["views", t("boost_metric_views")],
+                  ["likes", t("boost_metric_likes")],
+                  ["messages", t("boost_metric_messages")],
+                ].map(([k, label]) => (
+                  <div key={k} className="rounded-xl bg-card border border-border p-3">
+                    <p className="font-heading text-xl font-semibold tabular-nums">{(m?.[k] ?? 0).toLocaleString()}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
           <div className="mt-5 space-y-2">

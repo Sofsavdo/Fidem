@@ -7,6 +7,7 @@ export const QK = {
   notifications: ["notifications"],
   dailyStatus: ["daily", "status"],
   boostStatus: ["boost", "status"],
+  boostAnalytics: ["boost", "analytics"],
   leaderboard: (period) => ["leaderboard", period],
   candidates: (filters) => ["candidates", filters],
   candidateDetail: (id) => ["candidates", "detail", id],
@@ -73,6 +74,17 @@ export function useBoostStatus() {
   return useQuery({
     queryKey: QK.boostStatus,
     queryFn: () => api.get("/boost/status").then((r) => r.data),
+  });
+}
+
+// Live results of the boost the user paid for (impressions/views/likes/
+// messages this session). Only worth fetching while a boost is active.
+export function useBoostAnalytics(enabled = true) {
+  return useQuery({
+    queryKey: QK.boostAnalytics,
+    queryFn: () => api.get("/boost/analytics").then((r) => r.data),
+    enabled,
+    refetchInterval: enabled ? 30_000 : false, // metrics tick up during the boost window
   });
 }
 
