@@ -28,7 +28,7 @@ MODULES = [
     "routers.candidates_r", "routers.chaperone_r", "routers.chat_r", "routers.community_r",
     "routers.concierge_r", "routers.face_r", "routers.family_r", "routers.gamification_r",
     "routers.growth_r", "routers.payments_r", "routers.personality_r", "routers.prompts_r",
-    "routers.rankings_r", "routers.settings_r", "routers.stories_r", "routers.telegram_r",
+    "routers.settings_r", "routers.stories_r", "routers.telegram_r",
     "routers.withdrawals_r",
 ]
 

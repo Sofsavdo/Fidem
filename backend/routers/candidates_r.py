@@ -85,20 +85,6 @@ def compute_ai_match(viewer: dict, candidate: dict, lang: str = "uz") -> tuple[i
         else:
             ai_reasons.append(f"{viewer_plan.capitalize()} users")
     
-    # 6. Influence score proximity (premium feature)
-    viewer_influence = viewer.get("influence_score", 0)
-    candidate_influence = candidate.get("influence_score", 0)
-    if viewer_influence > 0 and candidate_influence > 0:
-        influence_diff = abs(viewer_influence - candidate_influence)
-        if influence_diff < 1000:
-            ai_boost += 5
-            if lang == "uz":
-                ai_reasons.append("Ta'sir darajasi yaqin")
-            elif lang == "ru":
-                ai_reasons.append("Уровень влияния близок")
-            else:
-                ai_reasons.append("Influence levels close")
-    
     # 7. Big5 personality compatibility (if available)
     viewer_big5 = viewer.get("big5_scores", {})
     candidate_big5 = candidate.get("big5_scores", {})

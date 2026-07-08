@@ -7,8 +7,7 @@ export const QK = {
   notifications: ["notifications"],
   dailyStatus: ["daily", "status"],
   boostStatus: ["boost", "status"],
-  rankings: (tab) => ["rankings", tab],
-  myRankings: ["rankings", "me"],
+  leaderboard: (period) => ["leaderboard", period],
   candidates: (filters) => ["candidates", filters],
   candidateDetail: (id) => ["candidates", "detail", id],
   saved: (tab = "mine") => ["saved", tab],
@@ -96,24 +95,13 @@ export function useActivateBoost() {
   });
 }
 
-const RANKINGS_ENDPOINTS = {
-  men: "/rankings/men",
-  women: "/rankings/women",
-  ambassadors: "/rankings/ambassadors",
-};
-
-export function useRankings(tab = "global") {
-  const endpoint = RANKINGS_ENDPOINTS[tab] || "/rankings/global";
+// Real gift-value leaderboard (chat_r.py aggregates db.gifts by sender) -
+// the "ranking_score" based /rankings/* endpoints were removed because that
+// field was never written anywhere, so they always returned empty results.
+export function useLeaderboard(period = "all") {
   return useQuery({
-    queryKey: QK.rankings(tab),
-    queryFn: () => api.get(endpoint).then((r) => r.data?.rankings || []),
-  });
-}
-
-export function useMyRankings() {
-  return useQuery({
-    queryKey: QK.myRankings,
-    queryFn: () => api.get("/rankings/me").then((r) => r.data?.my_rankings || null),
+    queryKey: QK.leaderboard(period),
+    queryFn: () => api.get(`/leaderboard?period=${period}`).then((r) => r.data || []),
   });
 }
 

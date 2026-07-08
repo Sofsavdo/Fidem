@@ -52,7 +52,6 @@ from routers.family_r import router as family_router  # noqa: E402
 from routers.concierge_r import router as concierge_router  # noqa: E402
 from routers.boost_analytics_r import router as boost_analytics_router  # noqa: E402
 from routers.face_r import router as face_router  # noqa: E402
-from routers.rankings_r import router as rankings_router  # noqa: E402
 from routers.community_r import router as community_router  # noqa: E402
 from routers.settings_r import router as settings_router  # noqa: E402
 from services import compute_completeness  # noqa: E402
@@ -78,7 +77,6 @@ api.include_router(family_router)
 api.include_router(concierge_router)
 api.include_router(boost_analytics_router)
 api.include_router(face_router)
-api.include_router(rankings_router)
 api.include_router(community_router)
 api.include_router(settings_router)
 app.include_router(api)
