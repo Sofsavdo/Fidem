@@ -7,6 +7,10 @@ import { toast } from "sonner";
 import { usePayments, QK } from "@/hooks/queries";
 import { useQueryClient } from "@tanstack/react-query";
 
+// Mirrors backend core.PRICE_CHAT_UNLOCK_UZS — used only for the illustrative
+// "N unlocks vs Standard" value comparison, not for charging.
+const CHAT_UNLOCK_PRICE = 9900;
+
 const PLANS = [
   {
     key: "free", title: "Free", price: 0,
@@ -195,6 +199,30 @@ export default function Premium() {
               );
             })}
           </div>
+
+          {/* Value comparison — separate chat unlocks vs Standard (Taskin-style) */}
+          {(() => {
+            const standardPrice = PLANS.find((p) => p.key === "standard")?.price || 34900;
+            const n = Math.ceil(standardPrice / CHAT_UNLOCK_PRICE); // chats where Standard breaks even
+            const separateTotal = n * CHAT_UNLOCK_PRICE;
+            return (
+              <div className="mt-4 rounded-3xl border border-gold/40 bg-gold-light/30 p-4" data-testid="plan-value-compare">
+                <p className="text-xs uppercase tracking-wider text-gold-dark font-semibold">{t("plan_compare_title")}</p>
+                <div className="mt-3 flex items-stretch gap-3">
+                  <div className="flex-1 rounded-2xl bg-card/70 border border-border p-3 text-center">
+                    <p className="text-sm font-semibold line-through decoration-primary/60 tabular-nums">{separateTotal.toLocaleString()} {t("sum")}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{t("plan_compare_separate").replace("{n}", n)}</p>
+                  </div>
+                  <div className="grid place-items-center text-muted-foreground text-xs font-medium">vs</div>
+                  <div className="flex-1 rounded-2xl bg-secondary/10 border border-secondary/30 p-3 text-center">
+                    <p className="text-sm font-semibold text-secondary tabular-nums">{standardPrice.toLocaleString()} {t("sum")}</p>
+                    <p className="text-[11px] text-secondary/90 mt-0.5">{t("plan_compare_unlimited")}</p>
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2 text-center">{t("plan_compare_note").replace("{n}", n)}</p>
+              </div>
+            );
+          })()}
 
           {/* Concierge — premium manual matching */}
           <div className="rounded-3xl bg-gradient-to-br from-secondary/10 via-primary/5 to-gold-light/30 border-2 border-secondary/40 p-5" data-testid="concierge-section">

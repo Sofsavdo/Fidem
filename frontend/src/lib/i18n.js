@@ -466,6 +466,10 @@ const dict = {
     per_month: "/oy",
     upgrade_plan: "Tarifni yangilash",
     current_plan: "Joriy tarif",
+    plan_compare_title: "Standard nega arziydi?",
+    plan_compare_separate: "{n} ta alohida suhbat ochish",
+    plan_compare_unlimited: "cheksiz yozishish",
+    plan_compare_note: "{n} tadan ko'p yozsangiz — Standard allaqachon arzonroq",
     // Stories
     stories_title: "Muvaffaqiyat hikoyalari",
     stories_subtitle: "FIDEM orqali topishgan juftliklar",
@@ -1064,6 +1068,10 @@ const dict = {
     per_month: "/мес",
     upgrade_plan: "Обновить план",
     current_plan: "Текущий план",
+    plan_compare_title: "Почему стоит Standard?",
+    plan_compare_separate: "{n} отдельных чатов",
+    plan_compare_unlimited: "безлимитные сообщения",
+    plan_compare_note: "Больше {n} чатов — Standard уже выгоднее",
     // Stories
     stories_title: "Истории успеха",
     stories_subtitle: "Пары, нашедшие друг друга через FIDEM",
@@ -1653,6 +1661,10 @@ const dict = {
     per_month: "/mo",
     upgrade_plan: "Upgrade",
     current_plan: "Current plan",
+    plan_compare_title: "Why Standard is worth it",
+    plan_compare_separate: "{n} separate chat unlocks",
+    plan_compare_unlimited: "unlimited messaging",
+    plan_compare_note: "Past {n} chats, Standard is already cheaper",
     // Stories
     stories_title: "Success stories",
     stories_subtitle: "Couples who found each other through FIDEM",
