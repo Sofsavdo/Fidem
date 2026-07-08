@@ -4,47 +4,44 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { Sparkles, ArrowRight, Award } from "lucide-react";
 import { toast } from "sonner";
+import { usePersonalityQuestions, usePersonalityMine } from "@/hooks/queries";
+import { useMutation } from "@tanstack/react-query";
 
 export default function Personality() {
   const { t, lang, refresh } = useApp();
   const nav = useNavigate();
-  const [questions, setQuestions] = useState([]);
-  const [traitLabels, setTraitLabels] = useState({});
   const [answers, setAnswers] = useState({});
   const [step, setStep] = useState(0);
-  const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
 
+  const { data: qData } = usePersonalityQuestions(lang);
+  const questions = qData?.questions || [];
+  const traitLabels = qData?.trait_labels || {};
+
+  const { data: mine } = usePersonalityMine();
   useEffect(() => {
-    api.get(`/personality/questions?lang=${lang}`).then((r) => {
-      setQuestions(r.data.questions || []);
-      setTraitLabels(r.data.trait_labels || {});
-    });
-    api.get("/personality/mine").then((r) => {
-      if (r.data?.scores && Object.keys(r.data.scores).length > 0) {
-        setResult({ scores: r.data.scores, completed_at: r.data.completed_at });
-      }
-    });
-  }, [lang]);
+    if (mine?.scores && Object.keys(mine.scores).length > 0) {
+      setResult({ scores: mine.scores, completed_at: mine.completed_at });
+    }
+  }, [mine]);
 
   const setAns = (qid, value) => {
     setAnswers((a) => ({ ...a, [qid]: value }));
     if (step < questions.length - 1) setTimeout(() => setStep((s) => s + 1), 120);
   };
 
-  const submit = async () => {
-    setSubmitting(true);
-    try {
-      const r = await api.post("/personality/submit", answers);
+  const submitMutation = useMutation({
+    mutationFn: () => api.post("/personality/submit", answers),
+    onSuccess: (r) => {
       setResult({ scores: r.data.scores, bonus: r.data.bonus });
       toast.success(`Test tugatildi! +${r.data.bonus} so'm bonus 🎉`);
       refresh();
-    } catch (e) {
-      toast.error("Xato");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    },
+    onError: () => toast.error("Xato"),
+  });
+
+  const submit = () => submitMutation.mutate();
+  const submitting = submitMutation.isPending;
 
   if (result) {
     return (

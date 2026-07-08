@@ -1,4 +1,4 @@
-import React, { useEffect, lazy, Suspense } from "react";
+import React, { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AppProvider, useApp } from "@/contexts/AppContext";
@@ -30,7 +30,6 @@ const About = lazy(() => import("@/pages/About"));
 const FAQ = lazy(() => import("@/pages/FAQ"));
 const Referral = lazy(() => import("@/pages/Referral"));
 const Rankings = lazy(() => import("@/pages/Rankings"));
-const Gifts = lazy(() => import("@/pages/Gifts"));
 
 function isTelegramWebApp() {
   return Boolean(window.Telegram?.WebApp?.initData);
@@ -93,28 +92,32 @@ function RootRoute() {
   );
 }
 
+// The hot navigation paths. Their JS chunks are prefetched while the app is
+// idle so tapping a tab (or opening a profile/chat) never blocks on a chunk
+// download — the #1 source of the "yuklanmoqda" blank spinner on slow
+// networks. import() is deduped by webpack, so lazy() resolves instantly
+// once the chunk is warm.
+function prefetchHotRoutes() {
+  import("@/pages/Candidates");
+  import("@/pages/ProfileDetail");
+  import("@/pages/Messages");
+  import("@/pages/Chat");
+  import("@/pages/Saved");
+  import("@/pages/Me");
+  import("@/pages/Withdrawals");
+  import("@/pages/Premium");
+}
+
 function Inner() {
   useEffect(() => {
-    const tg = window.Telegram?.WebApp;
-    if (!tg) {
-      console.warn("Telegram WebApp not available");
-      return;
-    }
-    
-    try {
-      tg.ready();
-      tg.expand();
-      
-      // Set colors immediately
-      if (tg.setHeaderColor) tg.setHeaderColor("#ffffff");
-      if (tg.setBackgroundColor) tg.setBackgroundColor("#ffffff");
-      if (tg.enableClosingConfirmation) tg.enableClosingConfirmation();
-      
-      console.log("Telegram WebApp initialized successfully");
-    } catch (e) {
-      console.error("Telegram WebApp init error:", e);
-    }
+    const ric = window.requestIdleCallback || ((cb) => setTimeout(cb, 1500));
+    const cancel = window.cancelIdleCallback || clearTimeout;
+    const id = ric(prefetchHotRoutes);
+    return () => cancel(id);
   }, []);
+
+  // Telegram WebApp init (ready/expand/colors) now runs in index.js, before
+  // React even mounts, so the native splash hands off as early as possible.
 
   return (
     <Suspense fallback={<PageSpinner />}>
@@ -143,7 +146,6 @@ function Inner() {
           <Route path="/verification" element={<Verification />} />
           <Route path="/referral" element={<Referral />} />
           <Route path="/rankings" element={<Rankings />} />
-          <Route path="/gifts" element={<Gifts />} />
           <Route path="/admin" element={<Admin />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

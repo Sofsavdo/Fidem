@@ -2,6 +2,7 @@ import React from "react";
 import { NavLink } from "react-router-dom";
 import { Users, MessageCircle, Bookmark, User, Wallet, Gift } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
+import { selection } from "@/lib/haptics";
 
 const tabs = [
   { to: "/", icon: Users, key: "candidates", testid: "nav-candidates" },
@@ -26,6 +27,7 @@ export default function BottomNav() {
             to={tab.to}
             data-testid={tab.testid}
             end={tab.to === "/"}
+            onClick={selection}
             className={({ isActive }) =>
               `flex flex-col items-center gap-0.5 py-2.5 transition-colors ${
                 isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"

@@ -3,10 +3,12 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import GiftModal from "@/components/GiftModal";
+import GiftCelebration, { tierFromPrice } from "@/components/GiftCelebration";
 import ChatVoiceRecorder from "@/components/ChatVoiceRecorder";
 import { ArrowLeft, Send, Gift, MoreVertical, Ban, Flag, Wand2, Play } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
 import { formatLastActive } from "@/lib/time";
+import { tapLight } from "@/lib/haptics";
 import { toast } from "sonner";
 
 export default function Chat() {
@@ -25,6 +27,7 @@ export default function Chat() {
   const [reportOpen, setReportOpen] = useState(false);
   const [icebreakers, setIcebreakers] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
+  const [celebration, setCelebration] = useState(null);
   const endRef = useRef(null);
 
   const chatId = user && otherId ? [user.id, otherId].sort().join("_") : null;
@@ -91,6 +94,11 @@ export default function Chat() {
     if (m.to_user_id === user?.id) {
       api.get(`/messages/${chatId}`).catch(() => {}); // server-side mark-read happens on GET
     }
+    // Receiving a gift deserves the same celebration as sending one - a
+    // 499,000 so'm rocket landing in your chat shouldn't look like plain text.
+    if (m.kind === "gift" && m.to_user_id === user?.id && m.meta) {
+      setCelebration({ emoji: m.meta.emoji, label: m.meta.label, tier: tierFromPrice(m.meta.price || 0) });
+    }
     // eslint-disable-next-line
   }, [wsEvent, chatId, user]);
 
@@ -101,6 +109,7 @@ export default function Chat() {
   const send = async (txt) => {
     const finalText = txt ?? text;
     if (!finalText.trim()) return;
+    tapLight();
 
     // Optimistic UI update - show message immediately
     const tempMsg = {
@@ -322,7 +331,10 @@ export default function Chat() {
               <p className="text-xs text-muted-foreground">
                 {t("chat_locked_desc")} · 🛡 {access.guarantee_hours}h {t("guarantee")}
               </p>
-              <p className="text-xs text-secondary mt-2">{t("chat_match_tip")}</p>
+              {/* Free-path explainer — keeps the paywall from reading as a hard
+                  wall: replying to an incoming message and mutual-save chat are
+                  both free. Monetization stays on initiating a NEW conversation. */}
+              <p className="text-xs text-secondary mt-2 leading-relaxed rounded-xl bg-secondary/5 border border-secondary/20 p-2">{t("chat_free_paths")}</p>
               <div className="grid grid-cols-1 gap-2 pt-1">
                 {access.free_credits > 0 && (
                   <button data-testid="unlock-credit" onClick={() => unlockChat("credit")} disabled={unlocking}
@@ -339,6 +351,12 @@ export default function Chat() {
                 </Link>
               </div>
             </div>
+          )}
+          {/* Free weekly conversation hint — the composer is already open; this
+              just tells the free user this one is on the house, so they notice
+              when it's spent and understand the upgrade. */}
+          {access?.uses_free_weekly && (
+            <p data-testid="chat-free-weekly-hint" className="text-[11px] text-secondary text-center">{t("chat_free_weekly_hint")}</p>
           )}
           {/* Always-visible message composer (disabled when locked) */}
           <div className="flex items-end gap-1.5 min-w-0">
@@ -366,8 +384,16 @@ export default function Chat() {
           </div>
         </div>
       </div>
-      {giftOpen && <GiftModal targetId={otherId} targetName={other.name} onClose={() => setGiftOpen(false)} onSent={load} />}
+      {giftOpen && (
+        <GiftModal
+          targetId={otherId}
+          targetName={other.name}
+          onClose={() => setGiftOpen(false)}
+          onSent={(item) => { load(); setCelebration(item); }}
+        />
+      )}
       {reportOpen && <ReportModal t={t} onClose={() => setReportOpen(false)} onSubmit={reportUser} />}
+      <GiftCelebration gift={celebration} onDone={() => setCelebration(null)} />
     </div>
   );
 }

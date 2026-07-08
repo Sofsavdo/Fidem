@@ -1,56 +1,45 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import CandidateCard from "@/components/CandidateCard";
 import { useApp } from "@/contexts/AppContext";
-import { X, SlidersHorizontal, MapPin } from "lucide-react";
+import { X, SlidersHorizontal, MapPin, Lock } from "lucide-react";
 import { toast } from "sonner";
 import CountrySelect from "@/components/CountrySelect";
 import RegionSelect from "@/components/RegionSelect";
+import { useCandidates, useSaved, useToggleSave } from "@/hooks/queries";
+import { MATCH_EVENT } from "@/components/MatchCelebration";
+import { tapMedium } from "@/lib/haptics";
 
 export default function Candidates() {
-  const { t, user } = useApp();
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { t } = useApp();
   const [showFilter, setShowFilter] = useState(false);
   const [filters, setFilters] = useState({ sort: "match", verified_only: false, financial_only: false });
-  const [savedIds, setSavedIds] = useState(new Set());
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = { ...filters };
-      const [r, s] = await Promise.all([
-        api.get("/candidates", { params }),
-        api.get("/saved/mine").catch(() => ({ data: [] }))
-      ]);
-      setItems(r.data || []);
-      setSavedIds(new Set((s.data || []).map((x) => x.id)));
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters.sort, filters.verified_only, filters.financial_only, filters.country, filters.region, filters.district, filters.age_min, filters.age_max]);
+  const { data: items = [], isLoading } = useCandidates(filters);
+  const { data: savedList = [] } = useSaved("mine");
+  const savedIds = useMemo(() => new Set(savedList.map((x) => x.id)), [savedList]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const toggleSave = useToggleSave();
 
-  const onSave = useCallback(async (c) => {
-    try {
-      if (savedIds.has(c.id)) {
-        await api.delete(`/saved/${c.id}`);
-        setSavedIds((s) => { const n = new Set(s); n.delete(c.id); return n; });
-      } else {
-        await api.post("/saved", { user_id: c.id });
-        setSavedIds((s) => new Set(s).add(c.id));
-        toast.success(t("saved_short"));
+  const onSave = (c) => {
+    const isSaved = savedIds.has(c.id);
+    tapMedium();
+    toggleSave.mutate(
+      { candidate: c, isSaved },
+      {
+        onSuccess: (data) => {
+          if (isSaved) return;
+          if (data?.mutual_match) {
+            window.dispatchEvent(new CustomEvent(MATCH_EVENT, { detail: c }));
+          } else {
+            toast.success(t("saved_short"));
+          }
+        },
+        onError: () => toast.error(t("error")),
       }
-    } catch (e) {
-      toast.error(t("error"));
-    }
-  }, [savedIds, t]);
+    );
+  };
 
   return (
     <div className="px-4 md:px-8 pt-6 pb-4">
@@ -138,7 +127,7 @@ export default function Candidates() {
         </div>
       )}
 
-      {loading ? (
+      {isLoading ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {[...Array(6)].map((_, i) => (
             <div key={i} className="aspect-[4/5] rounded-3xl bg-muted animate-pulse" />
@@ -162,7 +151,8 @@ export default function Candidates() {
 }
 
 function FilterSheet({ filters, setFilters, onClose }) {
-  const { t, lang } = useApp();
+  const { t, lang, user } = useApp();
+  const isPaid = ["standard", "premium", "vip"].includes(user?.plan);
   const [local, setLocal] = useState(filters);
   return (
     <div className="fixed inset-0 z-50 flex items-end" data-testid="filter-sheet">
@@ -204,14 +194,29 @@ function FilterSheet({ filters, setFilters, onClose }) {
             </div>
           </label>
           <label className="block">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground">{t("district")}</span>
-            <input
-              data-testid="filter-district"
-              className="mt-1.5 w-full rounded-2xl border border-border bg-card px-4 py-3 outline-none focus:border-primary"
-              placeholder={t("select_district")}
-              value={local.district || ""}
-              onChange={(e) => setLocal({ ...local, district: e.target.value || undefined })}
-            />
+            <span className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              {t("district")}
+              {!isPaid && <Lock className="w-3 h-3" />}
+            </span>
+            {isPaid ? (
+              <input
+                data-testid="filter-district"
+                className="mt-1.5 w-full rounded-2xl border border-border bg-card px-4 py-3 outline-none focus:border-primary"
+                placeholder={t("select_district")}
+                value={local.district || ""}
+                onChange={(e) => setLocal({ ...local, district: e.target.value || undefined })}
+              />
+            ) : (
+              <Link
+                to="/premium?tab=plans"
+                data-testid="filter-district-locked"
+                onClick={onClose}
+                className="mt-1.5 flex items-center justify-between w-full rounded-2xl border border-dashed border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground"
+              >
+                {t("more_filters_premium_hint") || t("upgrade")}
+                <Lock className="w-3.5 h-3.5" />
+              </Link>
+            )}
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">

@@ -1,44 +1,28 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { Lock } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
-import { toast } from "sonner";
+import { useSaved } from "@/hooks/queries";
 
 const TABS = [
-  { k: "mine", api: "/saved/mine", labelKey: "saved_by_me" },
-  { k: "by_others", api: "/saved/by-others", labelKey: "saved_me" },
-  { k: "viewers", api: "/saved/viewers", labelKey: "viewed_my_profile" },
-  { k: "interested", api: "/saved/interested", labelKey: "interested_in_me" },
+  { k: "mine", labelKey: "saved_by_me" },
+  { k: "by_others", labelKey: "saved_me" },
+  { k: "viewers", labelKey: "viewed_my_profile" },
+  { k: "interested", labelKey: "interested_in_me" },
 ];
 
 export default function Saved() {
   const { t } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState("mine");
-  const [data, setData] = useState({});
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const q = searchParams.get("tab");
-    if (q && TABS.some((x) => x.k === q)) {
-      setTab(q);
-    }
+    if (q && TABS.some((x) => x.k === q)) setTab(q);
   }, [searchParams]);
 
-  const loadTab = useCallback(async (currentTab) => {
-    const cur = TABS.find((x) => x.k === currentTab);
-    setLoading(true);
-    api.get(cur.api)
-      .then((r) => setData((d) => ({ ...d, [currentTab]: r.data || [] })))
-      .catch(() => toast.error(t("error_generic")))
-      .finally(() => setLoading(false));
-  }, [t]);
-
-  useEffect(() => {
-    loadTab(tab);
-  }, [tab, loadTab]);
+  const { data: items = [], isLoading } = useSaved(tab);
 
   const selectTab = useCallback((k) => {
     setTab(k);
@@ -48,8 +32,6 @@ export default function Saved() {
       setSearchParams({ tab: k }, { replace: true });
     }
   }, [setSearchParams]);
-
-  const items = data[tab] || [];
 
   return (
     <div className="px-4 md:px-8 pt-6">
@@ -69,14 +51,14 @@ export default function Saved() {
         ))}
       </div>
 
-      {loading && (
+      {isLoading && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="aspect-[4/5] rounded-3xl bg-muted animate-pulse" />
           ))}
         </div>
       )}
-      {!loading && items.length === 0 && <div className="text-center py-12 text-muted-foreground" data-testid="saved-empty">{t("no_data")}</div>}
+      {!isLoading && items.length === 0 && <div className="text-center py-12 text-muted-foreground" data-testid="saved-empty">{t("no_data")}</div>}
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 stagger" data-testid="saved-grid">
         {items.map((c, idx) => {
@@ -103,11 +85,7 @@ export default function Saved() {
               className="block aspect-[4/5] rounded-3xl bg-card border border-border overflow-hidden relative hover:shadow-elevated transition-shadow"
             >
               {photoUrl ? (
-                <img
-                  src={photoUrl}
-                  alt=""
-                  className="w-full h-full object-cover"
-                />
+                <img src={photoUrl} alt="" className="w-full h-full object-cover" />
               ) : (
                 <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center">
                   <Lock className="w-6 h-6 text-muted-foreground" />

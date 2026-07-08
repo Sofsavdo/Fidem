@@ -48,12 +48,12 @@ async def create_concierge_order(
     order_id = new_id()
 
     if payment_method == "balance":
-        if me.get("balance", 0) < CONCIERGE_PRICE_UZS:
-            raise HTTPException(402, "Balansda mablag' yetarli emas")
-        await db.users.update_one(
+        res = await db.users.update_one(
             {"id": uid, "balance": {"$gte": CONCIERGE_PRICE_UZS}},
             {"$inc": {"balance": -CONCIERGE_PRICE_UZS}},
         )
+        if res.modified_count == 0:
+            raise HTTPException(402, "Balansda mablag' yetarli emas")
         order = {
             "id": order_id,
             "user_id": uid,

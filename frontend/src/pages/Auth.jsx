@@ -49,7 +49,7 @@ export default function Auth() {
     try {
       const r = await api.post("/auth/telegram", { init_data: tg.initData });
       localStorage.setItem("fidem_token", r.data.token);
-      await refresh();
+      await refresh(r.data.user);
     } catch (err) {
       toast.error(t("error"));
     } finally {

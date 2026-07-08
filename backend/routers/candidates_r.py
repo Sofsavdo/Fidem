@@ -9,7 +9,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from auth import get_current_user_id
-from core import db, get_user, iso, log, manager, now_utc, parse_dt, push_notif, strip_locked_photo, touch_active, user_public, user_public_minimal
+from core import PAID_PLANS, db, get_user, iso, log, manager, now_utc, parse_dt, push_notif, strip_locked_photo, touch_active, user_public, user_public_minimal
+from geo import distance_bucket, haversine_km
 from models import PhotoUnlockDecision, PhotoUnlockRequest, SaveRequest, new_id
 from services import age_from_birth, compute_match
 
@@ -84,20 +85,6 @@ def compute_ai_match(viewer: dict, candidate: dict, lang: str = "uz") -> tuple[i
             ai_reasons.append(f"{viewer_plan.capitalize()} пользователи")
         else:
             ai_reasons.append(f"{viewer_plan.capitalize()} users")
-    
-    # 6. Influence score proximity (premium feature)
-    viewer_influence = viewer.get("influence_score", 0)
-    candidate_influence = candidate.get("influence_score", 0)
-    if viewer_influence > 0 and candidate_influence > 0:
-        influence_diff = abs(viewer_influence - candidate_influence)
-        if influence_diff < 1000:
-            ai_boost += 5
-            if lang == "uz":
-                ai_reasons.append("Ta'sir darajasi yaqin")
-            elif lang == "ru":
-                ai_reasons.append("Уровень влияния близок")
-            else:
-                ai_reasons.append("Influence levels close")
     
     # 7. Big5 personality compatibility (if available)
     viewer_big5 = viewer.get("big5_scores", {})
@@ -175,6 +162,8 @@ async def candidates(
     height_max: Optional[int] = None,
     verified_only: bool = False,
     financial_only: bool = False,
+    verified_location_only: bool = False,
+    max_distance_km: Optional[int] = None,
     sort: str = "match",
     limit: int = 30,
     uid: str = Depends(get_current_user_id),
@@ -185,6 +174,19 @@ async def candidates(
         match_lang = "uz"
     if not me_doc.get("onboarded"):
         return []
+
+    # "more_filters" (district, marital_status, has_children, height range) is
+    # a Standard+ perk per the pricing page - free users keep age + region.
+    is_paid = me_doc.get("plan", "free") in PAID_PLANS
+    if not is_paid:
+        district = None
+        marital_status = None
+        has_children = None
+        height_min = None
+        height_max = None
+        # Distance-radius ("nearby") is a Premium perk; verified-location
+        # filter and the badge itself stay free (trust is a base-tier value).
+        max_distance_km = None
 
     await touch_active(uid)
 
@@ -216,6 +218,8 @@ async def candidates(
         query["verified_selfie"] = True
     if financial_only:
         query["verified_financial"] = True
+    if verified_location_only:
+        query["location_verified"] = True
 
     # Perf: pre-filter age range at DB level via birth_date ISO string comparison.
     a_lo = age_min or me_doc.get("search_age_min", 18)
@@ -239,6 +243,20 @@ async def candidates(
 
     unlocked_set = {p["target_id"] for p in photo_unlocks}
 
+    # Coarse distance (Map M1). Raw coordinates stay server-side: we read both
+    # parties' points from the isolated user_locations collection, compute the
+    # real distance for filtering, but only ever attach a rounded bucket to
+    # the payload. My own point is loaded once; candidates' in one batch.
+    my_loc = await db.user_locations.find_one({"user_id": uid}, {"_id": 0, "geo_point": 1})
+    my_pt = my_loc.get("geo_point") if my_loc else None
+    cand_pts: dict = {}
+    if my_pt:
+        loc_rows = await db.user_locations.find(
+            {"user_id": {"$in": [d["id"] for d in docs]}},
+            {"_id": 0, "user_id": 1, "geo_point": 1},
+        ).to_list(2000)
+        cand_pts = {r["user_id"]: r["geo_point"] for r in loc_rows if r.get("geo_point")}
+
     enriched = []
 
     for d in docs:
@@ -249,6 +267,14 @@ async def candidates(
         if height_min and d.get("height_cm", 0) < height_min:
             continue
         if height_max and d.get("height_cm", 999) > height_max:
+            continue
+
+        # distance bucket (only when both users shared a verified point)
+        dist_km = None
+        cpt = cand_pts.get(d["id"])
+        if my_pt and cpt:
+            dist_km = haversine_km(my_pt[1], my_pt[0], cpt[1], cpt[0])
+        if max_distance_km is not None and (dist_km is None or dist_km > max_distance_km):
             continue
 
         # Use AI match calculation for premium users
@@ -262,6 +288,7 @@ async def candidates(
         pub["match_reasons"] = reasons
         pub["photo_unlocked"] = d["id"] in unlocked_set
         pub["can_message"] = candidate_can_message(d, me_doc)
+        pub["distance_bucket"] = distance_bucket(dist_km, match_lang) if dist_km is not None else None
         pub = strip_locked_photo(pub)
 
         now_iso2 = iso(now_utc())
@@ -356,6 +383,15 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
     pub["photo_unlocked"] = bool(unlock and unlock.get("approved"))
     pub["photo_unlock_status"] = unlock.get("status") if unlock else "none"
     pub["can_message"] = candidate_can_message(target, me_doc)
+
+    # Coarse distance — both parties must have a verified point; only the
+    # rounded bucket is exposed, never the raw coordinates.
+    pub["distance_bucket"] = None
+    my_loc = await db.user_locations.find_one({"user_id": uid}, {"_id": 0, "geo_point": 1})
+    t_loc = await db.user_locations.find_one({"user_id": target_id}, {"_id": 0, "geo_point": 1})
+    if my_loc and t_loc and my_loc.get("geo_point") and t_loc.get("geo_point"):
+        mp, tp = my_loc["geo_point"], t_loc["geo_point"]
+        pub["distance_bucket"] = distance_bucket(haversine_km(mp[1], mp[0], tp[1], tp[0]), match_lang)
 
     try:
         now_iso = iso(now_utc())
@@ -495,6 +531,12 @@ async def save_user(req: SaveRequest, uid: str = Depends(get_current_user_id)):
         upsert=True,
     )
 
+    # Mutual save = a match (also what unlocks free chat, see chat_r.can_initiate_chat).
+    # Only worth celebrating the instant it newly forms, not on every re-save.
+    mutual_match = False
+    if is_new:
+        mutual_match = await db.saved.find_one({"owner_id": req.user_id, "target_id": uid}) is not None
+
     if is_new:
         try:
             target = await get_user(req.user_id)
@@ -517,7 +559,7 @@ async def save_user(req: SaveRequest, uid: str = Depends(get_current_user_id)):
             link="/saved?tab=by_others",
         )
 
-    return {"ok": True}
+    return {"ok": True, "mutual_match": mutual_match}
 
 
 @router.delete("/saved/{target_id}")

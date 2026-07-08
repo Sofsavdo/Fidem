@@ -46,10 +46,14 @@ if not ADMIN_PASSWORD:
     )
 PRICE_PREMIUM = int(os.environ.get("PRICE_PREMIUM_UZS", "79000"))
 PRICE_VIP = int(os.environ.get("PRICE_VIP_UZS", "199000"))
-PRICE_STANDARD = int(os.environ.get("PRICE_STANDARD_UZS", "19900"))
+PRICE_STANDARD = int(os.environ.get("PRICE_STANDARD_UZS", "34900"))
 PRICE_CHAT_UNLOCK = int(os.environ.get("PRICE_CHAT_UNLOCK_UZS", "9900"))
 CHAT_UNLOCK_COINS = int(os.environ.get("CHAT_UNLOCK_COINS", "100"))
 CHAT_GUARANTEE_HOURS = int(os.environ.get("CHAT_GUARANTEE_HOURS", "48"))
+# Free users may start this many NEW conversations per week at no cost — a
+# freemium "taste" that seeds marketplace liquidity and converts better than a
+# hard wall, without weakening the paid tiers (set to 0 to disable entirely).
+FREE_WEEKLY_INITIATIONS = int(os.environ.get("FREE_WEEKLY_INITIATIONS", "1"))
 PAID_PLANS = ("standard", "premium", "vip")
 
 
@@ -170,6 +174,9 @@ def user_public(u: dict, include_private: bool = False) -> dict:
         "verified_identity": u.get("verified_identity", False),
         "verified_selfie": u.get("verified_selfie", False),
         "verified_financial": u.get("verified_financial", False),
+        # Public trust badge only. Raw GPS coordinates live in the separate
+        # user_locations collection and are NEVER exposed via any user payload.
+        "location_verified": bool(u.get("location_verified", False)),
         "last_active": la,
         "last_active_label": last_active_label(la),
         "last_active_minutes": last_active_minutes(la),
@@ -220,6 +227,7 @@ def user_public_minimal(u: dict) -> dict:
         "photo_url": u.get("photo_url"),
         "verified_selfie": u.get("verified_selfie", False),
         "verified_financial": u.get("verified_financial", False),
+        "location_verified": bool(u.get("location_verified", False)),
         "last_active": la,
         "last_active_label": last_active_label(la),
         "online": is_online(la),

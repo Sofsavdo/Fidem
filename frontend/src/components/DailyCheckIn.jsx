@@ -12,8 +12,16 @@ export default function DailyCheckIn() {
 
   useEffect(() => {
     if (!user || !user.onboarded) return;
-    const lastShown = localStorage.getItem("fidem_daily_shown");
     const today = new Date().toISOString().slice(0, 10);
+    // Skip the one time a user lands here straight out of onboarding - they
+    // haven't seen the app yet, and this would bury the "profile ready"
+    // toast under a gamification modal before they've even seen a candidate.
+    if (sessionStorage.getItem("fidem_just_onboarded")) {
+      sessionStorage.removeItem("fidem_just_onboarded");
+      localStorage.setItem("fidem_daily_shown", today);
+      return;
+    }
+    const lastShown = localStorage.getItem("fidem_daily_shown");
     if (lastShown === today) return;
     api.get("/daily/status").then((r) => {
       setStatus(r.data);

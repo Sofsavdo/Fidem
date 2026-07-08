@@ -254,3 +254,52 @@ textarea.input { resize: vertical; min-height: 92px; line-height: 1.45; }
 .divider-with-label { display: flex; align-items: center; gap: 0.75rem; }
 .divider-with-label::before, .divider-with-label::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, hsl(var(--border)), transparent); }
 .divider-with-label > span { font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: hsl(var(--muted-foreground)); font-weight: 500; }
+
+/* ===== Gift celebration (GiftCelebration.jsx) ===== */
+@keyframes giftPopCare {
+  0% { transform: scale(0.4) translateY(10px); opacity: 0; }
+  55% { transform: scale(1.15) translateY(-4px); opacity: 1; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+@keyframes giftPopLove {
+  0% { transform: scale(0.3) rotate(-8deg); opacity: 0; }
+  50% { transform: scale(1.25) rotate(4deg); opacity: 1; }
+  75% { transform: scale(0.95) rotate(-2deg); }
+  100% { transform: scale(1.05) rotate(0deg); opacity: 1; }
+}
+@keyframes giftPopLuxury {
+  0% { transform: scale(0.2) rotate(-15deg); opacity: 0; filter: drop-shadow(0 0 0 hsl(45 90% 60% / 0)); }
+  45% { transform: scale(1.35) rotate(8deg); opacity: 1; filter: drop-shadow(0 0 26px hsl(45 90% 60% / 0.55)); }
+  70% { transform: scale(0.92) rotate(-4deg); }
+  100% { transform: scale(1.1) rotate(0deg); opacity: 1; filter: drop-shadow(0 0 20px hsl(45 90% 60% / 0.45)); }
+}
+.gift-emoji-care { display: inline-block; animation: giftPopCare 1.3s cubic-bezier(0.2,0.8,0.2,1) both; }
+.gift-emoji-love { display: inline-block; animation: giftPopLove 1.9s cubic-bezier(0.2,0.8,0.2,1) both; }
+.gift-emoji-luxury { display: inline-block; animation: giftPopLuxury 2.6s cubic-bezier(0.2,0.8,0.2,1) both; }
+
+@keyframes giftLabelIn {
+  0% { opacity: 0; transform: translateY(6px); }
+  40% { opacity: 0; }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.gift-label-in { animation: giftLabelIn 1.1s ease both; }
+
+@keyframes giftParticleFly {
+  0% { transform: rotate(var(--angle)) translateY(0) scale(0.6); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: rotate(var(--angle)) translateY(-90px) scale(1.1); opacity: 0; }
+}
+.gift-particle {
+  position: absolute;
+  top: 50%; left: 50%;
+  font-size: 18px;
+  animation: giftParticleFly 1.6s ease-out both;
+  animation-delay: var(--delay);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gift-emoji-care, .gift-emoji-love, .gift-emoji-luxury, .gift-label-in, .gift-particle {
+    animation-duration: 0.01ms !important;
+  }
+}

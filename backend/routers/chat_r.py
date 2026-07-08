@@ -12,6 +12,7 @@ from ai_service import quick_moderation
 from core import (
     CHAT_GUARANTEE_HOURS,
     CHAT_UNLOCK_COINS,
+    FREE_WEEKLY_INITIATIONS,
     PAID_PLANS,
     PRICE_CHAT_UNLOCK,
     chat_id_for,
@@ -46,6 +47,38 @@ router = APIRouter(tags=["chat"])
 # ---------- Chat access / monetization ----------
 def _plan_active(user: dict) -> bool:
     return user.get("plan", "free") in PAID_PLANS
+
+
+def _week_id() -> str:
+    return now_utc().strftime("%G-W%V")
+
+
+def free_weekly_left(user: dict) -> int:
+    """Free first-conversation allowance remaining this week (read-only)."""
+    if FREE_WEEKLY_INITIATIONS <= 0 or _plan_active(user):
+        return 0
+    used = user.get("free_init_used", 0) if user.get("free_init_week") == _week_id() else 0
+    return max(0, FREE_WEEKLY_INITIATIONS - int(used or 0))
+
+
+async def _consume_free_initiation(uid: str) -> bool:
+    """Atomically spend one weekly free initiation. Returns True if one was
+    available and consumed. Uses the same $-guarded conditional-update pattern
+    as every other balance/quota deduction so concurrent sends can't over-spend.
+    """
+    if FREE_WEEKLY_INITIATIONS <= 0:
+        return False
+    week = _week_id()
+    # Idempotent weekly reset — only rewrites when the stored week is stale.
+    await db.users.update_one(
+        {"id": uid, "free_init_week": {"$ne": week}},
+        {"$set": {"free_init_week": week, "free_init_used": 0}},
+    )
+    res = await db.users.update_one(
+        {"id": uid, "free_init_week": week, "free_init_used": {"$lt": FREE_WEEKLY_INITIATIONS}},
+        {"$inc": {"free_init_used": 1}},
+    )
+    return res.modified_count == 1
 
 
 async def _incoming_count(uid: str, target_id: str) -> int:
@@ -100,20 +133,26 @@ async def chat_access(target_id: str, uid: str = Depends(get_current_user_id)):
     is_reply = (await _incoming_count(uid, target_id)) > 0
     unlocked = bool(await _unlock_doc(uid, target_id))
     plan_ok = _plan_active(me)
-    # Free users can always chat - no paywall
-    can = True
+    can_hard = await can_initiate_chat(me, target_id)
+    fwl = free_weekly_left(me)
+    # A free-weekly allowance also opens the composer (consumed on actual send),
+    # but only when this isn't already covered by a plan/unlock/match/reply.
+    uses_free_weekly = (not can_hard) and fwl > 0
+    can = can_hard or uses_free_weekly
     return {
         "can_message": can,
         "is_reply": is_reply,
         "unlocked": unlocked,
         "plan": me.get("plan", "free"),
         "plan_active": plan_ok,
-        "requires_unlock": False,  # No paywall for anyone
-        "price_uzs": 0,
-        "price_coins": 0,
+        "requires_unlock": not can,
+        "price_uzs": 0 if can else PRICE_CHAT_UNLOCK,
+        "price_coins": 0 if can else CHAT_UNLOCK_COINS,
         "balance": int(me.get("balance", 0) or 0),
         "coins": int(me.get("coins", 0) or 0),
         "free_credits": int(me.get("free_chat_credits", 0) or 0),
+        "free_weekly_left": fwl,
+        "uses_free_weekly": uses_free_weekly,
         "guarantee_hours": CHAT_GUARANTEE_HOURS,
     }
 
@@ -279,9 +318,20 @@ async def chat_history(chat_id: str, uid: str = Depends(get_current_user_id)):
 async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_user_id)):
     if req.to_user_id == uid:
         raise HTTPException(400, "Cannot message self")
+
+    sender_doc = await get_user(uid)
+    if not await can_initiate_chat(sender_doc, req.to_user_id):
+        # Free-weekly allowance: a free user may open a limited number of new
+        # conversations per week. Consume atomically, then record a free unlock
+        # for this target so their follow-up messages here don't re-charge it.
+        if await _consume_free_initiation(uid):
+            await _create_unlock(uid, req.to_user_id, source="free_weekly", guarantee=False)
+        else:
+            raise HTTPException(402, "Chat locked - unlock required")
+
     is_voice = req.kind == "voice"
     is_video = req.kind == "video"
-    
+
     if is_voice:
         if not req.voice_url:
             raise HTTPException(400, "voice_url required for voice message")
@@ -299,8 +349,8 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
         if not ok:
             raise HTTPException(422, reason)
         req.text = sanitized_text
-    
-    sender = await get_user(uid)
+
+    sender = sender_doc
     await get_user(req.to_user_id)
     cid = chat_id_for(uid, req.to_user_id)
     
@@ -386,19 +436,7 @@ async def _background_message_ops(uid: str, to_user_id: str, cid: str, text: str
         if msg:
             ws_payload = {"type": "message", "data": {**msg, "created_at": iso(parse_dt(msg["created_at"]))}}
             await manager.broadcast_chat([uid, to_user_id], ws_payload)
-            
-            # Also notify chaperones
-            try:
-                chap_rows = await db.chaperones.find(
-                    {"$or": [{"owner_id": uid}, {"owner_id": to_user_id}], "status": "active"},
-                    {"_id": 0, "wali_id": 1},
-                ).to_list(50)
-                chaperone_ids = list({c["wali_id"] for c in chap_rows})
-                if chaperone_ids:
-                    await manager.broadcast_chat(chaperone_ids, {"type": "chaperone_message", "data": ws_payload["data"]})
-            except Exception:
-                pass
-        
+
         await push_notif(to_user_id, "message", f"Yangi xabar: {sender.get('name','')}")
     except Exception:
         pass
@@ -550,8 +588,6 @@ async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id
         quota = FREE_GIFTS_BY_PLAN.get(plan, 1)
         if week_used >= quota:
             raise HTTPException(402, f"Bu hafta uchun bepul sovg'a kvotangiz tugadi ({quota} ta). Pulli gift yuboring yoki kelasi haftani kuting.")
-    elif sender.get("balance", 0) < price:
-        raise HTTPException(402, "Balansda mablag' yetarli emas")
     await get_user(req.to_user_id)  # validates exists
     # Apply balance/quota change
     if is_free_gift:
@@ -561,9 +597,12 @@ async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id
             {"$inc": {f"free_gifts_used.{week_id}": 1, "gifts_sent_count": 1}},
         )
     else:
-        await db.users.update_one(
-            {"id": uid}, {"$inc": {"balance": -price, "gifts_sent_total": price, "gifts_sent_count": 1}}
+        res = await db.users.update_one(
+            {"id": uid, "balance": {"$gte": price}},
+            {"$inc": {"balance": -price, "gifts_sent_total": price, "gifts_sent_count": 1}},
         )
+        if res.modified_count == 0:
+            raise HTTPException(402, "Balansda mablag' yetarli emas")
         await db.users.update_one(
             {"id": req.to_user_id},
             {"$inc": {"gifts_received_total": price}},

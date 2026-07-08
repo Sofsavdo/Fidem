@@ -1,24 +1,29 @@
-import React, { useEffect, useState, useCallback, memo } from "react";
+import React, { useState, useCallback, memo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
-import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot } from "@/components/Badges";
+import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot, LocationBadge } from "@/components/Badges";
 import CompatibilityCard from "@/components/CompatibilityCard";
 import { photoSrc } from "@/lib/photo";
 import { formatLastActive } from "@/lib/time";
 import { Bookmark, MessageCircle, ArrowLeft, Lock, Clock, Shield, Share2 } from "lucide-react";
 import { toast } from "sonner";
+import { useCandidateDetail, useSaved, useToggleSave, QK } from "@/hooks/queries";
+import { useQueryClient } from "@tanstack/react-query";
+import { MATCH_EVENT } from "@/components/MatchCelebration";
 
 export default function ProfileDetail() {
   const { id } = useParams();
   const { t, user } = useApp();
   const nav = useNavigate();
-  const [c, setC] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const queryClient = useQueryClient();
   const [famSending, setFamSending] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
+
+  const { data: c, isLoading: loading } = useCandidateDetail(id);
+  const { data: savedList = [] } = useSaved("mine");
+  const saved = savedList.some((x) => x.id === id);
+  const toggleSaveMutation = useToggleSave();
+  const saving = toggleSaveMutation.isPending;
 
   const requestFamily = useCallback(async () => {
     if (user?.plan !== "vip") {
@@ -66,39 +71,29 @@ export default function ProfileDetail() {
     }
   }, [c, id, t]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [r, my] = await Promise.all([
-        api.get(`/candidates/${id}`),
-        api.get("/saved/mine").catch(() => ({ data: [] })),
-      ]);
-      setC(r.data);
-      setSaved((my.data || []).some((x) => x.id === id));
-    } catch (e) {
-      toast.error(t("error_generic"));
-    } finally {
-      setLoading(false);
-    }
-  }, [id, t]);
-
-  useEffect(() => { load(); }, [load]);
-
   const unlockPhoto = useCallback(async () => {
     try {
       const r = await api.post("/photo-unlock/request", { target_user_id: id });
       toast.success(r.data.status === "approved" ? t("photo_unlocked_toast") : t("photo_request_sent_toast"));
-      load();
+      queryClient.invalidateQueries({ queryKey: QK.candidateDetail(id) });
     } catch (e) { toast.error(t("error_generic")); }
-  }, [id, t, load]);
+  }, [id, t, queryClient]);
 
-  const toggleSave = useCallback(async () => {
-    setSaving(true);
-    try {
-      if (saved) { await api.delete(`/saved/${id}`); setSaved(false); }
-      else { await api.post("/saved", { user_id: id }); setSaved(true); toast.success(t("saved_successfully")); }
-    } finally { setSaving(false); }
-  }, [saved, id, t]);
+  const toggleSave = useCallback(() => {
+    toggleSaveMutation.mutate(
+      { candidate: c, isSaved: saved },
+      {
+        onSuccess: (data) => {
+          if (saved) return;
+          if (data?.mutual_match) {
+            window.dispatchEvent(new CustomEvent(MATCH_EVENT, { detail: c }));
+          } else {
+            toast.success(t("saved_successfully"));
+          }
+        },
+      }
+    );
+  }, [saved, c, t, toggleSaveMutation]);
 
   if (loading || !c) {
     return (
@@ -143,17 +138,18 @@ export default function ProfileDetail() {
             <h1 className="font-heading text-3xl font-semibold flex items-center gap-2">
               {c.name}, {c.age} <OnlineDot online={c.online} />
             </h1>
-            <p className="text-sm text-white/85">{c.region} · {c.district} · {formatLastActive(c.last_active_minutes, t, c.online)}</p>
+            <p className="text-sm text-white/85">{c.region} · {c.district}{c.distance_bucket ? ` · ${c.distance_bucket} ${t("away")}` : ""} · {formatLastActive(c.last_active_minutes, t, c.online)}</p>
           </div>
         </div>
       </div>
 
       <div className="px-5 pt-5 space-y-4">
         {/* Verification badges row */}
-        {(c.verified_selfie || c.verified_financial || c.verified_identity) && (
+        {(c.verified_selfie || c.verified_financial || c.verified_identity || c.location_verified) && (
           <div className="flex gap-2 flex-wrap" data-testid="profile-badges">
             <VerifiedBadge verified={c.verified_selfie} />
             <FinancialBadge verified={c.verified_financial} />
+            <LocationBadge verified={c.location_verified} />
             {c.verified_identity && (
               <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 px-2 py-1 text-[11px] font-medium">
                 <Shield className="w-3 h-3" /> {t("identity_badge")}
@@ -161,6 +157,9 @@ export default function ProfileDetail() {
             )}
           </div>
         )}
+
+        {/* ---- Section: basic info ---- */}
+        <p className="field-label pt-1">{t("pd_section_basic")}</p>
 
         {/* Key stats — 2 columns on mobile, 3 on larger */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2" data-testid="profile-stats">
@@ -190,6 +189,9 @@ export default function ProfileDetail() {
           </div>
         )}
 
+        {/* ---- Section: personality & interests ---- */}
+        <p className="field-label pt-3">{t("pd_section_personality")}</p>
+
         {c.bio && (
           <div className="rounded-2xl bg-card border border-border p-4">
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-2">{t("bio")}</p>
@@ -207,7 +209,7 @@ export default function ProfileDetail() {
               <div key={i} className="rounded-2xl bg-card border border-border p-4">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">{p.text || p.id?.replace("p_", "")}</p>
                 {p.kind === "voice" && p.voice_url ? (
-                  <audio controls src={p.voice_url} className="w-full mt-2" />
+                  <audio controls src={photoSrc(p.voice_url)} className="w-full mt-2" />
                 ) : (
                   <p className="text-base mt-1 leading-relaxed">{p.answer || "—"}</p>
                 )}

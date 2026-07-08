@@ -1,12 +1,22 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import posthog from "posthog-js";
 import api from "@/lib/api";
 import { WS } from "@/lib/ws";
 import dict, { detectLang } from "@/lib/i18n";
 import { toast } from "sonner";
 
+// Identify by id + plan only — never name/phone/photo. Matches the
+// user_public() PII-safety boundary the backend already enforces.
+function identifyForAnalytics(user) {
+  if (!process.env.REACT_APP_POSTHOG_KEY || !user?.id) return;
+  posthog.identify(user.id, { plan: user.plan || "free", is_admin: !!user.is_admin });
+}
+
 const AppCtx = createContext(null);
 
 export function AppProvider({ children }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lang, setLang] = useState(detectLang());
@@ -32,7 +42,18 @@ export function AppProvider({ children }) {
     }
   };
 
-  const loadMe = useCallback(async () => {
+  const loadMe = useCallback(async (prefetchedUser) => {
+    // login/register/telegram-auth responses already embed the full profile —
+    // skip the extra GET /auth/me round-trip when we already have it.
+    if (prefetchedUser) {
+      setUser(prefetchedUser);
+      if (prefetchedUser.language && dict[prefetchedUser.language]) {
+        setLang(prefetchedUser.language);
+      }
+      identifyForAnalytics(prefetchedUser);
+      setLoading(false);
+      return prefetchedUser;
+    }
     const token = localStorage.getItem("fidem_token");
     if (!token) {
       setUser(null);
@@ -45,6 +66,7 @@ export function AppProvider({ children }) {
       if (r.data.language && dict[r.data.language]) {
         setLang(r.data.language);
       }
+      identifyForAnalytics(r.data);
       return r.data;
     } catch {
       setUser(null);
@@ -72,15 +94,10 @@ export function AppProvider({ children }) {
       const initData = tg?.initData;
 
       if (!initData) {
-        console.log("No Telegram initData available");
         return false;
       }
 
       try {
-        console.log("Attempting Telegram auth...");
-        tg.ready?.();
-        tg.expand?.();
-
         const r = await api.post("/auth/telegram", {
           init_data: initData,
         });
@@ -88,7 +105,7 @@ export function AppProvider({ children }) {
         if (cancelled) return true;
 
         localStorage.setItem("fidem_token", r.data.token);
-        await loadMe();
+        await loadMe(r.data.user);
 
         if (r.data.onboarded) {
           window.history.replaceState(null, "", "/");
@@ -96,7 +113,6 @@ export function AppProvider({ children }) {
           window.history.replaceState(null, "", "/onboarding");
         }
 
-        console.log("Telegram auth successful");
         return true;
       } catch (e) {
         console.error("Telegram auto-auth failed:", e);
@@ -121,8 +137,6 @@ export function AppProvider({ children }) {
         const ok = await tryTelegramAuth();
         if (ok) return;
       }
-      
-      console.log("Telegram auth failed after retries");
     };
 
     run();
@@ -134,19 +148,25 @@ export function AppProvider({ children }) {
   const login = async (email, password) => {
     const r = await api.post("/auth/login", { email, password });
     localStorage.setItem("fidem_token", r.data.token);
-    await loadMe();
+    await loadMe(r.data.user);
     return r.data;
   };
   const register = async (email, password, name) => {
     const r = await api.post("/auth/register", { email, password, name });
     localStorage.setItem("fidem_token", r.data.token);
-    await loadMe();
+    await loadMe(r.data.user);
     return r.data;
   };
   const logout = () => {
     localStorage.removeItem("fidem_token");
     setUser(null);
     if (wsRef.current) { wsRef.current.stop(); wsRef.current = null; }
+    // Clear the persisted query cache too — otherwise a different account
+    // logging in on the same device would briefly paint the previous user's
+    // cached candidates/chats/profile from localStorage before revalidating.
+    queryClient.clear();
+    try { localStorage.removeItem("fidem-query-cache"); } catch { /* ignore */ }
+    if (process.env.REACT_APP_POSTHOG_KEY) posthog.reset();
     window.location.href = "/auth";
   };
 

@@ -1,11 +1,17 @@
-import React, { useEffect, useState } from "react";
-import api from "@/lib/api";
+import React, { useState } from "react";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ShieldCheck, Wallet, Users as UsersIcon, DollarSign, TrendingUp, BarChart3, LayoutDashboard, Search, MessageSquare, Settings, ChevronRight, Filter, Calendar, MapPin, Phone, Mail, Clock, Activity, AlertTriangle } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Wallet, Users as UsersIcon, DollarSign, TrendingUp, BarChart3, LayoutDashboard, Search, MessageSquare, Settings, ChevronRight, MapPin, Activity, AlertTriangle } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
+import {
+  useAdminStats, useAdminUsers, useAdminRegions, useAdminUserSearch, useUpdateAdminUser,
+  useAdminPayments, useAdminPaymentBlock, useAdminVerifications, useAdminDecideVerification,
+  useAdminReports, useAdminWithdrawals, useAdminWithdrawalDecision, useAdminConcierge,
+  useAdminConciergeMatch, useAdminReferrals, useAdminMessages, useAdminDeleteMessage,
+  useAdminFraud, useAdminMarkSafe,
+} from "@/hooks/queries";
 
 const menuItems = [
   { id: "dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -21,15 +27,22 @@ const menuItems = [
   { id: "reports", icon: Settings, label: "Reports" },
 ];
 
+function AdminPagination({ page, setPage, total, limit }) {
+  if (total <= limit) return null;
+  return (
+    <div className="flex justify-center gap-2 mt-4">
+      <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
+      <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
+      <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
+    </div>
+  );
+}
+
 export default function Admin() {
   const { user, t } = useApp();
-  const [stats, setStats] = useState(null);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-
-  useEffect(() => {
-    api.get("/admin/stats").then((r) => setStats(r.data)).catch(() => {});
-  }, []);
+  const { data: stats } = useAdminStats();
 
   if (!user) return null;
   if (!user.is_admin) {
@@ -247,46 +260,31 @@ function AdminAnalytics({ stats }) {
 function AdminUsers() {
   const [q, setQ] = useState("");
   const [filters, setFilters] = useState({ gender: "", region: "", age_min: "", age_max: "", marital_status: "" });
-  const [list, setList] = useState([]);
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [regions, setRegions] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [zoomPhoto, setZoomPhoto] = useState(null);
   const limit = 20;
-  
-  const load = () => {
-    setLoading(true);
-    const params = { q, page, limit };
-    if (filters.gender) params.gender = filters.gender;
-    if (filters.region) params.region = filters.region;
-    if (filters.marital_status) params.marital_status = filters.marital_status;
-    if (filters.age_min) params.age_min = parseInt(filters.age_min);
-    if (filters.age_max) params.age_max = parseInt(filters.age_max);
-    
-    api.get("/admin/users", { params }).then((r) => {
-      setList(r.data.users || []);
-      setTotal(r.data.total || 0);
-    }).catch((e) => {
-      console.error("Failed to load users:", e);
-      toast.error("Foydalanuvchilarni yuklashda xatolik");
-    }).finally(() => setLoading(false));
+
+  const params = { q, page, limit };
+  if (filters.gender) params.gender = filters.gender;
+  if (filters.region) params.region = filters.region;
+  if (filters.marital_status) params.marital_status = filters.marital_status;
+  if (filters.age_min) params.age_min = parseInt(filters.age_min);
+  if (filters.age_max) params.age_max = parseInt(filters.age_max);
+
+  const { data, isLoading: loading } = useAdminUsers(params);
+  const { data: regions = [] } = useAdminRegions();
+  const list = data?.users || [];
+  const total = data?.total || 0;
+  const updateUser = useUpdateAdminUser();
+
+  const patch = (id, p) => {
+    updateUser.mutate({ id, patch: p }, {
+      onSuccess: () => toast.success("Updated"),
+      onError: () => toast.error("Foydalanuvchilarni yuklashda xatolik"),
+    });
   };
-  
-  const loadRegions = () => api.get("/admin/regions").then((r) => {
-    setRegions(r.data.regions || []);
-  }).catch(() => {});
-  
-  useEffect(() => { load(); loadRegions(); /* eslint-disable-next-line */ }, []);
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [q, page, filters]);
-  
-  const patch = async (id, patch) => {
-    await api.patch(`/admin/users/${id}`, patch);
-    load();
-    toast.success("Updated");
-  };
-  
+
   return (
     <div className="space-y-4" data-testid="admin-users">
       {/* Search and Filters */}
@@ -348,13 +346,7 @@ function AdminUsers() {
       </div>
 
       {/* Pagination */}
-      {total > limit && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
-          <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
-          <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
-        </div>
-      )}
+      <AdminPagination page={page} setPage={setPage} total={total} limit={limit} />
 
       {/* User Detail Modal */}
       {selectedUser && (
@@ -364,7 +356,7 @@ function AdminUsers() {
               <h3 className="font-heading text-xl font-semibold">Foydalanuvchi tafsilotlari</h3>
               <button onClick={() => setSelectedUser(null)} className="p-2 rounded-full hover:bg-muted">✕</button>
             </div>
-            
+
             <div className="space-y-4">
               {/* Profile */}
               <div className="flex items-center gap-4 p-4 bg-muted rounded-2xl">
@@ -483,25 +475,16 @@ function AdminUsers() {
 }
 
 function AdminPayments() {
-  const [list, setList] = useState([]);
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
   const limit = 20;
-  const load = () => api.get("/admin/payments", { params: { page, limit } }).then((r) => {
-    setList(r.data.payments || []);
-    setTotal(r.data.total || 0);
-  });
-  useEffect(() => { load(); }, [page]);
-  const blockPayment = async (id) => {
-    await api.post(`/admin/payments/${id}/block`);
-    toast.success("Blocked");
-    load();
-  };
-  const unblockPayment = async (id) => {
-    await api.post(`/admin/payments/${id}/unblock`);
-    toast.success("Unblocked");
-    load();
-  };
+  const { data } = useAdminPayments({ page, limit });
+  const list = data?.payments || [];
+  const total = data?.total || 0;
+  const blockMutation = useAdminPaymentBlock();
+
+  const blockPayment = (id) => blockMutation.mutate({ id, block: true }, { onSuccess: () => toast.success("Blocked") });
+  const unblockPayment = (id) => blockMutation.mutate({ id, block: false }, { onSuccess: () => toast.success("Unblocked") });
+
   return (
     <div className="space-y-2" data-testid="admin-payments">
       {list.map((p) => (
@@ -521,31 +504,20 @@ function AdminPayments() {
           </div>
         </div>
       ))}
-      {total > limit && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
-          <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
-          <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
-        </div>
-      )}
+      <AdminPagination page={page} setPage={setPage} total={total} limit={limit} />
     </div>
   );
 }
 
 function AdminVerifications() {
-  const [list, setList] = useState([]);
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
   const limit = 20;
-  const load = () => api.get("/admin/verifications", { params: { page, limit } }).then((r) => {
-    setList(r.data.verifications || []);
-    setTotal(r.data.total || 0);
-  });
-  useEffect(() => { load(); }, [page]);
-  const decide = async (id, approve) => {
-    await api.post(`/admin/verifications/${id}/decide`, { approve });
-    load();
-  };
+  const { data } = useAdminVerifications({ page, limit });
+  const list = data?.verifications || [];
+  const total = data?.total || 0;
+  const decideMutation = useAdminDecideVerification();
+  const decide = (id, approve) => decideMutation.mutate({ id, approve });
+
   return (
     <div className="space-y-2" data-testid="admin-verifs">
       {list.length === 0 && <p className="text-sm text-muted-foreground">No pending</p>}
@@ -561,20 +533,13 @@ function AdminVerifications() {
           </div>
         </div>
       ))}
-      {total > limit && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
-          <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
-          <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
-        </div>
-      )}
+      <AdminPagination page={page} setPage={setPage} total={total} limit={limit} />
     </div>
   );
 }
 
 function AdminReports() {
-  const [list, setList] = useState([]);
-  useEffect(() => { api.get("/admin/reports").then((r) => setList(r.data || [])); }, []);
+  const { data: list = [] } = useAdminReports();
   return (
     <div className="space-y-2" data-testid="admin-reports">
       {list.length === 0 && <p className="text-sm text-muted-foreground">No reports</p>}
@@ -589,28 +554,21 @@ function AdminReports() {
 }
 
 function AdminWithdrawals() {
-  const [list, setList] = useState([]);
   const [filter, setFilter] = useState("pending");
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
   const [selectedWithdrawal, setSelectedWithdrawal] = useState(null);
   const limit = 20;
-  const load = () => api.get("/admin/withdrawals", { params: { status: filter || undefined, page, limit } }).then((r) => {
-    setList(r.data.withdrawals || []);
-    setTotal(r.data.total || 0);
-  });
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter, page]);
-  const approve = async (id) => { 
-    await api.post(`/admin/withdrawals/${id}/approve`); 
-    toast.success("Tasdiqlandi"); 
-    load(); 
-  };
-  const reject = async (id) => {
+  const { data } = useAdminWithdrawals({ status: filter || undefined, page, limit });
+  const list = data?.withdrawals || [];
+  const total = data?.total || 0;
+  const decisionMutation = useAdminWithdrawalDecision();
+
+  const approve = (id) => decisionMutation.mutate({ id, approve: true }, { onSuccess: () => toast.success("Tasdiqlandi") });
+  const reject = (id) => {
     const reason = prompt("Rad etish sababi:") || "";
-    await api.post(`/admin/withdrawals/${id}/reject`, { reason });
-    toast.success("Rad etildi"); 
-    load();
+    decisionMutation.mutate({ id, approve: false, reason }, { onSuccess: () => toast.success("Rad etildi") });
   };
+
   return (
     <div className="space-y-4" data-testid="admin-withdrawals">
       <div className="flex gap-1">
@@ -638,13 +596,7 @@ function AdminWithdrawals() {
           </div>
         ))}
       </div>
-      {total > limit && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
-          <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
-          <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
-        </div>
-      )}
+      <AdminPagination page={page} setPage={setPage} total={total} limit={limit} />
 
       {/* Withdrawal Detail Modal */}
       {selectedWithdrawal && (
@@ -654,7 +606,7 @@ function AdminWithdrawals() {
               <h3 className="font-heading text-xl font-semibold">Yechib olish tafsilotlari</h3>
               <button onClick={() => setSelectedWithdrawal(null)} className="p-2 rounded-full hover:bg-muted">✕</button>
             </div>
-            
+
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-muted rounded-xl">
@@ -718,22 +670,20 @@ function AdminWithdrawals() {
 }
 
 function AdminConcierge() {
-  const [list, setList] = useState([]);
-  const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
-  const load = () => api.get("/admin/concierge").then((r) => setList(r.data || []));
-  useEffect(() => { load(); }, []);
-  useEffect(() => {
-    if (search.length >= 2) api.get("/admin/users", { params: { q: search } }).then((r) => setUsers(r.data || []));
-  }, [search]);
-  const addMatch = async (orderId, matchUserId) => {
+  const { data: list = [] } = useAdminConcierge();
+  const { data: userSearchData } = useAdminUserSearch(search);
+  const users = userSearchData?.users || [];
+  const matchMutation = useAdminConciergeMatch();
+
+  const addMatch = (orderId, matchUserId) => {
     const note = prompt("Mos haqida izoh (ixtiyoriy):") || "";
-    try {
-      await api.post(`/admin/concierge/${orderId}/match`, { match_user_id: matchUserId, note });
-      toast.success("Mos qo'shildi");
-      load();
-    } catch (e) { toast.error("Xato"); }
+    matchMutation.mutate({ orderId, matchUserId, note }, {
+      onSuccess: () => toast.success("Mos qo'shildi"),
+      onError: () => toast.error("Xato"),
+    });
   };
+
   return (
     <div className="space-y-3" data-testid="admin-concierge">
       <input placeholder="Foydalanuvchi qidirish (mos qo'shish uchun)..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm" />
@@ -768,10 +718,8 @@ function AdminConcierge() {
 }
 
 function AdminReferrals() {
-  const [list, setList] = useState([]);
   const [filter, setFilter] = useState("all");
-  const load = () => api.get("/admin/referrals", { params: { type: filter || undefined } }).then((r) => setList(r.data || []));
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter]);
+  const { data: list = [] } = useAdminReferrals({ type: filter || undefined });
   return (
     <div className="space-y-2" data-testid="admin-referrals">
       <div className="flex gap-1">
@@ -799,47 +747,36 @@ function AdminReferrals() {
 }
 
 function AdminMessages() {
-  const [list, setList] = useState([]);
   const [q, setQ] = useState("");
   const [userIdFilter, setUserIdFilter] = useState("");
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
   const limit = 20;
-  const load = () => {
-    setLoading(true);
-    const params = { q, page, limit };
-    if (userIdFilter) params.user_id = userIdFilter;
-    
-    api.get("/admin/messages", { params }).then((r) => {
-      setList(r.data.messages || []);
-      setTotal(r.data.total || 0);
-    }).catch((e) => {
-      console.error("Failed to load messages:", e);
-      toast.error("Xabarlarni yuklashda xatolik");
-    }).finally(() => setLoading(false));
-  };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [q, userIdFilter, page]);
-  const deleteMsg = async (id) => {
+  const params = { q, page, limit };
+  if (userIdFilter) params.user_id = userIdFilter;
+  const { data, isLoading: loading } = useAdminMessages(params);
+  const list = data?.messages || [];
+  const total = data?.total || 0;
+  const deleteMutation = useAdminDeleteMessage();
+
+  const deleteMsg = (id) => {
     if (confirm("Xabarni o'chirmoqchimisiz?")) {
-      await api.delete(`/admin/messages/${id}`);
-      toast.success("O'chirildi");
-      load();
+      deleteMutation.mutate(id, { onSuccess: () => toast.success("O'chirildi") });
     }
   };
+
   return (
     <div className="space-y-4" data-testid="admin-messages">
       <div className="space-y-2">
         <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search messages by text..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" />
         <input value={userIdFilter} onChange={(e) => { setUserIdFilter(e.target.value); setPage(1); }} placeholder="Filter by user ID..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" />
       </div>
-      
+
       {loading && (
         <div className="text-center py-8 text-muted-foreground">
           Yuklanmoqda...
         </div>
       )}
-      
+
       {!loading && list.length === 0 && <p className="text-sm text-muted-foreground">Xabarlar topilmadi</p>}
       {!loading && list.map((m) => (
         <div key={m.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`adm-msg-${m.id}`}>
@@ -863,33 +800,22 @@ function AdminMessages() {
           </div>
         </div>
       ))}
-      {total > limit && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
-          <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
-          <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
-        </div>
-      )}
+      <AdminPagination page={page} setPage={setPage} total={total} limit={limit} />
     </div>
   );
 }
 
 function AdminFraud() {
-  const [list, setList] = useState([]);
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
   const [minScore, setMinScore] = useState(50);
   const limit = 50;
-  const load = () => api.get("/admin/fraud", { params: { min_score: minScore, page, limit } }).then((r) => {
-    setList(r.data.users || []);
-    setTotal(r.data.total || 0);
-  });
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [minScore, page]);
-  const markSafe = async (uid) => {
-    await api.post(`/admin/users/${uid}/mark-safe`);
-    toast.success("Marked as safe");
-    load();
-  };
+  const { data } = useAdminFraud({ min_score: minScore, page, limit });
+  const list = data?.users || [];
+  const total = data?.total || 0;
+  const markSafeMutation = useAdminMarkSafe();
+
+  const markSafe = (uid) => markSafeMutation.mutate(uid, { onSuccess: () => toast.success("Marked as safe") });
+
   return (
     <div className="space-y-4" data-testid="admin-fraud">
       <div className="flex gap-2 items-center">
@@ -921,13 +847,7 @@ function AdminFraud() {
           </div>
         ))}
       </div>
-      {total > limit && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
-          <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
-          <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
-        </div>
-      )}
+      <AdminPagination page={page} setPage={setPage} total={total} limit={limit} />
     </div>
   );
 }

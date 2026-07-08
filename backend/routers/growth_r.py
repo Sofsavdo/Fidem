@@ -16,17 +16,6 @@ router = APIRouter(tags=["growth"])
 BOOST_PRICE = 5000        # 24h boost in UZS (deducts from balance or paid via CLICK)
 DAILY_COINS = 20          # +20 coins (non-cashable) per daily check-in
 STREAK_7_COINS = 100      # week-7 streak bonus (coins)
-INVITE_REWARD_GIVES_PREMIUM_DAYS = 7  # 3 invites → 7 free Premium days
-
-# Enhanced referral rewards
-REFERRAL_TIERS = {
-    1: {"coins": 50, "label": "Birinchi do'st"},
-    3: {"coins": 200, "premium_days": 7, "label": "3 do'st"},
-    5: {"coins": 500, "premium_days": 14, "label": "5 do'st"},
-    10: {"coins": 1500, "premium_days": 30, "label": "10 do'st"},
-    25: {"coins": 5000, "premium_days": 60, "vip_days": 7, "label": "25 do'st"},
-    50: {"coins": 15000, "premium_days": 90, "vip_days": 14, "label": "50 do'st"},
-}
 
 
 # ---------- Daily check-in / Streak ----------
@@ -98,11 +87,9 @@ async def boost_activate(request: Request, use_balance: bool = Body(True, embed=
         from models import CreatePaymentRequest
         return await create_payment(CreatePaymentRequest(purpose="balance_topup", amount=BOOST_PRICE), request, uid=uid)
     me = await get_user(uid)
-    if me.get("balance", 0) < BOOST_PRICE:
-        raise HTTPException(402, f"Need {BOOST_PRICE:,} so'm balance")
     until = now_utc() + timedelta(hours=24)
-    await db.users.update_one(
-        {"id": uid},
+    res = await db.users.update_one(
+        {"id": uid, "balance": {"$gte": BOOST_PRICE}},
         {
             "$set": {
                 "boost_until": iso(until),
@@ -115,6 +102,8 @@ async def boost_activate(request: Request, use_balance: bool = Body(True, embed=
             "$inc": {"balance": -BOOST_PRICE},
         },
     )
+    if res.modified_count == 0:
+        raise HTTPException(402, f"Need {BOOST_PRICE:,} so'm balance")
     await push_notif(uid, "boost", "Profile Boost faollashtirildi — 24 soat 5x ko'proq ko'rinish 🚀")
     return {"active": True, "until": iso(until), "balance_after": me.get("balance", 0) - BOOST_PRICE}
 
@@ -162,144 +151,6 @@ ICEBREAKERS_EN = [
 async def icebreakers(lang: str = "uz"):
     pool = {"ru": ICEBREAKERS_RU, "en": ICEBREAKERS_EN}.get(lang, ICEBREAKERS_UZ)
     return pool
-
-
-# ---------- Invite Friends (3 → free Premium week) ----------
-@router.get("/invites/status")
-async def invites_status(uid: str = Depends(get_current_user_id)):
-    me = await get_user(uid)
-    code = me.get("referral_code") or uid[:8]
-    if not me.get("referral_code"):
-        await db.users.update_one({"id": uid}, {"$set": {"referral_code": code}})
-    invited = await db.users.count_documents({"referred_by": code})
-    redeemed = me.get("invite_premium_redeemed", 0)
-    eligible_redemptions = invited // 3
-    available_redemptions = max(0, eligible_redemptions - redeemed)
-    from core import TELEGRAM_BOT_USERNAME
-    link = f"https://t.me/{TELEGRAM_BOT_USERNAME}?start={code}"
-    
-    # Calculate tier rewards
-    claimed_tiers = me.get("referral_claimed_tiers", [])
-    next_tier = None
-    for tier_count in sorted(REFERRAL_TIERS.keys()):
-        if tier_count not in claimed_tiers and invited >= tier_count:
-            next_tier = tier_count
-            break
-    
-    # Monthly tier system
-    monthly_count = me.get("monthly_referral_count", 0)
-    if monthly_count >= 1001:
-        monthly_tier = "gold"
-        next_tier_threshold = None
-        tier_max_reward = 49900
-    elif monthly_count >= 301:
-        monthly_tier = "silver"
-        next_tier_threshold = 1001
-        tier_max_reward = 39900
-    else:
-        monthly_tier = "bronze"
-        next_tier_threshold = 301
-        tier_max_reward = 29900
-    
-    return {
-        "code": code,
-        "link": link,
-        "invited": invited,
-        "redeemed_weeks": redeemed,
-        "available_weeks": available_redemptions,
-        "next_milestone": 3 - (invited % 3) if invited % 3 != 0 else 3,
-        "claimed_tiers": claimed_tiers,
-        "next_tier": next_tier,
-        "tier_rewards": REFERRAL_TIERS,
-        "monthly_tier": monthly_tier,
-        "monthly_count": monthly_count,
-        "next_tier_threshold": next_tier_threshold,
-        "tier_max_reward": tier_max_reward,
-    }
-
-
-@router.post("/invites/redeem")
-async def invites_redeem(uid: str = Depends(get_current_user_id)):
-    """Claim 1 free Premium week per 3 invited friends."""
-    me = await get_user(uid)
-    code = me.get("referral_code") or uid[:8]
-    invited = await db.users.count_documents({"referred_by": code})
-    redeemed = me.get("invite_premium_redeemed", 0)
-    if invited // 3 <= redeemed:
-        raise HTTPException(400, "Not enough invites for redemption")
-    # Extend plan by 7 days; if currently free, set premium with new expiry
-    cur_until = me.get("plan_until")
-    base = parse_dt(cur_until) if cur_until else now_utc()
-    if base < now_utc():
-        base = now_utc()
-    new_until = base + timedelta(days=INVITE_REWARD_GIVES_PREMIUM_DAYS)
-    await db.users.update_one(
-        {"id": uid},
-        {
-            "$set": {"plan": "premium", "plan_until": iso(new_until)},
-            "$inc": {"invite_premium_redeemed": 1},
-        },
-    )
-    await push_notif(uid, "premium", f"Tabriklaymiz! Premium {INVITE_REWARD_GIVES_PREMIUM_DAYS} kun faollashtirildi 🎉")
-    return {"ok": True, "plan_until": iso(new_until)}
-
-
-@router.post("/invites/claim-tier")
-async def claim_tier_reward(tier: int = Body(..., embed=True), uid: str = Depends(get_current_user_id)):
-    """Claim tier-based referral rewards (coins, premium days, VIP days)."""
-    if tier not in REFERRAL_TIERS:
-        raise HTTPException(400, "Invalid tier")
-    
-    me = await get_user(uid)
-    code = me.get("referral_code") or uid[:8]
-    invited = await db.users.count_documents({"referred_by": code})
-    claimed_tiers = me.get("referral_claimed_tiers", [])
-    
-    if tier in claimed_tiers:
-        raise HTTPException(400, "Tier already claimed")
-    
-    if invited < tier:
-        raise HTTPException(400, f"Need {tier} invites to claim this tier")
-    
-    reward = REFERRAL_TIERS[tier]
-    
-    # Grant rewards
-    updates = {"$inc": {}, "$set": {}}
-    updates["$push"] = {"referral_claimed_tiers": tier}
-    
-    if "coins" in reward:
-        updates["$inc"]["coins"] = reward["coins"]
-    
-    if "premium_days" in reward:
-        cur_until = me.get("plan_until")
-        base = parse_dt(cur_until) if cur_until else now_utc()
-        if base < now_utc():
-            base = now_utc()
-        new_until = base + timedelta(days=reward["premium_days"])
-        updates["$set"]["plan"] = "premium"
-        updates["$set"]["plan_until"] = iso(new_until)
-    
-    if "vip_days" in reward:
-        cur_until = me.get("plan_until")
-        base = parse_dt(cur_until) if cur_until else now_utc()
-        if base < now_utc():
-            base = now_utc()
-        new_until = base + timedelta(days=reward["vip_days"])
-        updates["$set"]["plan"] = "vip"
-        updates["$set"]["plan_until"] = iso(new_until)
-    
-    await db.users.update_one({"id": uid}, updates)
-    
-    # Send notification
-    reward_text = f"{reward.get('coins', 0)} coins"
-    if "premium_days" in reward:
-        reward_text += f" + {reward['premium_days']} kun Premium"
-    if "vip_days" in reward:
-        reward_text += f" + {reward['vip_days']} kun VIP"
-    
-    await push_notif(uid, "referral", f"Tabriklaymiz! {reward['label']} mukofoti: {reward_text} 🎉")
-    
-    return {"ok": True, "reward": reward, "claimed_tiers": claimed_tiers + [tier]}
 
 
 # ---------- Referral Username System (Phase 1.4) ----------
@@ -379,15 +230,12 @@ async def set_username(
 
     # Charge for subsequent changes (10,000 so'm)
     if change_count > 0:
-        balance = me.get("balance", 0)
-        if balance < 10000:
-            raise HTTPException(400, "Insufficient balance. Username change costs 10,000 so'm")
-
-        # Deduct balance
-        await db.users.update_one(
+        res = await db.users.update_one(
             {"id": uid, "balance": {"$gte": 10000}},
             {"$inc": {"balance": -10000}}
         )
+        if res.modified_count == 0:
+            raise HTTPException(400, "Insufficient balance. Username change costs 10,000 so'm")
 
     # Atomic swap: remove old reservation, claim new one
     try:

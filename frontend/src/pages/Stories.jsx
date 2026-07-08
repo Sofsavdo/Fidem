@@ -1,17 +1,12 @@
-import React, { useEffect, useState } from "react";
-import api from "@/lib/api";
+import React from "react";
 import { useApp } from "@/contexts/AppContext";
 import { Heart, Eye, Star } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useStories } from "@/hooks/queries";
 
 export default function Stories() {
   const { t } = useApp();
-  const [stories, setStories] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api.get("/stories?limit=50").then((r) => { setStories(r.data || []); setLoading(false); }).catch(() => setLoading(false));
-  }, []);
+  const { data: stories = [], isLoading: loading } = useStories();
 
   return (
     <div className="p-5 max-w-5xl mx-auto pb-24" data-testid="stories-page">

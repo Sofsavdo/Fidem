@@ -1,33 +1,37 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { Wallet, ArrowDownToLine, Clock, CheckCircle2, XCircle, Info } from "lucide-react";
+import { useWithdrawalsStatus, useWithdrawalsHistory, QK } from "@/hooks/queries";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function Withdrawals() {
   const { t } = useApp();
-  const [status, setStatus] = useState(null);
-  const [history, setHistory] = useState([]);
+  const queryClient = useQueryClient();
   const [amount, setAmount] = useState("");
   const [card, setCard] = useState("");
   const [holder, setHolder] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  const load = async () => {
-    try {
-      const [s, h] = await Promise.all([api.get("/withdrawals/status"), api.get("/withdrawals/mine")]);
-      setStatus(s.data);
-      setHistory(h.data || []);
-    } catch (e) { /* ignore */ }
-  };
+  const { data: status } = useWithdrawalsStatus();
+  const { data: history = [] } = useWithdrawalsHistory();
 
-  useEffect(() => { load(); }, []);
+  const submitMutation = useMutation({
+    mutationFn: ({ amt, cardNumber, holderName }) =>
+      api.post("/withdrawals/request", { amount: amt, card_number: cardNumber, holder_name: holderName }),
+    onSuccess: () => {
+      toast.success(t("submit_request") + " ✓");
+      setAmount(""); setCard(""); setHolder("");
+      queryClient.invalidateQueries({ queryKey: QK.withdrawalsStatus });
+      queryClient.invalidateQueries({ queryKey: QK.withdrawalsHistory });
+    },
+    onError: () => toast.error(t("error_generic")),
+  });
 
-  const submit = async () => {
+  const submit = () => {
     const amt = parseInt(amount, 10);
     const minPayout = status?.min_payout || 100000;
     const maxPayout = status?.max_payout;
-    
     if (!amt || amt < minPayout) {
       toast.error(`${t("withdraw_min_error")}: ${minPayout.toLocaleString()} ${t("sum")}`);
       return;
@@ -44,15 +48,7 @@ export default function Withdrawals() {
       toast.error(t("withdraw_card_length_error"));
       return;
     }
-    setLoading(true);
-    try {
-      await api.post("/withdrawals/request", { amount: amt, card_number: card, holder_name: holder });
-      toast.success(t("submit_request") + " ✓");
-      setAmount(""); setCard(""); setHolder("");
-      load();
-    } catch (e) {
-      toast.error(t("error_generic"));
-    } finally { setLoading(false); }
+    submitMutation.mutate({ amt, cardNumber: card, holderName: holder });
   };
 
   if (!status) return <div className="p-6 text-muted-foreground">{t("loading_word")}</div>;
@@ -92,7 +88,6 @@ export default function Withdrawals() {
         </div>
       </div>
 
-      {/* Info - reduced to tooltip */}
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Info className="w-4 h-4 cursor-help" title={t("withdraw_only_referral")} />
         <span>{t("withdraw_explainer")}</span>
@@ -171,11 +166,11 @@ export default function Withdrawals() {
         <button
           data-testid="withdraw-submit"
           onClick={submit}
-          disabled={loading || (status.referral_earnings_withdrawable || 0) < (status.min_payout || 100000)}
+          disabled={submitMutation.isPending || (status.referral_earnings_withdrawable || 0) < (status.min_payout || 100000)}
           className="w-full py-3 rounded-2xl bg-primary text-white font-medium disabled:opacity-50 flex items-center justify-center gap-2"
         >
           <ArrowDownToLine className="w-4 h-4" />
-          {loading ? "..." : t("submit_request")}
+          {submitMutation.isPending ? "..." : t("submit_request")}
         </button>
       </div>
 

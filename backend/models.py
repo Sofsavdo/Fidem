@@ -35,6 +35,10 @@ class AuthResponse(BaseModel):
     user_id: str
     is_admin: bool = False
     onboarded: bool = False
+    user: dict | None = None
+    """Full profile (same shape as GET /auth/me), included so the client can
+    render immediately instead of round-tripping to /auth/me right after
+    login/register/telegram-auth. Optional for backward compatibility."""
 
 
 # ---------- User / Profile ----------
@@ -216,7 +220,11 @@ class PaymentOut(BaseModel):
 # ---------- Gifts ----------
 class SendGiftRequest(BaseModel):
     to_user_id: str
-    gift_kind: Literal["rose", "box", "diamond", "crown"]
+    # Not a Literal of the old 4 legacy kinds - that silently 422'd 10 of the
+    # 12 real catalog gifts (only "diamond"/"crown" happened to overlap with
+    # the legacy names). send_gift() below validates against GIFT_PRICES /
+    # LEGACY_GIFT_MAP itself and 400s on anything actually invalid.
+    gift_kind: str
 
 
 GIFT_PRICES = {
@@ -265,24 +273,6 @@ class AdminUpdateUserRequest(BaseModel):
     balance: Optional[int] = None
     blocked: Optional[bool] = None
     add_balance: Optional[int] = None
-
-
-# ---------- Community Groups ----------
-class CreateGroupRequest(BaseModel):
-    name: str
-    description: str
-    category: str  # e.g., "interests", "region", "hobbies"
-    region: Optional[str] = None
-    is_private: bool = False
-
-
-class JoinGroupRequest(BaseModel):
-    group_id: str
-
-
-class GroupPostRequest(BaseModel):
-    group_id: str
-    text: str
 
 
 # ---------- Notification Preferences ----------

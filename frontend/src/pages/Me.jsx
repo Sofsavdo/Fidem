@@ -1,46 +1,58 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, PlanPill } from "@/components/Badges";
 import PhotoUpload from "@/components/PhotoUpload";
-import { ChevronRight, Crown, Gem, Wallet, Share2, Settings as SettingsIcon, LogOut, Copy, Trophy, ShieldCheck, Bell, Clock, SlidersHorizontal, Brain, UsersRound, Pen, BookOpen, Phone, Plane, TrendingUp, Award } from "lucide-react";
+import { ChevronRight, Crown, Gem, Wallet, Share2, Settings as SettingsIcon, LogOut, Copy, Trophy, ShieldCheck, Bell, Clock, SlidersHorizontal, Brain, UsersRound, Pen, BookOpen, Phone, Plane, TrendingUp, Award, Rocket } from "lucide-react";
 import ProgressCard from "@/components/ProgressCard";
 import LangSwitch from "@/components/LangSwitch";
+import BoostModal from "@/components/BoostModal";
+import LocationVerifyCard from "@/components/LocationVerifyCard";
 import { photoSrc } from "@/lib/photo";
 import { toast } from "sonner";
+import { useReferral, useNotifications, useDailyStatus, useLeaderboard, useSaved, QK } from "@/hooks/queries";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
 
 export default function Me() {
   const { user, t, logout, refresh, wsEvent } = useApp();
-  const [referral, setReferral] = useState(null);
-  const [leaders, setLeaders] = useState([]);
+  const queryClient = useQueryClient();
   const [leadPeriod, setLeadPeriod] = useState("all");
-  const [unread, setUnread] = useState(0);
+  const [boostOpen, setBoostOpen] = useState(false);
 
-  const loadData = useCallback(() => {
-    Promise.all([
-      api.get("/referral/mine").catch(() => ({ data: null })),
-      api.get("/notifications").catch(() => ({ data: [] })),
-      api.get("/daily/status").catch(() => ({ data: null })),
-      api.get(`/rankings/global`).catch(() => ({ data: { rankings: [] } })),
-    ]).then(([r, n, d, l]) => {
-      setReferral(r.data);
-      setUnread((n.data || []).filter((x) => !x.read).length);
-      setDaily(d.data);
-      setLeaders(l.data?.rankings || []);
-    });
-  }, []);
+  const { data: referral } = useReferral();
+  const { data: notifications = [] } = useNotifications();
+  const { data: daily, refetch: refetchDaily } = useDailyStatus();
+  const { data: leaders = [] } = useLeaderboard(leadPeriod);
+  const { data: profileViewers = [] } = useSaved("viewers");
+  const { data: profileSavers = [] } = useSaved("by_others");
 
-  useEffect(() => { loadData(); }, [loadData]);
+  const unread = notifications.filter((x) => !x.read).length;
 
-  const [daily, setDaily] = useState(null);
-
-  // Increment unread on WS notification
+  // Invalidate notifications on WS event so count stays in sync
   useEffect(() => {
     if (wsEvent?.type === "notification") {
-      setUnread((u) => u + 1);
+      queryClient.invalidateQueries({ queryKey: QK.notifications });
     }
-  }, [wsEvent]);
+  }, [wsEvent, queryClient]);
+
+  const claimDailyMutation = useMutation({
+    mutationFn: () => api.post("/daily/claim"),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: QK.dailyStatus });
+      const previous = queryClient.getQueryData(QK.dailyStatus);
+      queryClient.setQueryData(QK.dailyStatus, (old) => old ? { ...old, claimed_today: true } : old);
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(QK.dailyStatus, context.previous);
+    },
+    onSuccess: (r) => {
+      toast.success(`+${r.data.bonus} ${r.data.currency === "coins" ? t("coin") : t("sum")}`);
+      queryClient.invalidateQueries({ queryKey: QK.dailyStatus });
+      refresh();
+    },
+  });
 
   if (!user) return null;
 
@@ -112,6 +124,29 @@ export default function Me() {
         </div>
       </div>
 
+      {/* Contextual upsell — surfaces existing profile_views/saved-by-others data instead of burying it in a tab */}
+      {!["premium", "vip"].includes(user.plan) && (profileViewers.length > 0 || profileSavers.length > 0) && (
+        <Link
+          to="/premium?tab=plans"
+          data-testid="profile-teaser-banner"
+          className="block rounded-3xl bg-gradient-to-r from-primary/10 to-card border border-primary/30 p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium leading-snug">
+              {profileViewers.length > 0 && profileSavers.length > 0
+                ? t("profile_teaser_both").replace("{n}", profileViewers.length).replace("{m}", profileSavers.length)
+                : profileViewers.length > 0
+                ? t("profile_teaser_views_only").replace("{n}", profileViewers.length)
+                : t("profile_teaser_saves_only").replace("{m}", profileSavers.length)}
+            </p>
+            <span className="shrink-0 text-xs font-semibold text-primary whitespace-nowrap">{t("profile_teaser_cta")} →</span>
+          </div>
+        </Link>
+      )}
+
+      {/* Location verification (Map M1) */}
+      <LocationVerifyCard />
+
       {/* Completeness */}
       <div className="rounded-3xl bg-card border border-border p-4">
         <div className="flex items-center justify-between mb-2">
@@ -131,22 +166,28 @@ export default function Me() {
 
       {/* Premium/balance row */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <Link to="/premium?tab=plans" data-testid="link-premium" className="rounded-3xl bg-gradient-to-br from-ink to-zinc-800 text-white p-4 hover:-translate-y-0.5 transition-transform">
+        <Link to="/premium?tab=plans" data-testid="link-premium" className="rounded-3xl bg-gradient-to-br from-ink to-zinc-800 text-white p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform">
           <Crown className="w-5 h-5 text-gold" />
           <p className="font-heading text-lg mt-2">{t("premium")}</p>
           <p className="text-xs text-white/70 mt-0.5">{t("premium_subtitle")} →</p>
         </Link>
-        <Link to="/withdrawals" data-testid="link-balance" className="rounded-3xl bg-card border border-border p-4 hover:-translate-y-0.5 transition-transform">
+        <Link to="/withdrawals" data-testid="link-balance" className="rounded-3xl bg-card border border-border p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform">
           <Wallet className="w-5 h-5 text-foreground" />
           <p className="font-heading text-lg mt-2">{(user.balance || 0).toLocaleString()} {t("sum")}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{t("balance")}</p>
         </Link>
-        <Link to="/premium?tab=plans" data-testid="link-boost" className="rounded-3xl bg-gradient-to-br from-primary/10 to-card border border-primary/30 p-4 hover:-translate-y-0.5 transition-transform col-span-2 md:col-span-1">
-          <Trophy className="w-5 h-5 text-foreground" />
+        <button
+          type="button"
+          onClick={() => setBoostOpen(true)}
+          data-testid="link-boost"
+          className="text-left rounded-3xl bg-gradient-to-br from-primary/10 to-card border border-primary/30 p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform col-span-2 md:col-span-1"
+        >
+          <Rocket className="w-5 h-5 text-foreground" />
           <p className="font-heading text-lg mt-2">{t("boost_title")}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{t("boost_subtitle")} →</p>
-        </Link>
+        </button>
       </div>
+      {boostOpen && <BoostModal onClose={() => setBoostOpen(false)} />}
 
       {/* Daily streak */}
       {daily && (
@@ -160,16 +201,9 @@ export default function Me() {
           ) : (
             <button
               data-testid="daily-claim-inline"
-              onClick={async () => {
-                try {
-                  const r = await api.post("/daily/claim");
-                  toast.success(`+${r.data.bonus} ${r.data.currency === "coins" ? t("coin") : t("sum")}`);
-                  const s = await api.get("/daily/status");
-                  setDaily(s.data);
-                  refresh();
-                } catch (e) { /* ignore */ }
-              }}
-              className="rounded-xl bg-gold text-ink px-4 py-2 text-sm font-medium"
+              onClick={() => claimDailyMutation.mutate()}
+              disabled={claimDailyMutation.isPending}
+              className="rounded-xl bg-gold text-ink px-4 py-2 text-sm font-medium disabled:opacity-60"
             >
               +{daily.next_bonus} {daily.currency === "coins" ? t("coin") : t("sum")}
             </button>
@@ -179,7 +213,7 @@ export default function Me() {
 
       {/* Invite friends → unified single entrypoint */}
       {referral && (
-        <Link to="/referral" data-testid="invite-card" className="block rounded-3xl bg-gradient-to-r from-secondary/10 to-card border border-secondary/30 p-4 hover:-translate-y-0.5 transition-transform">
+        <Link to="/referral" data-testid="invite-card" className="block rounded-3xl bg-gradient-to-r from-secondary/10 to-card border border-secondary/30 p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform">
           <div className="flex items-center justify-between">
             <div className="min-w-0">
               <p className="font-heading text-lg flex items-center gap-2"><Share2 className="w-4 h-4 text-secondary" /> {t("invite_friends")}</p>
@@ -239,65 +273,52 @@ export default function Me() {
         <div className="space-y-2">
           {leaders.length === 0 && <p className="text-xs text-muted-foreground">{t("no_data")}</p>}
           {leaders.slice(0, 10).map((row, i) => (
-            <div key={row.user_id || row.id || i} className="flex items-center gap-3 text-sm">
+            <div key={row.user?.id || i} className="flex items-center gap-3 text-sm">
               <span className="w-5 text-center font-medium text-muted-foreground">{i + 1}</span>
               <div className="w-7 h-7 rounded-full bg-muted overflow-hidden">
-                {row.photo_url && <img loading="lazy" decoding="async" src={photoSrc(row.photo_url)} alt="" className="w-full h-full object-cover" />}
+                {row.user?.photo_url && <img loading="lazy" decoding="async" src={photoSrc(row.user.photo_url)} alt="" className="w-full h-full object-cover" />}
               </div>
-              <span className="flex-1 truncate">{row.name || "—"}</span>
-              <span className="text-gold-dark font-medium">{(row.ranking_score || row.total || 0).toLocaleString()}</span>
+              <span className="flex-1 truncate">{row.user?.name || "—"}</span>
+              <span className="text-gold-dark font-medium">{(row.total || 0).toLocaleString()}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Admin & settings */}
-      <div className="rounded-3xl bg-card border border-border divide-y">
-        <Link to="/personality" data-testid="link-personality" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><Brain className="w-4 h-4 text-secondary" /> {t("personality_test")}</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
-        <Link to="/prompts" data-testid="link-prompts" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><Pen className="w-4 h-4 text-secondary" /> {t("profile_prompts")}</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
-        <Link to="/stories" data-testid="link-stories" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><BookOpen className="w-4 h-4 text-foreground" /> {t("success_stories")}</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
-        <Link to="/concierge" data-testid="link-concierge" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><Crown className="w-4 h-4 text-secondary" /> {t("concierge_title")} (199,000 {t("sum")})</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
-        <Link to="/family" data-testid="link-family" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><Phone className="w-4 h-4 text-foreground" /> {t("family_contact")}</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
-        <Link to="/withdrawals" data-testid="link-withdrawals" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><Wallet className="w-4 h-4 text-foreground" /> {t("withdraw_money")} ({(user.withdrawable_balance || 0).toLocaleString()} {t("sum")})</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
-        <Link to="/rankings" data-testid="link-rankings" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><Award className="w-4 h-4 text-gold-dark" /> {t("rankings")}</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
-        <Link to="/verification" data-testid="link-verification" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><ShieldCheck className="w-4 h-4 text-foreground" /> {t("profile_verification")}</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
-        <Link to="/settings" data-testid="link-settings" className="flex items-center justify-between p-4">
-          <span className="flex items-center gap-3 text-sm"><SlidersHorizontal className="w-4 h-4" /> {t("who_can_message_me")}</span>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
-        {user.is_admin && (
-          <Link to="/admin" data-testid="link-admin" className="flex items-center justify-between p-4">
-            <span className="flex items-center gap-3 text-sm"><SettingsIcon className="w-4 h-4" /> {t("admin_panel")}</span>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </Link>
-        )}
-        <button data-testid="btn-logout" onClick={logout} className="flex items-center justify-between p-4 w-full text-left">
-          <span className="flex items-center gap-3 text-sm text-foreground"><LogOut className="w-4 h-4" /> {t("logout")}</span>
-        </button>
+      {/* Profil */}
+      <div>
+        <p className="field-label mb-2 px-1">{t("me_group_profile")}</p>
+        <div className="rounded-3xl bg-card border border-border divide-y">
+          <NavRow to="/personality" testid="link-personality" icon={<Brain className="w-4 h-4 text-secondary" />} label={t("personality_test")} />
+          <NavRow to="/prompts" testid="link-prompts" icon={<Pen className="w-4 h-4 text-secondary" />} label={t("profile_prompts")} />
+          <NavRow to="/family" testid="link-family" icon={<Phone className="w-4 h-4 text-foreground" />} label={t("family_contact")} />
+          <NavRow to="/verification" testid="link-verification" icon={<ShieldCheck className="w-4 h-4 text-foreground" />} label={t("profile_verification")} />
+        </div>
+      </div>
+
+      {/* Pul va imkoniyatlar */}
+      <div>
+        <p className="field-label mb-2 px-1">{t("me_group_money")}</p>
+        <div className="rounded-3xl bg-card border border-border divide-y">
+          <NavRow to="/concierge" testid="link-concierge" icon={<Crown className="w-4 h-4 text-secondary" />} label={`${t("concierge_title")} (199,000 ${t("sum")})`} />
+          <NavRow to="/withdrawals" testid="link-withdrawals" icon={<Wallet className="w-4 h-4 text-foreground" />} label={`${t("withdraw_money")} (${(user.withdrawable_balance || 0).toLocaleString()} ${t("sum")})`} />
+          <NavRow to="/rankings" testid="link-rankings" icon={<Award className="w-4 h-4 text-gold-dark" />} label={t("rankings")} />
+        </div>
+      </div>
+
+      {/* Ilova */}
+      <div>
+        <p className="field-label mb-2 px-1">{t("me_group_app")}</p>
+        <div className="rounded-3xl bg-card border border-border divide-y">
+          <NavRow to="/stories" testid="link-stories" icon={<BookOpen className="w-4 h-4 text-foreground" />} label={t("success_stories")} />
+          <NavRow to="/settings" testid="link-settings" icon={<SlidersHorizontal className="w-4 h-4" />} label={t("who_can_message_me")} />
+          {user.is_admin && (
+            <NavRow to="/admin" testid="link-admin" icon={<SettingsIcon className="w-4 h-4" />} label={t("admin_panel")} />
+          )}
+          <button data-testid="btn-logout" onClick={logout} className="flex items-center justify-between p-4 w-full text-left">
+            <span className="flex items-center gap-3 text-sm text-foreground"><LogOut className="w-4 h-4" /> {t("logout")}</span>
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -309,5 +330,14 @@ const Row = React.memo(function Row({ icon, label, right }) {
       <span className="flex items-center gap-3 text-sm">{icon} {label}</span>
       <div>{right}</div>
     </div>
+  );
+});
+
+const NavRow = React.memo(function NavRow({ to, testid, icon, label }) {
+  return (
+    <Link to={to} data-testid={testid} className="flex items-center justify-between p-4">
+      <span className="flex items-center gap-3 text-sm">{icon} {label}</span>
+      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+    </Link>
   );
 });

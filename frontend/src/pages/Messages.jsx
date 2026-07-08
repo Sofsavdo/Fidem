@@ -1,29 +1,24 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { photoSrc } from "@/lib/photo";
+import { useMessagesChats, useMessagesApplications, QK } from "@/hooks/queries";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function Messages() {
   const { t } = useApp();
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState("chats");
-  const [chats, setChats] = useState([]);
-  const [apps, setApps] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [c, a] = await Promise.all([
-        api.get("/messages/chats"),
-        api.get("/messages/applications"),
-      ]);
-      setChats(c.data || []);
-      setApps(a.data || []);
-    } finally { setLoading(false); }
-  }, []);
+  const { data: chats = [], isLoading: loadingChats } = useMessagesChats();
+  const { data: apps = [], isLoading: loadingApps } = useMessagesApplications();
+  const loading = loadingChats || loadingApps;
 
-  useEffect(() => { load(); }, [load]);
+  const reload = () => {
+    queryClient.invalidateQueries({ queryKey: QK.messagesChats });
+    queryClient.invalidateQueries({ queryKey: QK.messagesApplications });
+  };
 
   const matches = chats.filter((c) => c.status === "match");
 
@@ -60,7 +55,7 @@ export default function Messages() {
       {tab === "applications" && (
         <div className="space-y-2" data-testid="app-list">
           {apps.length === 0 && !loading && <Empty label={t("no_data")} />}
-          {apps.map((a) => <ApplicationRowMemo key={a.application.id} a={a} onChange={load} />)}
+          {apps.map((a) => <ApplicationRowMemo key={a.application.id} a={a} onChange={reload} />)}
         </div>
       )}
       {tab === "matches" && (

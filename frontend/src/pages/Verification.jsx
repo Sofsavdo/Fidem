@@ -1,13 +1,15 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { ShieldCheck, Upload, CheckCircle2, XCircle, Clock, FileText, IdCard, ScanFace, Banknote } from "lucide-react";
+import { useVerificationMine, QK } from "@/hooks/queries";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function Verification() {
   const { t } = useApp();
-  const [data, setData] = useState(null);
-  const [busy, setBusy] = useState(false);
+  const queryClient = useQueryClient();
+  const { data } = useVerificationMine();
 
   const kinds = [
     {
@@ -36,23 +38,23 @@ export default function Verification() {
     },
   ];
 
-  const load = () => api.get("/verification/mine").then((r) => setData(r.data)).catch(() => {});
-  useEffect(() => { load(); }, []);
-
-  const uploadAndSubmit = async (kind, file, note) => {
-    setBusy(true);
-    try {
+  const uploadMutation = useMutation({
+    mutationFn: async ({ kind, file, note }) => {
       const fd = new FormData();
       fd.append("file", file);
       const r = await api.post("/files/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
       const proof_url = `${process.env.REACT_APP_BACKEND_URL}${r.data.url}`;
-      await api.post("/verification/request", { kind, note: note || "", proof_url });
+      return api.post("/verification/request", { kind, note: note || "", proof_url });
+    },
+    onSuccess: () => {
       toast.success(t("submit_request") + " ✓");
-      load();
-    } catch (e) {
-      toast.error(t("error_generic"));
-    } finally { setBusy(false); }
-  };
+      queryClient.invalidateQueries({ queryKey: QK.verificationMine });
+    },
+    onError: () => toast.error(t("error_generic")),
+  });
+
+  const uploadAndSubmit = (kind, file, note) => uploadMutation.mutate({ kind, file, note });
+  const busy = uploadMutation.isPending;
 
   if (!data) {
     return (

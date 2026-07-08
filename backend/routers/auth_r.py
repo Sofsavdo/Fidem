@@ -160,6 +160,28 @@ async def health():
     return {"status": "ok", "service": "fidem"}
 
 
+def _build_me_payload(user: dict) -> dict:
+    """Full profile shape returned by GET /auth/me. Shared so login/register/
+    telegram-auth can embed it directly and skip a follow-up /auth/me call."""
+    pub = user_public(user, include_private=True)
+    pub["email"] = user.get("email")
+    pub["telegram_id"] = user.get("telegram_id")
+    pub["telegram_username"] = user.get("telegram_username")
+    pub["onboarded"] = user.get("onboarded", False)
+    pub["is_admin"] = user.get("is_admin", False)
+    pub["message_filters"] = user.get("message_filters", {})
+    pub["birth_date"] = user.get("birth_date")
+    pub["country"] = user.get("country")
+    pub["search_country"] = user.get("search_country")
+    pub["search_region"] = user.get("search_region")
+    pub["search_age_min"] = user.get("search_age_min", 18)
+    pub["search_age_max"] = user.get("search_age_max", 60)
+    pub["search_gender"] = user.get("search_gender")
+    pub["looking_for"] = user.get("looking_for")
+    pub["language"] = user.get("language", "uz")
+    return pub
+
+
 @router.post("/auth/register", response_model=AuthResponse)
 async def register(req: RegisterRequest, request: Request):
     rate_limit_auth(request)
@@ -201,7 +223,7 @@ async def register(req: RegisterRequest, request: Request):
         doc["flagged_as_bot"] = True
     
     await db.users.insert_one(doc)
-    return AuthResponse(token=create_token(uid), user_id=uid, onboarded=False)
+    return AuthResponse(token=create_token(uid), user_id=uid, onboarded=False, user=_build_me_payload(doc))
 
 
 @router.post("/auth/login", response_model=AuthResponse)
@@ -216,6 +238,7 @@ async def login(req: LoginRequest, request: Request):
         user_id=user["id"],
         is_admin=is_admin,
         onboarded=user.get("onboarded", False),
+        user=_build_me_payload(user),
     )
 
 
@@ -238,11 +261,13 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request):
             {"id": existing["id"]},
             {"$set": {"last_active": iso(now_utc()), "ip_address": client_ip, "user_agent": user_agent}},
         )
+        existing.update({"last_active": iso(now_utc()), "ip_address": client_ip, "user_agent": user_agent})
         return AuthResponse(
             token=create_token(existing["id"], is_admin=existing.get("is_admin", False)),
             user_id=existing["id"],
             is_admin=existing.get("is_admin", False),
             onboarded=existing.get("onboarded", False),
+            user=_build_me_payload(existing),
         )
 
     uid = new_id()
@@ -297,29 +322,13 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request):
             await db.users.update_one({"id": uid}, {"$set": {"referred_by": ref_code}})
             await db.pending_refs.delete_one({"telegram_id": tg_id})
 
-    return AuthResponse(token=create_token(uid), user_id=uid, onboarded=False)
+    return AuthResponse(token=create_token(uid), user_id=uid, onboarded=False, user=_build_me_payload(doc))
 
 
 @router.get("/auth/me")
 async def me(uid: str = Depends(get_current_user_id)):
     user = await get_user(uid)
-    pub = user_public(user, include_private=True)
-    pub["email"] = user.get("email")
-    pub["telegram_id"] = user.get("telegram_id")
-    pub["telegram_username"] = user.get("telegram_username")
-    pub["onboarded"] = user.get("onboarded", False)
-    pub["is_admin"] = user.get("is_admin", False)
-    pub["message_filters"] = user.get("message_filters", {})
-    pub["birth_date"] = user.get("birth_date")
-    pub["country"] = user.get("country")
-    pub["search_country"] = user.get("search_country")
-    pub["search_region"] = user.get("search_region")
-    pub["search_age_min"] = user.get("search_age_min", 18)
-    pub["search_age_max"] = user.get("search_age_max", 60)
-    pub["search_gender"] = user.get("search_gender")
-    pub["looking_for"] = user.get("looking_for")
-    pub["language"] = user.get("language", "uz")
-    return pub
+    return _build_me_payload(user)
 
 
 @router.post("/profile/onboard")
@@ -337,28 +346,38 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
         from ai_service import verify_face_photo
 
         result = await verify_face_photo(image_url=photo_url)
+        code = result.get("code") or "other"
         if not result.get("valid"):
             await db.users.update_one(
                 {"id": uid},
                 {
                     "$set": {
                         "photo_verified": False,
-                        "photo_verification_code": result.get("code"),
+                        "photo_verification_code": code,
                     }
                 },
             )
-            raise HTTPException(400, f"photo_invalid:{result.get('code') or 'other'}")
-
-        await db.users.update_one(
-            {"id": uid},
-            {
-                "$set": {
-                    "photo_verified": True,
-                    "photo_verified_at": iso(now_utc()),
-                    "photo_verification_code": "ok",
-                }
-            },
-        )
+            # "verification_unavailable" means the AI vision call itself
+            # failed (rate limit, timeout, outage) - it says nothing about
+            # the photo. Blocking signup on a third-party API hiccup would
+            # take down the entire registration funnel; let the user
+            # through unverified instead, re-checked next time they touch
+            # their photo. Only genuine content rejections (no_face,
+            # multiple_faces, minor, cartoon, celebrity, too_blurry, ...)
+            # actually block onboarding.
+            if code != "verification_unavailable":
+                raise HTTPException(400, f"photo_invalid:{code}")
+        else:
+            await db.users.update_one(
+                {"id": uid},
+                {
+                    "$set": {
+                        "photo_verified": True,
+                        "photo_verified_at": iso(now_utc()),
+                        "photo_verification_code": "ok",
+                    }
+                },
+            )
 
     update["onboarded"] = True
     update["last_active"] = iso(now_utc())
@@ -542,4 +561,15 @@ async def serve_file(
     except Exception:
         raise HTTPException(500, "Storage read failed")
 
-    return Response(content=data, media_type=rec.get("content_type", content_type))
+    # Each upload gets a fresh UUID-based storage_path (see /files/upload), so
+    # a given path's bytes never change - safe to cache aggressively. This is
+    # the single biggest win for perceived speed on photo-heavy pages
+    # (candidates grid, saved, chat avatars): without it every photo re-fetches
+    # from GridFS on every render, even the same photo seen seconds earlier.
+    # `private` (not `public`) because access is per-user authorized above -
+    # only the requesting browser may cache it, not shared/proxy caches.
+    return Response(
+        content=data,
+        media_type=rec.get("content_type", content_type),
+        headers={"Cache-Control": "private, max-age=31536000, immutable"},
+    )
