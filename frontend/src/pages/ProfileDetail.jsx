@@ -192,7 +192,7 @@ export default function ProfileDetail() {
               <div key={i} className="rounded-2xl bg-card border border-border p-4">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">{p.text || p.id?.replace("p_", "")}</p>
                 {p.kind === "voice" && p.voice_url ? (
-                  <audio controls src={p.voice_url} className="w-full mt-2" />
+                  <audio controls src={photoSrc(p.voice_url)} className="w-full mt-2" />
                 ) : (
                   <p className="text-base mt-1 leading-relaxed">{p.answer || "—"}</p>
                 )}

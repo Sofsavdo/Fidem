@@ -4,6 +4,7 @@ import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Mic, Square, Trash2, Pen, Save } from "lucide-react";
+import { photoSrc } from "@/lib/photo";
 import { usePromptsLibrary, usePromptsMine } from "@/hooks/queries";
 import { useMutation } from "@tanstack/react-query";
 
@@ -78,7 +79,7 @@ export default function Prompts() {
                 className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
               />
             ) : p.voice_url ? (
-              <audio controls src={p.voice_url} className="w-full mt-2" />
+              <audio controls src={photoSrc(p.voice_url)} className="w-full mt-2" />
             ) : (
               <p className="text-xs text-muted-foreground">{t("record_voice")}…</p>
             )}

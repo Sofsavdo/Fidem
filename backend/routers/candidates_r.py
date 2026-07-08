@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from auth import get_current_user_id
-from core import db, get_user, iso, log, manager, now_utc, parse_dt, push_notif, strip_locked_photo, touch_active, user_public, user_public_minimal
+from core import PAID_PLANS, db, get_user, iso, log, manager, now_utc, parse_dt, push_notif, strip_locked_photo, touch_active, user_public, user_public_minimal
 from models import PhotoUnlockDecision, PhotoUnlockRequest, SaveRequest, new_id
 from services import age_from_birth, compute_match
 
@@ -185,6 +185,16 @@ async def candidates(
         match_lang = "uz"
     if not me_doc.get("onboarded"):
         return []
+
+    # "more_filters" (district, marital_status, has_children, height range) is
+    # a Standard+ perk per the pricing page - free users keep age + region.
+    is_paid = me_doc.get("plan", "free") in PAID_PLANS
+    if not is_paid:
+        district = None
+        marital_status = None
+        has_children = None
+        height_min = None
+        height_max = None
 
     await touch_active(uid)
 

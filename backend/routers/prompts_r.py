@@ -144,20 +144,27 @@ async def upload_voice(file: UploadFile = File(...), uid: str = Depends(get_curr
     data = await file.read()
     if len(data) > MAX_AUDIO_SIZE:
         raise HTTPException(413, "Audio fayl 5MB dan oshmasligi kerak")
-    storage_path = f"{os.environ.get('APP_NAME','fidem')}/voice/{uid}/{new_id()}.{ext}"
+    upload_path = f"{os.environ.get('APP_NAME','fidem')}/voice/{uid}/{new_id()}.{ext}"
     try:
-        await put_object(storage_path, data, MIME.get(ext, "audio/mpeg"))
+        result = await put_object(upload_path, data, MIME.get(ext, "audio/mpeg"))
     except Exception as e:
         raise HTTPException(500, f"Upload failed: {e}")
-    # Track in DB
+    # Track in DB - same shape /files/upload uses. GET /api/files/{path}
+    # (serve_file -> get_object) does ObjectId(path) against GridFS, so the
+    # stored identifier must be result["path"] (the actual GridFS file id),
+    # not the human-readable upload_path - and _may_access_file looks up
+    # storage_path/is_deleted/owner_id, not path/user_id. A record in the old
+    # shape could never be found or read back, even by its own owner.
     rec = {
         "id": new_id(),
-        "user_id": uid,
-        "path": storage_path,
+        "owner_id": uid,
+        "storage_path": result["path"],
         "content_type": MIME.get(ext, "audio/mpeg"),
-        "size": len(data),
+        "size": result.get("size", len(data)),
+        "is_deleted": False,
+        "is_public": True,  # profile prompts are shown to any viewer of the profile
         "created_at": iso(now_utc()),
         "kind": "voice_prompt",
     }
     await db.files.insert_one(rec)
-    return {"id": rec["id"], "path": storage_path, "url": f"/api/files/{storage_path}"}
+    return {"id": rec["id"], "path": result["path"], "url": f"/api/files/{result['path']}"}
