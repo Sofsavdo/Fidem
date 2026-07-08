@@ -35,6 +35,10 @@ class AuthResponse(BaseModel):
     user_id: str
     is_admin: bool = False
     onboarded: bool = False
+    user: dict | None = None
+    """Full profile (same shape as GET /auth/me), included so the client can
+    render immediately instead of round-tripping to /auth/me right after
+    login/register/telegram-auth. Optional for backward compatibility."""
 
 
 # ---------- User / Profile ----------

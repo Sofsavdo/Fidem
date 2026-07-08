@@ -23,7 +23,7 @@ export default function Candidates() {
   const onSave = (c) => {
     const isSaved = savedIds.has(c.id);
     toggleSave.mutate(
-      { id: c.id, isSaved },
+      { candidate: c, isSaved },
       {
         onSuccess: () => { if (!isSaved) toast.success(t("saved_short")); },
         onError: () => toast.error(t("error")),

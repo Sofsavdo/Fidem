@@ -32,7 +32,17 @@ export function AppProvider({ children }) {
     }
   };
 
-  const loadMe = useCallback(async () => {
+  const loadMe = useCallback(async (prefetchedUser) => {
+    // login/register/telegram-auth responses already embed the full profile —
+    // skip the extra GET /auth/me round-trip when we already have it.
+    if (prefetchedUser) {
+      setUser(prefetchedUser);
+      if (prefetchedUser.language && dict[prefetchedUser.language]) {
+        setLang(prefetchedUser.language);
+      }
+      setLoading(false);
+      return prefetchedUser;
+    }
     const token = localStorage.getItem("fidem_token");
     if (!token) {
       setUser(null);
@@ -76,9 +86,6 @@ export function AppProvider({ children }) {
       }
 
       try {
-        tg.ready?.();
-        tg.expand?.();
-
         const r = await api.post("/auth/telegram", {
           init_data: initData,
         });
@@ -86,7 +93,7 @@ export function AppProvider({ children }) {
         if (cancelled) return true;
 
         localStorage.setItem("fidem_token", r.data.token);
-        await loadMe();
+        await loadMe(r.data.user);
 
         if (r.data.onboarded) {
           window.history.replaceState(null, "", "/");
@@ -129,13 +136,13 @@ export function AppProvider({ children }) {
   const login = async (email, password) => {
     const r = await api.post("/auth/login", { email, password });
     localStorage.setItem("fidem_token", r.data.token);
-    await loadMe();
+    await loadMe(r.data.user);
     return r.data;
   };
   const register = async (email, password, name) => {
     const r = await api.post("/auth/register", { email, password, name });
     localStorage.setItem("fidem_token", r.data.token);
-    await loadMe();
+    await loadMe(r.data.user);
     return r.data;
   };
   const logout = () => {

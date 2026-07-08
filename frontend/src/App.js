@@ -1,4 +1,4 @@
-import React, { useEffect, lazy, Suspense } from "react";
+import React, { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AppProvider, useApp } from "@/contexts/AppContext";
@@ -94,25 +94,8 @@ function RootRoute() {
 }
 
 function Inner() {
-  useEffect(() => {
-    const tg = window.Telegram?.WebApp;
-    if (!tg) {
-      console.warn("Telegram WebApp not available");
-      return;
-    }
-    
-    try {
-      tg.ready();
-      tg.expand();
-      
-      // Set colors immediately
-      if (tg.setHeaderColor) tg.setHeaderColor("#ffffff");
-      if (tg.setBackgroundColor) tg.setBackgroundColor("#ffffff");
-      if (tg.enableClosingConfirmation) tg.enableClosingConfirmation();
-    } catch (e) {
-      console.error("Telegram WebApp init error:", e);
-    }
-  }, []);
+  // Telegram WebApp init (ready/expand/colors) now runs in index.js, before
+  // React even mounts, so the native splash hands off as early as possible.
 
   return (
     <Suspense fallback={<PageSpinner />}>

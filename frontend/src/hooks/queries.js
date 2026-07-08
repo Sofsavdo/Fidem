@@ -232,9 +232,25 @@ export function useMessagesApplications() {
 export function useToggleSave() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, isSaved }) =>
-      isSaved ? api.delete(`/saved/${id}`) : api.post("/saved", { user_id: id }),
-    onSuccess: () => {
+    mutationFn: ({ candidate, isSaved }) =>
+      isSaved ? api.delete(`/saved/${candidate.id}`) : api.post("/saved", { user_id: candidate.id }),
+    // Optimistic: flip the saved state in the cache immediately on tap, so the
+    // UI responds instantly instead of waiting on the network round-trip.
+    // Pushes the full candidate object (not just an id) so the Saved page
+    // renders a real card even if opened before this mutation settles.
+    // Rolled back on error, reconciled with the server on settle.
+    onMutate: async ({ candidate, isSaved }) => {
+      await queryClient.cancelQueries({ queryKey: QK.saved("mine") });
+      const previous = queryClient.getQueryData(QK.saved("mine"));
+      queryClient.setQueryData(QK.saved("mine"), (old = []) =>
+        isSaved ? old.filter((c) => c.id !== candidate.id) : [...old, candidate]
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(QK.saved("mine"), context.previous);
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: QK.saved("mine") });
     },
   });

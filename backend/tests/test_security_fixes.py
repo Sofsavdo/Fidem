@@ -24,6 +24,7 @@ os.environ.setdefault("JWT_SECRET", "test-secret-for-local-testing")
 import core  # noqa: E402
 import auth  # noqa: E402
 import services  # noqa: E402
+from routers import auth_r  # noqa: E402
 
 
 # ---------- user_public() PII redaction ----------
@@ -201,3 +202,24 @@ def test_hash_pw_and_check_pw_roundtrip():
 
 def test_check_pw_handles_malformed_hash_gracefully():
     assert core.check_pw("anything", "not-a-bcrypt-hash") is False
+
+
+# ---------- _build_me_payload() — embedded in login/register/telegram-auth
+# responses so the client can skip the follow-up /auth/me round-trip ----------
+def test_build_me_payload_matches_auth_me_shape():
+    payload = auth_r._build_me_payload(FULL_USER)
+    # Same public fields as user_public(include_private=True)...
+    for field in PRIVATE_FIELDS:
+        assert field in payload
+    # ...plus the /auth/me-specific extras.
+    for extra in ["onboarded", "is_admin", "message_filters", "language"]:
+        assert extra in payload
+
+
+def test_build_me_payload_defaults_missing_fields_safely():
+    minimal_user = {"id": "u2", "name": "Minimal"}
+    payload = auth_r._build_me_payload(minimal_user)
+    assert payload["id"] == "u2"
+    assert payload["onboarded"] is False
+    assert payload["is_admin"] is False
+    assert payload["language"] == "uz"

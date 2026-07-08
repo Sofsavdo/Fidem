@@ -80,10 +80,10 @@ export default function ProfileDetail() {
 
   const toggleSave = useCallback(() => {
     toggleSaveMutation.mutate(
-      { id, isSaved: saved },
+      { candidate: c, isSaved: saved },
       { onSuccess: () => { if (!saved) toast.success(t("saved_successfully")); } }
     );
-  }, [saved, id, t, toggleSaveMutation]);
+  }, [saved, c, t, toggleSaveMutation]);
 
   if (loading || !c) {
     return (
