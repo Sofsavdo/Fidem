@@ -13,7 +13,7 @@ const PLANS = [
     style: "bg-card border border-border",
   },
   {
-    key: "standard", title: "Standard", price: 19900,
+    key: "standard", title: "Standard", price: 34900,
     features: ["chat_unlimited", "candidates", "saved", "more_filters"],
     style: "bg-card border-2 border-secondary",
     badge: "✅",

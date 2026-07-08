@@ -46,7 +46,7 @@ if not ADMIN_PASSWORD:
     )
 PRICE_PREMIUM = int(os.environ.get("PRICE_PREMIUM_UZS", "79000"))
 PRICE_VIP = int(os.environ.get("PRICE_VIP_UZS", "199000"))
-PRICE_STANDARD = int(os.environ.get("PRICE_STANDARD_UZS", "19900"))
+PRICE_STANDARD = int(os.environ.get("PRICE_STANDARD_UZS", "34900"))
 PRICE_CHAT_UNLOCK = int(os.environ.get("PRICE_CHAT_UNLOCK_UZS", "9900"))
 CHAT_UNLOCK_COINS = int(os.environ.get("CHAT_UNLOCK_COINS", "100"))
 CHAT_GUARANTEE_HOURS = int(os.environ.get("CHAT_GUARANTEE_HOURS", "48"))

@@ -100,17 +100,16 @@ async def chat_access(target_id: str, uid: str = Depends(get_current_user_id)):
     is_reply = (await _incoming_count(uid, target_id)) > 0
     unlocked = bool(await _unlock_doc(uid, target_id))
     plan_ok = _plan_active(me)
-    # Free users can always chat - no paywall
-    can = True
+    can = await can_initiate_chat(me, target_id)
     return {
         "can_message": can,
         "is_reply": is_reply,
         "unlocked": unlocked,
         "plan": me.get("plan", "free"),
         "plan_active": plan_ok,
-        "requires_unlock": False,  # No paywall for anyone
-        "price_uzs": 0,
-        "price_coins": 0,
+        "requires_unlock": not can,
+        "price_uzs": 0 if can else PRICE_CHAT_UNLOCK,
+        "price_coins": 0 if can else CHAT_UNLOCK_COINS,
         "balance": int(me.get("balance", 0) or 0),
         "coins": int(me.get("coins", 0) or 0),
         "free_credits": int(me.get("free_chat_credits", 0) or 0),
@@ -279,9 +278,14 @@ async def chat_history(chat_id: str, uid: str = Depends(get_current_user_id)):
 async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_user_id)):
     if req.to_user_id == uid:
         raise HTTPException(400, "Cannot message self")
+
+    sender_doc = await get_user(uid)
+    if not await can_initiate_chat(sender_doc, req.to_user_id):
+        raise HTTPException(402, "Chat locked - unlock required")
+
     is_voice = req.kind == "voice"
     is_video = req.kind == "video"
-    
+
     if is_voice:
         if not req.voice_url:
             raise HTTPException(400, "voice_url required for voice message")
@@ -299,8 +303,8 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
         if not ok:
             raise HTTPException(422, reason)
         req.text = sanitized_text
-    
-    sender = await get_user(uid)
+
+    sender = sender_doc
     await get_user(req.to_user_id)
     cid = chat_id_for(uid, req.to_user_id)
     

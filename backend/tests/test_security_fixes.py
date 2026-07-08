@@ -1,11 +1,13 @@
 """Unit tests for the security/correctness fixes made during the Phase 1 audit.
 
-These test pure logic (PII redaction, payment signature verification, JWT,
-Telegram initData validation) without a live MongoDB — the app's `db` handle
-is never touched by any test here. Run with: pytest backend/tests/test_security_fixes.py
+Most of these test pure logic (PII redaction, payment signature verification,
+JWT, Telegram initData validation) without a live MongoDB. The can_initiate_chat
+tests monkeypatch a fake db object instead. Run with:
+pytest backend/tests/test_security_fixes.py
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import os
@@ -25,6 +27,7 @@ import core  # noqa: E402
 import auth  # noqa: E402
 import services  # noqa: E402
 from routers import auth_r  # noqa: E402
+from routers import chat_r  # noqa: E402
 
 
 # ---------- user_public() PII redaction ----------
@@ -223,3 +226,61 @@ def test_build_me_payload_defaults_missing_fields_safely():
     assert payload["onboarded"] is False
     assert payload["is_admin"] is False
     assert payload["language"] == "uz"
+
+
+# ---------- can_initiate_chat() — the chat monetization gate ----------
+class _FakeCollection:
+    def __init__(self, count_result=0, find_one_result=None):
+        self._count_result = count_result
+        self._find_one_result = find_one_result
+
+    async def count_documents(self, *_a, **_kw):
+        return self._count_result
+
+    async def find_one(self, *_a, **_kw):
+        return self._find_one_result
+
+
+def _patch_db(monkeypatch, messages_count=0, unlock=None, saved_find_one_results=None):
+    fake_db = type("FakeDb", (), {})()
+    fake_db.messages = _FakeCollection(count_result=messages_count)
+    fake_db.chat_unlocks = _FakeCollection(find_one_result=unlock)
+    saved_results = iter(saved_find_one_results or [None, None])
+    fake_saved = type("FakeSaved", (), {})()
+    fake_saved.find_one = lambda *_a, **_kw: _next_result(saved_results)
+    fake_db.saved = fake_saved
+    monkeypatch.setattr(chat_r, "db", fake_db)
+
+
+async def _next_result(it):
+    return next(it)
+
+
+def test_can_initiate_chat_paid_plan_always_allowed(monkeypatch):
+    _patch_db(monkeypatch)
+    sender = {"id": "u1", "plan": "premium"}
+    assert asyncio.run(chat_r.can_initiate_chat(sender, "u2")) is True
+
+
+def test_can_initiate_chat_free_plan_blocked_by_default(monkeypatch):
+    _patch_db(monkeypatch, messages_count=0, unlock=None, saved_find_one_results=[None, None])
+    sender = {"id": "u1", "plan": "free"}
+    assert asyncio.run(chat_r.can_initiate_chat(sender, "u2")) is False
+
+
+def test_can_initiate_chat_free_plan_allowed_if_target_messaged_first(monkeypatch):
+    _patch_db(monkeypatch, messages_count=1)
+    sender = {"id": "u1", "plan": "free"}
+    assert asyncio.run(chat_r.can_initiate_chat(sender, "u2")) is True
+
+
+def test_can_initiate_chat_free_plan_allowed_with_paid_unlock(monkeypatch):
+    _patch_db(monkeypatch, messages_count=0, unlock={"user_id": "u1", "target_id": "u2"})
+    sender = {"id": "u1", "plan": "free"}
+    assert asyncio.run(chat_r.can_initiate_chat(sender, "u2")) is True
+
+
+def test_can_initiate_chat_free_plan_allowed_on_mutual_match(monkeypatch):
+    _patch_db(monkeypatch, messages_count=0, unlock=None, saved_find_one_results=[{"owner_id": "u1"}, {"owner_id": "u2"}])
+    sender = {"id": "u1", "plan": "free"}
+    assert asyncio.run(chat_r.can_initiate_chat(sender, "u2")) is True
