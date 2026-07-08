@@ -170,6 +170,9 @@ def user_public(u: dict, include_private: bool = False) -> dict:
         "verified_identity": u.get("verified_identity", False),
         "verified_selfie": u.get("verified_selfie", False),
         "verified_financial": u.get("verified_financial", False),
+        # Public trust badge only. Raw GPS coordinates live in the separate
+        # user_locations collection and are NEVER exposed via any user payload.
+        "location_verified": bool(u.get("location_verified", False)),
         "last_active": la,
         "last_active_label": last_active_label(la),
         "last_active_minutes": last_active_minutes(la),
@@ -220,6 +223,7 @@ def user_public_minimal(u: dict) -> dict:
         "photo_url": u.get("photo_url"),
         "verified_selfie": u.get("verified_selfie", False),
         "verified_financial": u.get("verified_financial", False),
+        "location_verified": bool(u.get("location_verified", False)),
         "last_active": la,
         "last_active_label": last_active_label(la),
         "online": is_online(la),

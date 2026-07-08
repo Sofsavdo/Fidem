@@ -77,6 +77,47 @@ def test_user_public_always_includes_safe_fields():
     assert out["region"] == "Tashkent"
 
 
+def test_user_public_never_leaks_raw_coordinates():
+    """Map M1: even if a stray geo_point ends up on the user doc, user_public
+    (an allow-list) must never surface raw coordinates — only the boolean
+    location_verified badge is public."""
+    user_with_geo = {**FULL_USER, "geo_point": [69.28, 41.31], "location_verified": True}
+    for out in (core.user_public(user_with_geo), core.user_public(user_with_geo, include_private=True), core.user_public_minimal(user_with_geo)):
+        assert "geo_point" not in out
+        assert out.get("location_verified") is True
+
+
+# ---------- geo.py — Map M1 location verification ----------
+def test_geo_region_from_coords_matches_known_cities():
+    import geo
+    assert geo.region_from_coords(41.31, 69.28) == "Toshkent shahri"
+    assert geo.region_from_coords(39.65, 66.96) == "Samarqand"
+    assert geo.region_from_coords(51.5, -0.12) is None  # London — outside UZ
+
+
+def test_geo_coords_match_region():
+    import geo
+    assert geo.coords_match_region(41.31, 69.28, "Toshkent shahri") is True
+    assert geo.coords_match_region(41.31, 69.28, "Buxoro") is False
+    assert geo.coords_match_region(41.31, 69.28, "") is False
+
+
+def test_geo_distance_bucket_is_coarse():
+    import geo
+    # never a precise figure — always rounded to 5km or a "50+"/"under 1" band
+    assert geo.distance_bucket(4.8) == "~5 km"
+    assert geo.distance_bucket(12.0) == "~10 km"
+    assert geo.distance_bucket(0.4).startswith("1 km") or "under" in geo.distance_bucket(0.4)
+    assert geo.distance_bucket(80) == "50+ km"
+
+
+def test_geo_valid_coords():
+    import geo
+    assert geo.valid_coords(41.3, 69.2) is True
+    assert geo.valid_coords(999, 0) is False
+    assert geo.valid_coords("abc", None) is False
+
+
 # ---------- CLICK payment signature verification ----------
 def _click_md5(*parts) -> str:
     return hashlib.md5("".join(str(p) for p in parts).encode()).hexdigest()

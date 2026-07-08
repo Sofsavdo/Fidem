@@ -52,6 +52,7 @@ from routers.family_r import router as family_router  # noqa: E402
 from routers.concierge_r import router as concierge_router  # noqa: E402
 from routers.boost_analytics_r import router as boost_analytics_router  # noqa: E402
 from routers.face_r import router as face_router  # noqa: E402
+from routers.location_r import router as location_router  # noqa: E402
 from routers.settings_r import router as settings_router  # noqa: E402
 from services import compute_completeness  # noqa: E402
 from storage import init_storage  # noqa: E402
@@ -76,6 +77,7 @@ api.include_router(family_router)
 api.include_router(concierge_router)
 api.include_router(boost_analytics_router)
 api.include_router(face_router)
+api.include_router(location_router)
 api.include_router(settings_router)
 app.include_router(api)
 
@@ -122,6 +124,7 @@ async def startup() -> None:
     # every photo render across the whole app (candidates grid, saved,
     # chat avatars, profile), so it compounds fast as the collection grows.
     await db.files.create_index("storage_path")
+    await db.user_locations.create_index("user_id", unique=True)
     await db.withdrawals.create_index([("user_id", 1), ("created_at", -1)])
     await db.withdrawals.create_index("status")
     await db.family_requests.create_index([("from_user_id", 1), ("to_user_id", 1)])
