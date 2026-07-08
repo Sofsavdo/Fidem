@@ -158,6 +158,9 @@ export default function ProfileDetail() {
           </div>
         )}
 
+        {/* ---- Section: basic info ---- */}
+        <p className="field-label pt-1">{t("pd_section_basic")}</p>
+
         {/* Key stats — 2 columns on mobile, 3 on larger */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2" data-testid="profile-stats">
           <Stat label={t("height")} value={`${c.height_cm} sm`} />
@@ -185,6 +188,9 @@ export default function ProfileDetail() {
             </span>
           </div>
         )}
+
+        {/* ---- Section: personality & interests ---- */}
+        <p className="field-label pt-3">{t("pd_section_personality")}</p>
 
         {c.bio && (
           <div className="rounded-2xl bg-card border border-border p-4">
