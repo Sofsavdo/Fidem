@@ -129,7 +129,7 @@ export default function Me() {
         <Link
           to="/premium?tab=plans"
           data-testid="profile-teaser-banner"
-          className="block rounded-3xl bg-gradient-to-r from-primary/10 to-card border border-primary/30 p-4 hover:-translate-y-0.5 transition-transform"
+          className="block rounded-3xl bg-gradient-to-r from-primary/10 to-card border border-primary/30 p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform"
         >
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-medium leading-snug">
@@ -166,12 +166,12 @@ export default function Me() {
 
       {/* Premium/balance row */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <Link to="/premium?tab=plans" data-testid="link-premium" className="rounded-3xl bg-gradient-to-br from-ink to-zinc-800 text-white p-4 hover:-translate-y-0.5 transition-transform">
+        <Link to="/premium?tab=plans" data-testid="link-premium" className="rounded-3xl bg-gradient-to-br from-ink to-zinc-800 text-white p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform">
           <Crown className="w-5 h-5 text-gold" />
           <p className="font-heading text-lg mt-2">{t("premium")}</p>
           <p className="text-xs text-white/70 mt-0.5">{t("premium_subtitle")} →</p>
         </Link>
-        <Link to="/withdrawals" data-testid="link-balance" className="rounded-3xl bg-card border border-border p-4 hover:-translate-y-0.5 transition-transform">
+        <Link to="/withdrawals" data-testid="link-balance" className="rounded-3xl bg-card border border-border p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform">
           <Wallet className="w-5 h-5 text-foreground" />
           <p className="font-heading text-lg mt-2">{(user.balance || 0).toLocaleString()} {t("sum")}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{t("balance")}</p>
@@ -180,7 +180,7 @@ export default function Me() {
           type="button"
           onClick={() => setBoostOpen(true)}
           data-testid="link-boost"
-          className="text-left rounded-3xl bg-gradient-to-br from-primary/10 to-card border border-primary/30 p-4 hover:-translate-y-0.5 transition-transform col-span-2 md:col-span-1"
+          className="text-left rounded-3xl bg-gradient-to-br from-primary/10 to-card border border-primary/30 p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform col-span-2 md:col-span-1"
         >
           <Rocket className="w-5 h-5 text-foreground" />
           <p className="font-heading text-lg mt-2">{t("boost_title")}</p>
@@ -213,7 +213,7 @@ export default function Me() {
 
       {/* Invite friends → unified single entrypoint */}
       {referral && (
-        <Link to="/referral" data-testid="invite-card" className="block rounded-3xl bg-gradient-to-r from-secondary/10 to-card border border-secondary/30 p-4 hover:-translate-y-0.5 transition-transform">
+        <Link to="/referral" data-testid="invite-card" className="block rounded-3xl bg-gradient-to-r from-secondary/10 to-card border border-secondary/30 p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform">
           <div className="flex items-center justify-between">
             <div className="min-w-0">
               <p className="font-heading text-lg flex items-center gap-2"><Share2 className="w-4 h-4 text-secondary" /> {t("invite_friends")}</p>
