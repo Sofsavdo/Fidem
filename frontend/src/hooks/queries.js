@@ -18,6 +18,10 @@ export const QK = {
   conciergeMine: ["concierge", "mine"],
   personalityQuestions: (lang) => ["personality", "questions", lang],
   personalityMine: ["personality", "mine"],
+  familyContact: ["family", "contact", "mine"],
+  familyRequests: ["family", "mine"],
+  promptsLibrary: (lang) => ["prompts", "library", lang],
+  promptsMine: ["prompts", "mine"],
 };
 
 export function useReferral() {
@@ -140,6 +144,35 @@ export function usePersonalityMine() {
   return useQuery({
     queryKey: QK.personalityMine,
     queryFn: () => api.get("/personality/mine").then((r) => r.data),
+  });
+}
+
+export function useFamilyContact() {
+  return useQuery({
+    queryKey: QK.familyContact,
+    queryFn: () => api.get("/family/contacts/mine").then((r) => r.data),
+  });
+}
+
+export function useFamilyRequests() {
+  return useQuery({
+    queryKey: QK.familyRequests,
+    queryFn: () => api.get("/family/mine").then((r) => r.data || { sent: [], received: [] }),
+  });
+}
+
+export function usePromptsLibrary(lang) {
+  return useQuery({
+    queryKey: QK.promptsLibrary(lang || "uz"),
+    queryFn: () => api.get(`/prompts/library?lang=${lang || "uz"}`).then((r) => r.data || []),
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
+export function usePromptsMine() {
+  return useQuery({
+    queryKey: QK.promptsMine,
+    queryFn: () => api.get("/prompts/mine").then((r) => r.data || []),
   });
 }
 

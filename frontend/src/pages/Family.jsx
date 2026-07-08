@@ -5,53 +5,53 @@ import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { Phone, Users, Send, CheckCircle2, XCircle, Clock, Crown, Save } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
+import { useFamilyContact, useFamilyRequests, QK } from "@/hooks/queries";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function Family() {
   const { user, t } = useApp();
-  const [contact, setContact] = useState(null);
-  const [requests, setRequests] = useState({ sent: [], received: [] });
+  const queryClient = useQueryClient();
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
-  const [savingContact, setSavingContact] = useState(false);
 
-  const load = async () => {
-    try {
-      const [c, r] = await Promise.all([api.get("/family/contacts/mine"), api.get("/family/mine")]);
-      setContact(c.data.family_contact || null);
-      setRequests(r.data || { sent: [], received: [] });
-      if (c.data.family_contact) {
-        setPhone(c.data.family_contact.phone || "");
-        setName(c.data.family_contact.name || "");
-      }
-    } catch (e) { /* ignore */ }
-  };
+  const { data: contactData } = useFamilyContact();
+  const { data: requests = { sent: [], received: [] } } = useFamilyRequests();
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (contactData?.family_contact) {
+      setPhone(contactData.family_contact.phone || "");
+      setName(contactData.family_contact.name || "");
+    }
+  }, [contactData]);
 
-  const saveContact = async () => {
+  const saveContactMutation = useMutation({
+    mutationFn: () => api.patch("/family/contacts", { parent_phone: phone, parent_name: name }),
+    onSuccess: () => {
+      toast.success(t("saved_successfully"));
+      queryClient.invalidateQueries({ queryKey: QK.familyContact });
+    },
+    onError: () => toast.error(t("error_generic")),
+  });
+
+  const saveContact = () => {
     if (phone.replace(/\D/g, "").length < 9) {
       toast.error(t("phone") + " ✗");
       return;
     }
-    setSavingContact(true);
-    try {
-      await api.patch("/family/contacts", { parent_phone: phone, parent_name: name });
-      toast.success(t("saved_successfully"));
-      load();
-    } catch (e) {
-      toast.error(t("error_generic"));
-    } finally { setSavingContact(false); }
+    saveContactMutation.mutate();
   };
+  const savingContact = saveContactMutation.isPending;
 
-  const respond = async (id, accept) => {
-    try {
-      await api.post(`/family/respond/${id}`, { accept });
+  const respondMutation = useMutation({
+    mutationFn: ({ id, accept }) => api.post(`/family/respond/${id}`, { accept }),
+    onSuccess: (_, { accept }) => {
       toast.success(accept ? t("accept_word") + " ✓" : t("reject_word") + " ✓");
-      load();
-    } catch (e) {
-      toast.error(t("error_generic"));
-    }
-  };
+      queryClient.invalidateQueries({ queryKey: QK.familyRequests });
+    },
+    onError: () => toast.error(t("error_generic")),
+  });
+
+  const respond = (id, accept) => respondMutation.mutate({ id, accept });
 
   const statusBadge = (s) => {
     const map = {

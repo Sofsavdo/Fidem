@@ -4,18 +4,20 @@ import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Mic, Square, Trash2, Pen, Save } from "lucide-react";
+import { usePromptsLibrary, usePromptsMine } from "@/hooks/queries";
+import { useMutation } from "@tanstack/react-query";
 
 export default function Prompts() {
   const { t, lang } = useApp();
-  const [library, setLibrary] = useState([]);
   const [mine, setMine] = useState([]);
-  const [saving, setSaving] = useState(false);
   const nav = useNavigate();
 
+  const { data: library = [] } = usePromptsLibrary(lang);
+  const { data: mineData } = usePromptsMine();
+
   useEffect(() => {
-    api.get(`/prompts/library?lang=${lang || "uz"}`).then((r) => setLibrary(r.data || []));
-    api.get("/prompts/mine").then((r) => setMine(r.data || []));
-  }, [lang]);
+    if (mineData) setMine(mineData);
+  }, [mineData]);
 
   const addPrompt = (libItem) => {
     if (mine.length >= 3) {
@@ -36,16 +38,16 @@ export default function Prompts() {
   const setVoice = (id, voice_url, duration_sec) => setMine(mine.map((p) => p.id === id ? { ...p, kind: "voice", voice_url, duration_sec } : p));
   const setText = (id) => setMine(mine.map((p) => p.id === id ? { ...p, kind: "text", voice_url: null } : p));
 
-  const save = async () => {
-    setSaving(true);
-    try {
+  const saveMutation = useMutation({
+    mutationFn: () => {
       const payload = mine.map((p) => ({ id: p.id, answer: p.answer, kind: p.kind, voice_url: p.voice_url, duration_sec: p.duration_sec || 0 }));
-      await api.post("/prompts/save", payload);
-      toast.success(t("saved_successfully"));
-    } catch (e) {
-      toast.error(t("error_generic"));
-    } finally { setSaving(false); }
-  };
+      return api.post("/prompts/save", payload);
+    },
+    onSuccess: () => toast.success(t("saved_successfully")),
+    onError: () => toast.error(t("error_generic")),
+  });
+  const save = () => saveMutation.mutate();
+  const saving = saveMutation.isPending;
 
   return (
     <div className="p-5 max-w-3xl mx-auto pb-24" data-testid="prompts-page">
