@@ -24,6 +24,8 @@ export const QK = {
   promptsMine: ["prompts", "mine"],
   stories: ["stories"],
   verificationMine: ["verification", "mine"],
+  messagesChats: ["messages", "chats"],
+  messagesApplications: ["messages", "applications"],
 };
 
 export function useReferral() {
@@ -189,6 +191,20 @@ export function useVerificationMine() {
   return useQuery({
     queryKey: QK.verificationMine,
     queryFn: () => api.get("/verification/mine").then((r) => r.data),
+  });
+}
+
+export function useMessagesChats() {
+  return useQuery({
+    queryKey: QK.messagesChats,
+    queryFn: () => api.get("/messages/chats").then((r) => r.data || []),
+  });
+}
+
+export function useMessagesApplications() {
+  return useQuery({
+    queryKey: QK.messagesApplications,
+    queryFn: () => api.get("/messages/applications").then((r) => r.data || []),
   });
 }
 
