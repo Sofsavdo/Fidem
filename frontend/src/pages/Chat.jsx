@@ -331,7 +331,10 @@ export default function Chat() {
               <p className="text-xs text-muted-foreground">
                 {t("chat_locked_desc")} · 🛡 {access.guarantee_hours}h {t("guarantee")}
               </p>
-              <p className="text-xs text-secondary mt-2">{t("chat_match_tip")}</p>
+              {/* Free-path explainer — keeps the paywall from reading as a hard
+                  wall: replying to an incoming message and mutual-save chat are
+                  both free. Monetization stays on initiating a NEW conversation. */}
+              <p className="text-xs text-secondary mt-2 leading-relaxed rounded-xl bg-secondary/5 border border-secondary/20 p-2">{t("chat_free_paths")}</p>
               <div className="grid grid-cols-1 gap-2 pt-1">
                 {access.free_credits > 0 && (
                   <button data-testid="unlock-credit" onClick={() => unlockChat("credit")} disabled={unlocking}
