@@ -1,9 +1,17 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import posthog from "posthog-js";
 import api from "@/lib/api";
 import { WS } from "@/lib/ws";
 import dict, { detectLang } from "@/lib/i18n";
 import { toast } from "sonner";
+
+// Identify by id + plan only — never name/phone/photo. Matches the
+// user_public() PII-safety boundary the backend already enforces.
+function identifyForAnalytics(user) {
+  if (!process.env.REACT_APP_POSTHOG_KEY || !user?.id) return;
+  posthog.identify(user.id, { plan: user.plan || "free", is_admin: !!user.is_admin });
+}
 
 const AppCtx = createContext(null);
 
@@ -42,6 +50,7 @@ export function AppProvider({ children }) {
       if (prefetchedUser.language && dict[prefetchedUser.language]) {
         setLang(prefetchedUser.language);
       }
+      identifyForAnalytics(prefetchedUser);
       setLoading(false);
       return prefetchedUser;
     }
@@ -57,6 +66,7 @@ export function AppProvider({ children }) {
       if (r.data.language && dict[r.data.language]) {
         setLang(r.data.language);
       }
+      identifyForAnalytics(r.data);
       return r.data;
     } catch {
       setUser(null);
@@ -156,6 +166,7 @@ export function AppProvider({ children }) {
     // cached candidates/chats/profile from localStorage before revalidating.
     queryClient.clear();
     try { localStorage.removeItem("fidem-query-cache"); } catch { /* ignore */ }
+    if (process.env.REACT_APP_POSTHOG_KEY) posthog.reset();
     window.location.href = "/auth";
   };
 

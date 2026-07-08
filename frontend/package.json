@@ -3,11 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@sentry/react": "^10.64.0",
     "@tanstack/query-sync-storage-persister": "^5.56.2",
     "@tanstack/react-query": "5.56.2",
     "@tanstack/react-query-persist-client": "^5.56.2",
     "axios": "1.16.0",
     "lucide-react": "0.516.0",
+    "posthog-js": "^1.398.2",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-router-dom": "6.28.0",

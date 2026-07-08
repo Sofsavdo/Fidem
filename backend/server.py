@@ -16,6 +16,15 @@ load_dotenv(ROOT_DIR / ".env")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 log = logging.getLogger("fidem")
 
+if os.environ.get("SENTRY_DSN"):
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=os.environ["SENTRY_DSN"],
+        environment=os.environ.get("SENTRY_ENVIRONMENT", "production"),
+        traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+        send_default_pii=False,
+    )
+
 from core import (  # noqa: E402  (must load env first)
     ADMIN_EMAIL,
     ADMIN_PASSWORD,
