@@ -4,7 +4,8 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { Crown, Check, Wallet } from "lucide-react";
 import { toast } from "sonner";
-import { usePayments } from "@/hooks/queries";
+import { usePayments, QK } from "@/hooks/queries";
+import { useQueryClient } from "@tanstack/react-query";
 
 const PLANS = [
   {
@@ -55,6 +56,7 @@ const FEATURE_LABELS = {
 
 export default function Premium() {
   const { t, lang, user, refresh } = useApp();
+  const queryClient = useQueryClient();
   const [sp, setSearchParams] = useSearchParams();
   const tab = sp.get("tab") || "plans";
   const showTopup = sp.get("topup") === "1";
@@ -88,7 +90,7 @@ export default function Premium() {
         }
         window.open(r.data.payment_link, "_blank");
       }
-      setPayments((p) => [{ ...r.data, purpose, amount, user_id: user.id, created_at: new Date() }, ...p]);
+      queryClient.invalidateQueries({ queryKey: QK.payments });
     } catch (e) {
       toast.error(t("error_generic"));
     } finally { setCreating(false); }
@@ -109,7 +111,7 @@ export default function Premium() {
         }
         window.open(r.data.payment_link, "_blank");
       }
-      setPayments((p) => [{ ...r.data, purpose: "balance_topup", amount: topupAmount }, ...p]);
+      queryClient.invalidateQueries({ queryKey: QK.payments });
     } catch (e) {
       toast.error(t("error_generic"));
     } finally { setCreating(false); }
