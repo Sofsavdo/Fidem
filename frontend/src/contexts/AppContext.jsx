@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { WS } from "@/lib/ws";
 import dict, { detectLang } from "@/lib/i18n";
@@ -7,6 +8,7 @@ import { toast } from "sonner";
 const AppCtx = createContext(null);
 
 export function AppProvider({ children }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lang, setLang] = useState(detectLang());
@@ -149,6 +151,11 @@ export function AppProvider({ children }) {
     localStorage.removeItem("fidem_token");
     setUser(null);
     if (wsRef.current) { wsRef.current.stop(); wsRef.current = null; }
+    // Clear the persisted query cache too — otherwise a different account
+    // logging in on the same device would briefly paint the previous user's
+    // cached candidates/chats/profile from localStorage before revalidating.
+    queryClient.clear();
+    try { localStorage.removeItem("fidem-query-cache"); } catch { /* ignore */ }
     window.location.href = "/auth";
   };
 
