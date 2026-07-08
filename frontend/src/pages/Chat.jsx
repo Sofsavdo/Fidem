@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import GiftModal from "@/components/GiftModal";
+import GiftCelebration, { tierFromPrice } from "@/components/GiftCelebration";
 import ChatVoiceRecorder from "@/components/ChatVoiceRecorder";
 import { ArrowLeft, Send, Gift, MoreVertical, Ban, Flag, Wand2, Play } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
@@ -25,6 +26,7 @@ export default function Chat() {
   const [reportOpen, setReportOpen] = useState(false);
   const [icebreakers, setIcebreakers] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
+  const [celebration, setCelebration] = useState(null);
   const endRef = useRef(null);
 
   const chatId = user && otherId ? [user.id, otherId].sort().join("_") : null;
@@ -90,6 +92,11 @@ export default function Chat() {
     // mark as read if I am the recipient
     if (m.to_user_id === user?.id) {
       api.get(`/messages/${chatId}`).catch(() => {}); // server-side mark-read happens on GET
+    }
+    // Receiving a gift deserves the same celebration as sending one - a
+    // 499,000 so'm rocket landing in your chat shouldn't look like plain text.
+    if (m.kind === "gift" && m.to_user_id === user?.id && m.meta) {
+      setCelebration({ emoji: m.meta.emoji, label: m.meta.label, tier: tierFromPrice(m.meta.price || 0) });
     }
     // eslint-disable-next-line
   }, [wsEvent, chatId, user]);
@@ -366,8 +373,16 @@ export default function Chat() {
           </div>
         </div>
       </div>
-      {giftOpen && <GiftModal targetId={otherId} targetName={other.name} onClose={() => setGiftOpen(false)} onSent={load} />}
+      {giftOpen && (
+        <GiftModal
+          targetId={otherId}
+          targetName={other.name}
+          onClose={() => setGiftOpen(false)}
+          onSent={(item) => { load(); setCelebration(item); }}
+        />
+      )}
       {reportOpen && <ReportModal t={t} onClose={() => setReportOpen(false)} onSubmit={reportUser} />}
+      <GiftCelebration gift={celebration} onDone={() => setCelebration(null)} />
     </div>
   );
 }

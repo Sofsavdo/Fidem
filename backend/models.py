@@ -220,7 +220,11 @@ class PaymentOut(BaseModel):
 # ---------- Gifts ----------
 class SendGiftRequest(BaseModel):
     to_user_id: str
-    gift_kind: Literal["rose", "box", "diamond", "crown"]
+    # Not a Literal of the old 4 legacy kinds - that silently 422'd 10 of the
+    # 12 real catalog gifts (only "diamond"/"crown" happened to overlap with
+    # the legacy names). send_gift() below validates against GIFT_PRICES /
+    # LEGACY_GIFT_MAP itself and 400s on anything actually invalid.
+    gift_kind: str
 
 
 GIFT_PRICES = {
