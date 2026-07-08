@@ -27,6 +27,18 @@ export const QK = {
   verificationMine: ["verification", "mine"],
   messagesChats: ["messages", "chats"],
   messagesApplications: ["messages", "applications"],
+  adminStats: ["admin", "stats"],
+  adminUsers: (params) => ["admin", "users", params],
+  adminRegions: ["admin", "regions"],
+  adminUserSearch: (q) => ["admin", "userSearch", q],
+  adminPayments: (params) => ["admin", "payments", params],
+  adminVerifications: (params) => ["admin", "verifications", params],
+  adminReports: ["admin", "reports"],
+  adminWithdrawals: (params) => ["admin", "withdrawals", params],
+  adminConcierge: ["admin", "concierge"],
+  adminReferrals: (params) => ["admin", "referrals", params],
+  adminMessages: (params) => ["admin", "messages", params],
+  adminFraud: (params) => ["admin", "fraud", params],
 };
 
 export function useReferral() {
@@ -225,5 +237,155 @@ export function useToggleSave() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QK.saved("mine") });
     },
+  });
+}
+
+// ---------- Admin ----------
+export function useAdminStats() {
+  return useQuery({
+    queryKey: QK.adminStats,
+    queryFn: () => api.get("/admin/stats").then((r) => r.data),
+  });
+}
+
+export function useAdminUsers(params) {
+  return useQuery({
+    queryKey: QK.adminUsers(params),
+    queryFn: () => api.get("/admin/users", { params }).then((r) => r.data),
+  });
+}
+
+export function useAdminRegions() {
+  return useQuery({
+    queryKey: QK.adminRegions,
+    queryFn: () => api.get("/admin/regions").then((r) => r.data?.regions || []),
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
+export function useAdminUserSearch(q) {
+  return useQuery({
+    queryKey: QK.adminUserSearch(q),
+    queryFn: () => api.get("/admin/users", { params: { q } }).then((r) => r.data),
+    enabled: (q || "").length >= 2,
+  });
+}
+
+export function useUpdateAdminUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }) => api.patch(`/admin/users/${id}`, patch),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "fraud"] });
+    },
+  });
+}
+
+export function useAdminPayments(params) {
+  return useQuery({
+    queryKey: QK.adminPayments(params),
+    queryFn: () => api.get("/admin/payments", { params }).then((r) => r.data),
+  });
+}
+
+export function useAdminPaymentBlock() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, block }) => api.post(`/admin/payments/${id}/${block ? "block" : "unblock"}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "payments"] }),
+  });
+}
+
+export function useAdminVerifications(params) {
+  return useQuery({
+    queryKey: QK.adminVerifications(params),
+    queryFn: () => api.get("/admin/verifications", { params }).then((r) => r.data),
+  });
+}
+
+export function useAdminDecideVerification() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, approve }) => api.post(`/admin/verifications/${id}/decide`, { approve }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "verifications"] }),
+  });
+}
+
+export function useAdminReports() {
+  return useQuery({
+    queryKey: QK.adminReports,
+    queryFn: () => api.get("/admin/reports").then((r) => r.data || []),
+  });
+}
+
+export function useAdminWithdrawals(params) {
+  return useQuery({
+    queryKey: QK.adminWithdrawals(params),
+    queryFn: () => api.get("/admin/withdrawals", { params }).then((r) => r.data),
+  });
+}
+
+export function useAdminWithdrawalDecision() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, approve, reason }) =>
+      approve
+        ? api.post(`/admin/withdrawals/${id}/approve`)
+        : api.post(`/admin/withdrawals/${id}/reject`, { reason }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "withdrawals"] }),
+  });
+}
+
+export function useAdminConcierge() {
+  return useQuery({
+    queryKey: QK.adminConcierge,
+    queryFn: () => api.get("/admin/concierge").then((r) => r.data || []),
+  });
+}
+
+export function useAdminConciergeMatch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ orderId, matchUserId, note }) =>
+      api.post(`/admin/concierge/${orderId}/match`, { match_user_id: matchUserId, note }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: QK.adminConcierge }),
+  });
+}
+
+export function useAdminReferrals(params) {
+  return useQuery({
+    queryKey: QK.adminReferrals(params),
+    queryFn: () => api.get("/admin/referrals", { params }).then((r) => r.data || []),
+  });
+}
+
+export function useAdminMessages(params) {
+  return useQuery({
+    queryKey: QK.adminMessages(params),
+    queryFn: () => api.get("/admin/messages", { params }).then((r) => r.data),
+  });
+}
+
+export function useAdminDeleteMessage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => api.delete(`/admin/messages/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "messages"] }),
+  });
+}
+
+export function useAdminFraud(params) {
+  return useQuery({
+    queryKey: QK.adminFraud(params),
+    queryFn: () => api.get("/admin/fraud", { params }).then((r) => r.data),
+  });
+}
+
+export function useAdminMarkSafe() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (uid) => api.post(`/admin/users/${uid}/mark-safe`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "fraud"] }),
   });
 }
