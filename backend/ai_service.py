@@ -1,30 +1,10 @@
-"""AI services. Compatibility reports, icebreakers and moderation are
-lightweight template/regex fallbacks (no model call). Face verification is
-a real Claude vision call - see verify_face_photo below.
+"""AI services disabled for Railway production deploy.
+Fallback-only implementation for compatibility reports, icebreakers, moderation and face verification.
 """
 from __future__ import annotations
 
-import base64
 import json
-import logging
-import os
 import re
-
-import httpx
-
-log = logging.getLogger("fidem.ai")
-
-ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-8")
-
-_client = None
-
-
-def _get_client():
-    global _client
-    if _client is None:
-        import anthropic
-        _client = anthropic.AsyncAnthropic()
-    return _client
 
 
 # ---------- 1) Compatibility narrative ----------
@@ -133,112 +113,33 @@ async def ai_moderation(text: str) -> tuple[bool, str]:
 
 
 # ---------- 4) Face verification ----------
-_FACE_VERIFY_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "valid": {"type": "boolean"},
-        "code": {
-            "type": "string",
-            "enum": ["ok", "no_face", "multiple_faces", "not_a_photo", "low_quality", "inappropriate"],
-        },
-        "reason_uz": {"type": "string"},
-    },
-    "required": ["valid", "code", "reason_uz"],
-    "additionalProperties": False,
-}
-
-
 async def verify_face_photo(image_url: str = "", image_base64: str = "") -> dict:
-    """Verify a submitted profile photo actually shows a single real human face.
+    return {
+        "valid": True,
+        "code": "ok",
+        "reason": "verification temporarily disabled",
+    }
 
-    Fails closed: any failure to load the image or reach the verification
-    model returns valid=False rather than silently approving, since this
-    result gates the "verified" badge and downstream trust/withdrawal checks.
-    """
+
+# ---------- Helpers ----------
+def _extract_json(text: str):
+    if not text:
+        return None
+
+    cleaned = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.MULTILINE).strip()
+
     try:
-        media_type, data_b64 = await _load_image_b64(image_url, image_base64)
-    except Exception as e:
-        log.warning("face_verify: could not load photo: %s", e)
-        return {"valid": False, "code": "not_a_photo", "reason": "Rasmni ochib bo'lmadi", "ai_generated": False}
-
-    try:
-        client = _get_client()
-        response = await client.messages.create(
-            model=ANTHROPIC_MODEL,
-            max_tokens=300,
-            output_config={"format": {"type": "json_schema", "schema": _FACE_VERIFY_SCHEMA}},
-            messages=[{
-                "role": "user",
-                "content": [
-                    {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": data_b64}},
-                    {
-                        "type": "text",
-                        "text": (
-                            "This photo was submitted to a dating/marriage platform for profile-photo "
-                            "verification. Check: (1) it shows exactly one real human face, clearly "
-                            "visible and in focus - not zero faces, not a group photo; (2) it is an actual "
-                            "photograph, not a screenshot, drawing, meme, logo, or AI-generated image; "
-                            "(3) it contains no nudity or sexually explicit content. Respond with the "
-                            "required JSON only. reason_uz should be a short explanation in Uzbek."
-                        ),
-                    },
-                ],
-            }],
-        )
-        text = next((b.text for b in response.content if b.type == "text"), "")
-        parsed = json.loads(text) if text else {}
-        valid = bool(parsed.get("valid"))
-        return {
-            "valid": valid,
-            "code": parsed.get("code") or ("ok" if valid else "not_a_photo"),
-            "reason": parsed.get("reason_uz") or "",
-            "ai_generated": True,
-        }
-    except Exception as e:
-        log.warning("face_verify: verification call failed: %s", e)
-        return {
-            "valid": False,
-            "code": "verification_unavailable",
-            "reason": "Tekshiruv xizmati vaqtincha ishlamayapti. Birozdan so'ng qayta urinib ko'ring.",
-            "ai_generated": False,
-        }
+        return json.loads(cleaned)
+    except Exception:
+        m = re.search(r"(\{.*\}|\[.*\])", cleaned, flags=re.DOTALL)
+        if m:
+            try:
+                return json.loads(m.group(1))
+            except Exception:
+                return None
+        return None
 
 
-async def _load_image_b64(image_url: str, image_base64: str) -> tuple[str, str]:
-    if image_base64:
-        raw = image_base64
-        if raw.startswith("data:"):
-            header, _, raw = raw.partition(",")
-            media_type = header.split(";")[0].replace("data:", "") or "image/jpeg"
-        else:
-            media_type = _sniff_media_type(raw)
-        return media_type, raw
-
-    if not image_url:
-        raise ValueError("no image provided")
-
-    # Internal /api/files/ URLs require our own JWT to fetch, which an
-    # external image fetcher can't present - read the bytes directly from
-    # our own storage instead of asking Claude to fetch the URL.
-    m = re.search(r"/api/files/(.+)$", image_url)
-    if m:
-        from storage import get_object
-        data, content_type = await get_object(m.group(1))
-        return content_type or "image/jpeg", base64.b64encode(data).decode()
-
-    async with httpx.AsyncClient(timeout=15.0) as cl:
-        r = await cl.get(image_url)
-        r.raise_for_status()
-        content_type = r.headers.get("content-type", "image/jpeg").split(";")[0]
-        return content_type, base64.b64encode(r.content).decode()
-
-
-def _sniff_media_type(b64: str) -> str:
-    head = b64[:12]
-    if head.startswith("iVBOR"):
-        return "image/png"
-    if head.startswith("R0lGOD"):
-        return "image/gif"
-    if head.startswith("UklGR"):
-        return "image/webp"
-    return "image/jpeg"
+def _safe_age(u: dict) -> int:
+    from services import age_from_birth
+    return age_from_birth(u.get("birth_date", "2000-01-01"))

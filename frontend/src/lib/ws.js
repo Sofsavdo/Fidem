@@ -38,6 +38,7 @@ export class WS {
     this.sock = sock;
     sock.onopen = () => {
       this.reconnectAttempt = 0;
+      console.log("WebSocket connected");
       this.onOpen();
       this.pingInterval = setInterval(() => {
         try { sock.readyState === 1 && sock.send("ping"); } catch {}
@@ -55,7 +56,8 @@ export class WS {
     sock.onerror = (e) => {
       console.warn("WebSocket error:", e);
     };
-    sock.onclose = () => {
+    sock.onclose = (e) => {
+      console.log("WebSocket closed:", e.code, e.reason);
       if (this.pingInterval) { clearInterval(this.pingInterval); this.pingInterval = null; }
       this.onClose();
       this._scheduleReconnect(token);
