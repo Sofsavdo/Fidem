@@ -4,9 +4,10 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, PlanPill } from "@/components/Badges";
 import PhotoUpload from "@/components/PhotoUpload";
-import { ChevronRight, Crown, Gem, Wallet, Share2, Settings as SettingsIcon, LogOut, Copy, Trophy, ShieldCheck, Bell, Clock, SlidersHorizontal, Brain, UsersRound, Pen, BookOpen, Phone, Plane, TrendingUp, Award } from "lucide-react";
+import { ChevronRight, Crown, Gem, Wallet, Share2, Settings as SettingsIcon, LogOut, Copy, Trophy, ShieldCheck, Bell, Clock, SlidersHorizontal, Brain, UsersRound, Pen, BookOpen, Phone, Plane, TrendingUp, Award, Rocket } from "lucide-react";
 import ProgressCard from "@/components/ProgressCard";
 import LangSwitch from "@/components/LangSwitch";
+import BoostModal from "@/components/BoostModal";
 import { photoSrc } from "@/lib/photo";
 import { toast } from "sonner";
 import { useReferral, useNotifications, useDailyStatus, useRankings, useSaved, QK } from "@/hooks/queries";
@@ -16,6 +17,7 @@ export default function Me() {
   const { user, t, logout, refresh, wsEvent } = useApp();
   const queryClient = useQueryClient();
   const [leadPeriod, setLeadPeriod] = useState("all");
+  const [boostOpen, setBoostOpen] = useState(false);
 
   const { data: referral } = useReferral();
   const { data: notifications = [] } = useNotifications();
@@ -170,12 +172,18 @@ export default function Me() {
           <p className="font-heading text-lg mt-2">{(user.balance || 0).toLocaleString()} {t("sum")}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{t("balance")}</p>
         </Link>
-        <Link to="/premium?tab=plans" data-testid="link-boost" className="rounded-3xl bg-gradient-to-br from-primary/10 to-card border border-primary/30 p-4 hover:-translate-y-0.5 transition-transform col-span-2 md:col-span-1">
-          <Trophy className="w-5 h-5 text-foreground" />
+        <button
+          type="button"
+          onClick={() => setBoostOpen(true)}
+          data-testid="link-boost"
+          className="text-left rounded-3xl bg-gradient-to-br from-primary/10 to-card border border-primary/30 p-4 hover:-translate-y-0.5 transition-transform col-span-2 md:col-span-1"
+        >
+          <Rocket className="w-5 h-5 text-foreground" />
           <p className="font-heading text-lg mt-2">{t("boost_title")}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{t("boost_subtitle")} →</p>
-        </Link>
+        </button>
       </div>
+      {boostOpen && <BoostModal onClose={() => setBoostOpen(false)} />}
 
       {/* Daily streak */}
       {daily && (

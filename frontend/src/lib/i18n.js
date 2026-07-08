@@ -403,6 +403,7 @@ const dict = {
     activate_with_balance: "Balans bilan faollashtirish",
     activate_with_click: "CLICK orqali to'lash",
     no_active_boost: "Faol boost yo'q",
+    boost_time_left: "{n} soat qoldi",
     // Withdrawals
     withdraw_title: "Pul yechib olish",
     withdrawable_balance: "Yechib olish mumkin",
@@ -979,6 +980,7 @@ const dict = {
     activate_with_balance: "Активировать с балансом",
     activate_with_click: "Оплатить через CLICK",
     no_active_boost: "Нет активного boost",
+    boost_time_left: "Осталось {n} ч.",
     // Withdrawals
     withdraw_title: "Вывод средств",
     withdrawable_balance: "Доступно к выводу",
@@ -1546,6 +1548,7 @@ const dict = {
     activate_with_balance: "Activate with balance",
     activate_with_click: "Pay with CLICK",
     no_active_boost: "No active boost",
+    boost_time_left: "{n}h left",
     // Withdrawals
     withdraw_title: "Withdraw funds",
     withdrawable_balance: "Withdrawable",

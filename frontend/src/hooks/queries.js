@@ -6,6 +6,7 @@ export const QK = {
   referralUsername: ["referral", "username"],
   notifications: ["notifications"],
   dailyStatus: ["daily", "status"],
+  boostStatus: ["boost", "status"],
   rankings: (tab) => ["rankings", tab],
   myRankings: ["rankings", "me"],
   candidates: (filters) => ["candidates", filters],
@@ -67,6 +68,31 @@ export function useDailyStatus() {
   return useQuery({
     queryKey: QK.dailyStatus,
     queryFn: () => api.get("/daily/status").then((r) => r.data),
+  });
+}
+
+export function useBoostStatus() {
+  return useQuery({
+    queryKey: QK.boostStatus,
+    queryFn: () => api.get("/boost/status").then((r) => r.data),
+  });
+}
+
+export function useActivateBoost() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post("/boost/activate", { use_balance: true }).then((r) => r.data),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: QK.boostStatus });
+      const previous = queryClient.getQueryData(QK.boostStatus);
+      const until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      queryClient.setQueryData(QK.boostStatus, (old) => old ? { ...old, active: true, until } : old);
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(QK.boostStatus, context.previous);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: QK.boostStatus }),
   });
 }
 
