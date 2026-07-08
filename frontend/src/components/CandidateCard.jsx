@@ -1,22 +1,37 @@
-import React, { memo } from "react";
+import React, { memo, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Bookmark, MessageCircle, Lock } from "lucide-react";
 import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot, LocationBadge } from "@/components/Badges";
 import { useApp } from "@/contexts/AppContext";
+import { QK } from "@/hooks/queries";
+import api from "@/lib/api";
 import { photoSrc } from "@/lib/photo";
 import { formatLastActive } from "@/lib/time";
 
 function CandidateCardInner({ c, onSave, saved }) {
   const { t } = useApp();
+  const queryClient = useQueryClient();
   const blurred = !c.photo_unlocked;
   const photoUrl = photoSrc(c.photo_url) || "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=800";
+
+  // Warm the profile-detail query the instant the finger touches the card,
+  // so ProfileDetail has data (or is already loading) by the time it mounts —
+  // the tap feels instant instead of showing a skeleton.
+  const prefetchDetail = useCallback(() => {
+    queryClient.prefetchQuery({
+      queryKey: QK.candidateDetail(c.id),
+      queryFn: () => api.get(`/candidates/${c.id}`).then((r) => r.data),
+      staleTime: 30_000,
+    });
+  }, [queryClient, c.id]);
 
   return (
     <div
       data-testid={`candidate-card-${c.id}`}
       className="bg-card rounded-3xl overflow-hidden shadow-soft hover:shadow-elevated transition-shadow border border-border/60"
     >
-      <Link to={`/candidate/${c.id}`} className="block">
+      <Link to={`/candidate/${c.id}`} className="block" onPointerDown={prefetchDetail} onMouseEnter={prefetchDetail}>
         <div className="relative aspect-[4/5] overflow-hidden bg-muted">
           <img
             src={photoUrl}

@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from "react";
+import React, { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AppProvider, useApp } from "@/contexts/AppContext";
@@ -92,7 +92,30 @@ function RootRoute() {
   );
 }
 
+// The hot navigation paths. Their JS chunks are prefetched while the app is
+// idle so tapping a tab (or opening a profile/chat) never blocks on a chunk
+// download — the #1 source of the "yuklanmoqda" blank spinner on slow
+// networks. import() is deduped by webpack, so lazy() resolves instantly
+// once the chunk is warm.
+function prefetchHotRoutes() {
+  import("@/pages/Candidates");
+  import("@/pages/ProfileDetail");
+  import("@/pages/Messages");
+  import("@/pages/Chat");
+  import("@/pages/Saved");
+  import("@/pages/Me");
+  import("@/pages/Withdrawals");
+  import("@/pages/Premium");
+}
+
 function Inner() {
+  useEffect(() => {
+    const ric = window.requestIdleCallback || ((cb) => setTimeout(cb, 1500));
+    const cancel = window.cancelIdleCallback || clearTimeout;
+    const id = ric(prefetchHotRoutes);
+    return () => cancel(id);
+  }, []);
+
   // Telegram WebApp init (ready/expand/colors) now runs in index.js, before
   // React even mounts, so the native splash hands off as early as possible.
 

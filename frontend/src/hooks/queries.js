@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import api from "@/lib/api";
 
 export const QK = {
@@ -121,6 +121,9 @@ export function useLeaderboard(period = "all") {
   return useQuery({
     queryKey: QK.leaderboard(period),
     queryFn: () => api.get(`/leaderboard?period=${period}`).then((r) => r.data || []),
+    // switching day/week/month keeps the old list visible while the new one
+    // loads instead of flashing an empty/loading state
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -128,6 +131,9 @@ export function useCandidates(filters = {}) {
   return useQuery({
     queryKey: QK.candidates(filters),
     queryFn: () => api.get("/candidates", { params: filters }).then((r) => r.data || []),
+    // changing a sort pill or filter re-keys the query; keep the previous
+    // results on screen (stale-while-revalidate) instead of a skeleton flash
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -144,6 +150,8 @@ export function useSaved(tab = "mine") {
   return useQuery({
     queryKey: QK.saved(tab),
     queryFn: () => api.get(endpoint).then((r) => r.data || []),
+    // switching between the 4 saved tabs keeps the old grid visible
+    placeholderData: keepPreviousData,
   });
 }
 
