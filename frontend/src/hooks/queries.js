@@ -441,6 +441,12 @@ export function useAdminFraud(params) {
   });
 }
 
+export function useAdminBroadcast() {
+  return useMutation({
+    mutationFn: ({ text, dryRun }) => api.post("/admin/notification/broadcast", { text, dry_run: !!dryRun }).then((r) => r.data),
+  });
+}
+
 export function useAdminMarkSafe() {
   const queryClient = useQueryClient();
   return useMutation({

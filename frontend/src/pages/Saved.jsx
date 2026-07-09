@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
-import { Lock, Bookmark } from "lucide-react";
+import { Lock, Bookmark, Crown } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
 import { useSaved } from "@/hooks/queries";
 import { EmptyState } from "@/components/kit";
@@ -13,8 +13,11 @@ const TABS = [
   { k: "interested", labelKey: "interested_in_me" },
 ];
 
+// Cheapest plan that unlocks these lists — mirrors PLANS.premium in Premium.jsx.
+const UNLOCK_PRICE = 79000;
+
 export default function Saved() {
-  const { t } = useApp();
+  const { t, user } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState("mine");
 
@@ -24,6 +27,9 @@ export default function Saved() {
   }, [searchParams]);
 
   const { data: items = [], isLoading } = useSaved(tab);
+  const isPremium = ["premium", "vip"].includes(user?.plan);
+  const hasLocked = useMemo(() => items.some((c) => c.locked), [items]);
+  const showPlanPromo = tab !== "mine" && !isPremium && hasLocked;
 
   const selectTab = useCallback((k) => {
     setTab(k);
@@ -51,6 +57,20 @@ export default function Saved() {
           </button>
         ))}
       </div>
+
+      {showPlanPromo && (
+        <Link
+          to="/premium?tab=plans"
+          data-testid="saved-plan-promo"
+          className="mb-4 flex items-center justify-between gap-3 rounded-3xl bg-gradient-to-r from-ink to-zinc-800 text-white p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform"
+        >
+          <div className="min-w-0">
+            <p className="font-heading text-base font-semibold flex items-center gap-1.5"><Crown className="w-4 h-4 text-gold" /> {t("who_viewed_unlock_hint")}</p>
+            <p className="text-xs text-white/70 mt-0.5">{t("premium")} · {UNLOCK_PRICE.toLocaleString()} {t("sum")}{t("plan_per_month")}</p>
+          </div>
+          <span className="shrink-0 rounded-full bg-white text-ink text-xs font-semibold px-3.5 py-2">{t("plan_choose_cta")}</span>
+        </Link>
+      )}
 
       {isLoading && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">

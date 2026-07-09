@@ -1,12 +1,13 @@
-import React, { useState, useCallback, memo } from "react";
+import React, { useState, useCallback, useEffect, memo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import posthog from "posthog-js";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot, LocationBadge } from "@/components/Badges";
 import CompatibilityCard from "@/components/CompatibilityCard";
 import { photoSrc } from "@/lib/photo";
 import { formatLastActive } from "@/lib/time";
-import { Heart, MessageCircle, ArrowLeft, Lock, Clock, Shield, Share2 } from "lucide-react";
+import { Heart, MessageCircle, ArrowLeft, Lock, Clock, Shield, Share2, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { useCandidateDetail, useSaved, useToggleSave, QK } from "@/hooks/queries";
 import { useQueryClient } from "@tanstack/react-query";
@@ -24,6 +25,15 @@ export default function ProfileDetail() {
   const saved = savedList.some((x) => x.id === id);
   const toggleSaveMutation = useToggleSave();
   const saving = toggleSaveMutation.isPending;
+
+  // Contextual upsell: seeing a Premium/VIP profile while on a lower tier is
+  // the moment the tier gap is most concrete, so it converts better than a
+  // generic banner elsewhere in the app.
+  const showTierUpsell = !!c && ["premium", "vip"].includes(c.plan) && !["premium", "vip"].includes(user?.plan);
+  useEffect(() => {
+    if (showTierUpsell) posthog.capture("profile_tier_upsell_impression", { candidate_id: c?.id, candidate_plan: c?.plan });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showTierUpsell, c?.id]);
 
   const requestFamily = useCallback(async () => {
     if (user?.plan !== "vip") {
@@ -156,6 +166,19 @@ export default function ProfileDetail() {
               </span>
             )}
           </div>
+        )}
+
+        {showTierUpsell && (
+          <Link
+            to="/premium?tab=plans"
+            data-testid="profile-tier-upsell"
+            onClick={() => posthog.capture("profile_tier_upsell_click", { candidate_id: c.id, candidate_plan: c.plan })}
+            className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-gold/15 to-card border border-gold/30 p-3.5 active:scale-[0.98] transition"
+          >
+            <Crown className="w-5 h-5 text-gold-dark shrink-0" />
+            <p className="text-sm flex-1 min-w-0">{t("profile_tier_upsell_hint").replace("{plan}", c.plan === "vip" ? "VIP" : "Premium")}</p>
+            <span className="text-xs font-semibold text-gold-dark shrink-0">{t("plan_choose_cta")}</span>
+          </Link>
         )}
 
         {/* ---- Section: basic info ---- */}

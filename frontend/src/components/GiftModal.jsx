@@ -57,7 +57,7 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
   const balance = user?.balance || 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center sm:justify-center" data-testid="gift-modal">
+    <div className="fixed inset-0 flex items-end sm:items-center sm:justify-center" style={{ zIndex: 10001 }} data-testid="gift-modal">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full sm:max-w-lg bg-card rounded-t-3xl sm:rounded-3xl shadow-2xl animate-fade-up max-h-[88vh] flex flex-col">
         {/* Header */}

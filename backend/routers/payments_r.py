@@ -129,6 +129,13 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
         amount = req.amount or 0
         if amount < 50:
             raise HTTPException(400, "Minimum 50")
+    elif req.purpose == "rank_boost":
+        # Direct real-money contribution to the leaderboard total (Rankings
+        # page) - same ledger the gift-sending leaderboard reads from, just
+        # without needing to pick a recipient.
+        amount = req.amount or 0
+        if amount < 1000:
+            raise HTTPException(400, "Minimum 1000")
     else:
         raise HTTPException(400, "Unknown purpose")
 
@@ -425,6 +432,17 @@ async def process_completed_payment(uid: str, purpose: str, amount: int, balance
             )
             await push_notif(uid, "gift", f"Sovg'a yuborildi. Ta'sir +{influence_gain}")
             await push_notif(target_user_id, "gift", "Sizga sovg'a yuborildi! 🎁")
+    elif purpose == "rank_boost":
+        await db.gifts.insert_one({
+            "id": new_id(),
+            "from_user_id": uid,
+            "to_user_id": uid,
+            "kind": "rank_boost",
+            "price": amount,
+            "is_free": False,
+            "created_at": iso(now_utc()),
+        })
+        await push_notif(uid, "rank_boost", f"Reytingga {amount:,} so'm qo'shildi 🏆")
     elif purpose == "concierge":
         if order_id:
             await db.concierge_orders.update_one(
@@ -503,6 +521,13 @@ async def my_referral(uid: str = Depends(get_current_user_id)):
         "plan": {"$ne": "free"}
     })
 
+    # Tier standing - drives "how much can I earn" on the Referral page (a
+    # referral pays 50% of the friend's first subscription, capped by tier).
+    monthly_count = await get_monthly_referral_count(uid)
+    tier = get_tier_name(monthly_count)
+    tier_cap = get_tier_max_reward(monthly_count)
+    next_tier_threshold = 301 if monthly_count < 301 else (1001 if monthly_count < 1001 else None)
+
     return {
         "code": code,
         "link": link,
@@ -514,4 +539,8 @@ async def my_referral(uid: str = Depends(get_current_user_id)):
         "referral_earnings_approved": me_doc.get("referral_earnings_approved", 0),
         "referral_earnings_withdrawable": me_doc.get("referral_earnings_withdrawable", 0),
         "referral_earnings_paid_out": me_doc.get("referral_earnings_paid_out", 0),
+        "monthly_count": monthly_count,
+        "monthly_tier": tier,
+        "tier_cap": tier_cap,
+        "next_tier_threshold": next_tier_threshold,
     }

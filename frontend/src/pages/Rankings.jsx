@@ -1,22 +1,58 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, Trophy, Medal, Gift } from "lucide-react";
+import { ChevronLeft, Trophy, Medal, Gift, Wallet, Rocket } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
-import { useLeaderboard } from "@/hooks/queries";
+import { useLeaderboard, QK } from "@/hooks/queries";
+import { useQueryClient } from "@tanstack/react-query";
+import api from "@/lib/api";
+import { toast } from "sonner";
 import { photoSrc } from "@/lib/photo";
 import { Skeleton, EmptyState } from "@/components/kit";
+import { tapMedium, notify } from "@/lib/haptics";
+
+const BOOST_PRESETS = [10000, 30000, 50000, 100000];
 
 export default function Rankings() {
-  const { t } = useApp();
+  const { t, user, refresh } = useApp();
+  const queryClient = useQueryClient();
   const [period, setPeriod] = useState("all");
+  const [amount, setAmount] = useState(BOOST_PRESETS[0]);
+  const [paying, setPaying] = useState(false);
 
   const { data: leaders = [], isLoading } = useLeaderboard(period);
+  const myRank = leaders.findIndex((row) => row.user?.id === user?.id);
 
   const getRankBadge = (rank) => {
     if (rank === 1) return <Medal className="w-5 h-5 text-yellow-500" />;
     if (rank === 2) return <Medal className="w-5 h-5 text-gray-400" />;
     if (rank === 3) return <Medal className="w-5 h-5 text-amber-700" />;
     return <span className="text-sm font-medium text-muted-foreground">#{rank}</span>;
+  };
+
+  const boost = async () => {
+    if (paying) return;
+    setPaying(true);
+    tapMedium();
+    try {
+      const r = await api.post("/payments/create", { purpose: "rank_boost", amount });
+      if (r.data.status === "paid") {
+        notify("success");
+        toast.success(t("payment_success"));
+        await refresh();
+        queryClient.invalidateQueries({ queryKey: QK.leaderboard(period) });
+      } else {
+        if (r.data.balance_used > 0) {
+          toast.success(`${t("balance_used")}: ${Number(r.data.balance_used).toLocaleString()} ${t("sum")} · ${t("pay_with_click")}: ${Number(r.data.click_amount).toLocaleString()} ${t("sum")}`);
+        } else {
+          toast.success(t("pay_with_click"));
+        }
+        if (r.data.payment_link) window.open(r.data.payment_link, "_blank");
+      }
+    } catch {
+      toast.error(t("error_generic"));
+    } finally {
+      setPaying(false);
+    }
   };
 
   return (
@@ -28,7 +64,50 @@ export default function Rankings() {
         <span className="font-heading font-bold text-lg flex items-center gap-2"><Trophy className="w-5 h-5 text-gold-dark" /> {t("top_supporters")}</span>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+      <main className="max-w-2xl mx-auto px-4 py-6 space-y-5">
+        {/* Your standing + how to climb - the page used to just show a list
+            with no explanation of how to get on it. */}
+        <section className="rounded-3xl bg-gradient-to-br from-gold/12 via-card to-secondary/10 border border-gold/25 p-5" data-testid="rankings-your-rank">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("rank_your_rank")}</p>
+              <p className="font-heading text-2xl font-semibold mt-0.5">
+                {myRank >= 0 ? `#${myRank + 1}` : t("rank_not_ranked_yet")}
+              </p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground inline-flex items-center gap-1 justify-end"><Wallet className="w-3.5 h-3.5" /> {t("balance")}</p>
+              <p className="font-heading text-lg font-semibold tabular-nums mt-0.5">{(user?.balance || 0).toLocaleString()} {t("sum")}</p>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-border/50">
+            <p className="text-xs font-medium text-muted-foreground mb-2 inline-flex items-center gap-1.5"><Rocket className="w-3.5 h-3.5" /> {t("rank_boost_hint")}</p>
+            <div className="grid grid-cols-4 gap-1.5">
+              {BOOST_PRESETS.map((v) => (
+                <button
+                  key={v}
+                  data-testid={`rank-boost-${v}`}
+                  onClick={() => setAmount(v)}
+                  className={`rounded-xl border py-2 text-xs font-semibold tabular-nums transition ${
+                    amount === v ? "bg-primary text-white border-primary" : "bg-card border-border"
+                  }`}
+                >
+                  {(v / 1000).toFixed(0)}k
+                </button>
+              ))}
+            </div>
+            <button
+              data-testid="rank-boost-pay"
+              onClick={boost}
+              disabled={paying}
+              className="w-full mt-2.5 rounded-2xl bg-gradient-to-r from-[#F0269D] to-[#8A2BE2] text-white text-sm font-semibold py-2.5 disabled:opacity-60 active:scale-[0.98] transition"
+            >
+              {paying ? "..." : `${t("rank_boost_cta")} · ${amount.toLocaleString()} ${t("sum")}`}
+            </button>
+          </div>
+        </section>
+
         <div className="flex gap-2 overflow-x-auto pb-2">
           {[
             ["day", t("daily")],
@@ -70,11 +149,12 @@ export default function Rankings() {
             <div className="space-y-3">
               {leaders.map((row, i) => {
                 const rank = i + 1;
+                const mine = row.user?.id === user?.id;
                 return (
                   <div
                     key={row.user?.id || i}
                     className={`flex items-center gap-3 p-3 rounded-xl ${
-                      rank <= 3 ? "bg-gradient-to-r from-gold/10 to-transparent" : "bg-muted/30"
+                      mine ? "bg-primary/8 border border-primary/30" : rank <= 3 ? "bg-gradient-to-r from-gold/10 to-transparent" : "bg-muted/30"
                     }`}
                   >
                     <div className="w-8 flex justify-center shrink-0">{getRankBadge(rank)}</div>
@@ -84,7 +164,7 @@ export default function Rankings() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{row.user?.name || "—"}</p>
+                      <p className="font-medium truncate">{row.user?.name || "—"}{mine ? ` (${t("me")})` : ""}</p>
                       <p className="text-xs text-muted-foreground">{row.user?.region}</p>
                     </div>
                     <div className="text-right shrink-0">

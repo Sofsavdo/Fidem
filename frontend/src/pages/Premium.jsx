@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
-import { Crown, Check, Wallet, ArrowUpRight, Sparkles, Plus } from "lucide-react";
+import { Crown, Check, Wallet, ArrowUpRight, Sparkles, Plus, Receipt, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { usePayments, QK } from "@/hooks/queries";
 import { useQueryClient } from "@tanstack/react-query";
@@ -46,9 +46,13 @@ export default function Premium() {
   const tab = sp.get("tab") || "plans";
   const [topupAmount, setTopupAmount] = useState(50000);
   const [creating, setCreating] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const perk = PERK[lang] || PERK.uz;
 
   const { data: payments = [] } = usePayments();
+  // Only completed payments are worth showing here - a pending/expired/failed
+  // attempt isn't a transaction the user needs to see in their history.
+  const successfulPayments = payments.filter((p) => p.status === "success" || p.status === "paid");
 
   const runPayment = async (purpose, amount) => {
     setCreating(true);
@@ -253,25 +257,34 @@ export default function Premium() {
         </div>
       )}
 
-      {/* Payments history */}
-      {payments.length > 0 && (
+      {/* Payments history - collapsed behind a button, and only completed
+          payments show up (a pending/expired attempt isn't useful to see). */}
+      {successfulPayments.length > 0 && (
         <div>
-          <SectionLabel className="mb-2">{t("payments")}</SectionLabel>
-          <div className="space-y-2">
-            {payments.slice(0, 8).map((p) => (
-              <div key={p.id} className="rounded-2xl bg-card border border-border p-3 flex items-center justify-between" data-testid={`payment-${p.id}`}>
-                <div>
-                  <p className="text-sm font-medium capitalize">{p.purpose?.replace(/_/g, " ")}</p>
-                  <p className="text-xs text-muted-foreground tabular-nums">{Number(p.amount || 0).toLocaleString()} {t("sum")}</p>
+          <button
+            type="button"
+            data-testid="payments-history-toggle"
+            onClick={() => setShowHistory((v) => !v)}
+            className="w-full flex items-center justify-between rounded-2xl bg-card border border-border p-3.5 active:scale-[0.99] transition"
+          >
+            <span className="text-sm font-medium inline-flex items-center gap-2"><Receipt className="w-4 h-4 text-muted-foreground" /> {t("payment_history_btn")}</span>
+            <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showHistory ? "rotate-180" : ""}`} />
+          </button>
+          {showHistory && (
+            <div className="space-y-2 mt-2" data-testid="payments-history-list">
+              {successfulPayments.slice(0, 8).map((p) => (
+                <div key={p.id} className="rounded-2xl bg-card border border-border p-3 flex items-center justify-between" data-testid={`payment-${p.id}`}>
+                  <div>
+                    <p className="text-sm font-medium capitalize">{p.purpose?.replace(/_/g, " ")}</p>
+                    <p className="text-xs text-muted-foreground tabular-nums">{Number(p.amount || 0).toLocaleString()} {t("sum")}</p>
+                  </div>
+                  <span className="text-[11px] font-medium px-2 py-1 rounded-full bg-secondary/10 text-secondary">
+                    {t("payment_success")}
+                  </span>
                 </div>
-                <span className={`text-[11px] font-medium px-2 py-1 rounded-full ${
-                  p.status === "success" ? "bg-secondary/10 text-secondary" : p.status === "failed" ? "bg-red-50 text-red-700" : "bg-gold-light text-yellow-900"
-                }`}>
-                  {t(`payment_${p.status}`)}
-                </span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

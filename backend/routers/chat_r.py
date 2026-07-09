@@ -298,7 +298,12 @@ async def decide_application(app_id: str, approve: bool = Body(..., embed=True),
         raise HTTPException(404, "Application not found")
     await db.applications.update_one({"id": app_id}, {"$set": {"status": "approved" if approve else "rejected"}})
     if approve:
-        await push_notif(row["from_user_id"], "match", "Sizning murojaatingiz qabul qilindi 🎉")
+        approver = await get_user(uid)
+        await push_notif(
+            row["from_user_id"], "match",
+            f"🎉 {approver.get('name', '')} murojaatingizni qabul qildi — endi yozishingiz mumkin!",
+            link=f"/chat/{uid}",
+        )
     return {"ok": True}
 
 
@@ -308,7 +313,17 @@ async def chat_history(chat_id: str, uid: str = Depends(get_current_user_id)):
     if uid not in (a, b):
         raise HTTPException(403, "Not your chat")
     rows = await db.messages.find({"chat_id": chat_id}, {"_id": 0}).sort("created_at", 1).to_list(500)
-    await db.messages.update_many({"chat_id": chat_id, "to_user_id": uid}, {"$set": {"read": True}})
+    result = await db.messages.update_many(
+        {"chat_id": chat_id, "to_user_id": uid, "read": {"$ne": True}},
+        {"$set": {"read": True}},
+    )
+    if result.modified_count > 0:
+        # Let the sender's open chat flip its own bubbles to "read" live,
+        # instead of only finding out next time they reload the page.
+        other_id = b if uid == a else a
+        asyncio.create_task(
+            manager.broadcast_chat([other_id], {"type": "read", "data": {"chat_id": chat_id, "reader_id": uid}})
+        )
     for r in rows:
         r["created_at"] = parse_dt(r["created_at"])
     return rows
@@ -385,15 +400,29 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
     # Insert message immediately for fast response
     await db.messages.insert_one(msg)
     msg.pop("_id", None)
-    
-    # Background operations - don't block response
+
+    # Real-time delivery goes out first, straight from the request handler -
+    # both parties (sender's own other tabs/devices included) see it within
+    # milliseconds. Previously this waited behind the slower bookkeeping
+    # below (applications record, response-time analytics), which could take
+    # long enough that the sender's own optimistic UI had already cleared
+    # before the WS echo arrived, making the just-sent message vanish.
+    asyncio.create_task(manager.broadcast_chat([uid, req.to_user_id], {"type": "message", "data": dict(msg)}))
+    asyncio.create_task(push_notif(
+        req.to_user_id, "message",
+        f"💬 {sender.get('name', '')} sizga yozdi — javob bering!",
+        link=f"/chat/{uid}",
+    ))
+
+    # Slower bookkeeping - fine to trail behind, doesn't affect what either
+    # party sees in the chat.
     asyncio.create_task(_background_message_ops(uid, req.to_user_id, cid, req.text, sender))
-    
+
     return msg
 
 
 async def _background_message_ops(uid: str, to_user_id: str, cid: str, text: str, sender: dict):
-    """Background operations after message send - don't block response"""
+    """Background bookkeeping after message send - not on the delivery path."""
     try:
         existing_msgs = await db.messages.count_documents({"chat_id": cid})
         is_first = existing_msgs == 1
@@ -430,14 +459,6 @@ async def _background_message_ops(uid: str, to_user_id: str, cid: str, text: str
                         )
                 except Exception:
                     pass
-        
-        # WebSocket push: deliver to BOTH parties
-        msg = await db.messages.find_one({"chat_id": cid}, sort=[("created_at", -1)])
-        if msg:
-            ws_payload = {"type": "message", "data": {**msg, "created_at": iso(parse_dt(msg["created_at"]))}}
-            await manager.broadcast_chat([uid, to_user_id], ws_payload)
-
-        await push_notif(to_user_id, "message", f"Yangi xabar: {sender.get('name','')}")
     except Exception:
         pass
 
@@ -632,7 +653,11 @@ async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id
     await db.messages.insert_one(gift_msg)
     gift_msg.pop("_id", None)
     await manager.broadcast_chat([uid, req.to_user_id], {"type": "message", "data": gift_msg})
-    await push_notif(req.to_user_id, "gift", f"Sizga {meta['emoji']} {meta['label_uz']} sovg'a yuborildi", link=f"/chat/{uid}")
+    await push_notif(
+        req.to_user_id, "gift",
+        f"{meta['emoji']} {sender.get('name', '')} sizga {meta['label_uz']} yubordi!",
+        link=f"/chat/{uid}",
+    )
     new_balance = sender.get("balance", 0) if is_free_gift else (sender.get("balance", 0) - price)
     return {"ok": True, "balance": new_balance, "gift": gift_msg["meta"]}
 

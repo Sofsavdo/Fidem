@@ -46,7 +46,6 @@ from routers.personality_r import router as personality_router  # noqa: E402
 from routers.ai_r import router as ai_router  # noqa: E402
 from routers.prompts_r import router as prompts_router  # noqa: E402
 from routers.stories_r import router as stories_router  # noqa: E402
-from routers.gamification_r import router as gamification_router  # noqa: E402
 from routers.withdrawals_r import router as withdrawals_router  # noqa: E402
 from routers.family_r import router as family_router  # noqa: E402
 from routers.concierge_r import router as concierge_router  # noqa: E402
@@ -56,6 +55,7 @@ from routers.location_r import router as location_router  # noqa: E402
 from routers.settings_r import router as settings_router  # noqa: E402
 from services import compute_completeness  # noqa: E402
 from storage import init_storage  # noqa: E402
+from winback import winback_loop  # noqa: E402
 
 app = FastAPI(title="FIDEM API")
 
@@ -71,7 +71,6 @@ api.include_router(personality_router)
 api.include_router(ai_router)
 api.include_router(prompts_router)
 api.include_router(stories_router)
-api.include_router(gamification_router)
 api.include_router(withdrawals_router)
 api.include_router(family_router)
 api.include_router(concierge_router)
@@ -96,6 +95,10 @@ async def startup() -> None:
 
     # Set Telegram webhook in background (non-fatal)
     asyncio.create_task(setup_telegram_webhook())
+
+    # Re-engagement notifications for inactive users - runs on its own
+    # interval for the life of the process, no external cron needed.
+    asyncio.create_task(winback_loop())
 
     # Indexes
     await db.users.create_index("id", unique=True)
