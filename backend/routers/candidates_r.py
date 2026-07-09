@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from auth import get_current_user_id
-from core import PAID_PLANS, db, get_user, iso, log, manager, now_utc, parse_dt, push_notif, strip_locked_photo, touch_active, user_public, user_public_minimal
+from core import PAID_PLANS, WHO_VIEWED_PLANS, db, get_user, iso, log, manager, mask_name, now_utc, parse_dt, push_notif, strip_locked_photo, touch_active, user_public, user_public_minimal
 from geo import distance_bucket, haversine_km
 from models import PhotoUnlockDecision, PhotoUnlockRequest, SaveRequest, new_id
 from services import age_from_birth, compute_match
@@ -606,7 +606,7 @@ async def saved_by_others(uid: str = Depends(get_current_user_id)):
     """Legacy endpoint kept for backward compatibility with old notification links.
     Frontend now uses /saved?tab=by_others but this endpoint remains functional."""
     me_doc = await get_user(uid)
-    is_premium = me_doc.get("plan") in ("premium", "vip")
+    is_premium = me_doc.get("plan") in WHO_VIEWED_PLANS
 
     rows = await db.saved.find({"target_id": uid}, {"_id": 0}).sort("at", -1).to_list(500)
 
@@ -626,9 +626,11 @@ async def saved_by_others(uid: str = Depends(get_current_user_id)):
             pub = user_public(u)
 
             if not is_premium:
-                pub["name"] = "•••••"
+                # Age and region stay visible — only the identity (name,
+                # photo) is locked pre-unlock, so the teaser still feels
+                # like a real person instead of an opaque blur.
+                pub["name"] = mask_name(u.get("name"))
                 pub["photo_url"] = None
-                pub["region"] = "•••"
                 pub["locked"] = True
 
             result.append(pub)
@@ -641,7 +643,7 @@ async def viewers(uid: str = Depends(get_current_user_id)):
     """Legacy endpoint kept for backward compatibility with old notification links.
     Frontend now uses /saved?tab=viewers but this endpoint remains functional."""
     me_doc = await get_user(uid)
-    is_premium = me_doc.get("plan") in ("premium", "vip")
+    is_premium = me_doc.get("plan") in WHO_VIEWED_PLANS
 
     rows = await db.profile_views.find({"target_id": uid}, {"_id": 0}).sort("at", -1).to_list(500)
 
@@ -672,9 +674,8 @@ async def viewers(uid: str = Depends(get_current_user_id)):
             pub = user_public(u)
 
             if not is_premium:
-                pub["name"] = "•••••"
+                pub["name"] = mask_name(u.get("name"))
                 pub["photo_url"] = None
-                pub["region"] = "•••"
                 pub["locked"] = True
 
             result.append(pub)
@@ -685,7 +686,7 @@ async def viewers(uid: str = Depends(get_current_user_id)):
 @router.get("/saved/interested")
 async def interested_in_me(uid: str = Depends(get_current_user_id)):
     me_doc = await get_user(uid)
-    is_premium = me_doc.get("plan") in ("premium", "vip")
+    is_premium = me_doc.get("plan") in WHO_VIEWED_PLANS
 
     saved_rows = await db.saved.find({"target_id": uid}, {"_id": 0}).to_list(500)
     msg_rows = await db.messages.find({"to_user_id": uid}, {"_id": 0}).to_list(500)
@@ -709,10 +710,56 @@ async def interested_in_me(uid: str = Depends(get_current_user_id)):
             pub = user_public(u)
 
             if not is_premium:
-                pub["name"] = "•••••"
+                pub["name"] = mask_name(u.get("name"))
                 pub["photo_url"] = None
                 pub["locked"] = True
 
             result.append(pub)
 
     return result
+
+
+@router.get("/saved/summary")
+async def saved_summary(uid: str = Depends(get_current_user_id)):
+    """Compact teaser for Me: who viewed or saved me, deduped and sorted by
+    recency. Returns up to 5 masked profiles plus the true total count, so
+    the UI can show real (if locked) cards instead of a blind redirect."""
+    me_doc = await get_user(uid)
+    is_premium = me_doc.get("plan") in WHO_VIEWED_PLANS
+
+    view_rows = await db.profile_views.find({"target_id": uid}, {"_id": 0}).sort("at", -1).to_list(500)
+    save_rows = await db.saved.find({"target_id": uid}, {"_id": 0}).sort("at", -1).to_list(500)
+
+    latest_at: dict[str, str] = {}
+    for r in view_rows:
+        vid = r.get("viewer_id")
+        if vid and vid != uid and vid not in latest_at:
+            latest_at[vid] = r.get("at", "")
+    for r in save_rows:
+        oid = r.get("owner_id")
+        if oid and oid != uid and oid not in latest_at:
+            latest_at[oid] = r.get("at", "")
+
+    ordered_ids = sorted(latest_at.keys(), key=lambda k: latest_at[k], reverse=True)
+    total = len(ordered_ids)
+    preview_ids = ordered_ids[:5]
+
+    users = await db.users.find(
+        {"id": {"$in": preview_ids}},
+        {"_id": 0, "password_hash": 0},
+    ).to_list(len(preview_ids))
+    users_by_id = {u["id"]: u for u in users}
+
+    items = []
+    for pid in preview_ids:
+        u = users_by_id.get(pid)
+        if not u:
+            continue
+        pub = user_public(u)
+        if not is_premium:
+            pub["name"] = mask_name(u.get("name"))
+            pub["photo_url"] = None
+            pub["locked"] = True
+        items.append(pub)
+
+    return {"items": items, "total": total, "unlocked": is_premium}

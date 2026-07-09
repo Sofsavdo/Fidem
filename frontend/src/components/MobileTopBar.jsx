@@ -1,8 +1,32 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Bell, Crown, Wallet } from "lucide-react";
+import { Bell, Crown, Wallet, Sun, Moon } from "lucide-react";
 import Logo from "@/components/Logo";
 import { useApp } from "@/contexts/AppContext";
+import { getTheme, setTheme, effectiveIsDark } from "@/lib/theme";
+
+// Cycles system -> light -> dark -> system. The icon always reflects the
+// *effective* (rendered) mode, so a "system" pick that resolves to dark
+// still shows the moon — what you see is what you get, no hidden state.
+function ThemeToggle() {
+  const [theme, setThemeState] = useState(getTheme());
+  const isDark = effectiveIsDark(theme);
+  const cycle = () => {
+    const next = theme === "system" ? (effectiveIsDark("system") ? "light" : "dark") : theme === "light" ? "dark" : "system";
+    setThemeState(next);
+    setTheme(next);
+  };
+  return (
+    <button
+      data-testid="topbar-theme"
+      onClick={cycle}
+      className="p-2 rounded-full hover:bg-muted"
+      title="Theme"
+    >
+      {isDark ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+    </button>
+  );
+}
 
 export default function MobileTopBar() {
   const { user, lang, setLang, t } = useApp();
@@ -43,6 +67,7 @@ export default function MobileTopBar() {
         >
           {lang}
         </button>
+        <ThemeToggle />
         <Link to="/notifications" data-testid="topbar-notif" className="p-2 rounded-full hover:bg-muted">
           <Bell className="w-5 h-5" />
         </Link>

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
@@ -20,6 +20,11 @@ const STEP_TITLES = {
 export default function Onboarding() {
   const { user, t, refresh, lang } = useApp();
   const nav = useNavigate();
+  const [searchParams] = useSearchParams();
+  // "Complete your profile" (from Me) reuses this screen to edit an already-
+  // onboarded profile. The name is locked in that path — see submit()/the
+  // name Field below — everything else stays freely editable.
+  const isEdit = searchParams.get("edit") === "1" && !!user?.onboarded;
   const [step, setStep] = useState(0);
   const [photoStatus, setPhotoStatus] = useState({ state: "idle", code: "", reason: "" });
   const [submitting, setSubmitting] = useState(false);
@@ -183,10 +188,15 @@ export default function Onboarding() {
                 <Field label={t("name")}>
                   <input
                     data-testid="ob-name"
-                    className="input" value={data.name}
+                    className={`input ${isEdit ? "opacity-60 cursor-not-allowed" : ""}`}
+                    value={data.name}
+                    disabled={isEdit}
                     onChange={(e) => set({ name: e.target.value })}
                     placeholder={t("name")}
                   />
+                  {isEdit && (
+                    <p className="text-[11px] text-muted-foreground mt-1.5">{t("name_locked_hint")}</p>
+                  )}
                 </Field>
                 <Field label={t("gender")}>
                   <RadioGroup
