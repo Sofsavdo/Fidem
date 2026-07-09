@@ -6,6 +6,7 @@ import Layout from "@/components/Layout";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ScrollToTop from "@/components/ScrollToTop";
 import BrandSplash from "@/components/BrandSplash";
+import { applyTheme, getTheme } from "@/lib/theme";
 
 const Auth = lazy(() => import("@/pages/Auth"));
 const Onboarding = lazy(() => import("@/pages/Onboarding"));
@@ -116,6 +117,16 @@ function Inner() {
     const cancel = window.cancelIdleCallback || clearTimeout;
     const id = ric(prefetchHotRoutes);
     return () => cancel(id);
+  }, []);
+
+  // Keep the theme in sync (and follow system/Telegram changes when set to
+  // "system"). The initial class is set by the inline script in index.html.
+  useEffect(() => {
+    applyTheme();
+    const mq = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => { if (getTheme() === "system") applyTheme("system"); };
+    mq && mq.addEventListener && mq.addEventListener("change", onChange);
+    return () => { mq && mq.removeEventListener && mq.removeEventListener("change", onChange); };
   }, []);
 
   // Telegram WebApp init (ready/expand/colors) now runs in index.js, before

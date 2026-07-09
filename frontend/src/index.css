@@ -47,7 +47,40 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Outfit', system-ui, sans-serif; }
         --chart-5: 10 30% 45%;
         --radius: 1rem;
     }
+
+    /* Dark theme — activated by the `dark` class on <html>. Same magenta/purple
+       brand, deep plum surfaces. Every token-based colour adapts automatically. */
+    .dark {
+        --background: 268 26% 8%;        /* #100C16 deep plum-black */
+        --foreground: 300 20% 96%;       /* near-white */
+        --card: 268 22% 13%;             /* #1A1422 */
+        --card-foreground: 300 20% 96%;
+        --popover: 268 22% 13%;
+        --popover-foreground: 300 20% 96%;
+        --primary: 325 90% 62%;          /* brighter magenta for dark */
+        --primary-foreground: 0 0% 100%;
+        --secondary: 271 84% 66%;        /* brighter purple */
+        --secondary-foreground: 0 0% 100%;
+        --muted: 268 18% 18%;
+        --muted-foreground: 280 10% 66%;
+        --accent: 268 18% 20%;
+        --accent-foreground: 300 20% 96%;
+        --destructive: 0 72% 58%;
+        --destructive-foreground: 0 0% 100%;
+        --border: 268 16% 22%;
+        --input: 268 16% 24%;
+        --ring: 325 90% 62%;
+    }
 }
+
+/* Dark overrides for the hand-built utilities that hardcode light values */
+.dark .glass { background: rgba(20, 15, 28, 0.72); }
+.dark .input:focus { background-color: hsl(var(--card)); }
+.dark .card-premium {
+    background: linear-gradient(180deg, hsl(268 22% 15%) 0%, hsl(268 22% 12%) 100%);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 24px 60px -28px rgba(0,0,0,0.6);
+}
+.dark .bg-grain { background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.03) 1px, transparent 0); }
 
 @layer base {
     * { @apply border-border; }
