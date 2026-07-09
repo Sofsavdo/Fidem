@@ -105,29 +105,7 @@ export default function Admin() {
             </div>
           </div>
 
-          {activeTab === "dashboard" && stats && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="admin-stats">
-              <StatCard label="Users" value={stats.total_users} icon={<UsersIcon className="w-4 h-4" />} />
-              <StatCard label="DAU" value={stats.dau} />
-              <StatCard label="WAU" value={stats.wau} />
-              <StatCard label="Conversion" value={`${stats.conversion_premium}%`} />
-              <StatCard label="Premium" value={stats.premium} />
-              <StatCard label="VIP" value={stats.vip} />
-              <StatCard label="M/F Ratio" value={`${stats.males} / ${stats.females}`} />
-              <StatCard label="Revenue" value={`${(stats.revenue?.total || 0).toLocaleString()} so'm`} icon={<DollarSign className="w-4 h-4" />} />
-              <StatCard label="Pending Pay" value={stats.pending_payments} />
-              <StatCard label="Pending Verif" value={stats.pending_verifications} />
-              <StatCard label="Referrals" value={stats.referrals?.total || 0} />
-              <StatCard label="Reports" value={stats.open_reports || 0} />
-              {stats.quality && (
-                <>
-                  <StatCard label="Avg Completion" value={`${stats.quality.avg_completion}%`} />
-                  <StatCard label="Retention" value={`${stats.quality.retention_rate}%`} />
-                  <StatCard label="Msgs/User" value={stats.quality.avg_messages_per_user} />
-                </>
-              )}
-            </div>
-          )}
+          {activeTab === "dashboard" && stats && <AdminDashboard stats={stats} go={setActiveTab} />}
 
           {activeTab === "analytics" && stats && <AdminAnalytics stats={stats} />}
           {activeTab === "users" && <AdminUsers />}
@@ -141,6 +119,100 @@ export default function Admin() {
           {activeTab === "reports" && <AdminReports />}
         </div>
       </main>
+    </div>
+  );
+}
+
+function RevenueTile({ label, value, accent }) {
+  return (
+    <div className={`rounded-3xl border p-4 ${accent ? "bg-gradient-to-br from-primary/10 to-card border-primary/30" : "bg-card border-border"}`}>
+      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="font-heading text-xl font-semibold mt-1 tabular-nums">{value}</p>
+    </div>
+  );
+}
+
+// Command-center dashboard: revenue at a glance, actionable "needs attention"
+// cards that jump to the relevant tab, full overview metrics, and top regions.
+function AdminDashboard({ stats, go }) {
+  const rev = stats.revenue || {};
+  const money = (n) => `${(n || 0).toLocaleString()} so'm`;
+  const attention = [
+    { label: "Pending payments", value: stats.pending_payments || 0, tab: "payments", Icon: DollarSign },
+    { label: "Pending verifications", value: stats.pending_verifications || 0, tab: "verifications", Icon: ShieldCheck },
+    { label: "Open reports", value: stats.open_reports || 0, tab: "reports", Icon: AlertTriangle },
+  ];
+  const regions = stats.top_regions || [];
+  const regionMax = regions.length ? (regions[0].count || 1) : 1;
+  return (
+    <div className="space-y-6" data-testid="admin-stats">
+      {/* Revenue */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <RevenueTile label="Total revenue" value={money(rev.total)} accent />
+        <RevenueTile label="Today" value={money(rev.today)} />
+        <RevenueTile label="This week" value={money(rev.week)} />
+        <RevenueTile label="This month" value={money(rev.month)} />
+      </div>
+
+      {/* Needs attention — actionable */}
+      <div>
+        <p className="field-label mb-2 px-1">Needs attention</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {attention.map((a) => (
+            <button
+              key={a.tab}
+              onClick={() => go(a.tab)}
+              data-testid={`admin-attention-${a.tab}`}
+              className={`rounded-3xl border p-4 text-left flex items-center justify-between transition hover:-translate-y-0.5 ${a.value > 0 ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}
+            >
+              <div>
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground flex items-center gap-1"><a.Icon className="w-3.5 h-3.5" /> {a.label}</p>
+                <p className={`font-heading text-2xl mt-1 ${a.value > 0 ? "text-primary" : ""}`}>{a.value}</p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Overview metrics */}
+      <div>
+        <p className="field-label mb-2 px-1">Overview</p>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <StatCard label="Users" value={(stats.total_users || 0).toLocaleString()} icon={<UsersIcon className="w-4 h-4" />} />
+          <StatCard label="Onboarded" value={(stats.onboarded || 0).toLocaleString()} />
+          <StatCard label="DAU" value={stats.dau} />
+          <StatCard label="WAU" value={stats.wau} />
+          <StatCard label="MAU" value={stats.mau} />
+          <StatCard label="Conversion" value={`${stats.conversion_premium}%`} />
+          <StatCard label="Premium" value={stats.premium} />
+          <StatCard label="VIP" value={stats.vip} />
+          <StatCard label="M / F" value={`${stats.males} / ${stats.females}`} />
+          <StatCard label="Referrals" value={stats.referrals?.total || 0} />
+          <StatCard label="Messages today" value={stats.messages?.today || 0} />
+          {stats.quality && <StatCard label="Avg completion" value={`${stats.quality.avg_completion}%`} />}
+          {stats.quality && <StatCard label="Retention" value={`${stats.quality.retention_rate}%`} />}
+          {stats.quality && <StatCard label="Msgs / user" value={stats.quality.avg_messages_per_user} />}
+        </div>
+      </div>
+
+      {/* Top regions */}
+      {regions.length > 0 && (
+        <div className="rounded-3xl bg-card border border-border p-4">
+          <p className="field-label mb-3 px-1 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> Top regions</p>
+          <div className="space-y-2">
+            {regions.slice(0, 8).map((r, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <span className="w-28 shrink-0 text-sm truncate">{r._id}</span>
+                <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full bg-primary rounded-full" style={{ width: `${(r.count / regionMax) * 100}%` }} />
+                </div>
+                <span className="w-12 text-right text-sm tabular-nums text-muted-foreground">{r.count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
