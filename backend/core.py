@@ -55,6 +55,19 @@ CHAT_GUARANTEE_HOURS = int(os.environ.get("CHAT_GUARANTEE_HOURS", "48"))
 # hard wall, without weakening the paid tiers (set to 0 to disable entirely).
 FREE_WEEKLY_INITIATIONS = int(os.environ.get("FREE_WEEKLY_INITIATIONS", "1"))
 PAID_PLANS = ("standard", "premium", "vip")
+# Plans that unlock "who viewed / who saved me" (see PLANS.premium.perks in
+# frontend/src/pages/Premium.jsx) — standard alone does not include it.
+WHO_VIEWED_PLANS = ("premium", "vip")
+
+
+def mask_name(name: str) -> str:
+    """First + last letter visible, middle replaced with a fixed run of
+    asterisks (e.g. "Alisher" -> "A****r") — enough to feel like a real
+    person in a teaser list without revealing who it is pre-unlock."""
+    name = (name or "").strip()
+    if len(name) <= 2:
+        return (name[:1] + "***") if name else "***"
+    return f"{name[0]}****{name[-1]}"
 
 
 def get_webapp_url() -> str:

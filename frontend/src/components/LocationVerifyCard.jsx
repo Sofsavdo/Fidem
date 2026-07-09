@@ -67,10 +67,9 @@ export default function LocationVerifyCard() {
             data-testid="location-verify-btn"
             onClick={start}
             disabled={busy}
-            className="btn-primary mt-3 inline-flex"
-            style={{ width: "auto" }}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#F0269D] to-[#8A2BE2] text-white text-xs font-semibold px-3.5 py-2 active:scale-[0.97] transition disabled:opacity-55"
           >
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5" />}
             {t("location_verify_btn")}
           </button>
         </div>

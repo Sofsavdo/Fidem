@@ -342,6 +342,14 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
     user = await get_user(uid)
     was_onboarded = bool(user.get("onboarded"))
 
+    if was_onboarded:
+        # Name is an identity-anchor field: once onboarding is complete,
+        # letting this "complete/edit profile" endpoint silently rename the
+        # user would let anyone reinvent themselves daily after other users
+        # have already matched/verified/chatted with the original name.
+        # Keep the original name regardless of what the client submits.
+        update.pop("name", None)
+
     if not user.get("photo_verified"):
         from ai_service import verify_face_photo
 

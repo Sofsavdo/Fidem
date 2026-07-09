@@ -68,11 +68,14 @@ export default function Saved() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 stagger" data-testid="saved-grid">
         {items.map((c, idx) => {
           if (c.locked) {
+            // Age + region stay visible (masked name, locked photo) — a real
+            // teaser instead of a blank card, consistent with Me's preview.
             return (
               <div key={`locked-${tab}-${idx}`} className="aspect-[4/5] rounded-3xl bg-card border border-border overflow-hidden relative">
                 <div className="absolute inset-0 bg-gradient-to-b from-muted to-card flex flex-col items-center justify-center text-center p-4">
                   <Lock className="w-6 h-6 text-muted-foreground" />
-                  <p className="text-xs text-muted-foreground mt-2">{t("premium_only")}</p>
+                  <p className="text-sm font-medium mt-2">{c.name}, {c.age}</p>
+                  <p className="text-[11px] text-muted-foreground">{c.region}</p>
                   <Link data-testid="locked-upgrade" to="/premium?tab=plans" className="mt-3 text-xs font-medium text-foreground underline">{t("upgrade")}</Link>
                 </div>
               </div>

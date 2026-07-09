@@ -12,6 +12,7 @@ export const QK = {
   candidates: (filters) => ["candidates", filters],
   candidateDetail: (id) => ["candidates", "detail", id],
   saved: (tab = "mine") => ["saved", tab],
+  savedSummary: ["saved", "summary"],
   withdrawalsStatus: ["withdrawals", "status"],
   withdrawalsHistory: ["withdrawals", "history"],
   payments: ["payments", "mine"],
@@ -152,6 +153,15 @@ export function useSaved(tab = "mine") {
     queryFn: () => api.get(endpoint).then((r) => r.data || []),
     // switching between the 4 saved tabs keeps the old grid visible
     placeholderData: keepPreviousData,
+  });
+}
+
+// Compact "who viewed/saved me" teaser for Me.jsx — up to 5 masked profiles
+// plus the true total count (see backend GET /saved/summary).
+export function useSavedSummary() {
+  return useQuery({
+    queryKey: QK.savedSummary,
+    queryFn: () => api.get("/saved/summary").then((r) => r.data),
   });
 }
 

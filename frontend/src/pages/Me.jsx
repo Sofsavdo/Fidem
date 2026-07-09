@@ -8,8 +8,9 @@ import { ChevronRight, Crown, Wallet, Share2, Settings as SettingsIcon, LogOut, 
 import ProgressCard from "@/components/ProgressCard";
 import BoostModal from "@/components/BoostModal";
 import LocationVerifyCard from "@/components/LocationVerifyCard";
+import InterestedPreview from "@/components/InterestedPreview";
 import { toast } from "sonner";
-import { useReferral, useDailyStatus, useSaved, QK } from "@/hooks/queries";
+import { useReferral, useDailyStatus, QK } from "@/hooks/queries";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 
 export default function Me() {
@@ -19,8 +20,6 @@ export default function Me() {
 
   const { data: referral } = useReferral();
   const { data: daily } = useDailyStatus();
-  const { data: profileViewers = [] } = useSaved("viewers");
-  const { data: profileSavers = [] } = useSaved("by_others");
 
   // Invalidate notifications on WS event so the top-bar count stays in sync
   useEffect(() => {
@@ -95,25 +94,9 @@ export default function Me() {
         )}
       </div>
 
-      {/* Contextual upsell — surfaces existing profile_views/saved-by-others data instead of burying it in a tab */}
-      {!["premium", "vip"].includes(user.plan) && (profileViewers.length > 0 || profileSavers.length > 0) && (
-        <Link
-          to="/premium?tab=plans"
-          data-testid="profile-teaser-banner"
-          className="block rounded-3xl bg-gradient-to-r from-primary/10 to-card border border-primary/30 p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform"
-        >
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium leading-snug">
-              {profileViewers.length > 0 && profileSavers.length > 0
-                ? t("profile_teaser_both").replace("{n}", profileViewers.length).replace("{m}", profileSavers.length)
-                : profileViewers.length > 0
-                ? t("profile_teaser_views_only").replace("{n}", profileViewers.length)
-                : t("profile_teaser_saves_only").replace("{m}", profileSavers.length)}
-            </p>
-            <span className="shrink-0 text-xs font-semibold text-primary whitespace-nowrap">{t("profile_teaser_cta")} →</span>
-          </div>
-        </Link>
-      )}
+      {/* Contextual upsell — real masked profile list with an inline unlock,
+          instead of a blind redirect to the plans page. */}
+      <InterestedPreview />
 
       {/* Location verification (Map M1) */}
       <LocationVerifyCard />

@@ -19,7 +19,7 @@ export default function BottomNav() {
   return (
     <nav
       data-testid="bottom-nav"
-      className="fixed bottom-0 inset-x-0 glass border-t border-border/60 pb-[env(safe-area-inset-bottom)]"
+      className="shrink-0 glass border-t border-border/60 pb-[env(safe-area-inset-bottom)]"
       style={{ zIndex: 10000 }}
     >
       <div className="max-w-md mx-auto grid grid-cols-5 px-1.5 pt-1.5">
