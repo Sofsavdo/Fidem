@@ -136,6 +136,13 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
         amount = req.amount or 0
         if amount < 1000:
             raise HTTPException(400, "Minimum 1000")
+    elif req.purpose == "boost":
+        # 24h profile boost. Routed through the smart-payment flow so the
+        # balance covers what it can and CLICK picks up the remainder -
+        # previously the "pay with CLICK" path only topped up the balance
+        # and never actually activated the boost.
+        from routers.growth_r import BOOST_PRICE
+        amount = BOOST_PRICE
     else:
         raise HTTPException(400, "Unknown purpose")
 
@@ -254,7 +261,17 @@ async def click_callback(request: Request):
         received_amount = int(form.get("amount", "0"))
         if received_amount != expected_amount:
             return JSONResponse({"error": -7, "error_note": "Amount mismatch"})
-        
+
+        # Late completion: if this payment already expired, the balance
+        # portion was refunded to the user (see /payments/mine). CLICK still
+        # completed, so deliver the purchase - but take the refunded balance
+        # part back first, otherwise the user gets it twice.
+        if payment.get("status") == "expired" and payment.get("balance_used", 0) > 0:
+            await db.users.update_one(
+                {"id": payment["user_id"]},
+                {"$inc": {"balance": -payment["balance_used"]}},
+            )
+
         await process_completed_payment(
             payment["user_id"],
             payment["purpose"],
@@ -432,6 +449,19 @@ async def process_completed_payment(uid: str, purpose: str, amount: int, balance
             )
             await push_notif(uid, "gift", f"Sovg'a yuborildi. Ta'sir +{influence_gain}")
             await push_notif(target_user_id, "gift", "Sizga sovg'a yuborildi! 🎁")
+    elif purpose == "boost":
+        await db.users.update_one(
+            {"id": uid},
+            {"$set": {
+                "boost_until": iso(now_utc() + timedelta(hours=24)),
+                "boost_metrics.started_at": iso(now_utc()),
+                "boost_metrics.impressions": 0,
+                "boost_metrics.views": 0,
+                "boost_metrics.likes": 0,
+                "boost_metrics.messages": 0,
+            }},
+        )
+        await push_notif(uid, "boost", "Profile Boost faollashtirildi — 24 soat 5x ko'proq ko'rinish 🚀")
     elif purpose == "rank_boost":
         await db.gifts.insert_one({
             "id": new_id(),
@@ -461,7 +491,9 @@ async def admin_confirm_payment(payment_id: str, _: str = Depends(get_current_ad
     payment = await db.payments.find_one({"id": payment_id})
     if not payment:
         raise HTTPException(404, "Not found")
-    if payment["status"] == "success":
+    # "paid" = completed instantly from balance; confirming it again would
+    # deliver the purchase a second time (double top-up, double plan, ...).
+    if payment["status"] in ("success", "paid"):
         return {"ok": True}
     await process_completed_payment(
         payment["user_id"],
@@ -470,6 +502,10 @@ async def admin_confirm_payment(payment_id: str, _: str = Depends(get_current_ad
         payment.get("balance_used", 0),
         payment.get("target_user_id"),
         payment.get("order_id")
+    )
+    await db.payments.update_one(
+        {"id": payment_id},
+        {"$set": {"status": "success", "updated_at": iso(now_utc()), "confirmed_by_admin": True}},
     )
     return {"ok": True}
 
@@ -483,12 +519,17 @@ async def my_payments(uid: str = Depends(get_current_user_id)):
     for row in rows:
         if row.get("status") == "pending" and parse_dt(row.get("created_at", now_utc())) < ten_minutes_ago:
             row["status"] = "expired"
-            # Update DB status to expired (idempotent)
-            await db.payments.update_one(
+            res = await db.payments.update_one(
                 {"id": row["id"], "status": "pending"},
                 {"$set": {"status": "expired", "updated_at": iso(now_utc())}}
             )
-    
+            # The balance portion was deducted up-front at create time; if the
+            # CLICK half never completed, that money would silently vanish.
+            # Refund it exactly once - the modified_count guard means only the
+            # request that actually flipped pending->expired pays it back.
+            if res.modified_count == 1 and row.get("balance_used", 0) > 0:
+                await db.users.update_one({"id": uid}, {"$inc": {"balance": row["balance_used"]}})
+
     return rows
 
 

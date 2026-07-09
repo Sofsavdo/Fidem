@@ -1,28 +1,14 @@
-import React, { useState } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, ShieldCheck, Sparkles, Heart } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import Logo from "@/components/Logo";
+import HeroScene from "@/components/HeroScene";
 import LangSwitch from "@/components/LangSwitch";
-
-// Hero photo. A bundled file at public/welcome-hero.jpg (drop one in to fully
-// control it) takes priority; otherwise a neutral, ethnicity-agnostic romantic
-// image (a couple silhouette at sunset — no visible skin tone, culturally safe)
-// loads from the CDN. If neither loads, the brand gradient shows.
-const HERO_LOCAL = "/welcome-hero.jpg";
-const HERO_CDN =
-  "https://images.unsplash.com/photo-1508672019048-805c876b67e2?w=1000&q=70&auto=format&fit=crop";
 
 export default function Welcome() {
   const { t, user } = useApp();
   const nav = useNavigate();
-  // Try the bundled photo first, fall back to the CDN, then to the gradient.
-  const [src, setSrc] = useState(HERO_LOCAL);
-  const [imgOk, setImgOk] = useState(true);
-  const onImgError = () => {
-    if (src === HERO_LOCAL) setSrc(HERO_CDN);
-    else setImgOk(false);
-  };
 
   const start = () => {
     try { localStorage.setItem("fidem_welcomed", "1"); } catch { /* ignore */ }
@@ -37,19 +23,12 @@ export default function Welcome() {
 
   return (
     <div className="relative h-[100dvh] bg-ink text-white overflow-hidden flex flex-col">
-      {/* ---- Hero photo (top ~56%) ---- */}
+      {/* ---- Hero (top ~56%): couple-at-sunset scene; a real photo dropped at
+           public/welcome-hero.jpg automatically replaces the illustration ---- */}
       <div className="relative flex-1 min-h-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#F0269D] via-[#B0279E] to-[#8A2BE2]" />
-        {imgOk && (
-          <img
-            src={src}
-            alt=""
-            onError={onImgError}
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-        )}
-        {/* legibility + brand tint */}
-        <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/30 to-black/25" />
+        <HeroScene className="absolute inset-0" />
+        {/* legibility for the text card below */}
+        <div className="absolute inset-0 bg-gradient-to-t from-ink via-transparent to-black/15" />
 
         {/* top bar over the photo */}
         <div className="relative z-10 flex items-center justify-between px-5 pt-4">

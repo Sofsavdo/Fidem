@@ -1,9 +1,11 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useState } from "react";
 import { X, Rocket, Check, Clock } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
-import { useBoostStatus, useActivateBoost, useBoostAnalytics } from "@/hooks/queries";
+import { useBoostStatus, useBoostAnalytics, QK } from "@/hooks/queries";
+import { useQueryClient } from "@tanstack/react-query";
+import api from "@/lib/api";
 import { toast } from "sonner";
+import { tapMedium, notify } from "@/lib/haptics";
 
 function hoursLeft(untilIso) {
   if (!untilIso) return 0;
@@ -12,23 +14,40 @@ function hoursLeft(untilIso) {
 }
 
 export default function BoostModal({ onClose }) {
-  const { t, user } = useApp();
+  const { t, user, refresh } = useApp();
+  const queryClient = useQueryClient();
   const { data: status } = useBoostStatus();
-  const activate = useActivateBoost();
   const { data: analytics } = useBoostAnalytics(!!status?.active);
+  const [paying, setPaying] = useState(false);
   const m = analytics?.boost;
 
   const price = status?.price ?? 5000;
   const balance = user?.balance || 0;
-  const canAfford = balance >= price;
+  const coversFromBalance = balance >= price;
 
-  const activateNow = () => {
-    // Optimistic: the mutation already flips `active` in cache on tap, so the
-    // modal reflects success immediately — the network call reconciles after.
-    activate.mutate(undefined, {
-      onSuccess: () => toast.success(t("profile_boost_title") + " 🚀"),
-      onError: (e) => toast.error(e?.response?.data?.detail || t("error_generic")),
-    });
+  // One flow for both wallets: /payments/create spends the balance first and
+  // sends the remainder to CLICK, so the button always works - no more
+  // "top up your balance first" detour.
+  const activateNow = async () => {
+    if (paying) return;
+    setPaying(true);
+    tapMedium();
+    try {
+      const r = await api.post("/payments/create", { purpose: "boost" });
+      if (r.data.status === "paid") {
+        notify("success");
+        toast.success(t("profile_boost_title") + " 🚀");
+        queryClient.invalidateQueries({ queryKey: QK.boostStatus });
+        refresh();
+      } else {
+        if (r.data.payment_link) window.open(r.data.payment_link, "_blank");
+        toast.info(t("redirecting_payment"));
+      }
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || t("error_generic"));
+    } finally {
+      setPaying(false);
+    }
   };
 
   return (
@@ -82,25 +101,19 @@ export default function BoostModal({ onClose }) {
           </div>
         ) : (
           <div className="mt-5 space-y-2">
-            <p className="text-xs text-muted-foreground" data-testid="boost-inactive-state">{t("no_active_boost")}</p>
             <button
               data-testid="boost-activate"
               onClick={activateNow}
-              disabled={!canAfford || activate.isPending}
+              disabled={paying}
               className="w-full rounded-2xl bg-primary text-white py-3 font-medium disabled:opacity-50 inline-flex items-center justify-center gap-2"
             >
-              🚀 {t("activate_with_balance")} · {price.toLocaleString()} {t("sum")}
+              🚀 {coversFromBalance ? t("activate_with_balance") : t("activate_with_click")} · {price.toLocaleString()} {t("sum")}
             </button>
-            {!canAfford && (
-              <Link
-                to="/premium?tab=balance"
-                data-testid="boost-topup-link"
-                onClick={onClose}
-                className="block text-center text-xs text-primary font-medium py-1"
-              >
-                {t("topup_balance")} ({balance.toLocaleString()} {t("sum")}) →
-              </Link>
-            )}
+            <p className="text-[11px] text-muted-foreground text-center" data-testid="boost-inactive-state">
+              {coversFromBalance
+                ? `${t("balance")}: ${balance.toLocaleString()} ${t("sum")}`
+                : t("topup_click_note")}
+            </p>
           </div>
         )}
       </div>

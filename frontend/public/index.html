@@ -25,6 +25,10 @@
     <link rel="icon" href="/logo.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/logo.svg" />
 
+    <!-- Start the TLS handshake to the API while the JS bundle is still
+         downloading — saves a round-trip on the first real request. -->
+    <link rel="preconnect" href="%REACT_APP_BACKEND_URL%" crossorigin />
+
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -58,6 +62,24 @@
 
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
+    <!-- Instant boot splash: pure HTML/CSS, painted before any JS loads, so
+         the user sees the animated brand mark instead of a blank screen /
+         generic skeleton while the bundle downloads. React replaces #root's
+         content on mount, which removes it automatically. -->
+    <style>
+      #boot-splash { position: fixed; inset: 0; display: grid; place-items: center; background: #fbf7fa; }
+      .dark #boot-splash { background: #1a1224; }
+      #boot-splash .track { opacity: 0.16; }
+      #boot-splash .draw { stroke-dasharray: 0.3 0.7; animation: bootsweep 1.5s linear infinite; }
+      @keyframes bootsweep { to { stroke-dashoffset: -1; } }
+    </style>
+    <div id="root"><div id="boot-splash"><svg width="88" height="88" viewBox="0 0 100 100" fill="none">
+      <g stroke-width="15" stroke-linecap="round">
+        <path class="track" d="M50 80 C 30 60, 12 52, 15 33 C 17 21, 37 20, 46 35 C 49 40, 50 45, 50 45" stroke="#F0269D" pathLength="1"/>
+        <path class="track" d="M50 80 C 70 60, 88 52, 85 33 C 83 21, 63 20, 54 35 C 51 40, 50 45, 50 45" stroke="#8A2BE2" pathLength="1"/>
+        <path class="draw" d="M50 80 C 30 60, 12 52, 15 33 C 17 21, 37 20, 46 35 C 49 40, 50 45, 50 45" stroke="#F0269D" pathLength="1"/>
+        <path class="draw" d="M50 80 C 70 60, 88 52, 85 33 C 83 21, 63 20, 54 35 C 51 40, 50 45, 50 45" stroke="#8A2BE2" pathLength="1"/>
+      </g>
+    </svg></div></div>
   </body>
 </html>

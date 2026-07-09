@@ -83,7 +83,12 @@ try {
   persister = null;
 }
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
+// The static boot splash lives inside #root in index.html; clear it just
+// before React takes over so createRoot doesn't warn about a non-empty
+// container (React's render would replace it anyway).
+const container = document.getElementById("root");
+container.replaceChildren();
+const root = ReactDOM.createRoot(container);
 const Providers = persister
   ? (
     <PersistQueryClientProvider
