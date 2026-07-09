@@ -86,9 +86,12 @@ async def boost_status(uid: str = Depends(get_current_user_id)):
 async def boost_activate(request: Request, use_balance: bool = Body(True, embed=True), uid: str = Depends(get_current_user_id)):
     """Activate 24h boost. If use_balance=True, deduct from balance; otherwise client should redirect to CLICK payment."""
     if not use_balance:
+        # Route through the boost payment purpose so completing the CLICK
+        # payment actually activates the boost (this used to create a plain
+        # balance_topup, which paid money in but never started the boost).
         from routers.payments_r import create_payment
         from models import CreatePaymentRequest
-        return await create_payment(CreatePaymentRequest(purpose="balance_topup", amount=BOOST_PRICE), request, uid=uid)
+        return await create_payment(CreatePaymentRequest(purpose="boost"), request, uid=uid)
     me = await get_user(uid)
     until = now_utc() + timedelta(hours=24)
     res = await db.users.update_one(

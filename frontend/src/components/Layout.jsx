@@ -31,7 +31,7 @@ export default function Layout({ children }) {
     <div className="h-[100dvh] flex flex-col bg-background bg-grain overflow-hidden">
       <OfflineBanner />
       {!isAdmin && !isChat && <MobileTopBar />}
-      <main id="app-scroll" className="flex-1 min-h-0 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: "touch" }}>
+      <main id="app-scroll" className="flex-1 min-h-0 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: "touch", overflowAnchor: "none" }}>
         <div className={`max-w-2xl xl:max-w-3xl mx-auto ${isChat ? "pb-0" : "pb-6 md:pb-10"} relative`}>
           {children || <Outlet />}
         </div>

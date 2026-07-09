@@ -12,11 +12,14 @@ import { useCandidates, useSaved, useToggleSave } from "@/hooks/queries";
 import { MATCH_EVENT } from "@/components/MatchCelebration";
 import { tapMedium } from "@/lib/haptics";
 import { EmptyState } from "@/components/kit";
+import HeroScene from "@/components/HeroScene";
 
 // Every Nth card in the free-tier feed is a plan pitch instead of a
 // candidate - frequent enough to be seen, rare enough not to feel spammy.
 const PROMO_EVERY = 9;
 
+// Mirrors CandidateCard's exact structure (4:5 image + p-3 footer) so it sits
+// in the grid at the same size as a real profile - image open, not blurred.
 function PlanPromoCard() {
   const { t } = useApp();
   useEffect(() => { posthog.capture("candidates_feed_promo_impression"); }, []);
@@ -25,12 +28,22 @@ function PlanPromoCard() {
       to="/premium?tab=plans"
       data-testid="candidates-promo-card"
       onClick={() => posthog.capture("candidates_feed_promo_click")}
-      className="aspect-[4/5] rounded-3xl bg-gradient-to-br from-ink to-zinc-800 text-white p-4 flex flex-col justify-between hover:-translate-y-0.5 active:scale-[0.98] transition-transform"
+      className="block bg-card rounded-3xl overflow-hidden shadow-soft hover:shadow-elevated transition-shadow border border-gold/40"
     >
-      <Crown className="w-6 h-6 text-gold" />
-      <div>
-        <p className="font-heading text-base font-semibold leading-snug">{t("candidates_promo_title")}</p>
-        <p className="text-xs text-white/70 mt-1">{t("candidates_promo_hint")} →</p>
+      <div className="relative aspect-[4/5] overflow-hidden bg-muted">
+        <HeroScene className="absolute inset-0" photo="/promo-hero.jpg" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/0 to-black/0" />
+        <div className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-full bg-gold text-ink px-2.5 py-1 text-[11px] font-bold">
+          <Crown className="w-3 h-3" /> Premium
+        </div>
+        <div className="absolute bottom-3 left-3 right-3 text-white">
+          <h3 className="font-heading text-lg font-semibold leading-snug">{t("candidates_promo_title")}</h3>
+          <p className="text-xs text-white/85 mt-0.5">{t("candidates_promo_hint")}</p>
+        </div>
+      </div>
+      <div className="p-3 flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-primary">{t("plan_choose_cta")} →</span>
+        <span className="p-2 rounded-full bg-gold/15 text-gold-dark"><Crown className="w-4 h-4" /></span>
       </div>
     </Link>
   );
