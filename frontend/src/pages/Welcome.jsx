@@ -1,7 +1,8 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Heart, Check, Sparkles } from "lucide-react";
+import { Check, Sparkles } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
+import Logo from "@/components/Logo";
 import LangSwitch from "@/components/LangSwitch";
 
 export default function Welcome() {
@@ -32,9 +33,7 @@ export default function Welcome() {
 
       <header className="relative z-10 flex items-center justify-between px-5 pt-4">
         <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-gold grid place-items-center text-white">
-            <Heart className="w-5 h-5" fill="currentColor" />
-          </div>
+          <Logo tone="white" className="w-9 h-9" />
           <span className="font-heading font-bold text-xl tracking-tight">FIDEM</span>
         </div>
         <LangSwitch />

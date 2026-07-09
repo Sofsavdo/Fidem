@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Bell, Crown, Wallet } from "lucide-react";
+import Logo from "@/components/Logo";
 import { useApp } from "@/contexts/AppContext";
 
 export default function MobileTopBar() {
@@ -11,10 +12,8 @@ export default function MobileTopBar() {
   return (
     <header data-testid="mobile-topbar" className="sticky top-0 z-30 glass border-b border-border/40 px-3 py-2 flex items-center justify-between gap-2" style={{ paddingTop: "max(8px, env(safe-area-inset-top))" }}>
       <Link to="/" className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-secondary grid place-items-center text-white text-base">
-          ❤️
-        </div>
-        <span className="font-heading font-semibold text-lg leading-none">FIDEM</span>
+        <Logo className="w-8 h-8" />
+        <span className="font-heading font-semibold text-lg leading-none tracking-tight">FIDEM</span>
       </Link>
       <div className="flex items-center gap-1">
         {/* Unified wallet pill → balance/top-up surface (in-app spending money).

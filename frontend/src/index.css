@@ -19,27 +19,27 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Outfit', system-ui, sans-serif; }
 
 @layer base {
     :root {
-        /* FIDEM modern-premium theme: clean cool-neutral canvas, terracotta
-           primary, forest secondary, gold accent. No cream/beige. */
-        --background: 220 20% 97%;       /* #F4F6F8 clean light */
-        --foreground: 222 24% 11%;       /* #15171D near-black */
+        /* FIDEM brand theme: magenta→purple brand (matches the logo), clean
+           light canvas, gold reserved for VIP/premium accents. */
+        --background: 300 20% 98%;       /* #FBF7FB barely-tinted light */
+        --foreground: 268 30% 12%;       /* #1C1426 near-black plum */
         --card: 0 0% 100%;
-        --card-foreground: 222 24% 11%;
+        --card-foreground: 268 30% 12%;
         --popover: 0 0% 100%;
-        --popover-foreground: 222 24% 11%;
-        --primary: 10 62% 45%;           /* #BB4A34 deeper terracotta, pops on cool base */
+        --popover-foreground: 268 30% 12%;
+        --primary: 325 87% 54%;          /* #F0269D magenta */
         --primary-foreground: 0 0% 100%;
-        --secondary: 168 40% 26%;        /* #285A4E forest */
+        --secondary: 271 76% 53%;        /* #8A2BE2 purple */
         --secondary-foreground: 0 0% 100%;
-        --muted: 220 16% 93%;            /* #E9ECF1 */
-        --muted-foreground: 220 9% 42%;  /* #626873 */
-        --accent: 220 16% 93%;
-        --accent-foreground: 222 24% 11%;
-        --destructive: 0 65% 48%;
+        --muted: 290 18% 94%;            /* #EFE9F1 */
+        --muted-foreground: 268 10% 42%; /* #6B6172 */
+        --accent: 290 18% 94%;
+        --accent-foreground: 268 30% 12%;
+        --destructive: 0 72% 51%;
         --destructive-foreground: 0 0% 100%;
-        --border: 220 15% 88%;           /* #DCE0E7 */
-        --input: 220 15% 88%;
-        --ring: 10 62% 45%;
+        --border: 290 20% 90%;           /* #E5DCE8 */
+        --input: 290 20% 90%;
+        --ring: 325 87% 54%;
         --chart-1: 11 50% 41%;
         --chart-2: 164 35% 27%;
         --chart-3: 45 60% 53%;
@@ -140,7 +140,7 @@ textarea.input { resize: vertical; min-height: 92px; line-height: 1.45; }
 .btn-primary {
     width: 100%;
     border-radius: 1rem;
-    background: linear-gradient(135deg, hsl(10 62% 48%) 0%, hsl(10 64% 39%) 100%);
+    background: linear-gradient(135deg, hsl(325 87% 56%) 0%, hsl(271 76% 50%) 100%);
     color: white;
     font-weight: 600;
     padding: 0.95rem 1.25rem;
@@ -148,24 +148,24 @@ textarea.input { resize: vertical; min-height: 92px; line-height: 1.45; }
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    box-shadow: 0 8px 24px hsl(10 62% 45% / 0.28), 0 1px 2px hsl(10 64% 28% / 0.2), inset 0 1px 0 rgba(255,255,255,0.15);
+    box-shadow: 0 8px 24px hsl(325 80% 50% / 0.28), 0 1px 2px hsl(271 76% 30% / 0.2), inset 0 1px 0 rgba(255,255,255,0.15);
     transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
     border: 0;
     cursor: pointer;
 }
-.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 30px hsl(10 62% 45% / 0.35), inset 0 1px 0 rgba(255,255,255,0.18); filter: brightness(1.04); }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 30px hsl(325 80% 50% / 0.35), inset 0 1px 0 rgba(255,255,255,0.18); filter: brightness(1.04); }
 .btn-primary:active { transform: scale(0.985); }
 .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 
 .btn-secondary {
     width: 100%;
     border-radius: 1rem;
-    background: linear-gradient(135deg, hsl(168 42% 29%) 0%, hsl(168 44% 22%) 100%);
+    background: linear-gradient(135deg, hsl(271 76% 52%) 0%, hsl(271 74% 40%) 100%);
     color: white;
     font-weight: 600;
     padding: 0.95rem 1.25rem;
     display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
-    box-shadow: 0 8px 24px hsl(168 42% 24% / 0.28), inset 0 1px 0 rgba(255,255,255,0.15);
+    box-shadow: 0 8px 24px hsl(271 70% 42% / 0.28), inset 0 1px 0 rgba(255,255,255,0.15);
     transition: transform 0.18s ease, filter 0.18s ease;
     border: 0; cursor: pointer;
 }
@@ -192,9 +192,9 @@ textarea.input { resize: vertical; min-height: 92px; line-height: 1.45; }
     pointer-events: none;
     z-index: 0;
 }
-.orb-1 { width: 360px; height: 360px; background: radial-gradient(circle, hsl(11 80% 65%) 0%, transparent 70%); top: -120px; right: -90px; animation: float 14s ease-in-out infinite; }
+.orb-1 { width: 360px; height: 360px; background: radial-gradient(circle, hsl(325 90% 68%) 0%, transparent 70%); top: -120px; right: -90px; animation: float 14s ease-in-out infinite; }
 .orb-2 { width: 320px; height: 320px; background: radial-gradient(circle, hsl(45 80% 65%) 0%, transparent 70%); bottom: -120px; left: -90px; animation: float 18s ease-in-out infinite reverse; }
-.orb-3 { width: 240px; height: 240px; background: radial-gradient(circle, hsl(164 40% 50%) 0%, transparent 70%); top: 40%; left: 50%; transform: translateX(-50%); animation: float 22s ease-in-out infinite; opacity: 0.35; }
+.orb-3 { width: 240px; height: 240px; background: radial-gradient(circle, hsl(271 74% 64%) 0%, transparent 70%); top: 40%; left: 50%; transform: translateX(-50%); animation: float 22s ease-in-out infinite; opacity: 0.35; }
 
 @keyframes float {
     0%, 100% { transform: translate(0, 0) scale(1); }
@@ -224,10 +224,10 @@ textarea.input { resize: vertical; min-height: 92px; line-height: 1.45; }
 }
 .chip-option:hover { border-color: hsl(var(--foreground) / 0.3); transform: translateY(-1px); }
 .chip-option.active {
-    background: linear-gradient(135deg, hsl(10 62% 48%) 0%, hsl(10 64% 39%) 100%);
+    background: linear-gradient(135deg, hsl(325 87% 56%) 0%, hsl(271 76% 50%) 100%);
     color: white;
-    border-color: hsl(10 64% 39%);
-    box-shadow: 0 6px 16px hsl(10 62% 45% / 0.25);
+    border-color: hsl(271 76% 50%);
+    box-shadow: 0 6px 16px hsl(325 80% 50% / 0.25);
 }
 
 .tile-option {
@@ -244,15 +244,15 @@ textarea.input { resize: vertical; min-height: 92px; line-height: 1.45; }
 }
 .tile-option:hover { border-color: hsl(var(--foreground) / 0.3); }
 .tile-option.active {
-    background: linear-gradient(135deg, hsl(10 62% 48%) 0%, hsl(10 64% 39%) 100%);
+    background: linear-gradient(135deg, hsl(325 87% 56%) 0%, hsl(271 76% 50%) 100%);
     color: white;
-    border-color: hsl(10 64% 39%);
-    box-shadow: 0 6px 16px hsl(10 62% 45% / 0.22);
+    border-color: hsl(271 76% 50%);
+    box-shadow: 0 6px 16px hsl(325 80% 50% / 0.22);
 }
 
 /* Step indicator with shimmer */
 .step-bar { height: 0.3rem; border-radius: 9999px; background-color: hsl(var(--border)); flex: 1; overflow: hidden; }
-.step-bar.active { background: linear-gradient(90deg, hsl(10 62% 48%), hsl(10 64% 39%)); box-shadow: 0 0 14px hsl(10 62% 45% / 0.35); }
+.step-bar.active { background: linear-gradient(90deg, hsl(325 87% 56%), hsl(271 76% 50%)); box-shadow: 0 0 14px hsl(325 80% 50% / 0.35); }
 
 /* Smooth content fade-in on step change */
 .step-fade { animation: stepFade 0.42s cubic-bezier(0.2,0.8,0.2,1); }
