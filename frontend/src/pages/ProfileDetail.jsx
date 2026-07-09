@@ -6,7 +6,7 @@ import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot, LocationBadge } f
 import CompatibilityCard from "@/components/CompatibilityCard";
 import { photoSrc } from "@/lib/photo";
 import { formatLastActive } from "@/lib/time";
-import { Bookmark, MessageCircle, ArrowLeft, Lock, Clock, Shield, Share2 } from "lucide-react";
+import { Heart, MessageCircle, ArrowLeft, Lock, Clock, Shield, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { useCandidateDetail, useSaved, useToggleSave, QK } from "@/hooks/queries";
 import { useQueryClient } from "@tanstack/react-query";
@@ -88,7 +88,7 @@ export default function ProfileDetail() {
           if (data?.mutual_match) {
             window.dispatchEvent(new CustomEvent(MATCH_EVENT, { detail: c }));
           } else {
-            toast.success(t("saved_successfully"));
+            toast.success(t("liked_toast"), { id: "like" });
           }
         },
       }
@@ -237,7 +237,7 @@ export default function ProfileDetail() {
         {/* actions */}
         <div className="flex gap-2 pt-3">
           <button data-testid="profile-save" onClick={toggleSave} disabled={saving} className={`flex-1 rounded-2xl py-3 inline-flex items-center justify-center gap-2 font-medium border transition ${saved ? "bg-primary text-white border-primary" : "bg-card border-border hover:bg-muted"}`}>
-            <Bookmark className="w-4 h-4" fill={saved ? "currentColor" : "none"} /> {t("save")}
+            <Heart key={saved ? "on" : "off"} className={`w-4 h-4 ${saved ? "animate-heart-pop" : ""}`} fill={saved ? "currentColor" : "none"} /> {saved ? t("liked") : t("like")}
           </button>
           <Link data-testid="profile-write" to={`/chat/${c.id}`} className="flex-1 rounded-2xl py-3 inline-flex items-center justify-center gap-2 font-medium bg-secondary text-white">
             <MessageCircle className="w-4 h-4" /> {t("write")}

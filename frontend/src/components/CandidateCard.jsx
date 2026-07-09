@@ -1,7 +1,7 @@
 import React, { memo, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Bookmark, MessageCircle, Lock, MapPin, BadgeCheck } from "lucide-react";
+import { Heart, MessageCircle, Lock, MapPin, BadgeCheck } from "lucide-react";
 import { MatchBadge, OnlineDot } from "@/components/Badges";
 import { useApp } from "@/contexts/AppContext";
 import { QK } from "@/hooks/queries";
@@ -88,9 +88,9 @@ function CandidateCardInner({ c, onSave, saved }) {
             className={`p-2 rounded-full transition ${
               saved ? "bg-primary text-white" : "bg-muted text-foreground hover:bg-border"
             }`}
-            title={t("save")}
+            title={t("like")}
           >
-            <Bookmark className="w-4 h-4" fill={saved ? "currentColor" : "none"} />
+            <Heart key={saved ? "on" : "off"} className={`w-4 h-4 ${saved ? "animate-heart-pop" : ""}`} fill={saved ? "currentColor" : "none"} />
           </button>
           <Link
             to={`/chat/${c.id}`}

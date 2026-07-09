@@ -141,6 +141,15 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Outfit', system-ui, sans-serif; }
     from { stroke-dashoffset: 1; }
     to { stroke-dashoffset: 0; }
 }
+
+/* "Like" pop — the heart springs when you like someone */
+@keyframes heartPop {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.35); }
+    60% { transform: scale(0.9); }
+    100% { transform: scale(1); }
+}
+.animate-heart-pop { animation: heartPop 0.4s cubic-bezier(0.2,0.8,0.2,1); }
 @media (prefers-reduced-motion: reduce) {
     .logo-draw path { animation: none; stroke-dasharray: none; }
     .logo-track path { opacity: 1; }

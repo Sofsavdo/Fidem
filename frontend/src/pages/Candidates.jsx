@@ -34,10 +34,10 @@ export default function Candidates() {
           if (data?.mutual_match) {
             window.dispatchEvent(new CustomEvent(MATCH_EVENT, { detail: c }));
           } else {
-            toast.success(t("saved_short"));
+            toast.success(t("liked_toast"), { id: "like" });
           }
         },
-        onError: () => toast.error(t("error")),
+        onError: () => toast.error(t("error"), { id: "like" }),
       }
     );
   };

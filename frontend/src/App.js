@@ -173,7 +173,9 @@ export default function App() {
       <AppProvider>
         <BrowserRouter>
           <ScrollToTop />
-          <Toaster position="top-center" richColors />
+          {/* Keep toasts from piling up and covering the screen on rapid taps:
+              at most 2 at once, short-lived, not expanded. */}
+          <Toaster position="top-center" richColors visibleToasts={2} duration={2000} expand={false} gap={8} />
           <Inner />
         </BrowserRouter>
       </AppProvider>
