@@ -148,11 +148,11 @@ export default function Onboarding() {
   const stepTitle = (STEP_TITLES[lang] || STEP_TITLES.uz)[step];
 
   return (
-    <div className="relative min-h-screen bg-background bg-grain overflow-hidden">
+    <div className="relative min-h-[100dvh] bg-background bg-grain overflow-hidden">
       <div className="orb orb-1" style={{ opacity: 0.35 }} />
       <div className="orb orb-2" style={{ opacity: 0.3 }} />
 
-      <div className="relative z-10 max-w-md md:max-w-2xl lg:max-w-3xl mx-auto w-full min-h-screen flex flex-col px-5 pt-8 pb-32 sm:px-6 md:px-8">
+      <div className="relative z-10 max-w-md md:max-w-2xl lg:max-w-3xl mx-auto w-full min-h-[100dvh] flex flex-col px-5 pt-6 pb-28 sm:px-6 md:px-8">
         {/* Progress */}
         <div className="flex items-center gap-1.5 mb-6">
           {Array.from({ length: STEPS }).map((_, i) => (

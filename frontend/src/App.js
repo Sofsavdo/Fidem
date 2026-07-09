@@ -5,6 +5,7 @@ import { AppProvider, useApp } from "@/contexts/AppContext";
 import Layout from "@/components/Layout";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ScrollToTop from "@/components/ScrollToTop";
+import BrandSplash from "@/components/BrandSplash";
 
 const Auth = lazy(() => import("@/pages/Auth"));
 const Onboarding = lazy(() => import("@/pages/Onboarding"));
@@ -35,23 +36,19 @@ function isTelegramWebApp() {
   return Boolean(window.Telegram?.WebApp?.initData);
 }
 
+// Both the Telegram auth handoff and route/data loading now show the same
+// premium branded splash — no "Telegram orqali kirilmoqda" text, no spinner.
 function TelegramLoading() {
-  return (
-    <div className="min-h-screen grid place-items-center text-muted-foreground">
-      Telegram orqali kirilmoqda...
-    </div>
-  );
+  return <BrandSplash full />;
 }
 
 function PageSpinner() {
-  return (
-    <div className="min-h-[50vh] grid place-items-center">
-      <div className="flex flex-col items-center gap-3">
-        <div className="w-10 h-10 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
-        <p className="text-xs text-muted-foreground">Yuklanmoqda...</p>
-      </div>
-    </div>
-  );
+  return <BrandSplash full={false} />;
+}
+
+const WELCOMED_KEY = "fidem_welcomed";
+function hasSeenWelcome() {
+  try { return Boolean(localStorage.getItem(WELCOMED_KEY)); } catch { return false; }
 }
 
 function Gate({ children }) {
@@ -82,6 +79,11 @@ function RootRoute() {
   }
 
   if (!user) return <Welcome />;
+
+  // First-time users (incl. Telegram, who are auto-authenticated) see the
+  // Welcome/intro screen once before registration. The Welcome CTA sets the
+  // welcomed flag, so returning users skip straight to onboarding.
+  if (!user.onboarded && !hasSeenWelcome()) return <Welcome />;
 
   if (!user.onboarded) return <Navigate to="/onboarding" replace />;
 
