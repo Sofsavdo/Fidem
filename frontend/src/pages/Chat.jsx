@@ -504,7 +504,7 @@ function ReportModal({ t, onClose, onSubmit }) {
     onSubmit(final);
   };
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" data-testid="report-modal">
+    <div className="fixed inset-0 flex items-end sm:items-center justify-center" style={{ zIndex: 10001 }} data-testid="report-modal">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative w-full max-w-md bg-card rounded-t-3xl sm:rounded-3xl p-6 mx-auto">
         <div className="flex items-center justify-between mb-3">

@@ -47,7 +47,7 @@ export default function DailyCheckIn() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" data-testid="daily-checkin">
+    <div className="fixed inset-0 flex items-center justify-center px-4" style={{ zIndex: 10001 }} data-testid="daily-checkin">
       <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
       <div className="relative w-full max-w-sm bg-card rounded-3xl p-6 text-center animate-fade-up shadow-elevated">
         <button onClick={() => setOpen(false)} data-testid="daily-close" className="absolute right-3 top-3 p-1.5 rounded-full hover:bg-muted">

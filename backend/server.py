@@ -46,7 +46,6 @@ from routers.personality_r import router as personality_router  # noqa: E402
 from routers.ai_r import router as ai_router  # noqa: E402
 from routers.prompts_r import router as prompts_router  # noqa: E402
 from routers.stories_r import router as stories_router  # noqa: E402
-from routers.gamification_r import router as gamification_router  # noqa: E402
 from routers.withdrawals_r import router as withdrawals_router  # noqa: E402
 from routers.family_r import router as family_router  # noqa: E402
 from routers.concierge_r import router as concierge_router  # noqa: E402
@@ -71,7 +70,6 @@ api.include_router(personality_router)
 api.include_router(ai_router)
 api.include_router(prompts_router)
 api.include_router(stories_router)
-api.include_router(gamification_router)
 api.include_router(withdrawals_router)
 api.include_router(family_router)
 api.include_router(concierge_router)

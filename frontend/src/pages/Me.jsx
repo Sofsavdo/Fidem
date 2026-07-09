@@ -4,13 +4,16 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, PlanPill } from "@/components/Badges";
 import PhotoUpload from "@/components/PhotoUpload";
-import { ChevronRight, Crown, Wallet, Share2, Settings as SettingsIcon, LogOut, ShieldCheck, Clock, SlidersHorizontal, Brain, BookOpen, Phone, Award, Rocket } from "lucide-react";
-import ProgressCard from "@/components/ProgressCard";
+import { ChevronRight, Crown, Wallet, Share2, Settings as SettingsIcon, LogOut, ShieldCheck, Clock, SlidersHorizontal, Brain, BookOpen, Phone, Trophy, Rocket, MessageCircle } from "lucide-react";
 import BoostModal from "@/components/BoostModal";
 import LocationVerifyCard from "@/components/LocationVerifyCard";
 import { toast } from "sonner";
-import { useReferral, useDailyStatus, useSavedSummary, QK } from "@/hooks/queries";
+import { useReferral, useDailyStatus, useSavedSummary, useLeaderboard, QK } from "@/hooks/queries";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
+
+// Static support contact - a real Telegram account admins actually monitor,
+// not the bot (which only understands the mini-app commands).
+const ADMIN_TELEGRAM_USERNAME = process.env.REACT_APP_ADMIN_TELEGRAM_USERNAME || "Fidem_Admin";
 
 export default function Me() {
   const { user, t, logout, refresh, wsEvent } = useApp();
@@ -20,6 +23,8 @@ export default function Me() {
   const { data: referral } = useReferral();
   const { data: daily } = useDailyStatus();
   const { data: interestedSummary } = useSavedSummary();
+  const { data: leaders = [] } = useLeaderboard("all");
+  const myRank = leaders.findIndex((row) => row.user?.id === user?.id);
 
   // Invalidate notifications on WS event so the top-bar count stays in sync
   useEffect(() => {
@@ -138,8 +143,25 @@ export default function Me() {
         )}
       </div>
 
-      {/* Gamification — level + XP + badges */}
-      <ProgressCard />
+      {/* Rankings teaser — replaces the old badges/achievements card, which
+          had no real effect on the user. This one is concrete: your actual
+          standing, the current #1, and a direct path to climb it. */}
+      <Link to="/rankings" data-testid="rankings-teaser" className="block rounded-3xl bg-gradient-to-br from-gold/12 via-card to-secondary/10 border border-gold/25 p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-11 h-11 rounded-2xl bg-gold/15 text-gold-dark grid place-items-center shrink-0">
+              <Trophy className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-heading font-semibold">{t("top_supporters")}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {myRank >= 0 ? `${t("rank_your_rank")}: #${myRank + 1}` : (leaders[0]?.user?.name ? `#1 · ${leaders[0].user.name}` : t("rank_boost_hint"))}
+              </p>
+            </div>
+          </div>
+          <span className="shrink-0 text-xs font-semibold text-gold-dark whitespace-nowrap">{t("rank_boost_cta")} →</span>
+        </div>
+      </Link>
 
       {/* Premium/balance row */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -227,7 +249,6 @@ export default function Me() {
         <div className="rounded-3xl bg-card border border-border divide-y">
           <NavRow to="/concierge" testid="link-concierge" icon={<Crown className="w-4 h-4 text-secondary" />} label={`${t("concierge_title")} (199,000 ${t("sum")})`} />
           <NavRow to="/withdrawals" testid="link-withdrawals" icon={<Wallet className="w-4 h-4 text-foreground" />} label={`${t("withdraw_money")} (${(user.withdrawable_balance || 0).toLocaleString()} ${t("sum")})`} />
-          <NavRow to="/rankings" testid="link-rankings" icon={<Award className="w-4 h-4 text-gold-dark" />} label={t("rankings")} />
         </div>
       </div>
 
@@ -240,6 +261,16 @@ export default function Me() {
           {user.is_admin && (
             <NavRow to="/admin" testid="link-admin" icon={<SettingsIcon className="w-4 h-4" />} label={t("admin_panel")} />
           )}
+          <a
+            href={`https://t.me/${ADMIN_TELEGRAM_USERNAME}`}
+            target="_blank"
+            rel="noreferrer"
+            data-testid="link-contact-admin"
+            className="flex items-center justify-between p-4"
+          >
+            <span className="flex items-center gap-3 text-sm"><MessageCircle className="w-4 h-4 text-secondary" /> {t("contact_admin")}</span>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </a>
           <button data-testid="btn-logout" onClick={logout} className="flex items-center justify-between p-4 w-full text-left">
             <span className="flex items-center gap-3 text-sm text-foreground"><LogOut className="w-4 h-4" /> {t("logout")}</span>
           </button>

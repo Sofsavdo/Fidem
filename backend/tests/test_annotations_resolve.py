@@ -26,7 +26,7 @@ MODULES = [
     "core", "auth", "models", "services", "big5", "storage", "geo",
     "routers.admin_r", "routers.ai_r", "routers.auth_r", "routers.boost_analytics_r",
     "routers.candidates_r", "routers.chat_r",
-    "routers.concierge_r", "routers.face_r", "routers.family_r", "routers.gamification_r",
+    "routers.concierge_r", "routers.face_r", "routers.family_r",
     "routers.growth_r", "routers.location_r", "routers.payments_r", "routers.personality_r", "routers.prompts_r",
     "routers.settings_r", "routers.stories_r", "routers.telegram_r",
     "routers.withdrawals_r",

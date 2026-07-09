@@ -88,6 +88,29 @@ export default function Referral() {
           </div>
         ) : (
           <>
+            {/* "How much can I earn" - the concrete number that was missing,
+                answered up front with real plan prices instead of a vague promise. */}
+            <section className="rounded-3xl border border-secondary/25 bg-secondary/5 p-4" data-testid="ref-earn-potential">
+              <SectionLabel>{t("ref_how_much_title")}</SectionLabel>
+              <p className="text-sm mt-1.5 leading-snug">{t("ref_how_much_desc").replace("{cap}", (data?.tier_cap || 29900).toLocaleString())}</p>
+              <div className="grid grid-cols-3 gap-2 mt-3">
+                {[
+                  { plan: "Standard", price: 34900 },
+                  { plan: "Premium", price: 79000 },
+                  { plan: "VIP", price: 199000 },
+                ].map((p) => {
+                  const reward = Math.min(Math.round(p.price * 0.5), data?.tier_cap || 29900);
+                  return (
+                    <div key={p.plan} className="rounded-2xl bg-card border border-border p-2.5 text-center">
+                      <p className="text-[11px] text-muted-foreground">{p.plan}</p>
+                      <p className="text-sm font-semibold text-secondary mt-0.5">+{reward.toLocaleString()}</p>
+                      <p className="text-[10px] text-muted-foreground">{t("sum")}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
             {/* Stats */}
             <section className="grid grid-cols-2 gap-2">
               <div className="rounded-2xl border border-border bg-card p-3 text-center" data-testid="ref-stat-invites">
@@ -202,7 +225,7 @@ export default function Referral() {
 
       {/* Username modal */}
       {showUsernameModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setShowUsernameModal(false)}>
+        <div className="fixed inset-0 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" style={{ zIndex: 10001 }} onClick={() => setShowUsernameModal(false)}>
           <div className="bg-card rounded-3xl p-6 w-full max-w-md space-y-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-heading font-semibold text-lg">{t("ref_username_modal_title")}</h3>
             <p className="text-sm text-muted-foreground">

@@ -32,7 +32,7 @@ export default function BoostModal({ onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center sm:justify-center" data-testid="boost-modal">
+    <div className="fixed inset-0 flex items-end sm:items-center sm:justify-center" style={{ zIndex: 10001 }} data-testid="boost-modal">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div
         className="relative w-full sm:max-w-md bg-card rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto"

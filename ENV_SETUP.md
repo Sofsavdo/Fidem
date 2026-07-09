@@ -29,6 +29,10 @@ Required environment variables for the frontend:
 
 ```bash
 REACT_APP_BACKEND_URL=https://fidem-production.up.railway.app
+
+# Optional - "Contact admin" link on the Me page (Telegram username, no @).
+# Defaults to Fidem_Admin if unset.
+REACT_APP_ADMIN_TELEGRAM_USERNAME=your_admin_username
 ```
 
 ## Railway Deployment

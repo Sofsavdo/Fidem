@@ -200,7 +200,7 @@ PlanType = Literal["premium", "vip"]
 
 
 class CreatePaymentRequest(BaseModel):
-    purpose: Literal["premium", "vip", "standard", "chat_unlock", "balance_topup", "gift", "concierge"]
+    purpose: Literal["premium", "vip", "standard", "chat_unlock", "balance_topup", "gift", "concierge", "rank_boost"]
     amount: Optional[int] = None  # for balance / gift
     target_user_id: Optional[str] = None  # for gift
     gift_kind: Optional[str] = None
