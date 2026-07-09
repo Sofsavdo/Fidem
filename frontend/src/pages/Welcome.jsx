@@ -1,85 +1,96 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Heart, Check, Sparkles, ShieldCheck, Users } from "lucide-react";
+import { ArrowRight, ShieldCheck, Sparkles, Heart } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
-import Logo, { LogoBadge } from "@/components/Logo";
+import Logo from "@/components/Logo";
 import LangSwitch from "@/components/LangSwitch";
+
+// Hero photo — loads from the Unsplash CDN in the real app. Modest, warm,
+// relationship-themed. Easy to swap: drop a file at public/welcome-hero.jpg and
+// set HERO = "/welcome-hero.jpg". If the image fails, the brand gradient shows.
+const HERO =
+  "https://images.unsplash.com/photo-1516726817505-f5ed825624d8?w=1000&q=70&auto=format&fit=crop";
 
 export default function Welcome() {
   const { t, user } = useApp();
   const nav = useNavigate();
+  const [imgOk, setImgOk] = useState(true);
 
   const start = () => {
     try { localStorage.setItem("fidem_welcomed", "1"); } catch { /* ignore */ }
     nav(user ? "/onboarding" : "/auth");
   };
 
-  const trust = [
+  const chips = [
     { Icon: ShieldCheck, label: t("land_trust1_t") },
-    { Icon: Users, label: t("land_trust2_t") },
-    { Icon: Sparkles, label: t("land_trust3_t") },
+    { Icon: Heart, label: t("land_trust3_t") },
+    { Icon: Sparkles, label: t("land_trust2_t") },
   ];
 
   return (
     <div className="relative h-[100dvh] bg-ink text-white overflow-hidden flex flex-col">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="orb orb-1 opacity-40" />
-        <div className="orb orb-2 opacity-25" />
-        <div className="orb orb-3 opacity-25" />
-      </div>
+      {/* ---- Hero photo (top ~56%) ---- */}
+      <div className="relative flex-1 min-h-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#F0269D] via-[#B0279E] to-[#8A2BE2]" />
+        {imgOk && (
+          <img
+            src={HERO}
+            alt=""
+            onError={() => setImgOk(false)}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        )}
+        {/* legibility + brand tint */}
+        <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/30 to-black/25" />
 
-      <header className="relative z-10 flex items-center justify-between px-5 pt-4 shrink-0">
-        <div className="flex items-center gap-2">
-          <Logo tone="white" className="w-8 h-8" />
-          <span className="font-heading font-bold text-lg tracking-tight">FIDEM</span>
-        </div>
-        <LangSwitch />
-      </header>
-
-      <main className="relative z-10 flex-1 min-h-0 flex flex-col justify-center px-6 max-w-md mx-auto w-full text-center">
-        {/* Illustration hero — branded scene: the animated mark on a glowing
-            panel with floating hearts. No photo needed, renders instantly. */}
-        <div className="relative mx-auto w-full max-w-[280px] aspect-[5/4] rounded-[2rem] bg-gradient-to-br from-primary/25 via-secondary/15 to-transparent border border-white/10 grid place-items-center overflow-hidden">
-          <div className="absolute inset-0 bg-grain opacity-[0.15]" />
-          <Heart className="absolute top-5 left-6 w-5 h-5 text-primary/70" fill="currentColor" />
-          <Heart className="absolute bottom-6 right-7 w-7 h-7 text-secondary/70" fill="currentColor" />
-          <Heart className="absolute top-8 right-10 w-3.5 h-3.5 text-gold/80" fill="currentColor" />
-          <Sparkles className="absolute bottom-8 left-8 w-4 h-4 text-gold/80" />
-          <LogoBadge animated className="w-24 h-24 relative" />
+        {/* top bar over the photo */}
+        <div className="relative z-10 flex items-center justify-between px-5 pt-4">
+          <div className="flex items-center gap-2">
+            <Logo tone="white" className="w-8 h-8 drop-shadow" />
+            <span className="font-heading font-bold text-lg tracking-tight drop-shadow">FIDEM</span>
+          </div>
+          <LangSwitch />
         </div>
 
-        <h1 className="mt-6 font-heading text-3xl sm:text-4xl font-bold leading-[1.1] tracking-tight">
-          {t("land_hero_a")}<span className="text-gold">{t("land_hero_em")}</span>{t("land_hero_b")}
-        </h1>
-        <p className="mt-2.5 text-white/65 text-sm leading-relaxed max-w-sm mx-auto">
-          {t("land_subtitle")}
-        </p>
-
-        <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
-          {trust.map((it, i) => (
-            <span key={i} className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-full bg-white/[0.06] border border-white/10">
-              <it.Icon className="w-3.5 h-3.5 text-gold" /> {it.label}
+        {/* floating chips, like the reference */}
+        <div className="absolute z-10 left-5 top-24 flex flex-col gap-2 items-start">
+          {chips.map((c, i) => (
+            <span
+              key={i}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-white/90 text-ink shadow-lg backdrop-blur"
+              style={{ marginLeft: i === 1 ? "3.5rem" : i === 2 ? "1.5rem" : 0 }}
+            >
+              <c.Icon className="w-3.5 h-3.5 text-primary" /> {c.label}
             </span>
           ))}
         </div>
+      </div>
 
-        <button
-          onClick={start}
-          data-testid="land-cta-primary"
-          className="mt-6 w-full rounded-2xl bg-gradient-to-r from-[#F0269D] to-[#8A2BE2] text-white font-semibold text-base py-4 shadow-lg shadow-primary/30 hover:-translate-y-0.5 active:scale-[0.98] transition inline-flex items-center justify-center gap-2"
-        >
-          <Check className="w-5 h-5" /> {t("welcome_cta_primary")}
-        </button>
-        <p className="mt-3 text-xs text-white/45">{t("land_social_proof")}</p>
-      </main>
+      {/* ---- Text + CTA card (bottom) ---- */}
+      <div className="relative z-10 shrink-0 px-6 pb-6 pt-2 -mt-6">
+        <div className="rounded-3xl bg-ink/60 backdrop-blur-xl border border-white/10 p-5 text-center">
+          <h1 className="font-heading text-2xl sm:text-3xl font-bold leading-tight tracking-tight">
+            {t("land_hero_a")}<span className="text-gold">{t("land_hero_em")}</span>{t("land_hero_b")}
+          </h1>
+          <p className="mt-2 text-white/70 text-sm leading-relaxed">{t("land_subtitle")}</p>
 
-      <footer className="relative z-10 text-center text-[11px] text-white/35 pb-5 px-6 flex items-center justify-center gap-4 shrink-0">
-        <button onClick={() => nav("/about")} className="hover:text-white/70 transition-colors" data-testid="footer-about">{t("land_about")}</button>
-        <span className="opacity-30">·</span>
-        <button onClick={() => nav("/faq")} className="hover:text-white/70 transition-colors" data-testid="footer-faq">{t("land_faq")}</button>
-        <span className="opacity-30">·</span>
-        <button onClick={() => nav("/auth")} className="hover:text-white/70 transition-colors" data-testid="land-login">{t("login")}</button>
-      </footer>
+          <button
+            onClick={start}
+            data-testid="land-cta-primary"
+            className="mt-4 w-full rounded-2xl bg-gradient-to-r from-[#F0269D] to-[#8A2BE2] text-white font-semibold text-base py-4 shadow-lg shadow-primary/30 active:scale-[0.98] transition inline-flex items-center justify-center gap-2"
+          >
+            {t("welcome_cta_primary")} <ArrowRight className="w-5 h-5" />
+          </button>
+
+          <div className="mt-3 flex items-center justify-center gap-4 text-[11px] text-white/45">
+            <button onClick={() => nav("/about")} data-testid="footer-about" className="hover:text-white/80">{t("land_about")}</button>
+            <span className="opacity-30">·</span>
+            <button onClick={() => nav("/faq")} data-testid="footer-faq" className="hover:text-white/80">{t("land_faq")}</button>
+            <span className="opacity-30">·</span>
+            <button onClick={() => nav("/auth")} data-testid="land-login" className="hover:text-white/80">{t("login")}</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
