@@ -6,10 +6,21 @@ import React, { useId } from "react";
 //   tone="gradient" (default) — magenta (left) + purple (right), for light bg
 //   tone="white"              — solid white, for coloured/gradient surfaces
 //   tone="mono"               — currentColor
+//   animated                  — a faint full mark + a bright segment that
+//                               sweeps around it (used on the boot splash)
 const LEFT = "M50 80 C 30 60, 12 52, 15 33 C 17 21, 37 20, 46 35 C 49 40, 50 45, 50 45";
 const RIGHT = "M50 80 C 70 60, 88 52, 85 33 C 83 21, 63 20, 54 35 C 51 40, 50 45, 50 45";
 
-export default function Logo({ className = "w-8 h-8", tone = "gradient", title = "FIDEM" }) {
+function Strokes({ leftStroke, rightStroke, className }) {
+  return (
+    <g strokeWidth="15" strokeLinecap="round" fill="none" className={className}>
+      <path d={LEFT} stroke={leftStroke} pathLength="1" />
+      <path d={RIGHT} stroke={rightStroke} pathLength="1" />
+    </g>
+  );
+}
+
+export default function Logo({ className = "w-8 h-8", tone = "gradient", animated = false, title = "FIDEM" }) {
   const id = useId();
   const leftStroke = tone === "white" ? "#fff" : tone === "mono" ? "currentColor" : `url(#l-${id})`;
   const rightStroke = tone === "white" ? "#fff" : tone === "mono" ? "currentColor" : `url(#r-${id})`;
@@ -25,19 +36,17 @@ export default function Logo({ className = "w-8 h-8", tone = "gradient", title =
           </linearGradient>
         </defs>
       )}
-      <g strokeWidth="15" strokeLinecap="round">
-        <path d={LEFT} stroke={leftStroke} />
-        <path d={RIGHT} stroke={rightStroke} />
-      </g>
+      {animated && <Strokes leftStroke={leftStroke} rightStroke={rightStroke} className="logo-track" />}
+      <Strokes leftStroke={leftStroke} rightStroke={rightStroke} className={animated ? "logo-draw" : ""} />
     </svg>
   );
 }
 
 // Rounded app-icon badge: the white mark on the brand gradient.
-export function LogoBadge({ className = "w-16 h-16" }) {
+export function LogoBadge({ className = "w-16 h-16", animated = false }) {
   return (
     <div className={`${className} rounded-[28%] bg-gradient-to-br from-[#F0269D] to-[#8A2BE2] grid place-items-center shadow-lg shadow-[#8A2BE2]/30`}>
-      <Logo tone="white" className="w-[64%] h-[64%]" />
+      <Logo tone="white" animated={animated} className="w-[64%] h-[64%]" />
     </div>
   );
 }
