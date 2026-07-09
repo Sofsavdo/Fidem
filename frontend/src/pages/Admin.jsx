@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ShieldCheck, Wallet, Users as UsersIcon, DollarSign, TrendingUp, BarChart3, LayoutDashboard, Search, MessageSquare, Settings, ChevronRight, MapPin, Activity, AlertTriangle } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Wallet, Users as UsersIcon, DollarSign, TrendingUp, BarChart3, LayoutDashboard, Search, MessageSquare, Settings, ChevronRight, MapPin, Activity, AlertTriangle, Send } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
 import {
@@ -10,13 +10,14 @@ import {
   useAdminPayments, useAdminPaymentBlock, useAdminVerifications, useAdminDecideVerification,
   useAdminReports, useAdminWithdrawals, useAdminWithdrawalDecision, useAdminConcierge,
   useAdminConciergeMatch, useAdminReferrals, useAdminMessages, useAdminDeleteMessage,
-  useAdminFraud, useAdminMarkSafe,
+  useAdminFraud, useAdminMarkSafe, useAdminBroadcast,
 } from "@/hooks/queries";
 
 const menuItems = [
   { id: "dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { id: "analytics", icon: BarChart3, label: "Analytics" },
   { id: "users", icon: UsersIcon, label: "Users" },
+  { id: "broadcast", icon: Send, label: "Broadcast" },
   { id: "payments", icon: DollarSign, label: "Payments" },
   { id: "verifications", icon: ShieldCheck, label: "Verifications" },
   { id: "withdrawals", icon: Wallet, label: "Withdrawals" },
@@ -109,6 +110,7 @@ export default function Admin() {
 
           {activeTab === "analytics" && stats && <AdminAnalytics stats={stats} />}
           {activeTab === "users" && <AdminUsers />}
+          {activeTab === "broadcast" && <AdminBroadcast />}
           {activeTab === "payments" && <AdminPayments />}
           {activeTab === "verifications" && <AdminVerifications />}
           {activeTab === "withdrawals" && <AdminWithdrawals />}
@@ -225,6 +227,75 @@ const StatCard = React.memo(function StatCard({ label, value, icon }) {
     </div>
   );
 });
+
+// Sends to every onboarded, non-blocked user - both in-app (Notifications
+// page) and Telegram (push_notif already forwards marketing pushes to
+// Telegram, which is the channel that actually gets seen without the user
+// having opened the mini app first). Dry-run first so an admin sees the
+// audience size before actually sending.
+function AdminBroadcast() {
+  const [text, setText] = useState("");
+  const [preview, setPreview] = useState(null);
+  const broadcast = useAdminBroadcast();
+
+  const checkAudience = () => {
+    if (!text.trim()) return;
+    broadcast.mutate({ text, dryRun: true }, {
+      onSuccess: (data) => setPreview(data.would_send),
+      onError: () => toast.error("Xatolik"),
+    });
+  };
+
+  const send = () => {
+    if (!text.trim()) return;
+    if (!window.confirm(`${preview ?? "?"} ta foydalanuvchiga yuborilsinmi? Bu qaytarib bo'lmaydi.`)) return;
+    broadcast.mutate({ text, dryRun: false }, {
+      onSuccess: (data) => {
+        toast.success(`Yuborildi: ${data.sent} ta (${data.skipped_daily_cap} tasi kunlik limitga tushib qoldi)`);
+        setText("");
+        setPreview(null);
+      },
+      onError: () => toast.error("Yuborishda xatolik"),
+    });
+  };
+
+  return (
+    <div className="max-w-xl space-y-4">
+      <div className="rounded-3xl bg-card border border-border p-5">
+        <p className="text-sm font-medium mb-2">Xabar matni</p>
+        <textarea
+          value={text}
+          onChange={(e) => { setText(e.target.value); setPreview(null); }}
+          rows={5}
+          placeholder="Masalan: Yangi imkoniyat qo'shildi - kim profilingizni ko'rganini endi ko'ra olasiz!"
+          className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary resize-none"
+        />
+        <p className="text-xs text-muted-foreground mt-2">
+          Onboarding'dan o'tgan va bloklanmagan barcha foydalanuvchilarga yuboriladi - ilova ichida (Bildirishnomalar) va Telegram orqali.
+        </p>
+        <div className="flex gap-2 mt-4">
+          <button
+            onClick={checkAudience}
+            disabled={!text.trim() || broadcast.isPending}
+            className="flex-1 rounded-2xl border border-border py-3 text-sm font-medium disabled:opacity-50"
+          >
+            Auditoriyani tekshirish
+          </button>
+          <button
+            onClick={send}
+            disabled={!text.trim() || preview === null || broadcast.isPending}
+            className="flex-1 rounded-2xl bg-primary text-white py-3 text-sm font-medium disabled:opacity-50"
+          >
+            {broadcast.isPending ? "..." : "Yuborish"}
+          </button>
+        </div>
+        {preview !== null && (
+          <p className="text-xs text-secondary mt-3 text-center">{preview} ta foydalanuvchiga yuboriladi</p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function AdminAnalytics({ stats }) {
   const revenueData = [
@@ -407,9 +478,13 @@ function AdminUsers() {
                 {u.photo_url && <img loading="lazy" decoding="async" src={photoSrc(u.photo_url)} alt="" className="w-full h-full object-cover" />}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{u.name} · {u.plan} {u.blocked ? "🚫" : ""}</p>
+                <p className="text-sm font-medium truncate flex items-center gap-1.5">
+                  {u.online && <span className="w-1.5 h-1.5 rounded-full bg-secondary shrink-0" />}
+                  {u.name} · {u.plan} {u.blocked ? "🚫" : ""}
+                </p>
                 <p className="text-xs text-muted-foreground truncate">{u.region} · age {u.age} · {u.gender} · {u.marital_status || "Noma'lum"}</p>
                 <p className="text-[10px] text-muted-foreground">{u.email} · {u.phone || "Telefon yo'q"}</p>
+                <p className="text-[10px] text-muted-foreground">{u.online ? "Hozir onlayn" : `Oxirgi faollik: ${u.last_active_label || "—"}`}</p>
               </div>
               <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
             </div>
