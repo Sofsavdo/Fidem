@@ -14,8 +14,11 @@ router = APIRouter(tags=["growth"])
 
 # Pricing
 BOOST_PRICE = 5000        # 24h boost in UZS (deducts from balance or paid via CLICK)
-DAILY_COINS = 20          # +20 coins (non-cashable) per daily check-in
-STREAK_7_COINS = 100      # week-7 streak bonus (coins)
+# Daily check-in rewards are paid in so'm into the internal `balance` (spendable
+# on gifts/boost/plans, NOT withdrawable — only referral earnings withdraw).
+# Kept modest so the free rewards don't erode paid revenue.
+DAILY_SUM = 200           # +200 so'm to internal balance per daily check-in
+STREAK_7_SUM = 1000       # week-7 streak bonus (so'm to internal balance)
 
 
 # ---------- Daily check-in / Streak ----------
@@ -29,9 +32,9 @@ async def daily_status(uid: str = Depends(get_current_user_id)):
     return {
         "claimed_today": claimed_today,
         "streak": streak,
-        "next_bonus": DAILY_COINS if not claimed_today else 0,
-        "currency": "coins",
-        "coins": int(me.get("coins", 0) or 0),
+        "next_bonus": DAILY_SUM if not claimed_today else 0,
+        "currency": "sum",
+        "balance": int(me.get("balance", 0) or 0),
         "streak_7_bonus_in": max(0, 7 - (streak % 7 or 0)) if not claimed_today else None,
     }
 
@@ -51,22 +54,22 @@ async def daily_claim(uid: str = Depends(get_current_user_id)):
         streak += 1
     else:
         streak = 1
-    bonus = DAILY_COINS
+    bonus = DAILY_SUM
     if streak % 7 == 0:
-        bonus += STREAK_7_COINS
+        bonus += STREAK_7_SUM
     await db.users.update_one(
         {"id": uid},
         {
             "$set": {"daily_last_at": iso(now_utc()), "daily_streak": streak},
-            "$inc": {"coins": bonus, "xp": 20 + (50 if streak % 7 == 0 else 0)},
+            "$inc": {"balance": bonus, "xp": 20 + (50 if streak % 7 == 0 else 0)},
         },
     )
-    await push_notif(uid, "balance", f"Daily bonus +{bonus} coin (streak {streak})")
+    await push_notif(uid, "balance", f"Kunlik bonus +{bonus} so'm (streak {streak})")
     return {
         "streak": streak,
         "bonus": bonus,
-        "currency": "coins",
-        "coins_after": int(me.get("coins", 0) or 0) + bonus,
+        "currency": "sum",
+        "balance_after": int(me.get("balance", 0) or 0) + bonus,
     }
 
 

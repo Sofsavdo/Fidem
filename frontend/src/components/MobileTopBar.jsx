@@ -1,21 +1,19 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Bell, Crown, Wallet } from "lucide-react";
+import Logo from "@/components/Logo";
 import { useApp } from "@/contexts/AppContext";
 
 export default function MobileTopBar() {
-  const { user, lang, setLang } = useApp();
+  const { user, lang, setLang, t } = useApp();
   const nav = useNavigate();
   if (!user) return null;
   const balance = user.balance || 0;
-  const coins = user.coins || 0;
   return (
     <header data-testid="mobile-topbar" className="sticky top-0 z-30 glass border-b border-border/40 px-3 py-2 flex items-center justify-between gap-2" style={{ paddingTop: "max(8px, env(safe-area-inset-top))" }}>
       <Link to="/" className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-secondary grid place-items-center text-white text-base">
-          ❤️
-        </div>
-        <span className="font-heading font-semibold text-lg leading-none">FIDEM</span>
+        <Logo className="w-8 h-8" />
+        <span className="font-heading font-semibold text-lg leading-none tracking-tight">FIDEM</span>
       </Link>
       <div className="flex items-center gap-1">
         {/* Unified wallet pill → balance/top-up surface (in-app spending money).
@@ -27,15 +25,7 @@ export default function MobileTopBar() {
           title="Wallet"
         >
           <Wallet className="w-3.5 h-3.5 text-foreground" />
-          <span>{balance.toLocaleString()}</span>
-          {coins > 0 && (
-            <>
-              <span className="opacity-30 mx-0.5">·</span>
-              <span className="inline-flex items-center gap-0.5 text-gold-dark" data-testid="topbar-coins">
-                🪙 {coins.toLocaleString()}
-              </span>
-            </>
-          )}
+          <span>{balance.toLocaleString()} {t("sum")}</span>
         </button>
         {user.plan === "vip" && (
           <span className="inline-flex items-center gap-0.5 px-2 py-1 rounded-full bg-gold-light/60 text-gold-dark text-[10px] font-medium">

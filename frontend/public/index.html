@@ -3,8 +3,23 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#9E4735" />
+    <meta name="theme-color" content="#F0269D" />
     <meta name="description" content="FIDEM — Serious Dating & Matchmaking platform" />
+
+    <!-- Apply the saved / system / Telegram theme before first paint (no flash) -->
+    <script>
+      (function () {
+        try {
+          var pref = localStorage.getItem("fidem_theme") || "system";
+          var tg = window.Telegram && window.Telegram.WebApp;
+          var sys = tg && tg.colorScheme
+            ? tg.colorScheme
+            : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+          var dark = pref === "dark" || (pref === "system" && sys === "dark");
+          document.documentElement.classList.toggle("dark", dark);
+        } catch (e) {}
+      })();
+    </script>
 
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" href="/logo.svg" type="image/svg+xml" />

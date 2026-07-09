@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { Heart, ChevronLeft, Plus, Minus } from "lucide-react";
+import { ChevronLeft, Plus, Minus } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
+import Logo from "@/components/Logo";
 
 const QA_BY_LANG = {
   uz: [
@@ -47,9 +48,7 @@ export default function FAQ() {
           <ChevronLeft className="w-5 h-5" />
         </Link>
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-secondary grid place-items-center text-white">
-            <Heart className="w-4 h-4" fill="currentColor" />
-          </div>
+          <Logo className="w-8 h-8" />
           <span className="font-heading font-bold text-lg">FAQ</span>
         </div>
       </header>

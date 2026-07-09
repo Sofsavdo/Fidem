@@ -34,10 +34,10 @@ export default function Candidates() {
           if (data?.mutual_match) {
             window.dispatchEvent(new CustomEvent(MATCH_EVENT, { detail: c }));
           } else {
-            toast.success(t("saved_short"));
+            toast.success(t("liked_toast"), { id: "like" });
           }
         },
-        onError: () => toast.error(t("error")),
+        onError: () => toast.error(t("error"), { id: "like" }),
       }
     );
   };
@@ -95,6 +95,15 @@ export default function Candidates() {
           }`}
         >
           💎 {t("only_financial")}
+        </button>
+        <button
+          data-testid="sort-vip"
+          onClick={() => setFilters((f) => ({ ...f, vip_only: !f.vip_only }))}
+          className={`rounded-full px-3 py-1.5 text-xs whitespace-nowrap border transition ${
+            filters.vip_only ? "bg-ink text-gold border-ink" : "bg-card border-border"
+          }`}
+        >
+          👑 VIP
         </button>
       </div>
 
@@ -165,9 +174,12 @@ function FilterSheet({ filters, setFilters, onClose }) {
   const isPaid = ["standard", "premium", "vip"].includes(user?.plan);
   const [local, setLocal] = useState(filters);
   return (
-    <div className="fixed inset-0 z-50 flex items-end" data-testid="filter-sheet">
+    <div className="fixed inset-0 flex items-end" style={{ zIndex: 10001 }} data-testid="filter-sheet">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-md mx-auto bg-card rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto">
+      <div
+        className="relative w-full max-w-md mx-auto bg-card rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto"
+        style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+      >
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-heading text-xl font-semibold">{t("filter")}</h3>
           <button data-testid="close-filter" onClick={onClose} className="p-2 rounded-full hover:bg-muted">

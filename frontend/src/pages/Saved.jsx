@@ -36,7 +36,7 @@ export default function Saved() {
 
   return (
     <div className="px-4 md:px-8 pt-6">
-      <h1 className="font-heading text-3xl md:text-4xl font-semibold tracking-tight mb-4">{t("saved")}</h1>
+      <h1 className="font-heading text-3xl md:text-4xl font-semibold tracking-tight mb-4">{t("liked")}</h1>
       <div className="flex gap-1 mb-4 overflow-x-auto no-scrollbar -mx-4 px-4">
         {TABS.map((x) => (
           <button

@@ -162,6 +162,7 @@ async def candidates(
     height_max: Optional[int] = None,
     verified_only: bool = False,
     financial_only: bool = False,
+    vip_only: bool = False,
     verified_location_only: bool = False,
     max_distance_km: Optional[int] = None,
     sort: str = "match",
@@ -218,6 +219,8 @@ async def candidates(
         query["verified_selfie"] = True
     if financial_only:
         query["verified_financial"] = True
+    if vip_only:
+        query["plan"] = "vip"
     if verified_location_only:
         query["location_verified"] = True
 

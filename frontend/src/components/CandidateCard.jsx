@@ -1,8 +1,8 @@
 import React, { memo, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Bookmark, MessageCircle, Lock } from "lucide-react";
-import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot, LocationBadge } from "@/components/Badges";
+import { Heart, MessageCircle, Lock, MapPin, BadgeCheck } from "lucide-react";
+import { MatchBadge, OnlineDot } from "@/components/Badges";
 import { useApp } from "@/contexts/AppContext";
 import { QK } from "@/hooks/queries";
 import api from "@/lib/api";
@@ -15,9 +15,7 @@ function CandidateCardInner({ c, onSave, saved }) {
   const blurred = !c.photo_unlocked;
   const photoUrl = photoSrc(c.photo_url) || "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=800";
 
-  // Warm the profile-detail query the instant the finger touches the card,
-  // so ProfileDetail has data (or is already loading) by the time it mounts —
-  // the tap feels instant instead of showing a skeleton.
+  // Warm the profile-detail query on touch so opening the profile feels instant.
   const prefetchDetail = useCallback(() => {
     queryClient.prefetchQuery({
       queryKey: QK.candidateDetail(c.id),
@@ -40,26 +38,13 @@ function CandidateCardInner({ c, onSave, saved }) {
             decoding="async"
             className={`w-full h-full object-cover transition-all duration-700 ${blurred ? "blur-photo" : ""}`}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/0 to-black/0" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/0 to-black/0" />
 
-          {/* Top row: match score + badges */}
-          <div className="absolute top-3 left-3 right-3 flex items-start justify-between">
-            <div className="flex flex-col gap-1">
-              <MatchBadge score={c.match_score ?? 0} />
-              {c.boosted && (
-                <span data-testid="badge-boost" className="inline-flex items-center gap-1 text-[9px] bg-primary text-white rounded-full px-2 py-0.5 font-semibold">
-                  🚀 Boost
-                </span>
-              )}
-            </div>
-            <div className="flex flex-col gap-1 items-end">
-              <VerifiedBadge verified={c.verified_selfie} />
-              <FinancialBadge verified={c.verified_financial} />
-              <LocationBadge verified={c.location_verified} />
-            </div>
+          {/* One small match pill — the rest of the badges live in the profile. */}
+          <div className="absolute top-3 left-3">
+            <MatchBadge score={c.match_score ?? 0} />
           </div>
 
-          {/* Blur overlay hint */}
           {blurred && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="glass-dark text-white rounded-full px-3 py-1.5 text-xs flex items-center gap-1.5">
@@ -68,15 +53,18 @@ function CandidateCardInner({ c, onSave, saved }) {
             </div>
           )}
 
-          {/* Bottom name/region */}
+          {/* Bottom: name (+ tiny verified tick), online dot, then the only meta
+              that matters at a glance — where, distance, last active. */}
           <div className="absolute bottom-3 left-3 right-3 text-white">
-            <div className="flex items-center gap-2">
-              <h3 className="font-heading text-xl font-semibold leading-tight">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <h3 className="font-heading text-xl font-semibold leading-tight truncate">
                 {c.name}, {c.age}
               </h3>
+              {c.verified_selfie && <BadgeCheck className="w-4 h-4 shrink-0 text-sky-300" title={t("verified")} />}
               <OnlineDot online={c.online} />
             </div>
-            <p className="text-xs text-white/85 mt-0.5">
+            <p className="text-xs text-white/85 mt-0.5 flex items-center gap-1 truncate">
+              <MapPin className="w-3 h-3 shrink-0" />
               {c.region}
               {c.distance_bucket ? ` · ${c.distance_bucket} ${t("away")}` : ""}
               {" · "}{formatLastActive(c.last_active_minutes, t, c.online)}
@@ -100,9 +88,9 @@ function CandidateCardInner({ c, onSave, saved }) {
             className={`p-2 rounded-full transition ${
               saved ? "bg-primary text-white" : "bg-muted text-foreground hover:bg-border"
             }`}
-            title={t("save")}
+            title={t("like")}
           >
-            <Bookmark className="w-4 h-4" fill={saved ? "currentColor" : "none"} />
+            <Heart key={saved ? "on" : "off"} className={`w-4 h-4 ${saved ? "animate-heart-pop" : ""}`} fill={saved ? "currentColor" : "none"} />
           </button>
           <Link
             to={`/chat/${c.id}`}

@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import api from "@/lib/api";
-import { Heart, Send, Mail, Lock, User as UserIcon, ArrowRight, ShieldCheck, Sparkles } from "lucide-react";
+import { Send, Mail, Lock, User as UserIcon, ArrowRight, ShieldCheck, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import Logo from "@/components/Logo";
 import LangSwitch from "@/components/LangSwitch";
 
 export default function Auth() {
@@ -68,9 +69,7 @@ export default function Auth() {
         {/* Top bar */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[hsl(11_55%_46%)] to-[hsl(11_50%_36%)] text-white grid place-items-center shadow-lg shadow-primary/30">
-              <Heart className="w-5 h-5" fill="currentColor" />
-            </div>
+            <Logo className="w-10 h-10" />
             <span className="font-heading text-2xl font-semibold tracking-tight">FIDEM</span>
           </div>
           <LangSwitch />

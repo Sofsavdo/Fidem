@@ -1,90 +1,104 @@
-import React from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Heart, Check, Sparkles } from "lucide-react";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowRight, ShieldCheck, Sparkles, Heart } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
+import Logo from "@/components/Logo";
 import LangSwitch from "@/components/LangSwitch";
+
+// Hero photo. A bundled file at public/welcome-hero.jpg (drop one in to fully
+// control it) takes priority; otherwise a neutral, ethnicity-agnostic romantic
+// image (a couple silhouette at sunset — no visible skin tone, culturally safe)
+// loads from the CDN. If neither loads, the brand gradient shows.
+const HERO_LOCAL = "/welcome-hero.jpg";
+const HERO_CDN =
+  "https://images.unsplash.com/photo-1508672019048-805c876b67e2?w=1000&q=70&auto=format&fit=crop";
 
 export default function Welcome() {
   const { t, user } = useApp();
   const nav = useNavigate();
+  // Try the bundled photo first, fall back to the CDN, then to the gradient.
+  const [src, setSrc] = useState(HERO_LOCAL);
+  const [imgOk, setImgOk] = useState(true);
+  const onImgError = () => {
+    if (src === HERO_LOCAL) setSrc(HERO_CDN);
+    else setImgOk(false);
+  };
 
-  const trustItems = [
-    { t: "land_trust1_t", s: "land_trust1_s" },
-    { t: "land_trust2_t", s: "land_trust2_s" },
-    { t: "land_trust3_t", s: "land_trust3_s" },
-  ];
-
-  // Mark welcome as seen, then route: an already-authenticated user (Telegram
-  // first-timer) goes straight to onboarding; a web visitor goes to auth.
   const start = () => {
     try { localStorage.setItem("fidem_welcomed", "1"); } catch { /* ignore */ }
     nav(user ? "/onboarding" : "/auth");
   };
 
+  const chips = [
+    { Icon: ShieldCheck, label: t("land_trust1_t") },
+    { Icon: Heart, label: t("land_trust3_t") },
+    { Icon: Sparkles, label: t("land_trust2_t") },
+  ];
+
   return (
     <div className="relative h-[100dvh] bg-ink text-white overflow-hidden flex flex-col">
-      {/* Ambient glow orbs — no external images, renders instantly */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="orb orb-1 opacity-40" />
-        <div className="orb orb-2 opacity-25" />
-        <div className="orb orb-3 opacity-20" />
-      </div>
+      {/* ---- Hero photo (top ~56%) ---- */}
+      <div className="relative flex-1 min-h-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#F0269D] via-[#B0279E] to-[#8A2BE2]" />
+        {imgOk && (
+          <img
+            src={src}
+            alt=""
+            onError={onImgError}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        )}
+        {/* legibility + brand tint */}
+        <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/30 to-black/25" />
 
-      <header className="relative z-10 flex items-center justify-between px-5 pt-4">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-gold grid place-items-center text-white">
-            <Heart className="w-5 h-5" fill="currentColor" />
+        {/* top bar over the photo */}
+        <div className="relative z-10 flex items-center justify-between px-5 pt-4">
+          <div className="flex items-center gap-2">
+            <Logo tone="white" className="w-8 h-8 drop-shadow" />
+            <span className="font-heading font-bold text-lg tracking-tight drop-shadow">FIDEM</span>
           </div>
-          <span className="font-heading font-bold text-xl tracking-tight">FIDEM</span>
-        </div>
-        <LangSwitch />
-      </header>
-
-      <main className="relative z-10 flex-1 flex flex-col justify-center px-6 py-5 max-w-md mx-auto w-full text-center">
-        <div className="inline-flex mx-auto items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-full bg-white/10 border border-white/15 backdrop-blur-sm">
-          <Sparkles className="w-3.5 h-3.5 text-gold" /> {t("land_badge")}
+          <LangSwitch />
         </div>
 
-        <h1 className="mt-4 font-heading text-3xl sm:text-5xl font-bold leading-[1.1] tracking-tight">
-          {t("land_hero_a")}<span className="text-gold">{t("land_hero_em")}</span>{t("land_hero_b")}
-        </h1>
-
-        <p className="mt-3 text-white/65 text-sm sm:text-[15px] leading-relaxed max-w-sm mx-auto">
-          {t("land_subtitle")}
-        </p>
-
-        <div className="mt-5 space-y-2 text-left">
-          {trustItems.map((item, i) => (
-            <div key={i} className="flex items-center gap-3 bg-white/[0.06] border border-white/10 rounded-2xl px-4 py-2.5">
-              <div className="w-6 h-6 rounded-full bg-gold/20 grid place-items-center shrink-0">
-                <Check className="w-3.5 h-3.5 text-gold" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium leading-tight">{t(item.t)}</p>
-                <p className="text-[11px] text-white/50 leading-tight">{t(item.s)}</p>
-              </div>
-            </div>
+        {/* floating chips, like the reference */}
+        <div className="absolute z-10 left-5 top-24 flex flex-col gap-2 items-start">
+          {chips.map((c, i) => (
+            <span
+              key={i}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-white/90 text-ink shadow-lg backdrop-blur"
+              style={{ marginLeft: i === 1 ? "3.5rem" : i === 2 ? "1.5rem" : 0 }}
+            >
+              <c.Icon className="w-3.5 h-3.5 text-primary" /> {c.label}
+            </span>
           ))}
         </div>
+      </div>
 
-        <button
-          onClick={start}
-          data-testid="land-cta-primary"
-          className="mt-5 block w-full rounded-2xl bg-gradient-to-r from-primary to-primary/90 text-white font-semibold text-base py-4 shadow-lg shadow-primary/30 hover:-translate-y-0.5 active:scale-[0.98] transition"
-        >
-          {t("welcome_cta_primary")}
-        </button>
+      {/* ---- Text + CTA card (bottom) ---- */}
+      <div className="relative z-10 shrink-0 px-6 pb-6 pt-2 -mt-6">
+        <div className="rounded-3xl bg-ink/60 backdrop-blur-xl border border-white/10 p-5 text-center">
+          <h1 className="font-heading text-2xl sm:text-3xl font-bold leading-tight tracking-tight">
+            {t("land_hero_a")}<span className="text-gold">{t("land_hero_em")}</span>{t("land_hero_b")}
+          </h1>
+          <p className="mt-2 text-white/70 text-sm leading-relaxed">{t("land_subtitle")}</p>
 
-        <p className="mt-3 text-xs text-white/45">{t("land_social_proof")}</p>
-      </main>
+          <button
+            onClick={start}
+            data-testid="land-cta-primary"
+            className="mt-4 w-full rounded-2xl bg-gradient-to-r from-[#F0269D] to-[#8A2BE2] text-white font-semibold text-base py-4 shadow-lg shadow-primary/30 active:scale-[0.98] transition inline-flex items-center justify-center gap-2"
+          >
+            {t("welcome_cta_primary")} <ArrowRight className="w-5 h-5" />
+          </button>
 
-      <footer className="relative z-10 text-center text-[11px] text-white/35 pb-6 px-6 flex items-center justify-center gap-4">
-        <Link to="/about" data-testid="footer-about" className="hover:text-white/70 transition-colors">{t("land_about")}</Link>
-        <span className="opacity-30">·</span>
-        <Link to="/faq" data-testid="footer-faq" className="hover:text-white/70 transition-colors">{t("land_faq")}</Link>
-        <span className="opacity-30">·</span>
-        <Link to="/auth" data-testid="land-login" className="hover:text-white/70 transition-colors">{t("login")}</Link>
-      </footer>
+          <div className="mt-3 flex items-center justify-center gap-4 text-[11px] text-white/45">
+            <button onClick={() => nav("/about")} data-testid="footer-about" className="hover:text-white/80">{t("land_about")}</button>
+            <span className="opacity-30">·</span>
+            <button onClick={() => nav("/faq")} data-testid="footer-faq" className="hover:text-white/80">{t("land_faq")}</button>
+            <span className="opacity-30">·</span>
+            <button onClick={() => nav("/auth")} data-testid="land-login" className="hover:text-white/80">{t("login")}</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

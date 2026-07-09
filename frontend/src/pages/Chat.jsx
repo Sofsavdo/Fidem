@@ -10,6 +10,8 @@ import { photoSrc } from "@/lib/photo";
 import { formatLastActive } from "@/lib/time";
 import { tapLight } from "@/lib/haptics";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import { QK } from "@/hooks/queries";
 
 // Mirrors the Standard plan price in Premium.jsx — shown next to the one-time
 // unlock so the user can compare "pay once" vs "unlimited messaging".
@@ -19,7 +21,10 @@ export default function Chat() {
   const { otherId } = useParams();
   const { user, t } = useApp();
   const nav = useNavigate();
-  const [other, setOther] = useState(null);
+  const queryClient = useQueryClient();
+  // Seed the header from the profile-detail cache the candidate card prefetched,
+  // so the chat opens instantly with the name/photo instead of a blank bar.
+  const [other, setOther] = useState(() => queryClient.getQueryData(QK.candidateDetail(otherId)) || null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -41,17 +46,13 @@ export default function Chat() {
     api.get(`/icebreakers?lang=${lang || "uz"}`).then((r) => setIcebreakers(r.data || [])).catch(() => {});
   }, [lang]);
 
-  const load = async () => {
-    try {
-      const [c, a, m] = await Promise.all([
-        api.get(`/candidates/${otherId}`),
-        api.get(`/chat/access/${otherId}`).catch(() => ({ data: null })),
-        chatId ? api.get(`/messages/${chatId}`).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
-      ]);
-      setOther(c.data);
-      setAccess(a.data);
-      setMessages(m.data || []);
-    } catch (e) { /* ignore */ }
+  // Fire the three requests independently and paint each as it arrives, so the
+  // header and messages show the moment they're ready rather than blocking on
+  // the slowest request (the old Promise.all made the whole screen wait).
+  const load = () => {
+    api.get(`/candidates/${otherId}`).then((c) => setOther(c.data)).catch(() => {});
+    api.get(`/chat/access/${otherId}`).then((a) => setAccess(a.data)).catch(() => {});
+    if (chatId) api.get(`/messages/${chatId}`).then((m) => setMessages(m.data || [])).catch(() => {});
   };
 
   const refreshAccess = async () => {
@@ -75,6 +76,36 @@ export default function Chat() {
       }
     } catch (err) {
       toast.error("Error");
+    } finally {
+      setUnlocking(false);
+    }
+  };
+
+  // One-time unlock: pay from balance if it covers the price, otherwise go
+  // straight to CLICK — so the button always does something (before, it was
+  // silently disabled when the balance was short).
+  const payOneTime = () => {
+    if (unlocking) return;
+    if ((access?.balance || 0) >= (access?.price_uzs || 0)) unlockChat("balance");
+    else unlockChat("click");
+  };
+
+  // Subscribe straight from chat: create the Standard payment and open CLICK,
+  // instead of bouncing to the plans page to pick again.
+  const subscribeStandard = async () => {
+    if (unlocking) return;
+    setUnlocking(true);
+    try {
+      const r = await api.post("/payments/create", { purpose: "standard", amount: STANDARD_PRICE });
+      if (r.data?.status === "paid") {
+        toast.success(t("payment_success"));
+        await refreshAccess();
+      } else if (r.data?.payment_link) {
+        window.open(r.data.payment_link, "_blank");
+        toast.info(t("redirecting_payment") || "To'lov sahifasiga o'tilmoqda...");
+      }
+    } catch (err) {
+      toast.error(t("error_generic") || "Error");
     } finally {
       setUnlocking(false);
     }
@@ -350,8 +381,8 @@ export default function Chat() {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   data-testid="unlock-balance"
-                  onClick={() => unlockChat("balance")}
-                  disabled={unlocking || access.balance < access.price_uzs}
+                  onClick={payOneTime}
+                  disabled={unlocking}
                   className="rounded-xl border border-border bg-card p-2.5 text-left transition active:scale-[0.98] disabled:opacity-50"
                 >
                   <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t("chat_onetime_label")}</p>
@@ -359,13 +390,16 @@ export default function Chat() {
                     {access.price_uzs.toLocaleString()}<span className="text-[10px] font-medium opacity-60"> {t("sum")}</span>
                   </p>
                   <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{t("chat_onetime_desc")}</p>
-                  <span className="mt-2 block text-center rounded-lg border border-primary/50 text-primary text-xs py-1.5 font-semibold">{t("chat_pay_now")}</span>
+                  <span className="mt-2 block text-center rounded-lg border border-primary/50 text-primary text-xs py-1.5 font-semibold">
+                    {access.balance >= access.price_uzs ? t("chat_pay_now") : t("pay_with_click")}
+                  </span>
                 </button>
 
-                <Link
-                  to="/premium?tab=plans"
+                <button
+                  onClick={subscribeStandard}
+                  disabled={unlocking}
                   data-testid="unlock-upgrade"
-                  className="relative rounded-xl border-2 border-primary bg-primary/5 p-2.5 text-left transition active:scale-[0.98]"
+                  className="relative rounded-xl border-2 border-primary bg-primary/5 p-2.5 text-left transition active:scale-[0.98] disabled:opacity-50"
                 >
                   <span className="absolute -top-2 right-2 rounded-full bg-primary text-white text-[8px] font-bold px-1.5 py-0.5 uppercase tracking-wide">{t("best_value")}</span>
                   <p className="text-[10px] uppercase tracking-wide text-primary font-semibold">Standard</p>
@@ -373,8 +407,8 @@ export default function Chat() {
                     {STANDARD_PRICE.toLocaleString()}<span className="text-[10px] font-medium opacity-60"> {t("sum")}{t("plan_per_month")}</span>
                   </p>
                   <p className="text-[10px] text-secondary mt-0.5 leading-tight font-medium">{t("chat_unlimited_desc")}</p>
-                  <span className="mt-2 block text-center rounded-lg bg-primary text-white text-xs py-1.5 font-semibold">{t("plan_choose_cta")}</span>
-                </Link>
+                  <span className="mt-2 block text-center rounded-lg bg-primary text-white text-xs py-1.5 font-semibold">{t("pay_with_click")}</span>
+                </button>
               </div>
             </div>
           )}

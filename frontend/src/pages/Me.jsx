@@ -4,14 +4,12 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, PlanPill } from "@/components/Badges";
 import PhotoUpload from "@/components/PhotoUpload";
-import { ChevronRight, Crown, Wallet, Share2, Settings as SettingsIcon, LogOut, ShieldCheck, Bell, Clock, SlidersHorizontal, Brain, Pen, BookOpen, Phone, Award, Rocket } from "lucide-react";
+import { ChevronRight, Crown, Wallet, Share2, Settings as SettingsIcon, LogOut, ShieldCheck, Clock, SlidersHorizontal, Brain, BookOpen, Phone, Award, Rocket } from "lucide-react";
 import ProgressCard from "@/components/ProgressCard";
-import LangSwitch from "@/components/LangSwitch";
 import BoostModal from "@/components/BoostModal";
 import LocationVerifyCard from "@/components/LocationVerifyCard";
-import { photoSrc } from "@/lib/photo";
 import { toast } from "sonner";
-import { useReferral, useNotifications, useDailyStatus, useSaved, QK } from "@/hooks/queries";
+import { useReferral, useDailyStatus, useSaved, QK } from "@/hooks/queries";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 
 export default function Me() {
@@ -20,14 +18,11 @@ export default function Me() {
   const [boostOpen, setBoostOpen] = useState(false);
 
   const { data: referral } = useReferral();
-  const { data: notifications = [] } = useNotifications();
   const { data: daily } = useDailyStatus();
   const { data: profileViewers = [] } = useSaved("viewers");
   const { data: profileSavers = [] } = useSaved("by_others");
 
-  const unread = notifications.filter((x) => !x.read).length;
-
-  // Invalidate notifications on WS event so count stays in sync
+  // Invalidate notifications on WS event so the top-bar count stays in sync
   useEffect(() => {
     if (wsEvent?.type === "notification") {
       queryClient.invalidateQueries({ queryKey: QK.notifications });
@@ -46,7 +41,7 @@ export default function Me() {
       if (context?.previous) queryClient.setQueryData(QK.dailyStatus, context.previous);
     },
     onSuccess: (r) => {
-      toast.success(`+${r.data.bonus} ${r.data.currency === "coins" ? t("coin") : t("sum")}`);
+      toast.success(`+${r.data.bonus} ${t("sum")}`);
       queryClient.invalidateQueries({ queryKey: QK.dailyStatus });
       refresh();
     },
@@ -56,32 +51,25 @@ export default function Me() {
 
   return (
     <div className="px-4 md:px-8 pt-6 pb-8 space-y-5">
-      {/* Header */}
+      {/* Header — notifications & language live in the top bar, so they're not
+          duplicated here. */}
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-3xl font-semibold tracking-tight">{t("me")}</h1>
-        <div className="flex items-center gap-2">
-          <Link to="/notifications" data-testid="link-notifications" className="relative p-2 rounded-full hover:bg-muted">
-            <Bell className="w-4 h-4" />
-            {unread > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-primary text-white text-[9px] font-medium grid place-items-center">
-                {unread > 9 ? "9+" : unread}
-              </span>
-            )}
-          </Link>
-          <LangSwitch />
-        </div>
       </div>
 
-      {/* Profile card */}
+      {/* Profile card — single tappable photo (avatar), no duplicate upload block */}
       <div className="rounded-3xl bg-card border border-border p-4 shadow-soft" data-testid="me-profile-card">
         <div className="flex items-center gap-4">
-          <div className="relative w-16 h-16 rounded-2xl bg-muted overflow-hidden flex-shrink-0">
-            {user.photo_url ? (
-              <img loading="lazy" decoding="async" src={photoSrc(user.photo_url)} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full grid place-items-center text-muted-foreground text-xl font-heading">{user.name?.[0]}</div>
-            )}
-          </div>
+          <PhotoUpload
+            avatar
+            name={user.name}
+            value={user.photo_url}
+            onChange={async (url) => {
+              await api.patch("/profile", { photo_url: url });
+              await refresh();
+            }}
+            testid="me-photo-upload"
+          />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-medium text-lg truncate">{user.name}, {user.age}</p>
@@ -99,23 +87,12 @@ export default function Me() {
             </div>
           </div>
         </div>
-        <div className="mt-3 pt-3 border-t border-border">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">{t("photo")}</p>
-          <PhotoUpload
-            value={user.photo_url}
-            onChange={async (url) => {
-              await api.patch("/profile", { photo_url: url });
-              await refresh();
-            }}
-            testid="me-photo-upload"
-          />
-          {user.avg_response_min != null && (
-            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground" data-testid="me-response-speed">
-              <Clock className="w-3.5 h-3.5" />
-              {t("response_usually")} <strong className="text-foreground">{user.avg_response_min < 60 ? `${user.avg_response_min} ${t("minutes")}` : `${Math.round(user.avg_response_min / 60)} ${t("hours")}`}</strong>
-            </div>
-          )}
-        </div>
+        {user.avg_response_min != null && (
+          <div className="mt-3 pt-3 border-t border-border flex items-center gap-2 text-xs text-muted-foreground" data-testid="me-response-speed">
+            <Clock className="w-3.5 h-3.5" />
+            {t("response_usually")} <strong className="text-foreground">{user.avg_response_min < 60 ? `${user.avg_response_min} ${t("minutes")}` : `${Math.round(user.avg_response_min / 60)} ${t("hours")}`}</strong>
+          </div>
+        )}
       </div>
 
       {/* Contextual upsell — surfaces existing profile_views/saved-by-others data instead of burying it in a tab */}
@@ -141,7 +118,7 @@ export default function Me() {
       {/* Location verification (Map M1) */}
       <LocationVerifyCard />
 
-      {/* Completeness */}
+      {/* Completeness — with a direct CTA to finish the missing parts */}
       <div className="rounded-3xl bg-card border border-border p-4">
         <div className="flex items-center justify-between mb-2">
           <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("completeness")}</p>
@@ -153,6 +130,16 @@ export default function Me() {
             style={{ width: `${user.completeness || 0}%` }}
           />
         </div>
+        {(user.completeness || 0) < 100 && (
+          <Link
+            to="/onboarding?edit=1"
+            data-testid="me-complete-profile"
+            className="mt-3 flex items-center justify-between rounded-2xl bg-primary/8 border border-primary/25 px-4 py-2.5 active:scale-[0.99] transition"
+          >
+            <span className="text-sm font-medium text-primary">{t("complete_profile_cta")}</span>
+            <ChevronRight className="w-4 h-4 text-primary" />
+          </Link>
+        )}
       </div>
 
       {/* Gamification — level + XP + badges */}
@@ -174,34 +161,41 @@ export default function Me() {
           type="button"
           onClick={() => setBoostOpen(true)}
           data-testid="link-boost"
-          className="text-left rounded-3xl bg-gradient-to-br from-primary/10 to-card border border-primary/30 p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform col-span-2 md:col-span-1"
+          className="text-left rounded-3xl bg-gradient-to-br from-primary/12 to-card border border-primary/30 p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform col-span-2 md:col-span-1"
         >
-          <Rocket className="w-5 h-5 text-foreground" />
+          <div className="flex items-center justify-between">
+            <Rocket className="w-5 h-5 text-primary" />
+            <span className="text-[10px] font-semibold text-primary bg-primary/10 rounded-full px-2 py-0.5">{t("bullet_views_3_5x")}</span>
+          </div>
           <p className="font-heading text-lg mt-2">{t("boost_title")}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{t("boost_subtitle")} →</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{t("boost_me_hint")} →</p>
         </button>
       </div>
       {boostOpen && <BoostModal onClose={() => setBoostOpen(false)} />}
 
-      {/* Daily streak */}
+      {/* Daily streak — reward is credited to the app balance (for gifts,
+          boost, plans). Missing a day restarts the streak. */}
       {daily && (
-        <div className="rounded-3xl bg-gradient-to-r from-gold/15 to-card border border-gold/30 p-4 flex items-center justify-between" data-testid="daily-strip">
-          <div>
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("daily_streak")}</p>
-            <p className="font-heading text-2xl">{daily.streak} {t("day_word")} 🔥</p>
+        <div className="rounded-3xl bg-gradient-to-r from-gold/15 to-card border border-gold/30 p-4" data-testid="daily-strip">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("daily_streak")}</p>
+              <p className="font-heading text-2xl">{daily.streak} {t("day_word")} 🔥</p>
+            </div>
+            {daily.claimed_today ? (
+              <span className="text-xs text-secondary font-medium">✓ {t("daily")}</span>
+            ) : (
+              <button
+                data-testid="daily-claim-inline"
+                onClick={() => claimDailyMutation.mutate()}
+                disabled={claimDailyMutation.isPending}
+                className="rounded-xl bg-gold text-ink px-4 py-2 text-sm font-medium disabled:opacity-60"
+              >
+                +{daily.next_bonus} {t("sum")}
+              </button>
+            )}
           </div>
-          {daily.claimed_today ? (
-            <span className="text-xs text-secondary">✓ {t("daily")}</span>
-          ) : (
-            <button
-              data-testid="daily-claim-inline"
-              onClick={() => claimDailyMutation.mutate()}
-              disabled={claimDailyMutation.isPending}
-              className="rounded-xl bg-gold text-ink px-4 py-2 text-sm font-medium disabled:opacity-60"
-            >
-              +{daily.next_bonus} {daily.currency === "coins" ? t("coin") : t("sum")}
-            </button>
-          )}
+          <p className="text-[11px] text-muted-foreground mt-2 leading-snug">{t("streak_explain")}</p>
         </div>
       )}
 
@@ -226,7 +220,6 @@ export default function Me() {
         <p className="field-label mb-2 px-1">{t("me_group_profile")}</p>
         <div className="rounded-3xl bg-card border border-border divide-y">
           <NavRow to="/personality" testid="link-personality" icon={<Brain className="w-4 h-4 text-secondary" />} label={t("personality_test")} />
-          <NavRow to="/prompts" testid="link-prompts" icon={<Pen className="w-4 h-4 text-secondary" />} label={t("profile_prompts")} />
           <NavRow to="/family" testid="link-family" icon={<Phone className="w-4 h-4 text-foreground" />} label={t("family_contact")} />
           <NavRow to="/verification" testid="link-verification" icon={<ShieldCheck className="w-4 h-4 text-foreground" />} label={t("profile_verification")} />
         </div>
