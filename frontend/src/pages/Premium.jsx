@@ -2,12 +2,12 @@ import React, { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
-import { Crown, Check, Wallet, ArrowUpRight, Sparkles } from "lucide-react";
+import { Crown, Check, Wallet, ArrowUpRight, Sparkles, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { usePayments, QK } from "@/hooks/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { PageHead, Segmented, Price, SectionLabel } from "@/components/kit";
-import { tapMedium, notify } from "@/lib/haptics";
+import { tapMedium, tapLight, notify } from "@/lib/haptics";
 
 const CHAT_UNLOCK_PRICE = 9900; // mirrors backend PRICE_CHAT_UNLOCK_UZS (comparison only)
 
@@ -75,7 +75,10 @@ export default function Premium() {
 
   return (
     <div className="px-4 md:px-8 pt-6 pb-10 space-y-5">
-      <PageHead title={t("premium")} subtitle={t("tagline")} />
+      <PageHead
+        title={tab === "balance" ? t("balance_page_title") : t("premium")}
+        subtitle={tab === "balance" ? t("balance_page_subtitle") : t("tagline")}
+      />
 
       <Segmented
         value={tab}
@@ -181,40 +184,33 @@ export default function Premium() {
 
       {tab === "balance" && (
         <div className="space-y-4" id="premium-balance">
-          {/* App balance — for purchases */}
-          <div className="rounded-3xl bg-gradient-to-br from-secondary/12 to-card border border-secondary/25 p-5">
+          {/* App balance hero — big, clear "how much do I have" */}
+          <div className="rounded-3xl bg-gradient-to-br from-secondary/15 via-card to-gold-light/20 border border-secondary/25 p-5" data-testid="app-balance-card">
             <div className="flex items-center justify-between">
-              <div>
+              <div className="min-w-0">
                 <SectionLabel>{t("app_balance_title")}</SectionLabel>
-                <p className="font-heading text-3xl font-semibold mt-1 tabular-nums">{(user.balance || 0).toLocaleString()} <span className="text-base font-medium opacity-60">{t("sum")}</span></p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{t("app_balance_hint")}</p>
+                <p className="font-heading text-3xl sm:text-4xl font-semibold mt-1 tabular-nums leading-none break-words">
+                  {(user.balance || 0).toLocaleString()} <span className="text-lg font-medium opacity-60">{t("sum")}</span>
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-1.5">{t("app_balance_hint")}</p>
               </div>
-              <div className="w-11 h-11 rounded-2xl bg-secondary/15 grid place-items-center shrink-0"><Wallet className="w-5 h-5 text-secondary" /></div>
+              <div className="w-12 h-12 rounded-2xl bg-secondary/15 grid place-items-center shrink-0"><Wallet className="w-6 h-6 text-secondary" /></div>
             </div>
           </div>
 
-          {/* Referral earnings — withdrawable, clearly separated */}
-          <Link to="/withdrawals" data-testid="ref-earnings-card" className="block rounded-3xl bg-card border border-border p-4 active:scale-[0.99] transition">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <SectionLabel>{t("ref_earnings_title")}</SectionLabel>
-                <p className="font-heading text-xl font-semibold mt-1 tabular-nums">{(user.withdrawable_balance || 0).toLocaleString()} <span className="text-sm font-medium opacity-60">{t("sum")}</span></p>
-                <p className="text-[11px] text-secondary mt-0.5">{t("ref_earnings_hint")}</p>
-              </div>
-              <span className="shrink-0 text-xs font-semibold text-primary inline-flex items-center gap-0.5">{t("withdraw_cta")} <ArrowUpRight className="w-3.5 h-3.5" /></span>
-            </div>
-          </Link>
-
-          {/* Top-up */}
+          {/* Top-up — the PRIMARY action of this page */}
           <div className="rounded-3xl bg-card border border-border p-4" data-testid="topup-section">
-            <SectionLabel>{t("topup_choose")}</SectionLabel>
+            <div className="flex items-center gap-2">
+              <Plus className="w-4 h-4 text-primary" />
+              <p className="font-heading text-base font-semibold">{t("topup_choose")}</p>
+            </div>
             <div className="grid grid-cols-3 gap-2 mt-3">
               {TOPUP_PACKAGES.map((v) => (
                 <button
                   key={v}
                   data-testid={`topup-${v}`}
-                  onClick={() => setTopupAmount(v)}
-                  className={`rounded-2xl border py-2.5 text-sm font-semibold tabular-nums transition active:scale-[0.97] ${
+                  onClick={() => { tapLight(); setTopupAmount(v); }}
+                  className={`rounded-2xl border py-3 text-sm font-semibold tabular-nums transition active:scale-[0.97] ${
                     topupAmount === v ? "bg-primary text-white border-primary shadow-sm" : "bg-card border-border hover:border-primary/40"
                   }`}
                 >
@@ -230,7 +226,30 @@ export default function Premium() {
             >
               {t("pay_with_click")} · {topupAmount.toLocaleString()} {t("sum")}
             </button>
+            <p className="text-[11px] text-muted-foreground text-center mt-2">{t("topup_click_note")}</p>
           </div>
+
+          {/* Referral earnings — shown ONLY to users who actually have referral
+              money. A non-referrer never sees a withdrawal block they don't need. */}
+          {(user.withdrawable_balance || 0) > 0 ? (
+            <Link to="/withdrawals" data-testid="ref-earnings-card" className="block rounded-3xl bg-card border border-secondary/30 p-4 active:scale-[0.99] transition">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <SectionLabel>{t("ref_earnings_title")}</SectionLabel>
+                  <p className="font-heading text-xl font-semibold mt-1 tabular-nums">{(user.withdrawable_balance || 0).toLocaleString()} <span className="text-sm font-medium opacity-60">{t("sum")}</span></p>
+                  <p className="text-[11px] text-secondary mt-0.5">{t("ref_earnings_hint")}</p>
+                </div>
+                <span className="shrink-0 text-xs font-semibold text-primary inline-flex items-center gap-0.5">{t("withdraw_cta")} <ArrowUpRight className="w-3.5 h-3.5" /></span>
+              </div>
+            </Link>
+          ) : (
+            <Link to="/referral" data-testid="ref-earn-teaser" className="block rounded-2xl bg-muted/40 border border-border p-3.5 active:scale-[0.99] transition">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground leading-snug">{t("ref_earn_teaser")}</p>
+                <span className="shrink-0 text-xs font-semibold text-secondary inline-flex items-center gap-0.5">{t("ref_title")} <ArrowUpRight className="w-3.5 h-3.5" /></span>
+              </div>
+            </Link>
+          )}
         </div>
       )}
 
