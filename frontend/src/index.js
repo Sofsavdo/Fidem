@@ -56,9 +56,14 @@ const PERSIST_MAX_AGE = 24 * 60 * 60 * 1000;
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 60_000,
+      // Longer stale window so re-opening a page within a session paints
+      // instantly from cache instead of re-flashing a skeleton; mutations
+      // invalidate the affected keys explicitly, so balance/payment-sensitive
+      // data still updates immediately after an action.
+      staleTime: 3 * 60_000,
       gcTime: PERSIST_MAX_AGE,
       refetchOnWindowFocus: false,
+      retry: 1,
     },
   },
 });
