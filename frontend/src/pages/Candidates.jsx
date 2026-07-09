@@ -96,6 +96,15 @@ export default function Candidates() {
         >
           💎 {t("only_financial")}
         </button>
+        <button
+          data-testid="sort-vip"
+          onClick={() => setFilters((f) => ({ ...f, vip_only: !f.vip_only }))}
+          className={`rounded-full px-3 py-1.5 text-xs whitespace-nowrap border transition ${
+            filters.vip_only ? "bg-ink text-gold border-ink" : "bg-card border-border"
+          }`}
+        >
+          👑 VIP
+        </button>
       </div>
 
       {/* Active filter chips */}
