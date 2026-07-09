@@ -34,7 +34,10 @@ export default function BoostModal({ onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center sm:justify-center" data-testid="boost-modal">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full sm:max-w-md bg-card rounded-t-3xl sm:rounded-3xl shadow-2xl p-6">
+      <div
+        className="relative w-full sm:max-w-md bg-card rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto"
+        style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+      >
         <div className="flex items-start justify-between mb-1">
           <h3 className="font-heading text-xl font-semibold flex items-center gap-2">
             <Rocket className="w-5 h-5 text-primary" /> {t("profile_boost_title")}

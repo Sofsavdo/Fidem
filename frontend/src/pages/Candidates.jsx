@@ -165,9 +165,12 @@ function FilterSheet({ filters, setFilters, onClose }) {
   const isPaid = ["standard", "premium", "vip"].includes(user?.plan);
   const [local, setLocal] = useState(filters);
   return (
-    <div className="fixed inset-0 z-50 flex items-end" data-testid="filter-sheet">
+    <div className="fixed inset-0 flex items-end" style={{ zIndex: 10001 }} data-testid="filter-sheet">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-md mx-auto bg-card rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto">
+      <div
+        className="relative w-full max-w-md mx-auto bg-card rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto"
+        style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+      >
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-heading text-xl font-semibold">{t("filter")}</h3>
           <button data-testid="close-filter" onClick={onClose} className="p-2 rounded-full hover:bg-muted">
