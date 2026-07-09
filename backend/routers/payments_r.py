@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.responses import JSONResponse
 
-from auth import get_current_admin, get_current_user_id
+from auth import get_current_user_id
 from core import (
     PRICE_CHAT_UNLOCK,
     PRICE_PREMIUM,
@@ -486,28 +486,12 @@ async def process_completed_payment(uid: str, purpose: str, amount: int, balance
             await push_notif(uid, "concierge", "💎 Sovchi Concierge buyurtmangiz qabul qilindi. Admin sizga 5 ta mosni qo'lda topadi!")
 
 
-@router.post("/payments/admin-confirm/{payment_id}")
-async def admin_confirm_payment(payment_id: str, _: str = Depends(get_current_admin)):
-    payment = await db.payments.find_one({"id": payment_id})
-    if not payment:
-        raise HTTPException(404, "Not found")
-    # "paid" = completed instantly from balance; confirming it again would
-    # deliver the purchase a second time (double top-up, double plan, ...).
-    if payment["status"] in ("success", "paid"):
-        return {"ok": True}
-    await process_completed_payment(
-        payment["user_id"],
-        payment["purpose"],
-        payment["amount"],
-        payment.get("balance_used", 0),
-        payment.get("target_user_id"),
-        payment.get("order_id")
-    )
-    await db.payments.update_one(
-        {"id": payment_id},
-        {"$set": {"status": "success", "updated_at": iso(now_utc()), "confirmed_by_admin": True}},
-    )
-    return {"ok": True}
+# NOTE: there is deliberately no admin "confirm payment" endpoint. CLICK
+# payments and balance top-ups are confirmed automatically by the CLICK
+# callback (see click_callback / process_completed_payment); balance-funded
+# purchases complete instantly at create time. The only money the admin ever
+# approves/rejects is a referral-earnings WITHDRAWAL request (see
+# routers/withdrawals_r.py: /admin/withdrawals/{id}/approve|reject).
 
 
 @router.get("/payments/mine")

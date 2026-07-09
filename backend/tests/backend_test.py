@@ -344,13 +344,24 @@ def test_leaderboard(session):
         assert isinstance(r.json(), list)
 
 
-# ---------- Admin payment confirm (premium grant) ----------
-def test_admin_confirm_payment(session, user_creds, admin_token):
-    # create payment
+# ---------- Payments auto-confirm (no admin approval) ----------
+def test_balance_funded_payment_auto_completes(session, user_creds, admin_token):
+    """A payment fully covered by balance completes instantly - no admin
+    confirmation step. (CLICK payments are likewise auto-confirmed by the
+    CLICK callback; admin only approves referral WITHDRAWALS.)"""
+    # Fund the balance so the premium plan is fully covered.
+    session.patch(f"{API}/admin/users/{user_creds['user_id']}",
+                  json={"add_balance": 200000}, headers=_auth_header(admin_token))
     r = session.post(f"{API}/payments/create", json={"purpose": "premium"},
                      headers=_auth_header(user_creds["token"]))
-    pid = r.json()["id"]
-    r2 = session.post(f"{API}/payments/admin-confirm/{pid}", headers=_auth_header(admin_token))
-    assert r2.status_code == 200
+    assert r.status_code == 200
+    assert r.json()["status"] == "paid"  # completed immediately, not "pending"
     me = session.get(f"{API}/auth/me", headers=_auth_header(user_creds["token"])).json()
     assert me["plan"] == "premium"
+
+
+def test_no_admin_confirm_payment_endpoint(session, admin_token):
+    """The admin-confirm-payment endpoint was removed on purpose - admins do
+    not confirm CLICK payments or top-ups."""
+    r = session.post(f"{API}/payments/admin-confirm/anything", headers=_auth_header(admin_token))
+    assert r.status_code == 404
