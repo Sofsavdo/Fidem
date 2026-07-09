@@ -5,16 +5,24 @@ import { useApp } from "@/contexts/AppContext";
 import Logo from "@/components/Logo";
 import LangSwitch from "@/components/LangSwitch";
 
-// Hero photo — loads from the Unsplash CDN in the real app. Modest, warm,
-// relationship-themed. Easy to swap: drop a file at public/welcome-hero.jpg and
-// set HERO = "/welcome-hero.jpg". If the image fails, the brand gradient shows.
-const HERO =
-  "https://images.unsplash.com/photo-1516726817505-f5ed825624d8?w=1000&q=70&auto=format&fit=crop";
+// Hero photo. A bundled file at public/welcome-hero.jpg (drop one in to fully
+// control it) takes priority; otherwise a neutral, ethnicity-agnostic romantic
+// image (a couple silhouette at sunset — no visible skin tone, culturally safe)
+// loads from the CDN. If neither loads, the brand gradient shows.
+const HERO_LOCAL = "/welcome-hero.jpg";
+const HERO_CDN =
+  "https://images.unsplash.com/photo-1508672019048-805c876b67e2?w=1000&q=70&auto=format&fit=crop";
 
 export default function Welcome() {
   const { t, user } = useApp();
   const nav = useNavigate();
+  // Try the bundled photo first, fall back to the CDN, then to the gradient.
+  const [src, setSrc] = useState(HERO_LOCAL);
   const [imgOk, setImgOk] = useState(true);
+  const onImgError = () => {
+    if (src === HERO_LOCAL) setSrc(HERO_CDN);
+    else setImgOk(false);
+  };
 
   const start = () => {
     try { localStorage.setItem("fidem_welcomed", "1"); } catch { /* ignore */ }
@@ -34,9 +42,9 @@ export default function Welcome() {
         <div className="absolute inset-0 bg-gradient-to-br from-[#F0269D] via-[#B0279E] to-[#8A2BE2]" />
         {imgOk && (
           <img
-            src={HERO}
+            src={src}
             alt=""
-            onError={() => setImgOk(false)}
+            onError={onImgError}
             className="absolute inset-0 w-full h-full object-cover"
           />
         )}
