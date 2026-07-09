@@ -55,6 +55,7 @@ from routers.location_r import router as location_router  # noqa: E402
 from routers.settings_r import router as settings_router  # noqa: E402
 from services import compute_completeness  # noqa: E402
 from storage import init_storage  # noqa: E402
+from winback import winback_loop  # noqa: E402
 
 app = FastAPI(title="FIDEM API")
 
@@ -94,6 +95,10 @@ async def startup() -> None:
 
     # Set Telegram webhook in background (non-fatal)
     asyncio.create_task(setup_telegram_webhook())
+
+    # Re-engagement notifications for inactive users - runs on its own
+    # interval for the life of the process, no external cron needed.
+    asyncio.create_task(winback_loop())
 
     # Indexes
     await db.users.create_index("id", unique=True)

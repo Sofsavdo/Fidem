@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
+import posthog from "posthog-js";
 import api from "@/lib/api";
 import CandidateCard from "@/components/CandidateCard";
 import { useApp } from "@/contexts/AppContext";
-import { X, SlidersHorizontal, MapPin, Lock } from "lucide-react";
+import { X, SlidersHorizontal, MapPin, Lock, Crown } from "lucide-react";
 import { toast } from "sonner";
 import CountrySelect from "@/components/CountrySelect";
 import RegionSelect from "@/components/RegionSelect";
@@ -12,10 +13,34 @@ import { MATCH_EVENT } from "@/components/MatchCelebration";
 import { tapMedium } from "@/lib/haptics";
 import { EmptyState } from "@/components/kit";
 
-export default function Candidates() {
+// Every Nth card in the free-tier feed is a plan pitch instead of a
+// candidate - frequent enough to be seen, rare enough not to feel spammy.
+const PROMO_EVERY = 9;
+
+function PlanPromoCard() {
   const { t } = useApp();
+  useEffect(() => { posthog.capture("candidates_feed_promo_impression"); }, []);
+  return (
+    <Link
+      to="/premium?tab=plans"
+      data-testid="candidates-promo-card"
+      onClick={() => posthog.capture("candidates_feed_promo_click")}
+      className="aspect-[4/5] rounded-3xl bg-gradient-to-br from-ink to-zinc-800 text-white p-4 flex flex-col justify-between hover:-translate-y-0.5 active:scale-[0.98] transition-transform"
+    >
+      <Crown className="w-6 h-6 text-gold" />
+      <div>
+        <p className="font-heading text-base font-semibold leading-snug">{t("candidates_promo_title")}</p>
+        <p className="text-xs text-white/70 mt-1">{t("candidates_promo_hint")} →</p>
+      </div>
+    </Link>
+  );
+}
+
+export default function Candidates() {
+  const { t, user } = useApp();
   const [showFilter, setShowFilter] = useState(false);
   const [filters, setFilters] = useState({ sort: "match", verified_only: false, financial_only: false });
+  const isPaid = ["premium", "vip"].includes(user?.plan);
 
   const { data: items = [], isLoading } = useCandidates(filters);
   const { data: savedList = [] } = useSaved("mine");
@@ -158,8 +183,11 @@ export default function Candidates() {
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 stagger" data-testid="candidates-grid">
-          {items.map((c) => (
-            <CandidateCard key={c.id} c={c} onSave={onSave} saved={savedIds.has(c.id)} />
+          {items.map((c, idx) => (
+            <React.Fragment key={c.id}>
+              <CandidateCard c={c} onSave={onSave} saved={savedIds.has(c.id)} />
+              {!isPaid && (idx + 1) % PROMO_EVERY === 0 && <PlanPromoCard key={`promo-${idx}`} />}
+            </React.Fragment>
           ))}
         </div>
       )}

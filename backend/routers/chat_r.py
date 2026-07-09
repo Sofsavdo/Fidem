@@ -298,7 +298,12 @@ async def decide_application(app_id: str, approve: bool = Body(..., embed=True),
         raise HTTPException(404, "Application not found")
     await db.applications.update_one({"id": app_id}, {"$set": {"status": "approved" if approve else "rejected"}})
     if approve:
-        await push_notif(row["from_user_id"], "match", "Sizning murojaatingiz qabul qilindi 🎉")
+        approver = await get_user(uid)
+        await push_notif(
+            row["from_user_id"], "match",
+            f"🎉 {approver.get('name', '')} murojaatingizni qabul qildi — endi yozishingiz mumkin!",
+            link=f"/chat/{uid}",
+        )
     return {"ok": True}
 
 
@@ -403,7 +408,11 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
     # long enough that the sender's own optimistic UI had already cleared
     # before the WS echo arrived, making the just-sent message vanish.
     asyncio.create_task(manager.broadcast_chat([uid, req.to_user_id], {"type": "message", "data": dict(msg)}))
-    asyncio.create_task(push_notif(req.to_user_id, "message", f"Yangi xabar: {sender.get('name','')}"))
+    asyncio.create_task(push_notif(
+        req.to_user_id, "message",
+        f"💬 {sender.get('name', '')} sizga yozdi — javob bering!",
+        link=f"/chat/{uid}",
+    ))
 
     # Slower bookkeeping - fine to trail behind, doesn't affect what either
     # party sees in the chat.
@@ -644,7 +653,11 @@ async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id
     await db.messages.insert_one(gift_msg)
     gift_msg.pop("_id", None)
     await manager.broadcast_chat([uid, req.to_user_id], {"type": "message", "data": gift_msg})
-    await push_notif(req.to_user_id, "gift", f"Sizga {meta['emoji']} {meta['label_uz']} sovg'a yuborildi", link=f"/chat/{uid}")
+    await push_notif(
+        req.to_user_id, "gift",
+        f"{meta['emoji']} {sender.get('name', '')} sizga {meta['label_uz']} yubordi!",
+        link=f"/chat/{uid}",
+    )
     new_balance = sender.get("balance", 0) if is_free_gift else (sender.get("balance", 0) - price)
     return {"ok": True, "balance": new_balance, "gift": gift_msg["meta"]}
 
