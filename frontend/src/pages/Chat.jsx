@@ -11,6 +11,10 @@ import { formatLastActive } from "@/lib/time";
 import { tapLight } from "@/lib/haptics";
 import { toast } from "sonner";
 
+// Mirrors the Standard plan price in Premium.jsx — shown next to the one-time
+// unlock so the user can compare "pay once" vs "unlimited messaging".
+const STANDARD_PRICE = 34900;
+
 export default function Chat() {
   const { otherId } = useParams();
   const { user, t } = useApp();
@@ -326,28 +330,50 @@ export default function Chat() {
         <div className="p-3 space-y-2">
           {/* Paywall banner (shown above the input — input remains visible & disabled) */}
           {access && access.requires_unlock && (
-            <div data-testid="chat-paywall" className="rounded-2xl bg-gold/10 border border-gold/40 p-3 space-y-2">
-              <p className="text-sm font-medium">{t("chat_locked_title")}</p>
-              <p className="text-xs text-muted-foreground">
-                {t("chat_locked_desc")} · 🛡 {access.guarantee_hours}h {t("guarantee")}
-              </p>
-              {/* Free-path explainer — keeps the paywall from reading as a hard
-                  wall: replying to an incoming message and mutual-save chat are
-                  both free. Monetization stays on initiating a NEW conversation. */}
-              <p className="text-xs text-secondary mt-2 leading-relaxed rounded-xl bg-secondary/5 border border-secondary/20 p-2">{t("chat_free_paths")}</p>
-              <div className="grid grid-cols-1 gap-2 pt-1">
-                {access.free_credits > 0 && (
-                  <button data-testid="unlock-credit" onClick={() => unlockChat("credit")} disabled={unlocking}
-                    className="w-full rounded-xl bg-secondary text-white text-sm py-2.5 font-medium disabled:opacity-50">
-                    🎁 {t("use_free_credit")} ({access.free_credits})
-                  </button>
-                )}
-                <button data-testid="unlock-balance" onClick={() => unlockChat("balance")} disabled={unlocking || access.balance < access.price_uzs}
-                  className="w-full rounded-xl bg-primary text-white text-sm py-2.5 font-medium disabled:opacity-50">
-                  💳 {t("unlock_one_time")} · {access.price_uzs.toLocaleString()} {t("sum")}
+            <div data-testid="chat-paywall" className="rounded-2xl bg-card border border-border shadow-soft p-3 space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold">{t("chat_locked_title")}</p>
+                <span className="text-[11px] text-muted-foreground shrink-0">🛡 {access.guarantee_hours}h {t("guarantee")}</span>
+              </div>
+              {/* Free-path explainer — replying to an incoming message and
+                  mutual-save chat are both free. */}
+              <p className="text-[11px] text-secondary leading-relaxed rounded-lg bg-secondary/8 border border-secondary/20 p-2">{t("chat_free_paths")}</p>
+
+              {access.free_credits > 0 && (
+                <button data-testid="unlock-credit" onClick={() => unlockChat("credit")} disabled={unlocking}
+                  className="w-full rounded-xl bg-secondary text-white text-sm py-2.5 font-medium disabled:opacity-50">
+                  🎁 {t("use_free_credit")} ({access.free_credits})
                 </button>
-                <Link to="/premium?tab=plans" data-testid="unlock-upgrade" className="w-full text-center rounded-xl border border-primary/40 text-foreground text-sm py-2.5 font-medium">
-                  ⭐ {t("or_subscribe")}
+              )}
+
+              {/* Drawn comparison: pay-once vs unlimited */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  data-testid="unlock-balance"
+                  onClick={() => unlockChat("balance")}
+                  disabled={unlocking || access.balance < access.price_uzs}
+                  className="rounded-xl border border-border bg-card p-2.5 text-left transition active:scale-[0.98] disabled:opacity-50"
+                >
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t("chat_onetime_label")}</p>
+                  <p className="font-heading text-lg font-bold tabular-nums leading-tight mt-0.5">
+                    {access.price_uzs.toLocaleString()}<span className="text-[10px] font-medium opacity-60"> {t("sum")}</span>
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{t("chat_onetime_desc")}</p>
+                  <span className="mt-2 block text-center rounded-lg border border-primary/50 text-primary text-xs py-1.5 font-semibold">{t("chat_pay_now")}</span>
+                </button>
+
+                <Link
+                  to="/premium?tab=plans"
+                  data-testid="unlock-upgrade"
+                  className="relative rounded-xl border-2 border-primary bg-primary/5 p-2.5 text-left transition active:scale-[0.98]"
+                >
+                  <span className="absolute -top-2 right-2 rounded-full bg-primary text-white text-[8px] font-bold px-1.5 py-0.5 uppercase tracking-wide">{t("best_value")}</span>
+                  <p className="text-[10px] uppercase tracking-wide text-primary font-semibold">Standard</p>
+                  <p className="font-heading text-lg font-bold tabular-nums leading-tight mt-0.5">
+                    {STANDARD_PRICE.toLocaleString()}<span className="text-[10px] font-medium opacity-60"> {t("sum")}{t("plan_per_month")}</span>
+                  </p>
+                  <p className="text-[10px] text-secondary mt-0.5 leading-tight font-medium">{t("chat_unlimited_desc")}</p>
+                  <span className="mt-2 block text-center rounded-lg bg-primary text-white text-xs py-1.5 font-semibold">{t("plan_choose_cta")}</span>
                 </Link>
               </div>
             </div>

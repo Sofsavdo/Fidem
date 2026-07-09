@@ -18,10 +18,11 @@ export default function MobileTopBar() {
         <span className="font-heading font-semibold text-lg leading-none">FIDEM</span>
       </Link>
       <div className="flex items-center gap-1">
-        {/* Unified wallet pill: shows balance and (only if > 0) coins side-by-side inside one button */}
+        {/* Unified wallet pill → balance/top-up surface (in-app spending money).
+            Shows balance and (only if > 0) coins side-by-side inside one button */}
         <button
           data-testid="topbar-balance"
-          onClick={() => nav("/withdrawals")}
+          onClick={() => nav("/premium?tab=balance")}
           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-muted/60 hover:bg-muted text-xs font-medium"
           title="Wallet"
         >

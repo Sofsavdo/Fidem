@@ -55,10 +55,10 @@ export default function LocationVerifyCard() {
   };
 
   return (
-    <div className="rounded-3xl bg-gradient-to-r from-blue-50 to-card border border-blue-100 p-4" data-testid="location-verify-card">
+    <div className="rounded-3xl bg-gradient-to-r from-secondary/8 to-card border border-secondary/25 p-4" data-testid="location-verify-card">
       <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-2xl bg-blue-100 grid place-items-center shrink-0">
-          <MapPin className="w-5 h-5 text-blue-700" />
+        <div className="w-10 h-10 rounded-2xl bg-secondary/12 grid place-items-center shrink-0">
+          <MapPin className="w-5 h-5 text-secondary" />
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-heading text-base font-semibold">{t("location_verify_title")}</p>

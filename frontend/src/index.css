@@ -19,26 +19,27 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Outfit', system-ui, sans-serif; }
 
 @layer base {
     :root {
-        /* FIDEM warm-premium theme: cream bg, terracotta primary, forest secondary */
-        --background: 36 50% 98%;        /* #FDFBF7 */
-        --foreground: 20 5% 16%;         /* #2C2A29 */
+        /* FIDEM modern-premium theme: clean cool-neutral canvas, terracotta
+           primary, forest secondary, gold accent. No cream/beige. */
+        --background: 220 20% 97%;       /* #F4F6F8 clean light */
+        --foreground: 222 24% 11%;       /* #15171D near-black */
         --card: 0 0% 100%;
-        --card-foreground: 20 5% 16%;
+        --card-foreground: 222 24% 11%;
         --popover: 0 0% 100%;
-        --popover-foreground: 20 5% 16%;
-        --primary: 11 50% 41%;           /* #9E4735 terracotta */
+        --popover-foreground: 222 24% 11%;
+        --primary: 10 62% 45%;           /* #BB4A34 deeper terracotta, pops on cool base */
         --primary-foreground: 0 0% 100%;
-        --secondary: 164 35% 27%;        /* #2D5A4C forest */
+        --secondary: 168 40% 26%;        /* #285A4E forest */
         --secondary-foreground: 0 0% 100%;
-        --muted: 36 25% 94%;
-        --muted-foreground: 20 5% 45%;
-        --accent: 36 25% 94%;
-        --accent-foreground: 20 5% 16%;
-        --destructive: 11 50% 41%;
+        --muted: 220 16% 93%;            /* #E9ECF1 */
+        --muted-foreground: 220 9% 42%;  /* #626873 */
+        --accent: 220 16% 93%;
+        --accent-foreground: 222 24% 11%;
+        --destructive: 0 65% 48%;
         --destructive-foreground: 0 0% 100%;
-        --border: 30 15% 89%;
-        --input: 30 15% 89%;
-        --ring: 11 50% 41%;
+        --border: 220 15% 88%;           /* #DCE0E7 */
+        --input: 220 15% 88%;
+        --ring: 10 62% 45%;
         --chart-1: 11 50% 41%;
         --chart-2: 164 35% 27%;
         --chart-3: 45 60% 53%;
@@ -87,6 +88,13 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Outfit', system-ui, sans-serif; }
     100% { opacity: 1; transform: translateY(0); }
 }
 
+/* Premium boot splash — gentle breathing of the brand mark */
+@keyframes brandpulse {
+    0%, 100% { transform: scale(1); opacity: 0.92; }
+    50% { transform: scale(1.08); opacity: 1; }
+}
+.animate-brandpulse { animation: brandpulse 1.4s ease-in-out infinite; }
+
 /* Premium gradient text */
 .text-premium {
     background: linear-gradient(135deg, #D4AF37 0%, #B5952F 100%);
@@ -132,7 +140,7 @@ textarea.input { resize: vertical; min-height: 92px; line-height: 1.45; }
 .btn-primary {
     width: 100%;
     border-radius: 1rem;
-    background: linear-gradient(135deg, hsl(11 55% 46%) 0%, hsl(11 50% 38%) 100%);
+    background: linear-gradient(135deg, hsl(10 62% 48%) 0%, hsl(10 64% 39%) 100%);
     color: white;
     font-weight: 600;
     padding: 0.95rem 1.25rem;
@@ -140,24 +148,24 @@ textarea.input { resize: vertical; min-height: 92px; line-height: 1.45; }
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    box-shadow: 0 8px 24px hsl(11 50% 41% / 0.28), 0 1px 2px hsl(11 50% 30% / 0.2), inset 0 1px 0 rgba(255,255,255,0.15);
+    box-shadow: 0 8px 24px hsl(10 62% 45% / 0.28), 0 1px 2px hsl(10 64% 28% / 0.2), inset 0 1px 0 rgba(255,255,255,0.15);
     transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
     border: 0;
     cursor: pointer;
 }
-.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 30px hsl(11 50% 41% / 0.35), inset 0 1px 0 rgba(255,255,255,0.18); filter: brightness(1.04); }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 30px hsl(10 62% 45% / 0.35), inset 0 1px 0 rgba(255,255,255,0.18); filter: brightness(1.04); }
 .btn-primary:active { transform: scale(0.985); }
 .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 
 .btn-secondary {
     width: 100%;
     border-radius: 1rem;
-    background: linear-gradient(135deg, hsl(164 38% 30%) 0%, hsl(164 35% 24%) 100%);
+    background: linear-gradient(135deg, hsl(168 42% 29%) 0%, hsl(168 44% 22%) 100%);
     color: white;
     font-weight: 600;
     padding: 0.95rem 1.25rem;
     display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
-    box-shadow: 0 8px 24px hsl(164 40% 25% / 0.28), inset 0 1px 0 rgba(255,255,255,0.15);
+    box-shadow: 0 8px 24px hsl(168 42% 24% / 0.28), inset 0 1px 0 rgba(255,255,255,0.15);
     transition: transform 0.18s ease, filter 0.18s ease;
     border: 0; cursor: pointer;
 }
@@ -216,10 +224,10 @@ textarea.input { resize: vertical; min-height: 92px; line-height: 1.45; }
 }
 .chip-option:hover { border-color: hsl(var(--foreground) / 0.3); transform: translateY(-1px); }
 .chip-option.active {
-    background: linear-gradient(135deg, hsl(11 55% 46%) 0%, hsl(11 50% 38%) 100%);
+    background: linear-gradient(135deg, hsl(10 62% 48%) 0%, hsl(10 64% 39%) 100%);
     color: white;
-    border-color: hsl(11 50% 38%);
-    box-shadow: 0 6px 16px hsl(11 50% 41% / 0.25);
+    border-color: hsl(10 64% 39%);
+    box-shadow: 0 6px 16px hsl(10 62% 45% / 0.25);
 }
 
 .tile-option {
@@ -236,15 +244,15 @@ textarea.input { resize: vertical; min-height: 92px; line-height: 1.45; }
 }
 .tile-option:hover { border-color: hsl(var(--foreground) / 0.3); }
 .tile-option.active {
-    background: linear-gradient(135deg, hsl(11 55% 46%) 0%, hsl(11 50% 38%) 100%);
+    background: linear-gradient(135deg, hsl(10 62% 48%) 0%, hsl(10 64% 39%) 100%);
     color: white;
-    border-color: hsl(11 50% 38%);
-    box-shadow: 0 6px 16px hsl(11 50% 41% / 0.22);
+    border-color: hsl(10 64% 39%);
+    box-shadow: 0 6px 16px hsl(10 62% 45% / 0.22);
 }
 
 /* Step indicator with shimmer */
 .step-bar { height: 0.3rem; border-radius: 9999px; background-color: hsl(var(--border)); flex: 1; overflow: hidden; }
-.step-bar.active { background: linear-gradient(90deg, hsl(11 55% 46%), hsl(11 50% 38%)); box-shadow: 0 0 14px hsl(11 50% 41% / 0.35); }
+.step-bar.active { background: linear-gradient(90deg, hsl(10 62% 48%), hsl(10 64% 39%)); box-shadow: 0 0 14px hsl(10 62% 45% / 0.35); }
 
 /* Smooth content fade-in on step change */
 .step-fade { animation: stepFade 0.42s cubic-bezier(0.2,0.8,0.2,1); }

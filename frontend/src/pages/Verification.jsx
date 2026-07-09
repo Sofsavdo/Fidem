@@ -1,8 +1,9 @@
 import React, { useState, useRef } from "react";
+import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
-import { ShieldCheck, Upload, CheckCircle2, XCircle, Clock, FileText, IdCard, ScanFace, Banknote } from "lucide-react";
+import { ShieldCheck, Upload, CheckCircle2, XCircle, Clock, FileText, IdCard, ScanFace, Banknote, ChevronLeft } from "lucide-react";
 import { useVerificationMine, QK } from "@/hooks/queries";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -81,10 +82,16 @@ export default function Verification() {
   return (
     <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-6">
       <div>
+        <Link to="/me" data-testid="verify-back" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-2">
+          <ChevronLeft className="w-4 h-4" /> {t("me")}
+        </Link>
         <h1 className="text-2xl font-heading font-semibold flex items-center gap-2">
-          <ShieldCheck className="w-6 h-6 text-foreground" /> {t("verification_title")}
+          <ShieldCheck className="w-6 h-6 text-secondary" /> {t("verification_title")}
         </h1>
         <p className="text-sm text-muted-foreground mt-1">{t("verification_subtitle")}</p>
+        <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-secondary/10 text-secondary border border-secondary/25 px-3 py-1 text-xs font-medium">
+          <ShieldCheck className="w-3.5 h-3.5" /> {t("verify_trust_line")}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

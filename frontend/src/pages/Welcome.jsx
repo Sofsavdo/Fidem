@@ -1,11 +1,12 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Heart, Check, Sparkles } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import LangSwitch from "@/components/LangSwitch";
 
 export default function Welcome() {
-  const { t } = useApp();
+  const { t, user } = useApp();
+  const nav = useNavigate();
 
   const trustItems = [
     { t: "land_trust1_t", s: "land_trust1_s" },
@@ -13,8 +14,15 @@ export default function Welcome() {
     { t: "land_trust3_t", s: "land_trust3_s" },
   ];
 
+  // Mark welcome as seen, then route: an already-authenticated user (Telegram
+  // first-timer) goes straight to onboarding; a web visitor goes to auth.
+  const start = () => {
+    try { localStorage.setItem("fidem_welcomed", "1"); } catch { /* ignore */ }
+    nav(user ? "/onboarding" : "/auth");
+  };
+
   return (
-    <div className="relative min-h-screen bg-ink text-white overflow-hidden flex flex-col">
+    <div className="relative h-[100dvh] bg-ink text-white overflow-hidden flex flex-col">
       {/* Ambient glow orbs — no external images, renders instantly */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="orb orb-1 opacity-40" />
@@ -59,15 +67,15 @@ export default function Welcome() {
           ))}
         </div>
 
-        <Link
-          to="/auth"
+        <button
+          onClick={start}
           data-testid="land-cta-primary"
           className="mt-5 block w-full rounded-2xl bg-gradient-to-r from-primary to-primary/90 text-white font-semibold text-base py-4 shadow-lg shadow-primary/30 hover:-translate-y-0.5 active:scale-[0.98] transition"
         >
           {t("welcome_cta_primary")}
-        </Link>
+        </button>
 
-        <p className="mt-4 text-xs text-white/45">{t("land_social_proof")}</p>
+        <p className="mt-3 text-xs text-white/45">{t("land_social_proof")}</p>
       </main>
 
       <footer className="relative z-10 text-center text-[11px] text-white/35 pb-6 px-6 flex items-center justify-center gap-4">

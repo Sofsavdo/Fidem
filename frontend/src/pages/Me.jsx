@@ -4,26 +4,24 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, PlanPill } from "@/components/Badges";
 import PhotoUpload from "@/components/PhotoUpload";
-import { ChevronRight, Crown, Gem, Wallet, Share2, Settings as SettingsIcon, LogOut, Copy, Trophy, ShieldCheck, Bell, Clock, SlidersHorizontal, Brain, UsersRound, Pen, BookOpen, Phone, Plane, TrendingUp, Award, Rocket } from "lucide-react";
+import { ChevronRight, Crown, Wallet, Share2, Settings as SettingsIcon, LogOut, ShieldCheck, Bell, Clock, SlidersHorizontal, Brain, Pen, BookOpen, Phone, Award, Rocket } from "lucide-react";
 import ProgressCard from "@/components/ProgressCard";
 import LangSwitch from "@/components/LangSwitch";
 import BoostModal from "@/components/BoostModal";
 import LocationVerifyCard from "@/components/LocationVerifyCard";
 import { photoSrc } from "@/lib/photo";
 import { toast } from "sonner";
-import { useReferral, useNotifications, useDailyStatus, useLeaderboard, useSaved, QK } from "@/hooks/queries";
+import { useReferral, useNotifications, useDailyStatus, useSaved, QK } from "@/hooks/queries";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 
 export default function Me() {
   const { user, t, logout, refresh, wsEvent } = useApp();
   const queryClient = useQueryClient();
-  const [leadPeriod, setLeadPeriod] = useState("all");
   const [boostOpen, setBoostOpen] = useState(false);
 
   const { data: referral } = useReferral();
   const { data: notifications = [] } = useNotifications();
-  const { data: daily, refetch: refetchDaily } = useDailyStatus();
-  const { data: leaders = [] } = useLeaderboard(leadPeriod);
+  const { data: daily } = useDailyStatus();
   const { data: profileViewers = [] } = useSaved("viewers");
   const { data: profileSavers = [] } = useSaved("by_others");
 
@@ -55,10 +53,6 @@ export default function Me() {
   });
 
   if (!user) return null;
-
-  const copy = (txt) => {
-    navigator.clipboard.writeText(txt).then(() => toast.success(t("copied")));
-  };
 
   return (
     <div className="px-4 md:px-8 pt-6 pb-8 space-y-5">
@@ -98,7 +92,7 @@ export default function Me() {
               <VerifiedBadge verified={user.verified_selfie} />
               <FinancialBadge verified={user.verified_financial} />
               {user.verified_identity && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 text-[10px]">
+                <span className="inline-flex items-center gap-1 rounded-full bg-secondary/10 text-secondary border border-secondary/25 px-2 py-0.5 text-[10px]">
                   <ShieldCheck className="w-3 h-3" /> ID
                 </span>
               )}
@@ -171,10 +165,10 @@ export default function Me() {
           <p className="font-heading text-lg mt-2">{t("premium")}</p>
           <p className="text-xs text-white/70 mt-0.5">{t("premium_subtitle")} →</p>
         </Link>
-        <Link to="/withdrawals" data-testid="link-balance" className="rounded-3xl bg-card border border-border p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform">
-          <Wallet className="w-5 h-5 text-foreground" />
+        <Link to="/premium?tab=balance" data-testid="link-balance" className="rounded-3xl bg-card border border-border p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform">
+          <Wallet className="w-5 h-5 text-secondary" />
           <p className="font-heading text-lg mt-2">{(user.balance || 0).toLocaleString()} {t("sum")}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{t("balance")}</p>
+          <p className="text-xs text-secondary mt-0.5">{t("app_balance_title")} →</p>
         </Link>
         <button
           type="button"
@@ -227,64 +221,6 @@ export default function Me() {
         </Link>
       )}
 
-      {/* Verification actions — full upload flow on /verification */}
-      <div className="rounded-3xl bg-card border border-border divide-y">
-        <Row
-          icon={<ShieldCheck className="w-4 h-4 text-secondary" />}
-          label={t("request_selfie")}
-          right={user.verified_selfie ? <span className="text-secondary text-xs">✓</span> : (
-            <Link to="/verification" data-testid="req-verify-selfie" className="text-xs text-foreground font-medium">{t("verify_go_page")}</Link>
-          )}
-        />
-        <Row
-          icon={<Gem className="w-4 h-4 text-gold-dark" />}
-          label={t("financial_verification")}
-          right={user.verified_financial ? <span className="text-secondary text-xs">✓</span> : (
-            <Link to="/verification" data-testid="req-verify-financial" className="text-xs text-foreground font-medium">{t("verify_go_page")}</Link>
-          )}
-        />
-      </div>
-
-      {/* Leaderboard */}
-      <div className="rounded-3xl bg-card border border-border p-4" data-testid="leaderboard-card">
-        <div className="flex items-center gap-2">
-          <Trophy className="w-4 h-4 text-gold-dark" />
-          <p className="font-heading text-lg">{t("top_supporters")}</p>
-        </div>
-        <div className="flex gap-1 mt-3 mb-3">
-          {[
-            ["day", t("daily")],
-            ["week", t("weekly")],
-            ["month", t("monthly")],
-            ["all", t("all_time")],
-          ].map(([k, l]) => (
-            <button
-              key={k}
-              data-testid={`lead-${k}`}
-              onClick={() => setLeadPeriod(k)}
-              className={`text-[10px] px-2 py-1 rounded-full border ${
-                leadPeriod === k ? "bg-foreground text-background border-foreground" : "bg-card border-border"
-              }`}
-            >
-              {l}
-            </button>
-          ))}
-        </div>
-        <div className="space-y-2">
-          {leaders.length === 0 && <p className="text-xs text-muted-foreground">{t("no_data")}</p>}
-          {leaders.slice(0, 10).map((row, i) => (
-            <div key={row.user?.id || i} className="flex items-center gap-3 text-sm">
-              <span className="w-5 text-center font-medium text-muted-foreground">{i + 1}</span>
-              <div className="w-7 h-7 rounded-full bg-muted overflow-hidden">
-                {row.user?.photo_url && <img loading="lazy" decoding="async" src={photoSrc(row.user.photo_url)} alt="" className="w-full h-full object-cover" />}
-              </div>
-              <span className="flex-1 truncate">{row.user?.name || "—"}</span>
-              <span className="text-gold-dark font-medium">{(row.total || 0).toLocaleString()}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Profil */}
       <div>
         <p className="field-label mb-2 px-1">{t("me_group_profile")}</p>
@@ -323,15 +259,6 @@ export default function Me() {
     </div>
   );
 }
-
-const Row = React.memo(function Row({ icon, label, right }) {
-  return (
-    <div className="flex items-center justify-between p-4">
-      <span className="flex items-center gap-3 text-sm">{icon} {label}</span>
-      <div>{right}</div>
-    </div>
-  );
-});
 
 const NavRow = React.memo(function NavRow({ to, testid, icon, label }) {
   return (

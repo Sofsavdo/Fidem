@@ -151,7 +151,7 @@ export default function ProfileDetail() {
             <FinancialBadge verified={c.verified_financial} />
             <LocationBadge verified={c.location_verified} />
             {c.verified_identity && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 px-2 py-1 text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1 rounded-full bg-secondary/10 text-secondary border border-secondary/25 px-2 py-1 text-[11px] font-medium">
                 <Shield className="w-3 h-3" /> {t("identity_badge")}
               </span>
             )}
