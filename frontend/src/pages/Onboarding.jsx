@@ -21,9 +21,12 @@ export default function Onboarding() {
   const { user, t, refresh, lang } = useApp();
   const nav = useNavigate();
   const [searchParams] = useSearchParams();
-  // "Complete your profile" (from Me) reuses this screen to edit an already-
-  // onboarded profile. The name is locked in that path — see submit()/the
-  // name Field below — everything else stays freely editable.
+  // "Complete your profile" (from Me) reuses this screen's data model, but
+  // only to fill in whatever is still missing - see the isEdit branch below,
+  // which renders a short form of just the empty fields instead of the full
+  // wizard. Letting people re-edit info they already gave (name, region,
+  // marital status, ...) would undermine trust in what other users already
+  // matched/verified against, so already-filled fields are never shown here.
   const isEdit = searchParams.get("edit") === "1" && !!user?.onboarded;
   const [step, setStep] = useState(0);
   const [photoStatus, setPhotoStatus] = useState({ state: "idle", code: "", reason: "" });
@@ -60,6 +63,46 @@ export default function Onboarding() {
 
   const set = (patch) => setData((d) => ({ ...d, ...patch }));
 
+  // Same "empty" rule the backend uses for completeness (services.py
+  // PROFILE_FIELDS): booleans always count as answered, everything else is
+  // missing if null/undefined/""/0. Restricted to the free-text/descriptive
+  // fields that are actually skippable at first onboarding - identity fields
+  // (name, gender, birth date, country, marital status, ...) always get a
+  // default value up front, so they never legitimately show up here.
+  const isFieldEmpty = (v) => (typeof v === "boolean" ? false : v === null || v === undefined || v === "" || v === 0);
+  const EDITABLE_MISSING_FIELDS = ["region", "district", "education", "profession", "religion", "looking_for", "bio", "search_region"];
+  const missingKeys = isEdit ? EDITABLE_MISSING_FIELDS.filter((k) => isFieldEmpty(user?.[k])) : [];
+
+  const buildPayload = (d) => {
+    const payload = { ...d };
+    if (!payload.search_gender) payload.search_gender = payload.gender === "male" ? "female" : "male";
+    if (!payload.search_country) payload.search_country = payload.country;
+    // backend OnboardingProfile requires non-empty string for region / education / religion / search_region
+    payload.region = payload.region || "";
+    payload.search_region = payload.search_region || "";
+    payload.education = payload.education || "";
+    payload.religion = payload.religion || "";
+    payload.profession = payload.profession || "";
+    payload.looking_for = payload.looking_for || "";
+    return payload;
+  };
+
+  const [savingEdit, setSavingEdit] = useState(false);
+  const saveMissingFields = async () => {
+    if (savingEdit) return;
+    setSavingEdit(true);
+    try {
+      await api.post("/profile/onboard", buildPayload(data));
+      toast.success(t("save"));
+      await refresh();
+      nav("/me", { replace: true });
+    } catch {
+      toast.error(t("error"));
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const verifyPhoto = async (url) => {
     if (!url) return;
     setPhotoStatus({ state: "verifying", code: "", reason: "" });
@@ -89,17 +132,7 @@ export default function Onboarding() {
     if (submitting) return;
     setSubmitting(true);
     try {
-      const payload = { ...data };
-      if (!payload.search_gender) payload.search_gender = payload.gender === "male" ? "female" : "male";
-      if (!payload.search_country) payload.search_country = payload.country;
-      // backend OnboardingProfile requires non-empty string for region / education / religion / search_region
-      payload.region = payload.region || "";
-      payload.search_region = payload.search_region || "";
-      payload.education = payload.education || "";
-      payload.religion = payload.religion || "";
-      payload.profession = payload.profession || "";
-      payload.looking_for = payload.looking_for || "";
-      await api.post("/profile/onboard", payload);
+      await api.post("/profile/onboard", buildPayload(data));
       toast.success(t("onboard_complete"));
       // Let the brand-new user actually see their first candidates screen
       // before DailyCheckIn's gamification modal covers it - it fires on
@@ -154,6 +187,103 @@ export default function Onboarding() {
 
   const stepTitle = (STEP_TITLES[lang] || STEP_TITLES.uz)[step];
 
+  if (isEdit) {
+    if (missingKeys.length === 0) {
+      nav("/me", { replace: true });
+      return null;
+    }
+    return (
+      <div className="relative min-h-[100dvh] bg-background bg-grain overflow-hidden">
+        <div className="orb orb-1" style={{ opacity: 0.35 }} />
+        <div className="orb orb-2" style={{ opacity: 0.3 }} />
+        <div className="relative z-10 max-w-md md:max-w-2xl lg:max-w-3xl mx-auto w-full min-h-[100dvh] flex flex-col px-5 pt-6 pb-28 sm:px-6 md:px-8">
+          <button onClick={() => nav("/me")} className="p-2 -ml-2 w-fit rounded-full hover:bg-muted" aria-label="Back" data-testid="ob-edit-back">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <h2 className="mt-3 font-heading text-2xl sm:text-3xl font-semibold tracking-tight leading-tight">{t("complete_profile_cta")}</h2>
+          <p className="text-sm text-muted-foreground mt-1">{t("complete_profile_missing_hint")}</p>
+
+          <div className="mt-6 card-premium p-5 sm:p-6 md:p-8" data-testid="onboarding-edit-missing">
+            <div className="space-y-5">
+              {missingKeys.includes("region") && (
+                <Field as="div" label={t("region")}>
+                  <RegionSelect testid="ob-edit-region" lang={lang} country={data.country} value={data.region} onChange={(r) => set({ region: r })} placeholder={t("select_region") || "Select region"} />
+                </Field>
+              )}
+              {missingKeys.includes("district") && (
+                <Field label={t("district")}>
+                  <input data-testid="ob-edit-district" className="input" value={data.district} onChange={(e) => set({ district: e.target.value })} placeholder={t("select_district")} />
+                </Field>
+              )}
+              {missingKeys.includes("education") && (
+                <Field label={t("education")}>
+                  <input data-testid="ob-edit-education" className="input" value={data.education} onChange={(e) => set({ education: e.target.value })} placeholder={t("education")} />
+                </Field>
+              )}
+              {missingKeys.includes("profession") && (
+                <Field label={t("profession")}>
+                  <input data-testid="ob-edit-profession" className="input" value={data.profession} onChange={(e) => set({ profession: e.target.value })} placeholder={t("profession")} />
+                </Field>
+              )}
+              {missingKeys.includes("religion") && (
+                <Field label={`${t("religion")} (${t("optional") || "optional"})`}>
+                  <RadioGroup
+                    testid="ob-edit-religion"
+                    value={data.religion || "prefer_not_to_say"}
+                    onChange={(v) => set({ religion: v === "prefer_not_to_say" ? "" : v })}
+                    options={[
+                      { value: "prefer_not_to_say", label: t("prefer_not_to_say") || "Prefer not to say" },
+                      { value: "Islam", label: t("rel_islam") || "Islam" },
+                      { value: "Christianity", label: t("rel_christianity") || "Christianity" },
+                      { value: "Judaism", label: t("rel_judaism") || "Judaism" },
+                      { value: "Buddhism", label: t("rel_buddhism") || "Buddhism" },
+                      { value: "Hinduism", label: t("rel_hinduism") || "Hinduism" },
+                      { value: "Other", label: t("rel_other") || "Other" },
+                      { value: "None", label: t("rel_none") || "Non-religious" },
+                    ]}
+                  />
+                </Field>
+              )}
+              {missingKeys.includes("looking_for") && (
+                <Field label={t("looking_for")}>
+                  <textarea data-testid="ob-edit-lookingfor" rows="3" className="input" value={data.looking_for} onChange={(e) => set({ looking_for: e.target.value })} />
+                </Field>
+              )}
+              {missingKeys.includes("bio") && (
+                <Field label={t("bio")}>
+                  <textarea data-testid="ob-edit-bio" rows="3" className="input" value={data.bio} onChange={(e) => set({ bio: e.target.value })} />
+                </Field>
+              )}
+              {missingKeys.includes("search_region") && (
+                <Field as="div" label={t("search_area")}>
+                  <RegionSelect testid="ob-edit-searchregion" lang={lang} country={data.search_country || data.country} value={data.search_region} onChange={(r) => set({ search_region: r })} placeholder={t("select_region") || "Select region"} />
+                </Field>
+              )}
+            </div>
+          </div>
+
+          <div className="fixed bottom-0 left-0 right-0 pointer-events-none" style={{ zIndex: 10000 }}>
+            <div className="max-w-md md:max-w-2xl lg:max-w-3xl mx-auto px-5 sm:px-6 md:px-8 pb-5 pt-3 pointer-events-auto">
+              <button
+                data-testid="ob-edit-save"
+                onClick={saveMissingFields}
+                disabled={savingEdit}
+                className="btn-primary w-full"
+                style={{ paddingBottom: "max(0.95rem, env(safe-area-inset-bottom))" }}
+              >
+                {savingEdit ? (
+                  <span className="inline-block w-4 h-4 rounded-full border-2 border-white/60 border-t-transparent animate-spin" />
+                ) : (
+                  <>{t("save")} <Check className="w-4 h-4" /></>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative min-h-[100dvh] bg-background bg-grain overflow-hidden">
       <div className="orb orb-1" style={{ opacity: 0.35 }} />
@@ -188,15 +318,11 @@ export default function Onboarding() {
                 <Field label={t("name")}>
                   <input
                     data-testid="ob-name"
-                    className={`input ${isEdit ? "opacity-60 cursor-not-allowed" : ""}`}
+                    className="input"
                     value={data.name}
-                    disabled={isEdit}
                     onChange={(e) => set({ name: e.target.value })}
                     placeholder={t("name")}
                   />
-                  {isEdit && (
-                    <p className="text-[11px] text-muted-foreground mt-1.5">{t("name_locked_hint")}</p>
-                  )}
                 </Field>
                 <Field label={t("gender")}>
                   <RadioGroup

@@ -5,7 +5,7 @@ import { useApp } from "@/contexts/AppContext";
 import GiftModal from "@/components/GiftModal";
 import GiftCelebration, { tierFromPrice } from "@/components/GiftCelebration";
 import ChatVoiceRecorder from "@/components/ChatVoiceRecorder";
-import { ArrowLeft, Send, Gift, MoreVertical, Ban, Flag, Wand2, Play } from "lucide-react";
+import { ArrowLeft, Send, Gift, MoreVertical, Ban, Flag, Wand2, Play, Check, CheckCheck } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
 import { formatLastActive } from "@/lib/time";
 import { tapLight } from "@/lib/haptics";
@@ -16,6 +16,14 @@ import { QK } from "@/hooks/queries";
 // Mirrors the Standard plan price in Premium.jsx — shown next to the one-time
 // unlock so the user can compare "pay once" vs "unlimited messaging".
 const STANDARD_PRICE = 34900;
+
+function formatMsgTime(iso) {
+  try {
+    return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+}
 
 export default function Chat() {
   const { otherId } = useParams();
@@ -137,6 +145,16 @@ export default function Chat() {
     // eslint-disable-next-line
   }, [wsEvent, chatId, user]);
 
+  // The other side just opened this chat and read our messages - flip our
+  // sent bubbles to "read" live instead of only on next reload.
+  useEffect(() => {
+    if (!wsEvent || wsEvent.type !== "read" || !chatId) return;
+    const { chat_id, reader_id } = wsEvent.data || {};
+    if (chat_id !== chatId || reader_id === user?.id) return;
+    setMessages((prev) => prev.map((m) => (m.from_user_id === user?.id ? { ...m, read: true } : m)));
+    // eslint-disable-next-line
+  }, [wsEvent, chatId, user]);
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
@@ -161,9 +179,11 @@ export default function Chat() {
 
     setSending(true);
     try {
-      await api.post("/messages/send", { to_user_id: otherId, text: finalText });
-      // Remove temp message, WebSocket will add the real one
-      setMessages((prev) => prev.filter((m) => m.id !== tempMsg.id));
+      const r = await api.post("/messages/send", { to_user_id: otherId, text: finalText });
+      // Swap the temp bubble for the server's confirmed copy directly - don't
+      // wait on the WebSocket echo to know the message made it. The WS
+      // dedup check (by id) below already ignores it if it arrives after.
+      setMessages((prev) => prev.map((m) => (m.id === tempMsg.id ? r.data : m)));
     } catch (e) {
       console.error("Send message error:", e);
       const errorMsg = e.response?.data?.detail || e.message || t("error");
@@ -176,16 +196,18 @@ export default function Chat() {
   const sendVoice = async ({ voice_url, voice_duration }) => {
     setSending(true);
     try {
-      await api.post("/messages/send", {
+      const r = await api.post("/messages/send", {
         to_user_id: otherId,
         text: "",
         kind: "voice",
         voice_url,
         voice_duration,
       });
+      // Show the confirmed message immediately rather than waiting on the
+      // WebSocket echo (same fix as text messages).
+      setMessages((prev) => (prev.some((m) => m.id === r.data.id) ? prev : [...prev, r.data]));
       setShowTemplates(false);
       toast.success("✅");
-      // Optimistic: don't reload, let WebSocket handle the update
     } catch (e) {
       console.error("Send voice error:", e);
       const errorMsg = e.response?.data?.detail || e.message || t("error");
@@ -287,27 +309,35 @@ export default function Chat() {
             👋
           </div>
         )}
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={`flex ${m.from_user_id === user?.id ? "justify-end" : "justify-start"}`}
-          >
-            <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
-              m.from_user_id === user?.id
-                ? "bg-primary text-white rounded-br-sm"
-                : "bg-card border border-border rounded-bl-sm"
-            } ${m.kind === "gift" ? "bg-gold-light text-yellow-900 border-gold/40" : ""}`}>
-              {m.kind === "voice" && m.meta?.voice_url ? (
-                <div className="flex items-center gap-2 min-w-[200px]" data-testid={`voice-msg-${m.id}`}>
-                  <span className="text-[9px] uppercase tracking-wider opacity-70">🎙 · {m.meta.voice_duration || 0}s</span>
-                  <audio controls preload="none" src={`/api/chat/voice/${m.id}?auth=${localStorage.getItem("fidem_token") || ""}`} className="h-8 max-w-full" />
-                </div>
-              ) : (
-                m.text
-              )}
+        {messages.map((m) => {
+          const mine = m.from_user_id === user?.id;
+          return (
+            <div key={m.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
+              <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
+                mine
+                  ? "bg-primary text-white rounded-br-sm"
+                  : "bg-card border border-border rounded-bl-sm"
+              } ${m.kind === "gift" ? "bg-gold-light text-yellow-900 border-gold/40" : ""}`}>
+                {m.kind === "voice" && m.meta?.voice_url ? (
+                  <div className="flex items-center gap-2 min-w-[200px]" data-testid={`voice-msg-${m.id}`}>
+                    <span className="text-[9px] uppercase tracking-wider opacity-70">🎙 · {m.meta.voice_duration || 0}s</span>
+                    <audio controls preload="none" src={`/api/chat/voice/${m.id}?auth=${localStorage.getItem("fidem_token") || ""}`} className="h-8 max-w-full" />
+                  </div>
+                ) : (
+                  m.text
+                )}
+              </div>
+              <div className={`flex items-center gap-1 mt-0.5 px-1 text-[10px] text-muted-foreground ${mine ? "flex-row-reverse" : ""}`} data-testid={`msg-meta-${m.id}`}>
+                <span>{formatMsgTime(m.created_at)}</span>
+                {mine && !m.sending && (
+                  m.read
+                    ? <CheckCheck className="w-3 h-3 text-secondary" />
+                    : <Check className="w-3 h-3" />
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         <div ref={endRef} />
       </div>
 

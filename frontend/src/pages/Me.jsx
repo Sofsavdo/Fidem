@@ -8,9 +8,8 @@ import { ChevronRight, Crown, Wallet, Share2, Settings as SettingsIcon, LogOut, 
 import ProgressCard from "@/components/ProgressCard";
 import BoostModal from "@/components/BoostModal";
 import LocationVerifyCard from "@/components/LocationVerifyCard";
-import InterestedPreview from "@/components/InterestedPreview";
 import { toast } from "sonner";
-import { useReferral, useDailyStatus, QK } from "@/hooks/queries";
+import { useReferral, useDailyStatus, useSavedSummary, QK } from "@/hooks/queries";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 
 export default function Me() {
@@ -20,6 +19,7 @@ export default function Me() {
 
   const { data: referral } = useReferral();
   const { data: daily } = useDailyStatus();
+  const { data: interestedSummary } = useSavedSummary();
 
   // Invalidate notifications on WS event so the top-bar count stays in sync
   useEffect(() => {
@@ -94,9 +94,22 @@ export default function Me() {
         )}
       </div>
 
-      {/* Contextual upsell — real masked profile list with an inline unlock,
-          instead of a blind redirect to the plans page. */}
-      <InterestedPreview />
+      {/* Contextual upsell — just a teaser + count here (Me is the profile
+          settings page, not a place to browse dozens of masked profiles).
+          Tapping goes to the dedicated Saved > Interested page, which shows
+          the actual list and the plan upsell in full. */}
+      {!["premium", "vip"].includes(user.plan) && interestedSummary?.total > 0 && (
+        <Link
+          to="/saved?tab=interested"
+          data-testid="profile-teaser-banner"
+          className="block rounded-3xl bg-gradient-to-r from-primary/10 to-card border border-primary/30 p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium leading-snug">{t("profile_teaser_title")} · {t("profile_teaser_subtitle").replace("{n}", interestedSummary.total)}</p>
+            <span className="shrink-0 text-xs font-semibold text-primary whitespace-nowrap">{t("profile_teaser_cta")} →</span>
+          </div>
+        </Link>
+      )}
 
       {/* Location verification (Map M1) */}
       <LocationVerifyCard />
