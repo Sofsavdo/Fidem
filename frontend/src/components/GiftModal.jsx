@@ -73,21 +73,20 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
           </button>
         </div>
 
-        {/* Balance info — balance is now a tappable top-up affordance */}
-        <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-muted/40 text-xs">
+        {/* Balance info — compact so it never crams on narrow screens.
+            Balance itself is a tappable top-up affordance. */}
+        <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-muted/40 text-xs shrink-0">
           <Link
             to="/premium?tab=balance"
             data-testid="gift-topup-link"
             onClick={onClose}
-            className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition"
+            className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2 py-1 font-medium hover:bg-primary/15 transition min-w-0"
           >
-            {t("gift_balance_label")}: <b className="text-foreground">{balance.toLocaleString()} {t("sum")}</b>
-            <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 text-primary px-1.5 py-0.5 font-medium">
-              <Plus className="w-3 h-3" /> {t("topup_balance")}
-            </span>
+            <Plus className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate"><b>{balance.toLocaleString()}</b> {t("sum")}</span>
           </Link>
           <span className="inline-flex items-center gap-1 text-secondary shrink-0">
-            <Sparkles className="w-3 h-3" /> {t("gift_free_remaining")}: {freeRemaining} / {catalog?.free_quota_per_week || 1}
+            <Sparkles className="w-3 h-3" /> {freeRemaining}/{catalog?.free_quota_per_week || 1} {t("gift_free_word")}
           </span>
         </div>
 
@@ -111,8 +110,9 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
           })}
         </div>
 
-        {/* Gifts grid - scrollable */}
-        <div className="overflow-y-auto p-4 grid grid-cols-3 gap-3" style={{ scrollbarWidth: "none" }}>
+        {/* Gifts grid — flex-1 + min-h-0 makes THIS the scrollable region so the
+            footer/tip and last row never get clipped on short screens. */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 grid grid-cols-3 gap-2 content-start" style={{ scrollbarWidth: "none" }}>
           {!catalog && <p className="col-span-3 text-center text-sm text-muted-foreground py-6">{t("loading")}</p>}
           {(groups[activeTier] || []).map((g) => {
             const cannotAfford = balance < g.price;
@@ -122,14 +122,14 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
                 data-testid={`gift-${g.kind}`}
                 onClick={() => cannotAfford ? toast.info(t("gift_need_topup")) : send(g)}
                 disabled={sending !== null}
-                className={`relative rounded-2xl border p-3 transition flex flex-col items-center gap-1 ${
-                  cannotAfford ? "border-dashed border-border bg-muted/20" : "border-border bg-card hover:-translate-y-1 hover:shadow-lg active:scale-95"
+                className={`relative rounded-2xl border p-2.5 transition flex flex-col items-center justify-center gap-0.5 aspect-square ${
+                  cannotAfford ? "border-dashed border-border bg-muted/20" : "border-border bg-card hover:-translate-y-0.5 hover:shadow-md active:scale-95"
                 }`}
               >
-                <span className={`text-4xl leading-none ${cannotAfford ? "opacity-40 grayscale" : ""}`}>{g.emoji}</span>
-                <span className={`text-[11px] font-medium text-center leading-tight mt-1 ${cannotAfford ? "opacity-60" : ""}`}>{g[labelKey]}</span>
-                <span className={`text-[10px] ${cannotAfford ? "text-primary font-medium" : "text-muted-foreground"}`}>
-                  {g.price >= 1000 ? `${(g.price / 1000).toFixed(g.price >= 10000 ? 0 : 1)}K` : g.price} {t("sum")}
+                <span className={`text-3xl leading-none ${cannotAfford ? "opacity-40 grayscale" : ""}`}>{g.emoji}</span>
+                <span className={`text-[10px] font-medium text-center leading-tight mt-0.5 line-clamp-1 w-full ${cannotAfford ? "opacity-60" : ""}`}>{g[labelKey]}</span>
+                <span className={`text-[10px] tabular-nums ${cannotAfford ? "text-primary font-semibold" : "text-muted-foreground"}`}>
+                  {g.price >= 1000 ? `${(g.price / 1000).toFixed(g.price >= 10000 ? 0 : 1)}K` : g.price}
                 </span>
                 {sending === g.kind && <span className="absolute inset-0 grid place-items-center bg-card/80 rounded-2xl text-foreground text-xs">{t("gift_sending")}</span>}
               </button>
