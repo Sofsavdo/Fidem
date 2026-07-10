@@ -187,13 +187,28 @@ export default function Withdrawals() {
         ) : (
           <div className="space-y-2">
             {history.map((w) => (
-              <div key={w.id} className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
-                <div>
-                  <p className="text-sm font-medium">{(w.amount || 0).toLocaleString()} {t("sum_word")}</p>
-                  <p className="text-[11px] text-muted-foreground">{w.created_at ? new Date(w.created_at).toLocaleString() : "—"}</p>
-                  <p className="text-[11px] text-muted-foreground font-mono">**** **** **** {(w.card_number || "").slice(-4)}</p>
+              <div key={w.id} className="py-2 border-b border-border/40 last:border-0">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{(w.amount || 0).toLocaleString()} {t("sum_word")}</p>
+                    <p className="text-[11px] text-muted-foreground">{w.created_at ? new Date(w.created_at).toLocaleString() : "—"}</p>
+                    <p className="text-[11px] text-muted-foreground font-mono">**** **** **** {(w.card_number || "").slice(-4)}</p>
+                  </div>
+                  {statusBadge(w.status)}
                 </div>
-                {statusBadge(w.status)}
+                {w.status === "rejected" && (
+                  <div
+                    data-testid={`withdraw-reject-reason-${w.id}`}
+                    className="mt-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 px-3 py-2"
+                  >
+                    {w.rejection_reason && (
+                      <p className="text-xs text-rose-700 dark:text-rose-300">
+                        <span className="font-semibold">{t("withdraw_reject_reason_label")}:</span> {w.rejection_reason}
+                      </p>
+                    )}
+                    <p className="text-[11px] text-rose-600/80 dark:text-rose-400/80 mt-0.5">{t("withdraw_reject_refund_note")}</p>
+                  </div>
+                )}
               </div>
             ))}
           </div>

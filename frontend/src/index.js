@@ -5,6 +5,21 @@ import posthog from "posthog-js";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
+// Self-hosted fonts (replaces the Google Fonts CDN link that used to live in
+// public/index.html) — the woff2 files ship from our own origin, so first
+// paint no longer waits on a fonts.googleapis.com round-trip and the brand
+// fonts still render offline / behind restrictive networks. Weights mirror
+// the old CDN request: 300/400/500/600/700 for both families.
+import "@fontsource/outfit/300.css";
+import "@fontsource/outfit/400.css";
+import "@fontsource/outfit/500.css";
+import "@fontsource/outfit/600.css";
+import "@fontsource/outfit/700.css";
+import "@fontsource/manrope/300.css";
+import "@fontsource/manrope/400.css";
+import "@fontsource/manrope/500.css";
+import "@fontsource/manrope/600.css";
+import "@fontsource/manrope/700.css";
 import "@/index.css";
 import App from "@/App";
 
