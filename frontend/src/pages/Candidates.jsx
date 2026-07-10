@@ -13,6 +13,7 @@ import { MATCH_EVENT } from "@/components/MatchCelebration";
 import { tapMedium } from "@/lib/haptics";
 import { EmptyState } from "@/components/kit";
 import HeroScene from "@/components/HeroScene";
+import { useExperiment } from "@/lib/experiments";
 
 // Every Nth card in the free-tier feed is a plan pitch instead of a
 // candidate - frequent enough to be seen, rare enough not to feel spammy.
@@ -22,12 +23,18 @@ const PROMO_EVERY = 9;
 // in the grid at the same size as a real profile - image open, not blurred.
 function PlanPromoCard() {
   const { t } = useApp();
-  useEffect(() => { posthog.capture("candidates_feed_promo_impression"); }, []);
+  // A/B experiment (PostHog flag "candidates-promo-copy"): does urgency-
+  // flavored copy ("online now") convert better than the benefit-flavored
+  // default? Falls back to "control" until the flag exists / loads, so the
+  // card always renders. The variant rides along on both funnel events.
+  const variant = useExperiment("candidates-promo-copy");
+  const title = variant === "urgent" ? t("candidates_promo_title_b") : t("candidates_promo_title");
+  useEffect(() => { posthog.capture("candidates_feed_promo_impression", { variant }); }, [variant]);
   return (
     <Link
       to="/premium?tab=plans"
       data-testid="candidates-promo-card"
-      onClick={() => posthog.capture("candidates_feed_promo_click")}
+      onClick={() => posthog.capture("candidates_feed_promo_click", { variant })}
       className="block bg-card rounded-3xl overflow-hidden shadow-soft hover:shadow-elevated transition-shadow border border-gold/40"
     >
       <div className="relative aspect-[4/5] overflow-hidden bg-muted">
@@ -37,7 +44,7 @@ function PlanPromoCard() {
           <Crown className="w-3 h-3" /> Premium
         </div>
         <div className="absolute bottom-3 left-3 right-3 text-white">
-          <h3 className="font-heading text-lg font-semibold leading-snug">{t("candidates_promo_title")}</h3>
+          <h3 className="font-heading text-lg font-semibold leading-snug">{title}</h3>
           <p className="text-xs text-white/85 mt-0.5">{t("candidates_promo_hint")}</p>
         </div>
       </div>

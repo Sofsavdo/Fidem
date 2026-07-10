@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
@@ -28,11 +28,34 @@ export default function Onboarding() {
   // marital status, ...) would undermine trust in what other users already
   // matched/verified against, so already-filled fields are never shown here.
   const isEdit = searchParams.get("edit") === "1" && !!user?.onboarded;
-  const [step, setStep] = useState(0);
+
+  // Draft persistence: the wizard is 7 steps long and Telegram Mini Apps get
+  // killed freely (backgrounding, incoming call, accidental swipe-down), so
+  // everything typed so far + the current step is kept in localStorage and
+  // restored on the next open. Cleared on successful submit; never used for
+  // the isEdit "fill missing fields" flow. Keyed per user id so a shared
+  // device doesn't leak one person's draft into another's signup.
+  const draftKey = `fidem_ob_draft_${user?.id || "anon"}`;
+  const [draft] = useState(() => {
+    if (user?.onboarded) return null;
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || typeof parsed.data !== "object" || parsed.data === null) return null;
+      // A week-old draft is more likely stale than helpful.
+      if (parsed.saved_at && Date.now() - parsed.saved_at > 7 * 24 * 3600 * 1000) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  });
+  const [step, setStep] = useState(() => Math.min(STEPS - 1, Math.max(0, Number(draft?.step) || 0)));
   const [photoStatus, setPhotoStatus] = useState({ state: "idle", code: "", reason: "" });
   const [submitting, setSubmitting] = useState(false);
   // Prefill from the existing profile so this screen doubles as a safe
   // "edit / complete profile" flow (reached from Me) without wiping fields.
+  // A saved draft (more recent than any profile prefill) wins field-by-field.
   const [data, setData] = useState({
     name: user?.name || "",
     gender: user?.gender || "male",
@@ -59,9 +82,21 @@ export default function Onboarding() {
     smoking: user?.smoking || "no",
     alcohol: user?.alcohol || "no",
     relocation: user?.relocation ?? false,
+    ...(draft?.data || {}),
   });
 
   const set = (patch) => setData((d) => ({ ...d, ...patch }));
+
+  // Save the draft (lightly debounced — this fires per keystroke otherwise).
+  useEffect(() => {
+    if (isEdit || user?.onboarded) return undefined;
+    const id = setTimeout(() => {
+      try {
+        localStorage.setItem(draftKey, JSON.stringify({ step, data, saved_at: Date.now() }));
+      } catch { /* storage full/unavailable — draft is best-effort */ }
+    }, 400);
+    return () => clearTimeout(id);
+  }, [data, step, isEdit, draftKey, user?.onboarded]);
 
   // Same "empty" rule the backend uses for completeness (services.py
   // PROFILE_FIELDS): booleans always count as answered, everything else is
@@ -133,6 +168,7 @@ export default function Onboarding() {
     setSubmitting(true);
     try {
       await api.post("/profile/onboard", buildPayload(data));
+      try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
       toast.success(t("onboard_complete"));
       // Let the brand-new user actually see their first candidates screen
       // before DailyCheckIn's gamification modal covers it - it fires on

@@ -35,8 +35,17 @@ TELEGRAM_WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "fidem-tg")
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@fidem.uz")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 
-# Set default ADMIN_PASSWORD if not provided
+# In production the admin password MUST come from the environment — the dev
+# default below is public (audit docs, test fixtures) and grants full admin
+# access. Mirrors the JWT_SECRET check in auth.py; accepts both ENV and
+# ENVIRONMENT since deploy docs have historically disagreed on the var name.
+_is_production = os.environ.get("ENV", os.environ.get("ENVIRONMENT", "")).lower() == "production"
 if not ADMIN_PASSWORD:
+    if _is_production:
+        raise ValueError(
+            "ADMIN_PASSWORD must be set in production environment "
+            "(the built-in default is publicly known and grants full admin access)"
+        )
     ADMIN_PASSWORD = "Admin@123"  # Default for development only
     log.warning(
         "ADMIN_PASSWORD is not set - falling back to a well-known default "
