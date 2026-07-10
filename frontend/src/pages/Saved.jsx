@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
-import { Lock, Bookmark, Crown, EyeOff } from "lucide-react";
+import { Lock, Bookmark, Crown, EyeOff, Camera, Check, X } from "lucide-react";
+import { toast } from "sonner";
 import { photoSrc } from "@/lib/photo";
-import { useSaved } from "@/hooks/queries";
+import { useSaved, usePhotoRequests, useDecidePhotoRequest } from "@/hooks/queries";
 import { EmptyState } from "@/components/kit";
 
 const TABS = [
@@ -11,6 +12,7 @@ const TABS = [
   { k: "by_others", labelKey: "saved_me" },
   { k: "viewers", labelKey: "viewed_my_profile" },
   { k: "interested", labelKey: "interested_in_me" },
+  { k: "requests", labelKey: "photo_requests_tab" },
 ];
 
 // Cheapest plan that unlocks these lists — mirrors PLANS.premium in Premium.jsx.
@@ -27,9 +29,23 @@ export default function Saved() {
   }, [searchParams]);
 
   const { data: items = [], isLoading } = useSaved(tab);
+  // Incoming photo-permission requests: always fetched so the tab chip can
+  // show a count badge even before the tab is opened.
+  const { data: photoRequests = [] } = usePhotoRequests();
+  const decideMutation = useDecidePhotoRequest();
   const isPremium = ["premium", "vip"].includes(user?.plan);
   const hasLocked = useMemo(() => items.some((c) => c.locked), [items]);
-  const showPlanPromo = tab !== "mine" && !isPremium && hasLocked;
+  const showPlanPromo = tab !== "mine" && tab !== "requests" && !isPremium && hasLocked;
+
+  const decide = (requestId, approve) => {
+    decideMutation.mutate(
+      { requestId, approve },
+      {
+        onSuccess: () => toast.success(approve ? t("photo_request_approved") : t("photo_request_rejected")),
+        onError: () => toast.error(t("error_generic")),
+      }
+    );
+  };
 
   const selectTab = useCallback((k) => {
     setTab(k);
@@ -49,11 +65,14 @@ export default function Saved() {
             key={x.k}
             data-testid={`saved-tab-${x.k}`}
             onClick={() => selectTab(x.k)}
-            className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs border transition ${
+            className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs border transition inline-flex items-center gap-1.5 ${
               tab === x.k ? "bg-foreground text-background border-foreground" : "bg-card border-border"
             }`}
           >
             {t(x.labelKey)}
+            {x.k === "requests" && photoRequests.length > 0 && (
+              <span className="rounded-full bg-primary text-white text-[10px] font-bold px-1.5 min-w-[18px] text-center">{photoRequests.length}</span>
+            )}
           </button>
         ))}
       </div>
@@ -90,21 +109,65 @@ export default function Saved() {
         </Link>
       )}
 
-      {isLoading && (
+      {/* Incoming photo-permission requests: WHO is asking, clearly, with
+          approve/reject right on the card. */}
+      {tab === "requests" && (
+        <div className="space-y-3" data-testid="photo-requests-list">
+          {photoRequests.length === 0 && (
+            <EmptyState icon={<Camera className="w-6 h-6" />} title={t("photo_requests_empty_title")} hint={t("photo_requests_empty_hint")} />
+          )}
+          {photoRequests.map(({ request, requester }) => (
+            <div key={request.id} className="rounded-3xl bg-card border border-border p-4" data-testid={`photo-request-${request.id}`}>
+              <Link to={`/candidate/${requester.id}`} className="flex items-center gap-3">
+                {requester.photo_url ? (
+                  <img src={photoSrc(requester.photo_url)} alt="" className="w-12 h-12 rounded-2xl object-cover" />
+                ) : (
+                  <div className="w-12 h-12 rounded-2xl bg-muted grid place-items-center text-lg font-semibold">{(requester.name || "?")[0]}</div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold truncate">{requester.name}, {requester.age}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{requester.region}{requester.profession ? ` · ${requester.profession}` : ""}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{t("photo_request_line")}</p>
+                </div>
+              </Link>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  data-testid={`photo-approve-${request.id}`}
+                  onClick={() => decide(request.id, true)}
+                  disabled={decideMutation.isPending}
+                  className="rounded-2xl bg-primary text-white text-sm font-medium py-2.5 disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" /> {t("photo_request_allow")}
+                </button>
+                <button
+                  data-testid={`photo-reject-${request.id}`}
+                  onClick={() => decide(request.id, false)}
+                  disabled={decideMutation.isPending}
+                  className="rounded-2xl bg-muted text-sm font-medium py-2.5 disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                >
+                  <X className="w-4 h-4" /> {t("photo_request_deny")}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab !== "requests" && isLoading && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="aspect-[4/5] rounded-3xl bg-muted animate-pulse" />
           ))}
         </div>
       )}
-      {!isLoading && items.length === 0 && (
+      {tab !== "requests" && !isLoading && items.length === 0 && (
         <div data-testid="saved-empty">
           <EmptyState icon={<Bookmark className="w-6 h-6" />} title={t("saved_empty_title")} hint={t("saved_empty_hint")} />
         </div>
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 stagger" data-testid="saved-grid">
-        {items.map((c, idx) => {
+        {tab !== "requests" && items.map((c, idx) => {
           if (c.locked) {
             // Age + region stay visible (masked name, locked photo) — a real
             // teaser instead of a blank card, consistent with Me's preview.

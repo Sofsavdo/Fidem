@@ -118,7 +118,21 @@ async def admin_stats(_: str = Depends(get_current_admin)):
 
 
 @router.get("/users")
-async def admin_list_users(q: str = "", page: int = 1, limit: int = 20, gender: str = "", region: str = "", age_min: int = None, age_max: int = None, marital_status: str = "", _: str = Depends(get_current_admin)):
+async def admin_list_users(
+    q: str = "",
+    page: int = 1,
+    limit: int = 20,
+    gender: str = "",
+    region: str = "",
+    age_min: int = None,
+    age_max: int = None,
+    marital_status: str = "",
+    plan: str = "",
+    joined_within_days: int = None,
+    active_within_days: int = None,
+    sort: str = "",
+    _: str = Depends(get_current_admin),
+):
     query = {}
     if q:
         query["$or"] = [
@@ -144,10 +158,37 @@ async def admin_list_users(q: str = "", page: int = 1, limit: int = 20, gender: 
             bd_query["$gt"] = today.replace(year=today.year - age_max - 1).isoformat()
         if bd_query:
             query["birth_date"] = bd_query
+    if plan:
+        query["plan"] = {"$in": ["standard", "premium", "vip"]} if plan == "paid" else plan
+    if joined_within_days is not None:
+        query["created_at"] = {"$gte": iso(now_utc() - timedelta(days=joined_within_days))}
+    if active_within_days is not None:
+        query["last_active"] = {"$gte": iso(now_utc() - timedelta(days=active_within_days))}
+
+    # "new" = signup date, "active" = most recently seen. Default keeps the
+    # old behavior (insertion order) so existing screens don't reshuffle.
+    sort_spec = {"new": [("created_at", -1)], "active": [("last_active", -1)]}.get(sort)
+
     skip = (page - 1) * limit
     total = await db.users.count_documents(query)
-    rows = await db.users.find(query, {"_id": 0, "password_hash": 0}).skip(skip).limit(limit).to_list(limit)
-    return {"users": [user_public(u, include_private=True) for u in rows], "total": total, "page": page, "limit": limit}
+    cursor = db.users.find(query, {"_id": 0, "password_hash": 0})
+    if sort_spec:
+        cursor = cursor.sort(sort_spec)
+    rows = await cursor.skip(skip).limit(limit).to_list(limit)
+
+    out = []
+    for u in rows:
+        pub = user_public(u, include_private=True)
+        # How long they've been on the platform - the "necha kundan beri
+        # ilovada" column the admin asked for.
+        try:
+            from core import parse_dt
+            created = parse_dt(u.get("created_at"))
+            pub["days_in_app"] = max(0, (now_utc() - created).days) if created else None
+        except Exception:
+            pub["days_in_app"] = None
+        out.append(pub)
+    return {"users": out, "total": total, "page": page, "limit": limit}
 
 
 @router.patch("/users/{target_id}")
@@ -166,13 +207,115 @@ async def admin_update_user(target_id: str, req: AdminUpdateUserRequest, _: str 
 
 @router.get("/payments")
 async def admin_payments(status: Optional[str] = None, page: int = 1, limit: int = 20, _: str = Depends(get_current_admin)):
+    """Payments feed for the admin panel.
+
+    status: "successful" (paid via balance + success via CLICK - the default
+    view), "other" (pending/expired/failed, collapsed by default in the UI),
+    a literal status, or empty for everything. Every row carries the paying
+    user's name so the admin can tell WHO paid at a glance.
+    """
     q: dict = {}
-    if status:
+    if status == "successful":
+        q["status"] = {"$in": ["success", "paid"]}
+    elif status == "other":
+        q["status"] = {"$nin": ["success", "paid"]}
+    elif status:
         q["status"] = status
     skip = (page - 1) * limit
     total = await db.payments.count_documents(q)
     rows = await db.payments.find(q, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+
+    user_ids = list({r.get("user_id") for r in rows if r.get("user_id")})
+    users = await db.users.find(
+        {"id": {"$in": user_ids}},
+        {"_id": 0, "id": 1, "name": 1, "telegram_username": 1, "plan": 1},
+    ).to_list(len(user_ids)) if user_ids else []
+    by_id = {u["id"]: u for u in users}
+    for r in rows:
+        u = by_id.get(r.get("user_id"), {})
+        r["user_name"] = u.get("name", "")
+        r["user_telegram"] = u.get("telegram_username", "")
+        r["user_plan"] = u.get("plan", "")
     return {"payments": rows, "total": total, "page": page, "limit": limit}
+
+
+# ---------- Referral tracking ----------
+@router.get("/referrers")
+async def admin_referrers(limit: int = 100, _: str = Depends(get_current_admin)):
+    """Who is actually distributing referral links: every user that at least
+    one other user signed up under, with invited/paid counts."""
+    pipeline = [
+        {"$match": {"referred_by": {"$nin": [None, ""]}}},
+        {"$group": {
+            "_id": "$referred_by",
+            "invited": {"$sum": 1},
+            "paid": {"$sum": {"$cond": [{"$in": ["$plan", ["standard", "premium", "vip"]]}, 1, 0]}},
+            "last_signup": {"$max": "$created_at"},
+        }},
+        {"$sort": {"invited": -1}},
+        {"$limit": max(1, min(limit, 500))},
+    ]
+    groups = await db.users.aggregate(pipeline).to_list(500)
+
+    # referred_by stores either the inviter's referral_id or their referral
+    # username - resolve both in one query.
+    codes = [g["_id"] for g in groups]
+    lowers = [str(c).lower() for c in codes]
+    refs = await db.users.find(
+        {"$or": [{"referral_id": {"$in": codes}}, {"referral_username_lower": {"$in": lowers}}]},
+        {"_id": 0, "id": 1, "name": 1, "telegram_username": 1, "plan": 1, "referral_id": 1,
+         "referral_username_lower": 1, "referral_earnings_withdrawable": 1, "referral_earnings_pending": 1},
+    ).to_list(1000)
+    by_code: dict = {}
+    for u in refs:
+        if u.get("referral_id"):
+            by_code[u["referral_id"]] = u
+        if u.get("referral_username_lower"):
+            by_code[u["referral_username_lower"]] = u
+
+    out = []
+    for g in groups:
+        u = by_code.get(g["_id"]) or by_code.get(str(g["_id"]).lower())
+        out.append({
+            "code": g["_id"],
+            "invited": g["invited"],
+            "paid": g["paid"],
+            "last_signup": g.get("last_signup"),
+            "referrer": {
+                "id": u.get("id") if u else None,
+                "name": (u or {}).get("name", "(topilmadi)"),
+                "telegram_username": (u or {}).get("telegram_username", ""),
+                "plan": (u or {}).get("plan", ""),
+                "earnings_withdrawable": (u or {}).get("referral_earnings_withdrawable", 0),
+                "earnings_pending": (u or {}).get("referral_earnings_pending", 0),
+            },
+        })
+    return out
+
+
+@router.get("/referrers/{user_id}")
+async def admin_referrer_detail(user_id: str, _: str = Depends(get_current_admin)):
+    """One referrer's full picture: exactly who they invited, when, and
+    whether each invitee has paid (upgraded off free) or not."""
+    ref = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    if not ref:
+        raise HTTPException(404, "User not found")
+    codes = [c for c in [ref.get("referral_id"), ref.get("referral_username_lower"), ref.get("referral_username")] if c]
+    invited = await db.users.find(
+        {"referred_by": {"$in": codes}},
+        {"_id": 0, "id": 1, "name": 1, "gender": 1, "region": 1, "plan": 1,
+         "created_at": 1, "last_active": 1, "onboarded": 1, "completeness": 1},
+    ).sort("created_at", -1).to_list(1000)
+    for u in invited:
+        u["is_paid"] = u.get("plan", "free") in ("standard", "premium", "vip")
+    return {
+        "referrer": user_public(ref, include_private=True),
+        "earnings_withdrawable": ref.get("referral_earnings_withdrawable", 0),
+        "earnings_pending": ref.get("referral_earnings_pending", 0),
+        "invited_total": len(invited),
+        "invited_paid": sum(1 for u in invited if u["is_paid"]),
+        "invited": invited,
+    }
 
 
 @router.get("/verifications")

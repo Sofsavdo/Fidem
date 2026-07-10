@@ -8,7 +8,7 @@ import { ChevronRight, Crown, Wallet, Share2, Settings as SettingsIcon, LogOut, 
 import BoostModal from "@/components/BoostModal";
 import LocationVerifyCard from "@/components/LocationVerifyCard";
 import { toast } from "sonner";
-import { useReferral, useDailyStatus, useSavedSummary, useLeaderboard, QK } from "@/hooks/queries";
+import { useReferral, useSavedSummary, useLeaderboard, QK } from "@/hooks/queries";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 
 // Static support contact - a real Telegram account admins actually monitor,
@@ -32,7 +32,6 @@ export default function Me() {
   const [boostOpen, setBoostOpen] = useState(false);
 
   const { data: referral } = useReferral();
-  const { data: daily } = useDailyStatus();
   const { data: interestedSummary } = useSavedSummary();
   const { data: leaders = [] } = useLeaderboard("all");
   const myRank = leaders.findIndex((row) => row.user?.id === user?.id);
@@ -56,24 +55,6 @@ export default function Me() {
       if (detail === "privacy_boost_active") toast.error(t("privacy_boost_active"));
       else if (detail === "privacy_requires_plan") toast.error(t("privacy_requires_plan"));
       else toast.error(t("error_generic"));
-    },
-  });
-
-  const claimDailyMutation = useMutation({
-    mutationFn: () => api.post("/daily/claim"),
-    onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: QK.dailyStatus });
-      const previous = queryClient.getQueryData(QK.dailyStatus);
-      queryClient.setQueryData(QK.dailyStatus, (old) => old ? { ...old, claimed_today: true } : old);
-      return { previous };
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previous) queryClient.setQueryData(QK.dailyStatus, context.previous);
-    },
-    onSuccess: (r) => {
-      toast.success(`+${r.data.bonus} ${t("sum")}`);
-      queryClient.invalidateQueries({ queryKey: QK.dailyStatus });
-      refresh();
     },
   });
 
@@ -288,31 +269,8 @@ export default function Me() {
       </div>
       {boostOpen && <BoostModal onClose={() => setBoostOpen(false)} />}
 
-      {/* Daily streak — reward is credited to the app balance (for gifts,
-          boost, plans). Missing a day restarts the streak. */}
-      {daily && (
-        <div className="rounded-3xl bg-gradient-to-r from-gold/15 to-card border border-gold/30 p-4" data-testid="daily-strip">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("daily_streak")}</p>
-              <p className="font-heading text-2xl">{daily.streak} {t("day_word")} 🔥</p>
-            </div>
-            {daily.claimed_today ? (
-              <span className="text-xs text-secondary font-medium">✓ {t("daily")}</span>
-            ) : (
-              <button
-                data-testid="daily-claim-inline"
-                onClick={() => claimDailyMutation.mutate()}
-                disabled={claimDailyMutation.isPending}
-                className="rounded-xl bg-gold text-ink px-4 py-2 text-sm font-medium disabled:opacity-60"
-              >
-                +{daily.next_bonus} {t("sum")}
-              </button>
-            )}
-          </div>
-          <p className="text-[11px] text-muted-foreground mt-2 leading-snug">{t("streak_explain")}</p>
-        </div>
-      )}
+      {/* Daily streak lives in Sozlamalar (/me/settings) now — Me stays a
+          clean overview page. */}
 
       {/* Invite friends → unified single entrypoint */}
       {referral && (
@@ -354,7 +312,7 @@ export default function Me() {
         <p className="field-label mb-2 px-1">{t("me_group_app")}</p>
         <div className="rounded-3xl bg-card border border-border divide-y">
           <NavRow to="/stories" testid="link-stories" icon={<BookOpen className="w-4 h-4 text-foreground" />} label={t("success_stories")} />
-          <NavRow to="/settings" testid="link-settings" icon={<SlidersHorizontal className="w-4 h-4" />} label={t("who_can_message_me")} />
+          <NavRow to="/me/settings" testid="link-settings" icon={<SlidersHorizontal className="w-4 h-4" />} label={t("me_settings_title")} />
           {user.is_admin && (
             <NavRow to="/admin" testid="link-admin" icon={<SettingsIcon className="w-4 h-4" />} label={t("admin_panel")} />
           )}
@@ -367,7 +325,6 @@ export default function Me() {
             <span className="flex items-center gap-3 text-sm"><MessageCircle className="w-4 h-4 text-secondary" /> {t("contact_admin")}</span>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </button>
-          <NavRow to="/terms" testid="link-terms" icon={<ShieldCheck className="w-4 h-4 text-muted-foreground" />} label={t("legal_links_title")} />
           <button data-testid="btn-logout" onClick={logout} className="flex items-center justify-between p-4 w-full text-left">
             <span className="flex items-center gap-3 text-sm text-foreground"><LogOut className="w-4 h-4" /> {t("logout")}</span>
           </button>

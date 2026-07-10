@@ -5,7 +5,7 @@ import { useApp } from "@/contexts/AppContext";
 import GiftModal from "@/components/GiftModal";
 import GiftCelebration, { tierFromPrice } from "@/components/GiftCelebration";
 import ChatVoiceRecorder from "@/components/ChatVoiceRecorder";
-import { ArrowLeft, Send, Gift, MoreVertical, Ban, Flag, Wand2, Play, Check, CheckCheck } from "lucide-react";
+import { ArrowLeft, Send, Gift, MoreVertical, Ban, Flag, Wand2, Play, Check, CheckCheck, Contact, AlertTriangle, X } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
 import { formatLastActive } from "@/lib/time";
 import { tapLight } from "@/lib/haptics";
@@ -159,9 +159,26 @@ export default function Chat() {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  const send = async (txt) => {
+  // Off-platform contact detection (mirrors backend detect_contact_info).
+  // Free plan: sharing contacts is a paid perk — blocked with an upsell.
+  // Paid plans: allowed, but a compact confirm bar appears first so nobody
+  // leaks their phone number with an accidental Enter.
+  const CONTACT_RE = /(\+?998[\s-]?\d{2}[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2})|(\d{2}[\s-]\d{3}[\s-]\d{2}[\s-]\d{2})|(\d{9,12})|(t\.me\/|telegram\.me\/|wa\.me\/|instagram\.com\/)|(@[a-z0-9_.]{4,})|(telegram)|(\btg\b)|(insta)|(whats?app)|(vatsap)|(viber)|(\bimo\b)|(raqam\w*\s*(ber|yubor|yoz|tashla))|(nomer)|(телефон)|(номер)|(телеграм)|(инстаграм)|(ватсап)/i;
+  const [contactConfirm, setContactConfirm] = useState(null); // text awaiting confirm
+  const [shareOpen, setShareOpen] = useState(false);
+  const isPaidPlan = ["standard", "premium", "vip"].includes(user?.plan);
+
+  const send = async (txt, opts = {}) => {
     const finalText = txt ?? text;
     if (!finalText.trim()) return;
+    if (!opts.skipContactCheck && CONTACT_RE.test(finalText)) {
+      if (!isPaidPlan) {
+        toast.error(t("contact_free_blocked_error"));
+        return;
+      }
+      setContactConfirm(finalText);
+      return;
+    }
     tapLight();
 
     // Optimistic UI update - show message immediately
@@ -186,11 +203,28 @@ export default function Chat() {
       setMessages((prev) => prev.map((m) => (m.id === tempMsg.id ? r.data : m)));
     } catch (e) {
       console.error("Send message error:", e);
-      const errorMsg = e.response?.data?.detail || e.message || t("error");
-      toast.error(errorMsg);
+      const detail = (e.response?.data?.detail || "").toString();
+      toast.error(detail === "contact_free_blocked" ? t("contact_free_blocked_error") : (detail || e.message || t("error")));
       setMessages((prev) => prev.filter((m) => m.id !== tempMsg.id));
       load();
     } finally { setSending(false); }
+  };
+
+  // "Share my contact" — composes a message from the contacts saved in
+  // Sozlamalar (phone / telegram / instagram) and sends it through the same
+  // confirm flow.
+  const savedContacts = [
+    user?.contact_phone && `📞 ${user.contact_phone}`,
+    user?.contact_telegram && `Telegram: @${String(user.contact_telegram).replace(/^@/, "")}`,
+    user?.contact_instagram && `Instagram: @${String(user.contact_instagram).replace(/^@/, "")}`,
+  ].filter(Boolean);
+  const shareContacts = () => {
+    if (!isPaidPlan) {
+      toast.error(t("contact_free_blocked_error"));
+      return;
+    }
+    setShareOpen(false);
+    setContactConfirm(savedContacts.join(" · "));
   };
 
   const sendVoice = async ({ voice_url, voice_duration }) => {
@@ -448,10 +482,50 @@ export default function Chat() {
           {access?.uses_free_weekly && (
             <p data-testid="chat-free-weekly-hint" className="text-[11px] text-secondary text-center">{t("chat_free_weekly_hint")}</p>
           )}
+          {/* Contact-share confirm — compact one-liner, never covers the chat */}
+          {contactConfirm && (
+            <div data-testid="contact-confirm" className="flex items-center gap-2 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 px-3 py-2">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <p className="text-[11px] text-amber-800 dark:text-amber-300 flex-1 min-w-0 truncate">{t("contact_confirm_hint")}</p>
+              <button
+                data-testid="contact-confirm-send"
+                onClick={() => { const msg = contactConfirm; setContactConfirm(null); setText(""); send(msg, { skipContactCheck: true }); }}
+                className="shrink-0 rounded-full bg-amber-600 text-white text-[11px] font-semibold px-3 py-1"
+              >
+                {t("send")}
+              </button>
+              <button data-testid="contact-confirm-cancel" onClick={() => setContactConfirm(null)} className="shrink-0 p-1 rounded-full hover:bg-amber-100 dark:hover:bg-amber-900">
+                <X className="w-3.5 h-3.5 text-amber-700" />
+              </button>
+            </div>
+          )}
+          {/* Contact-share sheet — compact */}
+          {shareOpen && (
+            <div data-testid="contact-share-panel" className="flex items-center gap-2 rounded-2xl bg-card border border-border px-3 py-2">
+              {savedContacts.length > 0 ? (
+                <>
+                  <p className="text-[11px] text-muted-foreground flex-1 min-w-0 truncate">{savedContacts.join(" · ")}</p>
+                  <button data-testid="contact-share-send" onClick={shareContacts} className="shrink-0 rounded-full bg-primary text-white text-[11px] font-semibold px-3 py-1">{t("contact_share_cta")}</button>
+                </>
+              ) : (
+                <Link to="/me/settings" className="text-[11px] text-primary underline flex-1">{t("contact_share_empty")}</Link>
+              )}
+              <button onClick={() => setShareOpen(false)} className="shrink-0 p-1 rounded-full hover:bg-muted"><X className="w-3.5 h-3.5" /></button>
+            </div>
+          )}
           {/* Always-visible message composer (disabled when locked) */}
           <div className="flex items-end gap-1.5 min-w-0">
             <button data-testid="gift-open" onClick={() => setGiftOpen(true)} disabled={access?.requires_unlock} className="shrink-0 w-10 h-10 grid place-items-center rounded-full bg-muted hover:bg-border disabled:opacity-40" title={t("send_gift")}>
               <Gift className="w-4 h-4" />
+            </button>
+            <button
+              data-testid="contact-share-open"
+              onClick={() => { setShareOpen((v) => !v); setContactConfirm(null); }}
+              disabled={access?.requires_unlock}
+              className="shrink-0 w-10 h-10 grid place-items-center rounded-full bg-muted hover:bg-border disabled:opacity-40"
+              title={t("contact_share_cta")}
+            >
+              <Contact className="w-4 h-4" />
             </button>
             {!access?.requires_unlock && <div className="shrink-0"><ChatVoiceRecorder onSend={sendVoice} /></div>}
             <input

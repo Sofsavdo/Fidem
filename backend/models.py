@@ -139,6 +139,12 @@ class UpdateProfileRequest(BaseModel):
     smoking: Optional[Literal["no", "sometimes", "yes"]] = None
     alcohol: Optional[Literal["no", "sometimes", "yes"]] = None
     relocation: Optional[bool] = None
+    # Owner's shareable contact details (Sozlamalar > aloqa ma'lumotlari).
+    # PRIVATE: never in user_public - only surfaced back to the owner via
+    # /auth/me and sent into a chat when the owner explicitly shares them.
+    contact_phone: Optional[str] = None
+    contact_telegram: Optional[str] = None
+    contact_instagram: Optional[str] = None
 
 
 class MessageFilters(BaseModel):

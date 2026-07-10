@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
 
 from auth import decode_token, get_current_user_id
-from ai_service import quick_moderation
+from ai_service import detect_contact_info, quick_moderation
 from core import (
     CHAT_GUARANTEE_HOURS,
     CHAT_UNLOCK_COINS,
@@ -363,6 +363,12 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
         ok, reason = quick_moderation(sanitized_text)
         if not ok:
             raise HTTPException(422, reason)
+        # Off-platform contact exchange (phone / telegram / instagram / ...):
+        # a paid perk. Free senders are refused with a code the frontend
+        # turns into an upsell ("aloqa almashish pullik tariflarda"); paid
+        # senders pass - the frontend already asked them to confirm.
+        if detect_contact_info(sanitized_text) and sender_doc.get("plan", "free") not in PAID_PLANS:
+            raise HTTPException(403, "contact_free_blocked")
         req.text = sanitized_text
 
     sender = sender_doc

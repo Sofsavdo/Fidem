@@ -2,6 +2,9 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tansta
 import api from "@/lib/api";
 
 export const QK = {
+  photoRequests: ["photo-unlock", "requests"],
+  adminReferrers: ["admin", "referrers"],
+  adminReferrerDetail: (id) => ["admin", "referrers", id],
   referral: ["referral", "mine"],
   referralUsername: ["referral", "username"],
   notifications: ["notifications"],
@@ -46,6 +49,24 @@ export function useReferral() {
   return useQuery({
     queryKey: QK.referral,
     queryFn: () => api.get("/referral/mine").then((r) => r.data),
+  });
+}
+
+// Incoming "may I see your photo?" requests — who is asking + approve/reject.
+export function usePhotoRequests(enabled = true) {
+  return useQuery({
+    queryKey: QK.photoRequests,
+    queryFn: () => api.get("/photo-unlock/requests").then((r) => r.data || []),
+    enabled,
+  });
+}
+
+export function useDecidePhotoRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ requestId, approve }) =>
+      api.post("/photo-unlock/decide", { request_id: requestId, approve }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: QK.photoRequests }),
   });
 }
 
@@ -416,6 +437,22 @@ export function useAdminReferrals(params) {
   return useQuery({
     queryKey: QK.adminReferrals(params),
     queryFn: () => api.get("/admin/referrals", { params }).then((r) => r.data || []),
+  });
+}
+
+// Referrer-centric view: who is distributing links, how many they brought in.
+export function useAdminReferrers() {
+  return useQuery({
+    queryKey: QK.adminReferrers,
+    queryFn: () => api.get("/admin/referrers").then((r) => r.data || []),
+  });
+}
+
+export function useAdminReferrerDetail(userId) {
+  return useQuery({
+    queryKey: QK.adminReferrerDetail(userId),
+    queryFn: () => api.get(`/admin/referrers/${userId}`).then((r) => r.data),
+    enabled: !!userId,
   });
 }
 

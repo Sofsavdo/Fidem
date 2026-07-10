@@ -189,6 +189,10 @@ def _build_me_payload(user: dict) -> dict:
     pub["search_gender"] = user.get("search_gender")
     pub["looking_for"] = user.get("looking_for")
     pub["language"] = user.get("language", "uz")
+    # Owner-only shareable contacts (Sozlamalar) - never in user_public.
+    pub["contact_phone"] = user.get("contact_phone", "")
+    pub["contact_telegram"] = user.get("contact_telegram", "")
+    pub["contact_instagram"] = user.get("contact_instagram", "")
     return pub
 
 

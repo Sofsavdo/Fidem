@@ -518,7 +518,7 @@ async def request_photo_unlock(req: PhotoUnlockRequest, uid: str = Depends(get_c
         "photo_request",
         f"📸 {me_doc.get('name', '')} rasmlaringizni ko‘rish uchun ruxsat so‘radi.\n\n"
         "Ruxsat berish yoki rad etish uchun FIDEM’ni oching.",
-        link="/saved",
+        link="/saved?tab=requests",
     )
 
     return {"status": "pending"}
