@@ -286,6 +286,13 @@ class NotificationPreferencesRequest(BaseModel):
     disable_balance: bool = False
 
 
+# ---------- Privacy settings ----------
+class PrivacySettingsRequest(BaseModel):
+    # None = leave unchanged, so each toggle can be flipped independently.
+    photo_public: Optional[bool] = None
+    hidden_profile: Optional[bool] = None
+
+
 # ---------- Reports / blocks ----------
 class ReportRequest(BaseModel):
     user_id: str

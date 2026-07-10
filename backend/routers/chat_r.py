@@ -683,7 +683,8 @@ async def leaderboard(period: str = "all", uid: str = Depends(get_current_user_i
     rows = []
     async for r in db.gifts.aggregate(pipeline):
         u = await db.users.find_one({"id": r["_id"]}, {"_id": 0, "password_hash": 0})
-        if u:
+        # Hidden profiles opted out of all public visibility — rankings too.
+        if u and not u.get("hidden_profile"):
             rows.append({"user": user_public(u), "total": r["total"], "count": r["count"]})
     return rows
 

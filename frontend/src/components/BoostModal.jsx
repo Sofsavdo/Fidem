@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Rocket, Check, Clock } from "lucide-react";
+import { X, Rocket, Check, Clock, EyeOff } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { useBoostStatus, useBoostAnalytics, QK } from "@/hooks/queries";
 import { useQueryClient } from "@tanstack/react-query";
@@ -44,9 +44,27 @@ export default function BoostModal({ onClose }) {
         toast.info(t("redirecting_payment"));
       }
     } catch (e) {
-      toast.error(e?.response?.data?.detail || t("error_generic"));
+      const detail = (e?.response?.data?.detail || "").toString();
+      toast.error(detail === "boost_hidden" ? t("boost_hidden_error") : detail || t("error_generic"));
     } finally {
       setPaying(false);
+    }
+  };
+
+  // Boost sells visibility; hidden mode removes all of it. Instead of a dead
+  // pay button, explain the conflict and offer the one-tap fix.
+  const [unhiding, setUnhiding] = useState(false);
+  const unhideProfile = async () => {
+    if (unhiding) return;
+    setUnhiding(true);
+    try {
+      await api.post("/settings/privacy", { hidden_profile: false });
+      await refresh();
+      toast.success(t("hidden_profile_label") + " ✗");
+    } catch {
+      toast.error(t("error_generic"));
+    } finally {
+      setUnhiding(false);
     }
   };
 
@@ -98,6 +116,21 @@ export default function BoostModal({ onClose }) {
                 ))}
               </div>
             </div>
+          </div>
+        ) : user?.hidden_profile ? (
+          <div className="mt-5 space-y-3" data-testid="boost-hidden-conflict">
+            <div className="rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 p-4 flex items-start gap-2.5">
+              <EyeOff className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">{t("boost_hidden_error")}</p>
+            </div>
+            <button
+              data-testid="boost-unhide"
+              onClick={unhideProfile}
+              disabled={unhiding}
+              className="w-full rounded-2xl bg-primary text-white py-3 font-medium disabled:opacity-50"
+            >
+              {t("boost_hidden_cta")}
+            </button>
           </div>
         ) : (
           <div className="mt-5 space-y-2">

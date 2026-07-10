@@ -365,3 +365,61 @@ def test_no_admin_confirm_payment_endpoint(session, admin_token):
     not confirm CLICK payments or top-ups."""
     r = session.post(f"{API}/payments/admin-confirm/anything", headers=_auth_header(admin_token))
     assert r.status_code == 404
+
+
+# ---------- Privacy: open photo / hidden profile / boost conflict ----------
+def test_privacy_settings_roundtrip(session, user_creds):
+    tok = user_creds["token"]
+    r = session.post(f"{API}/settings/privacy", json={"photo_public": True},
+                     headers=_auth_header(tok))
+    assert r.status_code == 200 and r.json()["photo_public"] is True
+    r = session.get(f"{API}/settings/privacy", headers=_auth_header(tok))
+    assert r.status_code == 200 and r.json()["photo_public"] is True
+    # /auth/me carries the flags so the frontend toggles render from `user`
+    me = session.get(f"{API}/auth/me", headers=_auth_header(tok)).json()
+    assert me.get("photo_public") is True
+    assert me.get("hidden_profile") is False
+    # partial update: flipping one flag must not touch the other
+    r = session.post(f"{API}/settings/privacy", json={"photo_public": False},
+                     headers=_auth_header(tok))
+    assert r.json()["photo_public"] is False and r.json()["hidden_profile"] is False
+
+
+def test_hidden_profile_blocks_boost(session, user_creds):
+    """Boost sells visibility; a hidden profile has none - both boost paths
+    must refuse instead of taking money."""
+    tok = user_creds["token"]
+    r = session.post(f"{API}/settings/privacy", json={"hidden_profile": True},
+                     headers=_auth_header(tok))
+    assert r.status_code == 200 and r.json()["hidden_profile"] is True
+
+    r = session.post(f"{API}/boost/activate", json={"use_balance": True},
+                     headers=_auth_header(tok))
+    assert r.status_code == 400 and r.json()["detail"] == "boost_hidden"
+
+    r = session.post(f"{API}/payments/create", json={"purpose": "boost"},
+                     headers=_auth_header(tok))
+    assert r.status_code == 400 and r.json()["detail"] == "boost_hidden"
+
+    r = session.post(f"{API}/settings/privacy", json={"hidden_profile": False},
+                     headers=_auth_header(tok))
+    assert r.status_code == 200 and r.json()["hidden_profile"] is False
+
+
+def test_boost_active_blocks_hiding(session, user_creds, admin_token):
+    """The mirror rule: while a paid boost is running, hiding the profile is
+    refused (it would waste the boost the user just paid for)."""
+    tok = user_creds["token"]
+    session.patch(f"{API}/admin/users/{user_creds['user_id']}",
+                  json={"add_balance": 10000}, headers=_auth_header(admin_token))
+    r = session.post(f"{API}/boost/activate", json={"use_balance": True},
+                     headers=_auth_header(tok))
+    assert r.status_code == 200, r.text
+
+    r = session.post(f"{API}/settings/privacy", json={"hidden_profile": True},
+                     headers=_auth_header(tok))
+    assert r.status_code == 400 and r.json()["detail"] == "privacy_boost_active"
+    # photo_public alone stays allowed while boosted
+    r = session.post(f"{API}/settings/privacy", json={"photo_public": False},
+                     headers=_auth_header(tok))
+    assert r.status_code == 200

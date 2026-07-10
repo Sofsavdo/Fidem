@@ -154,7 +154,16 @@ async def touch_active(uid: str) -> None:
 
 
 def strip_locked_photo(pub: dict) -> dict:
-    """Remove photo_url from API payloads when the viewer has not unlocked the photo."""
+    """Remove photo_url from API payloads when the viewer has not unlocked the photo.
+
+    Owners who opted in to a public photo (photo_public=True in their privacy
+    settings) are treated as unlocked for everyone — the flag is normalized
+    into photo_unlocked so the frontend needs no separate code path.
+    """
+    if pub.get("photo_public"):
+        out = dict(pub)
+        out["photo_unlocked"] = True
+        return out
     if pub.get("photo_unlocked"):
         return pub
     out = dict(pub)
@@ -210,6 +219,11 @@ def user_public(u: dict, include_private: bool = False) -> dict:
         "prompts": u.get("prompts") or [],
         "big5_scores": u.get("big5_scores") or {},
         "balance": u.get("balance", 0),
+        # Privacy settings: photo_public feeds strip_locked_photo (an opted-in
+        # open photo renders for every viewer); hidden_profile keeps the user
+        # out of candidate feeds / viewer lists (they can still browse).
+        "photo_public": bool(u.get("photo_public", False)),
+        "hidden_profile": bool(u.get("hidden_profile", False)),
     }
     if include_private:
         # Contact info, device/IP data and fraud-review fields - only for the
@@ -255,6 +269,7 @@ def user_public_minimal(u: dict) -> dict:
         "online": is_online(la),
         "plan": u.get("plan", "free"),
         "blocked": u.get("blocked", False),
+        "photo_public": bool(u.get("photo_public", False)),
     }
 
 

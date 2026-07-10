@@ -148,6 +148,10 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
 
     # Smart payment: use balance first, then Click for remainder
     me = await get_user(uid)
+    if req.purpose == "boost" and me.get("hidden_profile"):
+        # Same rule as /boost/activate: boost sells visibility, a hidden
+        # profile has none — don't take the money.
+        raise HTTPException(400, "boost_hidden")
     balance = me.get("balance", 0) or 0
     balance_used = min(balance, amount)
     click_amount = amount - balance_used

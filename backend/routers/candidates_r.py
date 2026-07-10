@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from auth import get_current_user_id
-from core import PAID_PLANS, WHO_VIEWED_PLANS, db, get_user, iso, log, manager, mask_name, now_utc, parse_dt, push_notif, strip_locked_photo, touch_active, user_public, user_public_minimal
+from core import PAID_PLANS, WHO_VIEWED_PLANS, chat_id_for, db, get_user, iso, log, manager, mask_name, now_utc, parse_dt, push_notif, strip_locked_photo, touch_active, user_public, user_public_minimal
 from geo import distance_bucket, haversine_km
 from models import PhotoUnlockDecision, PhotoUnlockRequest, SaveRequest, new_id
 from services import age_from_birth, compute_match
@@ -191,7 +191,9 @@ async def candidates(
 
     await touch_active(uid)
 
-    query: dict = {"id": {"$ne": uid}, "onboarded": True, "blocked": {"$ne": True}}
+    # hidden_profile users opted out of being discovered (they can still
+    # browse and keep their existing chats) — never surface them in the feed.
+    query: dict = {"id": {"$ne": uid}, "onboarded": True, "blocked": {"$ne": True}, "hidden_profile": {"$ne": True}}
 
     if me_doc.get("search_gender"):
         query["gender"] = me_doc["search_gender"]
@@ -346,6 +348,15 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
 
     target = await get_user(target_id)
     me_doc = await get_user(uid)
+
+    # A hidden profile is undiscoverable: direct opens 404 exactly like a
+    # nonexistent user, EXCEPT for admins and people who already have a chat
+    # with them (an existing match must stay able to see who they talk to).
+    if target.get("hidden_profile") and not me_doc.get("is_admin"):
+        has_chat = await db.messages.find_one({"chat_id": chat_id_for(uid, target_id)}, {"_id": 1})
+        if not has_chat:
+            raise HTTPException(404, "User not found")
+
     match_lang = me_doc.get("language", "uz")
     if match_lang not in ("uz", "ru", "en"):
         match_lang = "uz"
@@ -582,8 +593,10 @@ async def saved_mine(uid: str = Depends(get_current_user_id)):
     ).to_list(500)
     unlocked_set = {p["target_id"] for p in unlocks}
 
+    # Users who hid their profile after being saved drop out of the list —
+    # their card would 404 on open anyway.
     users = await db.users.find(
-        {"id": {"$in": target_ids}},
+        {"id": {"$in": target_ids}, "hidden_profile": {"$ne": True}},
         {"_id": 0, "password_hash": 0},
     ).to_list(len(target_ids))
     users_by_id = {u["id"]: u for u in users}
@@ -611,8 +624,9 @@ async def saved_by_others(uid: str = Depends(get_current_user_id)):
     rows = await db.saved.find({"target_id": uid}, {"_id": 0}).sort("at", -1).to_list(500)
 
     owner_ids = [r["owner_id"] for r in rows]
+    # Hidden profiles never appear in interaction lists (undiscoverable).
     users = await db.users.find(
-        {"id": {"$in": owner_ids}},
+        {"id": {"$in": owner_ids}, "hidden_profile": {"$ne": True}},
         {"_id": 0, "password_hash": 0},
     ).to_list(len(owner_ids))
     users_by_id = {u["id"]: u for u in users}
@@ -660,7 +674,7 @@ async def viewers(uid: str = Depends(get_current_user_id)):
         ordered_ids.append(vid)
 
     users = await db.users.find(
-        {"id": {"$in": ordered_ids}},
+        {"id": {"$in": ordered_ids}, "hidden_profile": {"$ne": True}},
         {"_id": 0, "password_hash": 0},
     ).to_list(len(ordered_ids))
     users_by_id = {u["id"]: u for u in users}
@@ -696,7 +710,7 @@ async def interested_in_me(uid: str = Depends(get_current_user_id)):
     user_ids = list(user_ids)
 
     users = await db.users.find(
-        {"id": {"$in": user_ids}},
+        {"id": {"$in": user_ids}, "hidden_profile": {"$ne": True}},
         {"_id": 0, "password_hash": 0},
     ).to_list(len(user_ids))
     users_by_id = {u["id"]: u for u in users}
@@ -741,6 +755,17 @@ async def saved_summary(uid: str = Depends(get_current_user_id)):
             latest_at[oid] = r.get("at", "")
 
     ordered_ids = sorted(latest_at.keys(), key=lambda k: latest_at[k], reverse=True)
+
+    # Exclude hidden profiles from both the preview AND the advertised total —
+    # a "12 kishi qiziqdi" teaser must not count people the list won't show.
+    if ordered_ids:
+        hidden_rows = await db.users.find(
+            {"id": {"$in": ordered_ids}, "hidden_profile": True},
+            {"_id": 0, "id": 1},
+        ).to_list(len(ordered_ids))
+        hidden_ids = {h["id"] for h in hidden_rows}
+        ordered_ids = [i for i in ordered_ids if i not in hidden_ids]
+
     total = len(ordered_ids)
     preview_ids = ordered_ids[:5]
 

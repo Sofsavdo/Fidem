@@ -4,7 +4,7 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, PlanPill } from "@/components/Badges";
 import PhotoUpload from "@/components/PhotoUpload";
-import { ChevronRight, Crown, Wallet, Share2, Settings as SettingsIcon, LogOut, ShieldCheck, Clock, SlidersHorizontal, Brain, BookOpen, Phone, Trophy, Rocket, MessageCircle } from "lucide-react";
+import { ChevronRight, Crown, Wallet, Share2, Settings as SettingsIcon, LogOut, ShieldCheck, Clock, SlidersHorizontal, Brain, BookOpen, Phone, Trophy, Rocket, MessageCircle, EyeOff, Camera } from "lucide-react";
 import BoostModal from "@/components/BoostModal";
 import LocationVerifyCard from "@/components/LocationVerifyCard";
 import { toast } from "sonner";
@@ -33,6 +33,19 @@ export default function Me() {
     }
   }, [wsEvent, queryClient]);
 
+  // Privacy toggles (photo open to everyone / hidden profile). The backend
+  // refuses hidden_profile=true while a paid boost is running
+  // ("privacy_boost_active") - surface that as a clear message, not a
+  // generic error.
+  const privacyMutation = useMutation({
+    mutationFn: (patch) => api.post("/settings/privacy", patch),
+    onSuccess: () => refresh(),
+    onError: (e) => {
+      const detail = (e?.response?.data?.detail || "").toString();
+      toast.error(detail === "privacy_boost_active" ? t("privacy_boost_active") : t("error_generic"));
+    },
+  });
+
   const claimDailyMutation = useMutation({
     mutationFn: () => api.post("/daily/claim"),
     onMutate: async () => {
@@ -60,6 +73,19 @@ export default function Me() {
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-3xl font-semibold tracking-tight">{t("me")}</h1>
       </div>
+
+      {/* Loud reminder when hidden mode is on — people forget they enabled it,
+          then wonder why nobody writes (and try to buy a boost, which the
+          backend rightly refuses). */}
+      {user.hidden_profile && (
+        <div
+          data-testid="hidden-profile-banner"
+          className="rounded-3xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 p-4 flex items-start gap-3"
+        >
+          <EyeOff className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">{t("hidden_profile_active_banner")}</p>
+        </div>
+      )}
 
       {/* Profile card — single tappable photo (avatar), no duplicate upload block */}
       <div className="rounded-3xl bg-card border border-border p-4 shadow-soft" data-testid="me-profile-card">
@@ -141,6 +167,29 @@ export default function Me() {
             <ChevronRight className="w-4 h-4 text-primary" />
           </Link>
         )}
+
+        {/* Privacy: open photo + hidden profile, right where people look at
+            their own profile state. */}
+        <div className="mt-4 pt-4 border-t border-border space-y-4">
+          <PrivacyToggle
+            testid="toggle-photo-public"
+            icon={<Camera className="w-4 h-4" />}
+            label={t("photo_public_label")}
+            hint={t("photo_public_hint")}
+            checked={!!user.photo_public}
+            disabled={privacyMutation.isPending}
+            onChange={(v) => privacyMutation.mutate({ photo_public: v })}
+          />
+          <PrivacyToggle
+            testid="toggle-hidden-profile"
+            icon={<EyeOff className="w-4 h-4" />}
+            label={t("hidden_profile_label")}
+            hint={t("hidden_profile_hint")}
+            checked={!!user.hidden_profile}
+            disabled={privacyMutation.isPending}
+            onChange={(v) => privacyMutation.mutate({ hidden_profile: v })}
+          />
+        </div>
       </div>
 
       {/* Rankings teaser — replaces the old badges/achievements card, which
@@ -288,3 +337,30 @@ const NavRow = React.memo(function NavRow({ to, testid, icon, label }) {
     </Link>
   );
 });
+
+function PrivacyToggle({ testid, icon, label, hint, checked, disabled, onChange }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start gap-2.5 min-w-0">
+        <span className="text-muted-foreground mt-0.5 shrink-0">{icon}</span>
+        <div className="min-w-0">
+          <p className="text-sm font-medium">{label}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{hint}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        data-testid={testid}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={`relative shrink-0 w-11 h-6 rounded-full transition-colors disabled:opacity-50 ${checked ? "bg-primary" : "bg-border"}`}
+      >
+        <span
+          className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${checked ? "left-[calc(100%-1.375rem)]" : "left-0.5"}`}
+        />
+      </button>
+    </div>
+  );
+}
