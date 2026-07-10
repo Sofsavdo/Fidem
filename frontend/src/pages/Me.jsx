@@ -4,7 +4,7 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, PlanPill } from "@/components/Badges";
 import PhotoUpload from "@/components/PhotoUpload";
-import { ChevronRight, Crown, Wallet, Share2, Settings as SettingsIcon, LogOut, ShieldCheck, Clock, SlidersHorizontal, Brain, BookOpen, Phone, Trophy, Rocket, MessageCircle, EyeOff, Camera, Check, Lock } from "lucide-react";
+import { ChevronRight, Crown, Wallet, Share2, Settings as SettingsIcon, LogOut, ShieldCheck, Clock, SlidersHorizontal, Brain, BookOpen, Phone, Trophy, Rocket, MessageCircle, EyeOff, Camera } from "lucide-react";
 import BoostModal from "@/components/BoostModal";
 import LocationVerifyCard from "@/components/LocationVerifyCard";
 import { toast } from "sonner";
@@ -176,48 +176,37 @@ export default function Me() {
             disabled={privacyMutation.isPending}
             onChange={(v) => privacyMutation.mutate({ photo_public: v })}
           />
-          <PrivacyToggle
-            testid="toggle-hidden-profile"
-            icon={<EyeOff className="w-4 h-4" />}
-            label={t("hidden_profile_label")}
-            hint={isPaidPlan ? t("hidden_profile_hint") : t("privacy_paid_hint")}
-            checked={!!user.hidden_profile}
-            disabled={privacyMutation.isPending || !isPaidPlan}
-            onChange={(v) => privacyMutation.mutate({ hidden_profile: v })}
-          />
-
-          {/* What each plan's privacy actually buys — the ladder itself is
-              the ad: every row you don't have yet is a reason to upgrade. */}
-          <div className="rounded-2xl bg-muted/50 border border-border p-3 space-y-2" data-testid="privacy-tiers">
-            {[
-              { key: "privacy_tier_standard", plans: ["standard", "premium", "vip"], name: "Standard" },
-              { key: "privacy_tier_premium", plans: ["premium", "vip"], name: "Premium" },
-              { key: "privacy_tier_vip", plans: ["vip"], name: "VIP" },
-            ].map((tier) => {
-              const included = tier.plans.includes(user.plan);
-              return (
-                <div key={tier.key} className="flex items-start gap-2">
-                  {included ? (
-                    <Check className="w-3.5 h-3.5 text-secondary shrink-0 mt-0.5" />
-                  ) : (
-                    <Lock className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
-                  )}
-                  <p className={`text-[11px] leading-relaxed ${included ? "" : "text-muted-foreground"}`}>
-                    <span className="font-semibold">{tier.name}:</span> {t(tier.key)}
+          {user.plan === "vip" ? (
+            // VIP: full privacy is theirs — the switch works right here.
+            <PrivacyToggle
+              testid="toggle-hidden-profile"
+              icon={<EyeOff className="w-4 h-4" />}
+              label={t("hidden_profile_label")}
+              hint={t("hidden_profile_hint")}
+              checked={!!user.hidden_profile}
+              disabled={privacyMutation.isPending}
+              onChange={(v) => privacyMutation.mutate({ hidden_profile: v })}
+            />
+          ) : (
+            // Everyone else: a live row (never a dead toggle) that opens the
+            // privacy center where each tier has its own working control.
+            <Link
+              to="/privacy-center"
+              data-testid="open-privacy-center"
+              className="flex items-start justify-between gap-3 active:scale-[0.99] transition"
+            >
+              <div className="flex items-start gap-2.5 min-w-0">
+                <span className="text-muted-foreground mt-0.5 shrink-0"><EyeOff className="w-4 h-4" /></span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{t("hidden_profile_label")}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                    {user.hidden_profile ? `✓ ${t("privacy_on_state")}` : t("privacy_paid_hint")}
                   </p>
                 </div>
-              );
-            })}
-            {user.plan !== "vip" && (
-              <Link
-                to="/premium?tab=plans"
-                data-testid="privacy-upgrade-cta"
-                className="mt-1 flex items-center justify-center gap-1.5 rounded-xl bg-primary/10 border border-primary/25 px-3 py-2 text-xs font-semibold text-primary active:scale-[0.98] transition"
-              >
-                {t("privacy_choose_plan")} <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
-            )}
-          </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
+            </Link>
+          )}
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
@@ -50,6 +50,16 @@ export default function Premium() {
   const queryClient = useQueryClient();
   const [sp, setSearchParams] = useSearchParams();
   const tab = sp.get("tab") || "plans";
+  // ?hl=vip — deep links from the privacy center land with the target plan
+  // highlighted and scrolled into view.
+  const hl = sp.get("hl") || "";
+  useEffect(() => {
+    if (!hl || tab !== "plans") return;
+    const timer = setTimeout(() => {
+      document.querySelector(`[data-testid="plan-${hl}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [hl, tab]);
   const [topupAmount, setTopupAmount] = useState(50000);
   const [creating, setCreating] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -106,7 +116,7 @@ export default function Premium() {
                 data-testid={`plan-${p.key}`}
                 className={`relative rounded-3xl border-2 p-4 transition ${p.accent} ${
                   p.dark ? "bg-ink text-white" : p.popular ? "bg-gradient-to-b from-gold-light/30 to-card" : "bg-card"
-                } ${isCurrent ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}
+                } ${isCurrent ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""} ${hl === p.key && !isCurrent ? "ring-2 ring-gold ring-offset-2 ring-offset-background" : ""}`}
               >
                 {p.popular && (
                   <span className="absolute -top-2.5 left-4 inline-flex items-center gap-1 rounded-full bg-gold text-ink text-[10px] font-bold px-2.5 py-0.5 shadow-sm">

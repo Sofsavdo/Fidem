@@ -36,7 +36,6 @@ export default function Chat() {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
-  const [showTemplates, setShowTemplates] = useState(true);
   const [access, setAccess] = useState(null);
   const [unlocking, setUnlocking] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -44,8 +43,10 @@ export default function Chat() {
   const [reportOpen, setReportOpen] = useState(false);
   const [icebreakers, setIcebreakers] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
+  const [messagesLoaded, setMessagesLoaded] = useState(false);
   const [celebration, setCelebration] = useState(null);
   const endRef = useRef(null);
+  const aiAutoRef = useRef(false);
 
   const chatId = user && otherId ? [user.id, otherId].sort().join("_") : null;
   const { wsEvent, lang } = useApp();
@@ -60,7 +61,14 @@ export default function Chat() {
   const load = () => {
     api.get(`/candidates/${otherId}`).then((c) => setOther(c.data)).catch(() => {});
     api.get(`/chat/access/${otherId}`).then((a) => setAccess(a.data)).catch(() => {});
-    if (chatId) api.get(`/messages/${chatId}`).then((m) => setMessages(m.data || [])).catch(() => {});
+    if (chatId) {
+      api.get(`/messages/${chatId}`)
+        .then((m) => setMessages(m.data || []))
+        .catch(() => {})
+        .finally(() => setMessagesLoaded(true));
+    } else {
+      setMessagesLoaded(true);
+    }
   };
 
   const refreshAccess = async () => {
@@ -159,6 +167,17 @@ export default function Chat() {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
+  // Empty chat: fetch AI-personalized first-message suggestions automatically
+  // (once per chat open) so the user doesn't have to know a button exists.
+  useEffect(() => {
+    if (aiAutoRef.current) return;
+    if (!messagesLoaded || messages.length > 0) return;
+    if (!access || access.requires_unlock) return;
+    aiAutoRef.current = true;
+    genAiIcebreakers();
+    // eslint-disable-next-line
+  }, [messagesLoaded, messages.length, access]);
+
   // Off-platform contact detection (mirrors backend detect_contact_info).
   // Free plan: sharing contacts is a paid perk — blocked with an upsell.
   // Paid plans: allowed, but a compact confirm bar appears first so nobody
@@ -192,7 +211,6 @@ export default function Chat() {
     };
     setMessages((prev) => [...prev, tempMsg]);
     setText("");
-    setShowTemplates(false);
 
     setSending(true);
     try {
@@ -240,8 +258,7 @@ export default function Chat() {
       // Show the confirmed message immediately rather than waiting on the
       // WebSocket echo (same fix as text messages).
       setMessages((prev) => (prev.some((m) => m.id === r.data.id) ? prev : [...prev, r.data]));
-      setShowTemplates(false);
-      toast.success("✅");
+        toast.success("✅");
     } catch (e) {
       console.error("Send voice error:", e);
       const errorMsg = e.response?.data?.detail || e.message || t("error");
@@ -375,49 +392,35 @@ export default function Chat() {
         <div ref={endRef} />
       </div>
 
-      {showTemplates && messages.length === 0 && (
-        <div className="px-4 pb-2 space-y-1.5">
-          {[t("greeting_1"), t("greeting_2"), t("greeting_3")].map((g, i) => (
+      {/* Empty chat: AI writes the first message for you — suggestions load
+          automatically (see the auto-effect above), tap one to put it in the
+          composer, edit if you like, send. The old canned template texts are
+          gone on purpose. */}
+      {messagesLoaded && messages.length === 0 && !access?.requires_unlock && (
+        <div className="px-4 pb-2 space-y-1.5" data-testid="ai-first-message">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] uppercase tracking-wider text-secondary font-semibold inline-flex items-center gap-1">
+              <Wand2 className="w-3 h-3" /> {t("ai_first_message_title")}
+            </p>
+            <button data-testid="ai-icebreaker-btn" onClick={genAiIcebreakers} disabled={aiLoading} className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-secondary disabled:opacity-50">
+              ↻ {t("ai_generate_short")}
+            </button>
+          </div>
+          {aiLoading && icebreakers.length === 0 && (
+            <div className="rounded-2xl bg-secondary/5 border border-dashed border-secondary/30 px-3 py-2.5 text-xs text-secondary animate-pulse">
+              {t("ai_preparing")}
+            </div>
+          )}
+          {icebreakers.slice(0, 3).map((q, i) => (
             <button
               key={i}
-              data-testid={`template-${i}`}
-              onClick={() => send(g)}
-              className="w-full text-left bg-muted hover:bg-border rounded-2xl px-3 py-2 text-sm"
+              data-testid={`icebreaker-${i}`}
+              onClick={() => setText(q)}
+              className="w-full text-left rounded-2xl border border-secondary/25 bg-secondary/5 hover:bg-secondary/10 px-3 py-2.5 text-sm"
             >
-              {g}
+              {q}
             </button>
           ))}
-        </div>
-      )}
-
-      {messages.length > 0 && messages.length < 6 && icebreakers.length > 0 && (
-        <div className="px-4 pb-2" data-testid="icebreaker-chips">
-          <div className="flex items-center justify-between mb-1.5">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("suggestion_chip")}</p>
-            <button data-testid="ai-icebreaker-btn" onClick={genAiIcebreakers} disabled={aiLoading} className="text-[10px] uppercase tracking-wider text-secondary hover:underline disabled:opacity-50 inline-flex items-center gap-1">
-              <Wand2 className="w-3 h-3" /> {aiLoading ? t("ai_preparing") : t("ai_generate_short")}
-            </button>
-          </div>
-          <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
-            {icebreakers.slice(0, 5).map((q, i) => (
-              <button
-                key={i}
-                data-testid={`icebreaker-${i}`}
-                onClick={() => setText(q)}
-                className="whitespace-nowrap rounded-full border border-border bg-card hover:bg-muted px-3 py-1.5 text-xs"
-              >
-                {q.length > 35 ? q.slice(0, 35) + "…" : q}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {messages.length === 0 && (
-        <div className="px-4 pb-2">
-          <button data-testid="ai-icebreaker-empty-btn" onClick={genAiIcebreakers} disabled={aiLoading} className="w-full rounded-2xl border border-dashed border-secondary/40 bg-secondary/5 hover:bg-secondary/10 py-2.5 text-xs text-secondary font-medium inline-flex items-center justify-center gap-1.5 disabled:opacity-50">
-            <Wand2 className="w-3.5 h-3.5" /> {aiLoading ? t("ai_preparing") : t("ai_suggest")}
-          </button>
         </div>
       )}
 
