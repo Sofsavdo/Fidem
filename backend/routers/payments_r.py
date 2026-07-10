@@ -132,10 +132,13 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
     elif req.purpose == "rank_boost":
         # Direct real-money contribution to the leaderboard total (Rankings
         # page) - same ledger the gift-sending leaderboard reads from, just
-        # without needing to pick a recipient.
+        # without needing to pick a recipient. Min is 1 so'm on purpose: even
+        # a 200-so'm streak bonus can be contributed from the balance, which
+        # builds trust before real money ever enters. (Tiny CLICK remainders
+        # are rejected below - the 1-so'm path is balance-only in practice.)
         amount = req.amount or 0
-        if amount < 1000:
-            raise HTTPException(400, "Minimum 1000")
+        if amount < 1:
+            raise HTTPException(400, "Minimum 1")
     elif req.purpose == "boost":
         # 24h profile boost. Routed through the smart-payment flow so the
         # balance covers what it can and CLICK picks up the remainder -
@@ -155,6 +158,12 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
     balance = me.get("balance", 0) or 0
     balance_used = min(balance, amount)
     click_amount = amount - balance_used
+
+    # CLICK cannot process sub-1000-so'm charges. Anything the balance fully
+    # covers sails through below; only a tiny CLICK *remainder* is refused,
+    # with a code the frontend maps to a helpful message.
+    if 0 < click_amount < 1000:
+        raise HTTPException(400, "click_min_1000")
 
     # If balance covers full amount, no Click payment needed
     if click_amount <= 0:

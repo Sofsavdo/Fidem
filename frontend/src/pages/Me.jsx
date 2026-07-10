@@ -367,6 +367,7 @@ export default function Me() {
             <span className="flex items-center gap-3 text-sm"><MessageCircle className="w-4 h-4 text-secondary" /> {t("contact_admin")}</span>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </button>
+          <NavRow to="/terms" testid="link-terms" icon={<ShieldCheck className="w-4 h-4 text-muted-foreground" />} label={t("legal_links_title")} />
           <button data-testid="btn-logout" onClick={logout} className="flex items-center justify-between p-4 w-full text-left">
             <span className="flex items-center gap-3 text-sm text-foreground"><LogOut className="w-4 h-4" /> {t("logout")}</span>
           </button>

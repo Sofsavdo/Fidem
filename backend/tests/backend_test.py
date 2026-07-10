@@ -110,7 +110,12 @@ def onboarded(session, user_creds):
         "search_region": "Toshkent",
         "photo_url": "https://example.com/p.jpg",
         "bio": "Hello",
+        "terms_accepted": True,
     }
+    # First onboarding without consent must be refused (legal gate)
+    no_consent = {**payload, "terms_accepted": False}
+    r = session.post(f"{API}/profile/onboard", json=no_consent, headers=_auth_header(user_creds["token"]))
+    assert r.status_code == 400 and r.json()["detail"] == "terms_required"
     r = session.post(f"{API}/profile/onboard", json=payload, headers=_auth_header(user_creds["token"]))
     assert r.status_code == 200, r.text
     body = r.json()

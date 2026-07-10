@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
@@ -51,6 +51,14 @@ export default function Onboarding() {
     }
   });
   const [step, setStep] = useState(() => Math.min(STEPS - 1, Math.max(0, Number(draft?.step) || 0)));
+
+  // Legal consent (terms + privacy + serious-intent pledge) gates the whole
+  // wizard for first-time users. Checkbox state lives in the draft too, so
+  // opening /terms or /privacy mid-consent and coming back loses nothing.
+  const [consent, setConsent] = useState(() => ({
+    terms: false, privacy: false, intent: false, done: false,
+    ...(draft?.consent || {}),
+  }));
   const [photoStatus, setPhotoStatus] = useState({ state: "idle", code: "", reason: "" });
   const [submitting, setSubmitting] = useState(false);
   // Prefill from the existing profile so this screen doubles as a safe
@@ -92,11 +100,11 @@ export default function Onboarding() {
     if (isEdit || user?.onboarded) return undefined;
     const id = setTimeout(() => {
       try {
-        localStorage.setItem(draftKey, JSON.stringify({ step, data, saved_at: Date.now() }));
+        localStorage.setItem(draftKey, JSON.stringify({ step, data, consent, saved_at: Date.now() }));
       } catch { /* storage full/unavailable — draft is best-effort */ }
     }, 400);
     return () => clearTimeout(id);
-  }, [data, step, isEdit, draftKey, user?.onboarded]);
+  }, [data, step, consent, isEdit, draftKey, user?.onboarded]);
 
   // Same "empty" rule the backend uses for completeness (services.py
   // PROFILE_FIELDS): booleans always count as answered, everything else is
@@ -167,7 +175,7 @@ export default function Onboarding() {
     if (submitting) return;
     setSubmitting(true);
     try {
-      await api.post("/profile/onboard", buildPayload(data));
+      await api.post("/profile/onboard", { ...buildPayload(data), terms_accepted: !!consent.done });
       try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
       toast.success(t("onboard_complete"));
       // Let the brand-new user actually see their first candidates screen
@@ -312,6 +320,60 @@ export default function Onboarding() {
                 ) : (
                   <>{t("save")} <Check className="w-4 h-4" /></>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Consent gate — shown once, before the wizard, for first-time users.
+  if (!user?.onboarded && !consent.done) {
+    const allChecked = consent.terms && consent.privacy && consent.intent;
+    const linkify = (text, linkText, to) => {
+      const [before, after] = text.split(`{${to === "/terms" ? "terms" : "privacy"}}`);
+      return (
+        <>{before}<Link to={to} className="text-primary underline font-medium" onClick={(e) => e.stopPropagation()}>{linkText}</Link>{after}</>
+      );
+    };
+    const Row = ({ k, children }) => (
+      <button
+        type="button"
+        data-testid={`consent-${k}`}
+        onClick={() => setConsent((c) => ({ ...c, [k]: !c[k] }))}
+        className={`w-full text-left flex items-start gap-3 rounded-2xl border p-4 transition ${consent[k] ? "border-primary/50 bg-primary/5" : "border-border bg-card"}`}
+      >
+        <span className={`shrink-0 w-5 h-5 rounded-md border grid place-items-center mt-0.5 transition ${consent[k] ? "bg-primary border-primary text-white" : "border-input bg-background"}`}>
+          {consent[k] && <Check className="w-3.5 h-3.5" />}
+        </span>
+        <span className="text-[13px] leading-relaxed">{children}</span>
+      </button>
+    );
+    return (
+      <div className="relative min-h-[100dvh] bg-background bg-grain overflow-hidden">
+        <div className="orb orb-1" style={{ opacity: 0.35 }} />
+        <div className="orb orb-2" style={{ opacity: 0.3 }} />
+        <div className="relative z-10 max-w-md md:max-w-2xl mx-auto w-full min-h-[100dvh] flex flex-col px-5 pt-8 pb-28 sm:px-6">
+          <h2 className="font-heading text-2xl sm:text-3xl font-semibold tracking-tight leading-tight">{t("consent_title")}</h2>
+          <p className="text-sm text-muted-foreground mt-1.5">{t("consent_subtitle")}</p>
+
+          <div className="mt-6 space-y-3" data-testid="consent-screen">
+            <Row k="terms">{linkify(t("consent_terms"), t("consent_terms_link"), "/terms")}</Row>
+            <Row k="privacy">{linkify(t("consent_privacy"), t("consent_privacy_link"), "/privacy")}</Row>
+            <Row k="intent">{t("consent_intent")}</Row>
+          </div>
+
+          <div className="fixed bottom-0 left-0 right-0 pointer-events-none" style={{ zIndex: 10000 }}>
+            <div className="max-w-md md:max-w-2xl mx-auto px-5 sm:px-6 pb-5 pt-3 pointer-events-auto">
+              <button
+                data-testid="consent-continue"
+                disabled={!allChecked}
+                onClick={() => setConsent((c) => ({ ...c, done: true }))}
+                className="btn-primary w-full disabled:opacity-50"
+                style={{ paddingBottom: "max(0.95rem, env(safe-area-inset-bottom))" }}
+              >
+                {t("consent_continue")} <Check className="w-4 h-4" />
               </button>
             </div>
           </div>

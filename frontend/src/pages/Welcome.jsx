@@ -76,6 +76,11 @@ export default function Welcome() {
             <span className="opacity-30">·</span>
             <button onClick={() => nav("/auth")} data-testid="land-login" className="hover:text-white/80">{t("login")}</button>
           </div>
+          <div className="mt-1.5 flex items-center justify-center gap-4 text-[11px] text-white/45">
+            <button onClick={() => nav("/terms")} data-testid="footer-terms" className="hover:text-white/80">{t("consent_terms_link")}</button>
+            <span className="opacity-30">·</span>
+            <button onClick={() => nav("/privacy")} data-testid="footer-privacy" className="hover:text-white/80">{t("consent_privacy_link")}</button>
+          </div>
         </div>
       </div>
     </div>

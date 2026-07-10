@@ -17,7 +17,12 @@ export default function Rankings() {
   const queryClient = useQueryClient();
   const [period, setPeriod] = useState("all");
   const [amount, setAmount] = useState(BOOST_PRESETS[0]);
+  const [customAmount, setCustomAmount] = useState("");
   const [paying, setPaying] = useState(false);
+
+  // Free-form amount wins over the preset chips; min 1 so'm so even a small
+  // streak bonus can be contributed straight from the balance.
+  const effectiveAmount = customAmount !== "" ? Math.max(0, parseInt(customAmount, 10) || 0) : amount;
 
   const { data: leaders = [], isLoading } = useLeaderboard(period);
   const myRank = leaders.findIndex((row) => row.user?.id === user?.id);
@@ -30,11 +35,11 @@ export default function Rankings() {
   };
 
   const boost = async () => {
-    if (paying) return;
+    if (paying || effectiveAmount < 1) return;
     setPaying(true);
     tapMedium();
     try {
-      const r = await api.post("/payments/create", { purpose: "rank_boost", amount });
+      const r = await api.post("/payments/create", { purpose: "rank_boost", amount: effectiveAmount });
       if (r.data.status === "paid") {
         notify("success");
         toast.success(t("payment_success"));
@@ -48,8 +53,9 @@ export default function Rankings() {
         }
         if (r.data.payment_link) window.open(r.data.payment_link, "_blank");
       }
-    } catch {
-      toast.error(t("error_generic"));
+    } catch (e) {
+      const detail = (e?.response?.data?.detail || "").toString();
+      toast.error(detail === "click_min_1000" ? t("click_min_error") : t("error_generic"));
     } finally {
       setPaying(false);
     }
@@ -88,22 +94,30 @@ export default function Rankings() {
                 <button
                   key={v}
                   data-testid={`rank-boost-${v}`}
-                  onClick={() => setAmount(v)}
+                  onClick={() => { setAmount(v); setCustomAmount(""); }}
                   className={`rounded-xl border py-2 text-xs font-semibold tabular-nums transition ${
-                    amount === v ? "bg-primary text-white border-primary" : "bg-card border-border"
+                    customAmount === "" && amount === v ? "bg-primary text-white border-primary" : "bg-card border-border"
                   }`}
                 >
                   {(v / 1000).toFixed(0)}k
                 </button>
               ))}
             </div>
+            <input
+              data-testid="rank-boost-custom"
+              inputMode="numeric"
+              placeholder={t("rank_boost_custom_placeholder")}
+              className="w-full mt-1.5 px-3.5 py-2 rounded-xl border border-input bg-background text-sm tabular-nums"
+              value={customAmount}
+              onChange={(e) => setCustomAmount(e.target.value.replace(/\D/g, ""))}
+            />
             <button
               data-testid="rank-boost-pay"
               onClick={boost}
-              disabled={paying}
+              disabled={paying || effectiveAmount < 1}
               className="w-full mt-2.5 rounded-2xl bg-gradient-to-r from-[#F0269D] to-[#8A2BE2] text-white text-sm font-semibold py-2.5 disabled:opacity-60 active:scale-[0.98] transition"
             >
-              {paying ? "..." : `${t("rank_boost_cta")} · ${amount.toLocaleString()} ${t("sum")}`}
+              {paying ? "..." : `${t("rank_boost_cta")} · ${effectiveAmount.toLocaleString()} ${t("sum")}`}
             </button>
           </div>
         </section>

@@ -352,6 +352,17 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
     user = await get_user(uid)
     was_onboarded = bool(user.get("onboarded"))
 
+    # Legal consent gate: the first onboarding is the platform's "signature
+    # moment" - terms of use, privacy policy and the serious-intent pledge
+    # must be explicitly accepted (checkboxes in the consent screen). The
+    # acceptance timestamp + version are stored as the durable record.
+    consented = bool(update.pop("terms_accepted", False))
+    if not was_onboarded:
+        if not consented:
+            raise HTTPException(400, "terms_required")
+        update["terms_accepted_at"] = iso(now_utc())
+        update["terms_version"] = "1.0"
+
     if was_onboarded:
         # Name is an identity-anchor field: once onboarding is complete,
         # letting this "complete/edit profile" endpoint silently rename the

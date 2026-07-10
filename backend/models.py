@@ -72,6 +72,10 @@ class OnboardingProfile(BaseModel):
     smoking: Literal["no", "sometimes", "yes"] = "no"
     alcohol: Literal["no", "sometimes", "yes"] = "no"
     relocation: bool = False
+    # Signup consent: terms of use + privacy policy + serious-intent pledge,
+    # all confirmed with checkboxes before the wizard. Required for FIRST
+    # onboarding (auth_r enforces); ignored on the edit/complete flow.
+    terms_accepted: bool = False
 
 
 class UserPublic(BaseModel):
