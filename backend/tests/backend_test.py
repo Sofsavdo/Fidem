@@ -385,10 +385,45 @@ def test_privacy_settings_roundtrip(session, user_creds):
     assert r.json()["photo_public"] is False and r.json()["hidden_profile"] is False
 
 
-def test_hidden_profile_blocks_boost(session, user_creds):
+def test_privacy_hidden_requires_paid_plan(session, user_creds, admin_token):
+    """Hidden mode is a paid feature: free plan gets a 403 upsell, any paid
+    plan can enable it."""
+    tok = user_creds["token"]
+    session.patch(f"{API}/admin/users/{user_creds['user_id']}",
+                  json={"plan": "free"}, headers=_auth_header(admin_token))
+    r = session.post(f"{API}/settings/privacy", json={"hidden_profile": True},
+                     headers=_auth_header(tok))
+    assert r.status_code == 403 and r.json()["detail"] == "privacy_requires_plan"
+    # photo_public stays free
+    r = session.post(f"{API}/settings/privacy", json={"photo_public": True},
+                     headers=_auth_header(tok))
+    assert r.status_code == 200
+    session.post(f"{API}/settings/privacy", json={"photo_public": False},
+                 headers=_auth_header(tok))
+    # smallest paid tier unlocks it
+    session.patch(f"{API}/admin/users/{user_creds['user_id']}",
+                  json={"plan": "standard"}, headers=_auth_header(admin_token))
+    r = session.post(f"{API}/settings/privacy", json={"hidden_profile": True},
+                     headers=_auth_header(tok))
+    assert r.status_code == 200 and r.json()["hidden_profile"] is True
+    session.post(f"{API}/settings/privacy", json={"hidden_profile": False},
+                 headers=_auth_header(tok))
+
+
+def test_vip_photo_peek_gated(session, user_creds, admin_token):
+    """/photo-peek requires vip plan AND hidden mode on."""
+    tok = user_creds["token"]
+    # standard plan, hidden off -> refused
+    r = session.post(f"{API}/photo-peek/some-user-id", headers=_auth_header(tok))
+    assert r.status_code == 403 and r.json()["detail"] == "peek_requires_vip"
+
+
+def test_hidden_profile_blocks_boost(session, user_creds, admin_token):
     """Boost sells visibility; a hidden profile has none - both boost paths
     must refuse instead of taking money."""
     tok = user_creds["token"]
+    session.patch(f"{API}/admin/users/{user_creds['user_id']}",
+                  json={"plan": "standard"}, headers=_auth_header(admin_token))
     r = session.post(f"{API}/settings/privacy", json={"hidden_profile": True},
                      headers=_auth_header(tok))
     assert r.status_code == 200 and r.json()["hidden_profile"] is True
@@ -411,7 +446,7 @@ def test_boost_active_blocks_hiding(session, user_creds, admin_token):
     refused (it would waste the boost the user just paid for)."""
     tok = user_creds["token"]
     session.patch(f"{API}/admin/users/{user_creds['user_id']}",
-                  json={"add_balance": 10000}, headers=_auth_header(admin_token))
+                  json={"add_balance": 10000, "plan": "standard"}, headers=_auth_header(admin_token))
     r = session.post(f"{API}/boost/activate", json={"use_balance": True},
                      headers=_auth_header(tok))
     assert r.status_code == 200, r.text

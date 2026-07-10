@@ -63,6 +63,23 @@ try {
   console.error("Telegram WebApp init error:", e);
 }
 
+// Photo protection (best-effort; see the matching CSS block in index.css).
+// Web apps cannot block OS-level screenshots, but every in-app way to save
+// a photo is closed: right-click/long-press menus and drag-out on images
+// are cancelled, and while the app is backgrounded the whole UI is blurred
+// so task-switcher previews don't expose profile photos.
+document.addEventListener("contextmenu", (e) => {
+  if (e.target && e.target.tagName === "IMG") e.preventDefault();
+});
+document.addEventListener("dragstart", (e) => {
+  if (e.target && e.target.tagName === "IMG") e.preventDefault();
+});
+document.addEventListener("visibilitychange", () => {
+  try {
+    document.body.classList.toggle("app-bg-hidden", document.hidden);
+  } catch { /* ignore */ }
+});
+
 // 24h: how long persisted cache entries stay usable across app restarts.
 // Older than this and we'd rather show a loading state than stale/wrong data
 // (e.g. a candidate who deactivated weeks ago).

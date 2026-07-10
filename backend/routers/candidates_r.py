@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from auth import get_current_user_id
-from core import PAID_PLANS, WHO_VIEWED_PLANS, chat_id_for, db, get_user, iso, log, manager, mask_name, now_utc, parse_dt, push_notif, strip_locked_photo, touch_active, user_public, user_public_minimal
+from core import INCOGNITO_PLANS, PAID_PLANS, WHO_VIEWED_PLANS, chat_id_for, db, get_user, iso, log, manager, mask_name, now_utc, parse_dt, push_notif, strip_locked_photo, touch_active, user_public, user_public_minimal
 from geo import distance_bucket, haversine_km
 from models import PhotoUnlockDecision, PhotoUnlockRequest, SaveRequest, new_id
 from services import age_from_birth, compute_match
@@ -361,23 +361,30 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
     if match_lang not in ("uz", "ru", "en"):
         match_lang = "uz"
 
-    existing_view = await db.profile_views.find_one(
-        {"viewer_id": uid, "target_id": target_id},
-        {"_id": 0, "at": 1},
-    )
-    should_notify_view = existing_view is None
-    if existing_view and existing_view.get("at"):
-        try:
-            if (now_utc() - parse_dt(existing_view["at"])) >= timedelta(hours=24):
-                should_notify_view = True
-        except Exception:
-            pass
+    # Premium/VIP privacy perk: with hidden mode on, visits are incognito —
+    # no profile_views record, no "kim ko'rdi" appearance, no notification,
+    # and no bump to the target's view counters further below.
+    incognito = bool(me_doc.get("hidden_profile")) and me_doc.get("plan") in INCOGNITO_PLANS
 
-    await db.profile_views.update_one(
-        {"viewer_id": uid, "target_id": target_id},
-        {"$set": {"viewer_id": uid, "target_id": target_id, "at": iso(now_utc())}},
-        upsert=True,
-    )
+    should_notify_view = False
+    if not incognito:
+        existing_view = await db.profile_views.find_one(
+            {"viewer_id": uid, "target_id": target_id},
+            {"_id": 0, "at": 1},
+        )
+        should_notify_view = existing_view is None
+        if existing_view and existing_view.get("at"):
+            try:
+                if (now_utc() - parse_dt(existing_view["at"])) >= timedelta(hours=24):
+                    should_notify_view = True
+            except Exception:
+                pass
+
+        await db.profile_views.update_one(
+            {"viewer_id": uid, "target_id": target_id},
+            {"$set": {"viewer_id": uid, "target_id": target_id, "at": iso(now_utc())}},
+            upsert=True,
+        )
 
     # Use AI match calculation for premium users in detail view too
     if me_doc.get("plan") in ("premium", "vip"):
@@ -408,13 +415,14 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
         pub["distance_bucket"] = distance_bucket(haversine_km(mp[1], mp[0], tp[1], tp[0]), match_lang)
 
     try:
-        now_iso = iso(now_utc())
-        inc = {"views_total": 1}
+        if not incognito:
+            now_iso = iso(now_utc())
+            inc = {"views_total": 1}
 
-        if target.get("boost_until") and target["boost_until"] > now_iso:
-            inc["boost_metrics.views"] = 1
+            if target.get("boost_until") and target["boost_until"] > now_iso:
+                inc["boost_metrics.views"] = 1
 
-        await db.users.update_one({"id": target_id}, {"$inc": inc})
+            await db.users.update_one({"id": target_id}, {"$inc": inc})
 
     except Exception:
         pass
@@ -431,6 +439,30 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
         )
 
     return strip_locked_photo(pub)
+
+
+# ---------- VIP photo peek (privacy tier 3) ----------
+@router.post("/photo-peek/{target_id}")
+async def photo_peek(target_id: str, uid: str = Depends(get_current_user_id)):
+    """VIP + hidden-mode perk: reveal a locked photo once per profile, for a
+    few seconds (the frontend enforces the 5s display; the once-per-profile
+    rule is enforced here). Deliberately silent — no notification to the
+    target, it's part of the incognito package."""
+    if target_id == uid:
+        raise HTTPException(400, "Cannot peek own photo")
+    me_doc = await get_user(uid)
+    if me_doc.get("plan") != "vip" or not me_doc.get("hidden_profile"):
+        raise HTTPException(403, "peek_requires_vip")
+    target = await get_user(target_id)
+    # Atomic once-per-(viewer,target): the upsert only inserts the first time.
+    res = await db.photo_peeks.update_one(
+        {"viewer_id": uid, "target_id": target_id},
+        {"$setOnInsert": {"id": new_id(), "viewer_id": uid, "target_id": target_id, "at": iso(now_utc())}},
+        upsert=True,
+    )
+    if res.upserted_id is None:
+        raise HTTPException(409, "peek_used")
+    return {"photo_url": target.get("photo_url"), "seconds": 5}
 
 
 # ---------- Photo unlock ----------

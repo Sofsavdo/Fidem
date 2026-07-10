@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 
 from auth import get_current_user_id
-from core import db, get_user, iso, now_utc
+from core import PAID_PLANS, db, get_user, iso, now_utc
 from models import NotificationPreferencesRequest, PrivacySettingsRequest
 
 router = APIRouter(tags=["settings"])
@@ -64,6 +64,11 @@ async def get_privacy_settings(uid: str = Depends(get_current_user_id)):
 async def update_privacy_settings(req: PrivacySettingsRequest, uid: str = Depends(get_current_user_id)):
     """Update photo visibility and/or hidden-profile mode.
 
+    Hidden mode is a PAID, plan-tiered feature (see INCOGNITO_PLANS in
+    core.py): standard hides the profile, premium also makes visits
+    incognito, vip additionally unlocks /photo-peek. Free users get a 403
+    that the frontend turns into a plan upsell.
+
     Hidden profile and boost are mutually exclusive by design: boost sells
     visibility, hiding removes all of it, so paying for both at once is
     always a mistake. The boost side of the same rule lives in
@@ -74,6 +79,8 @@ async def update_privacy_settings(req: PrivacySettingsRequest, uid: str = Depend
     if req.photo_public is not None:
         updates["photo_public"] = bool(req.photo_public)
     if req.hidden_profile is not None:
+        if req.hidden_profile and me.get("plan", "free") not in PAID_PLANS:
+            raise HTTPException(403, "privacy_requires_plan")
         if req.hidden_profile and me.get("boost_until") and me["boost_until"] > iso(now_utc()):
             # An active (paid) boost would keep charging for zero visibility.
             raise HTTPException(400, "privacy_boost_active")

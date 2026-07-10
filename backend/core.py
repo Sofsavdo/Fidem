@@ -67,6 +67,14 @@ PAID_PLANS = ("standard", "premium", "vip")
 # Plans that unlock "who viewed / who saved me" (see PLANS.premium.perks in
 # frontend/src/pages/Premium.jsx) — standard alone does not include it.
 WHO_VIEWED_PLANS = ("premium", "vip")
+# Tiered PAID privacy (hidden mode is a monetization feature, free users
+# cannot enable it):
+#   standard  — your profile is invisible everywhere
+#   premium+  — additionally, your visits are incognito: the people you view
+#               never see you in "who viewed me" and get no notification
+#   vip       — additionally, you may peek any locked photo once per profile
+#               for 5 seconds (see /photo-peek)
+INCOGNITO_PLANS = ("premium", "vip")
 
 
 def mask_name(name: str) -> str:

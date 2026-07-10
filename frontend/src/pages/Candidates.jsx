@@ -4,7 +4,7 @@ import posthog from "posthog-js";
 import api from "@/lib/api";
 import CandidateCard from "@/components/CandidateCard";
 import { useApp } from "@/contexts/AppContext";
-import { X, SlidersHorizontal, MapPin, Lock, Crown } from "lucide-react";
+import { X, SlidersHorizontal, MapPin, Lock, Crown, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import CountrySelect from "@/components/CountrySelect";
 import RegionSelect from "@/components/RegionSelect";
@@ -21,36 +21,42 @@ const PROMO_EVERY = 9;
 
 // Mirrors CandidateCard's exact structure (4:5 image + p-3 footer) so it sits
 // in the grid at the same size as a real profile - image open, not blurred.
-function PlanPromoCard() {
+// kind="plans" pitches the paid tiers; kind="privacy" pitches paid hidden
+// mode ("see without being seen") - the feed alternates between the two.
+function PlanPromoCard({ kind = "plans" }) {
   const { t } = useApp();
   // A/B experiment (PostHog flag "candidates-promo-copy"): does urgency-
   // flavored copy ("online now") convert better than the benefit-flavored
   // default? Falls back to "control" until the flag exists / loads, so the
   // card always renders. The variant rides along on both funnel events.
   const variant = useExperiment("candidates-promo-copy");
-  const title = variant === "urgent" ? t("candidates_promo_title_b") : t("candidates_promo_title");
-  useEffect(() => { posthog.capture("candidates_feed_promo_impression", { variant }); }, [variant]);
+  const isPrivacy = kind === "privacy";
+  const title = isPrivacy
+    ? t("privacy_promo_title")
+    : (variant === "urgent" ? t("candidates_promo_title_b") : t("candidates_promo_title"));
+  const hint = isPrivacy ? t("privacy_promo_hint") : t("candidates_promo_hint");
+  useEffect(() => { posthog.capture("candidates_feed_promo_impression", { variant, kind }); }, [variant, kind]);
   return (
     <Link
       to="/premium?tab=plans"
       data-testid="candidates-promo-card"
-      onClick={() => posthog.capture("candidates_feed_promo_click", { variant })}
+      onClick={() => posthog.capture("candidates_feed_promo_click", { variant, kind })}
       className="block bg-card rounded-3xl overflow-hidden shadow-soft hover:shadow-elevated transition-shadow border border-gold/40"
     >
       <div className="relative aspect-[4/5] overflow-hidden bg-muted">
         <HeroScene className="absolute inset-0" photo="/promo-hero.jpg" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/0 to-black/0" />
+        <div className={`absolute inset-0 bg-gradient-to-t ${isPrivacy ? "from-ink/85 via-ink/30 to-ink/10" : "from-black/70 via-black/0 to-black/0"}`} />
         <div className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-full bg-gold text-ink px-2.5 py-1 text-[11px] font-bold">
-          <Crown className="w-3 h-3" /> Premium
+          {isPrivacy ? <EyeOff className="w-3 h-3" /> : <Crown className="w-3 h-3" />} {isPrivacy ? t("privacy_title") : "Premium"}
         </div>
         <div className="absolute bottom-3 left-3 right-3 text-white">
           <h3 className="font-heading text-lg font-semibold leading-snug">{title}</h3>
-          <p className="text-xs text-white/85 mt-0.5">{t("candidates_promo_hint")}</p>
+          <p className="text-xs text-white/85 mt-0.5">{hint}</p>
         </div>
       </div>
       <div className="p-3 flex items-center justify-between gap-2">
         <span className="text-xs font-medium text-primary">{t("plan_choose_cta")} →</span>
-        <span className="p-2 rounded-full bg-gold/15 text-gold-dark"><Crown className="w-4 h-4" /></span>
+        <span className="p-2 rounded-full bg-gold/15 text-gold-dark">{isPrivacy ? <EyeOff className="w-4 h-4" /> : <Crown className="w-4 h-4" />}</span>
       </div>
     </Link>
   );
@@ -206,7 +212,10 @@ export default function Candidates() {
           {items.map((c, idx) => (
             <React.Fragment key={c.id}>
               <CandidateCard c={c} onSave={onSave} saved={savedIds.has(c.id)} />
-              {!isPaid && (idx + 1) % PROMO_EVERY === 0 && <PlanPromoCard key={`promo-${idx}`} />}
+              {!isPaid && (idx + 1) % PROMO_EVERY === 0 && (
+                // Alternate the pitch: plans, then privacy, then plans, ...
+                <PlanPromoCard key={`promo-${idx}`} kind={((idx + 1) / PROMO_EVERY) % 2 === 0 ? "privacy" : "plans"} />
+              )}
             </React.Fragment>
           ))}
         </div>
