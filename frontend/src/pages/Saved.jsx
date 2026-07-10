@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
-import { Lock, Bookmark, Crown } from "lucide-react";
+import { Lock, Bookmark, Crown, EyeOff } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
 import { useSaved } from "@/hooks/queries";
 import { EmptyState } from "@/components/kit";
@@ -69,6 +69,24 @@ export default function Saved() {
             <p className="text-xs text-white/70 mt-0.5">{t("premium")} · {UNLOCK_PRICE.toLocaleString()} {t("sum")}{t("plan_per_month")}</p>
           </div>
           <span className="shrink-0 rounded-full bg-white text-ink text-xs font-semibold px-3.5 py-2">{t("plan_choose_cta")}</span>
+        </Link>
+      )}
+
+      {/* Privacy upsell — this page is exactly where "kim ko'rdi" is on the
+          user's mind, so 'see without being seen' lands hardest here. Hidden
+          for people who already run hidden mode. */}
+      {tab !== "mine" && !user?.hidden_profile && (
+        <Link
+          to="/me"
+          data-testid="saved-privacy-promo"
+          className="mb-4 flex items-center gap-3 rounded-3xl bg-card border border-border p-3.5 hover:-translate-y-0.5 active:scale-[0.98] transition-transform"
+        >
+          <span className="shrink-0 w-9 h-9 rounded-2xl bg-primary/10 text-primary grid place-items-center"><EyeOff className="w-4 h-4" /></span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">{t("privacy_promo_title")}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{t("privacy_promo_hint")}</p>
+          </div>
+          <span className="shrink-0 text-xs font-semibold text-primary whitespace-nowrap">{t("privacy_promo_cta")} →</span>
         </Link>
       )}
 

@@ -4,7 +4,7 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, PlanPill } from "@/components/Badges";
 import PhotoUpload from "@/components/PhotoUpload";
-import { ChevronRight, Crown, Wallet, Share2, Settings as SettingsIcon, LogOut, ShieldCheck, Clock, SlidersHorizontal, Brain, BookOpen, Phone, Trophy, Rocket, MessageCircle } from "lucide-react";
+import { ChevronRight, Crown, Wallet, Share2, Settings as SettingsIcon, LogOut, ShieldCheck, Clock, SlidersHorizontal, Brain, BookOpen, Phone, Trophy, Rocket, MessageCircle, EyeOff, Camera, Check, Lock } from "lucide-react";
 import BoostModal from "@/components/BoostModal";
 import LocationVerifyCard from "@/components/LocationVerifyCard";
 import { toast } from "sonner";
@@ -13,7 +13,18 @@ import { useQueryClient, useMutation } from "@tanstack/react-query";
 
 // Static support contact - a real Telegram account admins actually monitor,
 // not the bot (which only understands the mini-app commands).
-const ADMIN_TELEGRAM_USERNAME = process.env.REACT_APP_ADMIN_TELEGRAM_USERNAME || "Fidem_Admin";
+const ADMIN_TELEGRAM_USERNAME = process.env.REACT_APP_ADMIN_TELEGRAM_USERNAME || "FidemAppSupport";
+
+// Inside the Telegram Mini App webview a plain target=_blank anchor to t.me
+// is silently swallowed - Telegram links must go through openTelegramLink.
+function openSupportChat() {
+  const url = `https://t.me/${ADMIN_TELEGRAM_USERNAME}`;
+  const tg = window.Telegram?.WebApp;
+  if (tg?.openTelegramLink) {
+    try { tg.openTelegramLink(url); return; } catch { /* fall through */ }
+  }
+  window.open(url, "_blank", "noopener");
+}
 
 export default function Me() {
   const { user, t, logout, refresh, wsEvent } = useApp();
@@ -32,6 +43,21 @@ export default function Me() {
       queryClient.invalidateQueries({ queryKey: QK.notifications });
     }
   }, [wsEvent, queryClient]);
+
+  // Privacy toggles (photo open to everyone / hidden profile). The backend
+  // refuses hidden_profile=true while a paid boost is running
+  // ("privacy_boost_active") - surface that as a clear message, not a
+  // generic error.
+  const privacyMutation = useMutation({
+    mutationFn: (patch) => api.post("/settings/privacy", patch),
+    onSuccess: () => refresh(),
+    onError: (e) => {
+      const detail = (e?.response?.data?.detail || "").toString();
+      if (detail === "privacy_boost_active") toast.error(t("privacy_boost_active"));
+      else if (detail === "privacy_requires_plan") toast.error(t("privacy_requires_plan"));
+      else toast.error(t("error_generic"));
+    },
+  });
 
   const claimDailyMutation = useMutation({
     mutationFn: () => api.post("/daily/claim"),
@@ -53,6 +79,8 @@ export default function Me() {
 
   if (!user) return null;
 
+  const isPaidPlan = ["standard", "premium", "vip"].includes(user.plan);
+
   return (
     <div className="px-4 md:px-8 pt-6 pb-8 space-y-5">
       {/* Header — notifications & language live in the top bar, so they're not
@@ -60,6 +88,19 @@ export default function Me() {
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-3xl font-semibold tracking-tight">{t("me")}</h1>
       </div>
+
+      {/* Loud reminder when hidden mode is on — people forget they enabled it,
+          then wonder why nobody writes (and try to buy a boost, which the
+          backend rightly refuses). */}
+      {user.hidden_profile && (
+        <div
+          data-testid="hidden-profile-banner"
+          className="rounded-3xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 p-4 flex items-start gap-3"
+        >
+          <EyeOff className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">{t("hidden_profile_active_banner")}</p>
+        </div>
+      )}
 
       {/* Profile card — single tappable photo (avatar), no duplicate upload block */}
       <div className="rounded-3xl bg-card border border-border p-4 shadow-soft" data-testid="me-profile-card">
@@ -141,6 +182,62 @@ export default function Me() {
             <ChevronRight className="w-4 h-4 text-primary" />
           </Link>
         )}
+
+        {/* Privacy: open photo + hidden profile, right where people look at
+            their own profile state. */}
+        <div className="mt-4 pt-4 border-t border-border space-y-4">
+          <PrivacyToggle
+            testid="toggle-photo-public"
+            icon={<Camera className="w-4 h-4" />}
+            label={t("photo_public_label")}
+            hint={t("photo_public_hint")}
+            checked={!!user.photo_public}
+            disabled={privacyMutation.isPending}
+            onChange={(v) => privacyMutation.mutate({ photo_public: v })}
+          />
+          <PrivacyToggle
+            testid="toggle-hidden-profile"
+            icon={<EyeOff className="w-4 h-4" />}
+            label={t("hidden_profile_label")}
+            hint={isPaidPlan ? t("hidden_profile_hint") : t("privacy_paid_hint")}
+            checked={!!user.hidden_profile}
+            disabled={privacyMutation.isPending || !isPaidPlan}
+            onChange={(v) => privacyMutation.mutate({ hidden_profile: v })}
+          />
+
+          {/* What each plan's privacy actually buys — the ladder itself is
+              the ad: every row you don't have yet is a reason to upgrade. */}
+          <div className="rounded-2xl bg-muted/50 border border-border p-3 space-y-2" data-testid="privacy-tiers">
+            {[
+              { key: "privacy_tier_standard", plans: ["standard", "premium", "vip"], name: "Standard" },
+              { key: "privacy_tier_premium", plans: ["premium", "vip"], name: "Premium" },
+              { key: "privacy_tier_vip", plans: ["vip"], name: "VIP" },
+            ].map((tier) => {
+              const included = tier.plans.includes(user.plan);
+              return (
+                <div key={tier.key} className="flex items-start gap-2">
+                  {included ? (
+                    <Check className="w-3.5 h-3.5 text-secondary shrink-0 mt-0.5" />
+                  ) : (
+                    <Lock className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                  )}
+                  <p className={`text-[11px] leading-relaxed ${included ? "" : "text-muted-foreground"}`}>
+                    <span className="font-semibold">{tier.name}:</span> {t(tier.key)}
+                  </p>
+                </div>
+              );
+            })}
+            {user.plan !== "vip" && (
+              <Link
+                to="/premium?tab=plans"
+                data-testid="privacy-upgrade-cta"
+                className="mt-1 flex items-center justify-center gap-1.5 rounded-xl bg-primary/10 border border-primary/25 px-3 py-2 text-xs font-semibold text-primary active:scale-[0.98] transition"
+              >
+                {t("privacy_choose_plan")} <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Rankings teaser — replaces the old badges/achievements card, which
@@ -261,16 +358,16 @@ export default function Me() {
           {user.is_admin && (
             <NavRow to="/admin" testid="link-admin" icon={<SettingsIcon className="w-4 h-4" />} label={t("admin_panel")} />
           )}
-          <a
-            href={`https://t.me/${ADMIN_TELEGRAM_USERNAME}`}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            type="button"
+            onClick={openSupportChat}
             data-testid="link-contact-admin"
-            className="flex items-center justify-between p-4"
+            className="flex items-center justify-between p-4 w-full text-left"
           >
             <span className="flex items-center gap-3 text-sm"><MessageCircle className="w-4 h-4 text-secondary" /> {t("contact_admin")}</span>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </a>
+          </button>
+          <NavRow to="/terms" testid="link-terms" icon={<ShieldCheck className="w-4 h-4 text-muted-foreground" />} label={t("legal_links_title")} />
           <button data-testid="btn-logout" onClick={logout} className="flex items-center justify-between p-4 w-full text-left">
             <span className="flex items-center gap-3 text-sm text-foreground"><LogOut className="w-4 h-4" /> {t("logout")}</span>
           </button>
@@ -288,3 +385,30 @@ const NavRow = React.memo(function NavRow({ to, testid, icon, label }) {
     </Link>
   );
 });
+
+function PrivacyToggle({ testid, icon, label, hint, checked, disabled, onChange }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start gap-2.5 min-w-0">
+        <span className="text-muted-foreground mt-0.5 shrink-0">{icon}</span>
+        <div className="min-w-0">
+          <p className="text-sm font-medium">{label}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{hint}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        data-testid={testid}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={`relative shrink-0 w-11 h-6 rounded-full transition-colors disabled:opacity-50 ${checked ? "bg-primary" : "bg-border"}`}
+      >
+        <span
+          className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${checked ? "left-[calc(100%-1.375rem)]" : "left-0.5"}`}
+        />
+      </button>
+    </div>
+  );
+}

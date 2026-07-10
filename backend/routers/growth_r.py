@@ -85,6 +85,12 @@ async def boost_status(uid: str = Depends(get_current_user_id)):
 @router.post("/boost/activate")
 async def boost_activate(request: Request, use_balance: bool = Body(True, embed=True), uid: str = Depends(get_current_user_id)):
     """Activate 24h boost. If use_balance=True, deduct from balance; otherwise client should redirect to CLICK payment."""
+    # Boost is pure visibility; a hidden profile has none to multiply. Refuse
+    # instead of silently taking money for nothing (settings_r enforces the
+    # mirror rule: can't hide while a paid boost is running).
+    me_check = await get_user(uid)
+    if me_check.get("hidden_profile"):
+        raise HTTPException(400, "boost_hidden")
     if not use_balance:
         # Route through the boost payment purpose so completing the CLICK
         # payment actually activates the boost (this used to create a plain

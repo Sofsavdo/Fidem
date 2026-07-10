@@ -371,3 +371,25 @@ textarea.input { resize: vertical; min-height: 92px; line-height: 1.45; }
     animation-duration: 0.01ms !important;
   }
 }
+
+/* ---------- Photo protection (best-effort deterrents) ----------
+   The web platform cannot truly block OS screenshots, but we remove every
+   in-app path to grabbing a photo: no long-press "save image" sheet (iOS
+   touch-callout), no drag-out, no right-click save, no selecting images.
+   Paired with the JS listeners in index.js (contextmenu/dragstart) and the
+   background-blur on visibilitychange so app-switcher thumbnails don't show
+   profile photos. */
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* While the app is backgrounded (task switcher, another tab), blur all
+   content so OS app-switcher previews don't expose profile photos. */
+body.app-bg-hidden #root {
+  filter: blur(28px);
+  transition: filter 0.1s ease;
+}

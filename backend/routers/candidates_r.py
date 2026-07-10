@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from auth import get_current_user_id
-from core import PAID_PLANS, WHO_VIEWED_PLANS, db, get_user, iso, log, manager, mask_name, now_utc, parse_dt, push_notif, strip_locked_photo, touch_active, user_public, user_public_minimal
+from core import INCOGNITO_PLANS, PAID_PLANS, WHO_VIEWED_PLANS, chat_id_for, db, get_user, iso, log, manager, mask_name, now_utc, parse_dt, push_notif, strip_locked_photo, touch_active, user_public, user_public_minimal
 from geo import distance_bucket, haversine_km
 from models import PhotoUnlockDecision, PhotoUnlockRequest, SaveRequest, new_id
 from services import age_from_birth, compute_match
@@ -191,7 +191,9 @@ async def candidates(
 
     await touch_active(uid)
 
-    query: dict = {"id": {"$ne": uid}, "onboarded": True, "blocked": {"$ne": True}}
+    # hidden_profile users opted out of being discovered (they can still
+    # browse and keep their existing chats) — never surface them in the feed.
+    query: dict = {"id": {"$ne": uid}, "onboarded": True, "blocked": {"$ne": True}, "hidden_profile": {"$ne": True}}
 
     if me_doc.get("search_gender"):
         query["gender"] = me_doc["search_gender"]
@@ -299,15 +301,32 @@ async def candidates(
 
         enriched.append(pub)
 
+    docs_by_id = {dd["id"]: dd for dd in docs}
+
     if sort == "match":
+        # Default feed order, in strict priority tiers:
+        #   1. Boosted profiles — boost buys the very top, above everything.
+        #   2. The viewer's own region (a Farg'ona user sees Farg'ona people
+        #      first) — explicit region/travel filters upstream still win
+        #      because they narrow the query itself.
+        #   3. Match score, with a freshness bonus so brand-new profiles get
+        #      early visibility (+15 first 3 days, +8 first week).
+        #   4. Profile completeness as the tie-breaker.
         now_iso = iso(now_utc())
+        my_region = me_doc.get("region") or ""
+        fresh_3d = iso(now_utc() - timedelta(days=3))
+        fresh_7d = iso(now_utc() - timedelta(days=7))
 
         def _rank(x):
-            d = next((dd for dd in docs if dd["id"] == x["id"]), {})
+            d = docs_by_id.get(x["id"], {})
             boosted = d.get("boost_until", "") > now_iso
+            same_region = bool(my_region) and d.get("region", "") == my_region
+            created = d.get("created_at", "")
+            fresh_bonus = 15 if created >= fresh_3d else (8 if created >= fresh_7d else 0)
             return (
-                -1 if boosted else 0,
-                -x.get("match_score", 0),
+                0 if boosted else 1,
+                0 if same_region else 1,
+                -(x.get("match_score", 0) + fresh_bonus),
                 -x.get("completeness", 0),
             )
 
@@ -317,7 +336,8 @@ async def candidates(
         enriched.sort(key=lambda x: (not x.get("online", False), x.get("last_active", "")), reverse=False)
 
     elif sort == "new":
-        enriched.sort(key=lambda x: x.get("last_active", ""), reverse=True)
+        # Genuinely new profiles (signup date), not merely recently active.
+        enriched.sort(key=lambda x: docs_by_id.get(x["id"], {}).get("created_at", ""), reverse=True)
 
     result = enriched[:limit]
 
@@ -346,27 +366,43 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
 
     target = await get_user(target_id)
     me_doc = await get_user(uid)
+
+    # A hidden profile is undiscoverable: direct opens 404 exactly like a
+    # nonexistent user, EXCEPT for admins and people who already have a chat
+    # with them (an existing match must stay able to see who they talk to).
+    if target.get("hidden_profile") and not me_doc.get("is_admin"):
+        has_chat = await db.messages.find_one({"chat_id": chat_id_for(uid, target_id)}, {"_id": 1})
+        if not has_chat:
+            raise HTTPException(404, "User not found")
+
     match_lang = me_doc.get("language", "uz")
     if match_lang not in ("uz", "ru", "en"):
         match_lang = "uz"
 
-    existing_view = await db.profile_views.find_one(
-        {"viewer_id": uid, "target_id": target_id},
-        {"_id": 0, "at": 1},
-    )
-    should_notify_view = existing_view is None
-    if existing_view and existing_view.get("at"):
-        try:
-            if (now_utc() - parse_dt(existing_view["at"])) >= timedelta(hours=24):
-                should_notify_view = True
-        except Exception:
-            pass
+    # Premium/VIP privacy perk: with hidden mode on, visits are incognito —
+    # no profile_views record, no "kim ko'rdi" appearance, no notification,
+    # and no bump to the target's view counters further below.
+    incognito = bool(me_doc.get("hidden_profile")) and me_doc.get("plan") in INCOGNITO_PLANS
 
-    await db.profile_views.update_one(
-        {"viewer_id": uid, "target_id": target_id},
-        {"$set": {"viewer_id": uid, "target_id": target_id, "at": iso(now_utc())}},
-        upsert=True,
-    )
+    should_notify_view = False
+    if not incognito:
+        existing_view = await db.profile_views.find_one(
+            {"viewer_id": uid, "target_id": target_id},
+            {"_id": 0, "at": 1},
+        )
+        should_notify_view = existing_view is None
+        if existing_view and existing_view.get("at"):
+            try:
+                if (now_utc() - parse_dt(existing_view["at"])) >= timedelta(hours=24):
+                    should_notify_view = True
+            except Exception:
+                pass
+
+        await db.profile_views.update_one(
+            {"viewer_id": uid, "target_id": target_id},
+            {"$set": {"viewer_id": uid, "target_id": target_id, "at": iso(now_utc())}},
+            upsert=True,
+        )
 
     # Use AI match calculation for premium users in detail view too
     if me_doc.get("plan") in ("premium", "vip"):
@@ -397,13 +433,14 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
         pub["distance_bucket"] = distance_bucket(haversine_km(mp[1], mp[0], tp[1], tp[0]), match_lang)
 
     try:
-        now_iso = iso(now_utc())
-        inc = {"views_total": 1}
+        if not incognito:
+            now_iso = iso(now_utc())
+            inc = {"views_total": 1}
 
-        if target.get("boost_until") and target["boost_until"] > now_iso:
-            inc["boost_metrics.views"] = 1
+            if target.get("boost_until") and target["boost_until"] > now_iso:
+                inc["boost_metrics.views"] = 1
 
-        await db.users.update_one({"id": target_id}, {"$inc": inc})
+            await db.users.update_one({"id": target_id}, {"$inc": inc})
 
     except Exception:
         pass
@@ -420,6 +457,30 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
         )
 
     return strip_locked_photo(pub)
+
+
+# ---------- VIP photo peek (privacy tier 3) ----------
+@router.post("/photo-peek/{target_id}")
+async def photo_peek(target_id: str, uid: str = Depends(get_current_user_id)):
+    """VIP + hidden-mode perk: reveal a locked photo once per profile, for a
+    few seconds (the frontend enforces the 5s display; the once-per-profile
+    rule is enforced here). Deliberately silent — no notification to the
+    target, it's part of the incognito package."""
+    if target_id == uid:
+        raise HTTPException(400, "Cannot peek own photo")
+    me_doc = await get_user(uid)
+    if me_doc.get("plan") != "vip" or not me_doc.get("hidden_profile"):
+        raise HTTPException(403, "peek_requires_vip")
+    target = await get_user(target_id)
+    # Atomic once-per-(viewer,target): the upsert only inserts the first time.
+    res = await db.photo_peeks.update_one(
+        {"viewer_id": uid, "target_id": target_id},
+        {"$setOnInsert": {"id": new_id(), "viewer_id": uid, "target_id": target_id, "at": iso(now_utc())}},
+        upsert=True,
+    )
+    if res.upserted_id is None:
+        raise HTTPException(409, "peek_used")
+    return {"photo_url": target.get("photo_url"), "seconds": 5}
 
 
 # ---------- Photo unlock ----------
@@ -582,8 +643,10 @@ async def saved_mine(uid: str = Depends(get_current_user_id)):
     ).to_list(500)
     unlocked_set = {p["target_id"] for p in unlocks}
 
+    # Users who hid their profile after being saved drop out of the list —
+    # their card would 404 on open anyway.
     users = await db.users.find(
-        {"id": {"$in": target_ids}},
+        {"id": {"$in": target_ids}, "hidden_profile": {"$ne": True}},
         {"_id": 0, "password_hash": 0},
     ).to_list(len(target_ids))
     users_by_id = {u["id"]: u for u in users}
@@ -611,8 +674,9 @@ async def saved_by_others(uid: str = Depends(get_current_user_id)):
     rows = await db.saved.find({"target_id": uid}, {"_id": 0}).sort("at", -1).to_list(500)
 
     owner_ids = [r["owner_id"] for r in rows]
+    # Hidden profiles never appear in interaction lists (undiscoverable).
     users = await db.users.find(
-        {"id": {"$in": owner_ids}},
+        {"id": {"$in": owner_ids}, "hidden_profile": {"$ne": True}},
         {"_id": 0, "password_hash": 0},
     ).to_list(len(owner_ids))
     users_by_id = {u["id"]: u for u in users}
@@ -660,7 +724,7 @@ async def viewers(uid: str = Depends(get_current_user_id)):
         ordered_ids.append(vid)
 
     users = await db.users.find(
-        {"id": {"$in": ordered_ids}},
+        {"id": {"$in": ordered_ids}, "hidden_profile": {"$ne": True}},
         {"_id": 0, "password_hash": 0},
     ).to_list(len(ordered_ids))
     users_by_id = {u["id"]: u for u in users}
@@ -696,7 +760,7 @@ async def interested_in_me(uid: str = Depends(get_current_user_id)):
     user_ids = list(user_ids)
 
     users = await db.users.find(
-        {"id": {"$in": user_ids}},
+        {"id": {"$in": user_ids}, "hidden_profile": {"$ne": True}},
         {"_id": 0, "password_hash": 0},
     ).to_list(len(user_ids))
     users_by_id = {u["id"]: u for u in users}
@@ -741,6 +805,17 @@ async def saved_summary(uid: str = Depends(get_current_user_id)):
             latest_at[oid] = r.get("at", "")
 
     ordered_ids = sorted(latest_at.keys(), key=lambda k: latest_at[k], reverse=True)
+
+    # Exclude hidden profiles from both the preview AND the advertised total —
+    # a "12 kishi qiziqdi" teaser must not count people the list won't show.
+    if ordered_ids:
+        hidden_rows = await db.users.find(
+            {"id": {"$in": ordered_ids}, "hidden_profile": True},
+            {"_id": 0, "id": 1},
+        ).to_list(len(ordered_ids))
+        hidden_ids = {h["id"] for h in hidden_rows}
+        ordered_ids = [i for i in ordered_ids if i not in hidden_ids]
+
     total = len(ordered_ids)
     preview_ids = ordered_ids[:5]
 

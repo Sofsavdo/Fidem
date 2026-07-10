@@ -72,6 +72,10 @@ class OnboardingProfile(BaseModel):
     smoking: Literal["no", "sometimes", "yes"] = "no"
     alcohol: Literal["no", "sometimes", "yes"] = "no"
     relocation: bool = False
+    # Signup consent: terms of use + privacy policy + serious-intent pledge,
+    # all confirmed with checkboxes before the wizard. Required for FIRST
+    # onboarding (auth_r enforces); ignored on the edit/complete flow.
+    terms_accepted: bool = False
 
 
 class UserPublic(BaseModel):
@@ -284,6 +288,13 @@ class NotificationPreferencesRequest(BaseModel):
     disable_community: bool = False
     disable_referral: bool = False
     disable_balance: bool = False
+
+
+# ---------- Privacy settings ----------
+class PrivacySettingsRequest(BaseModel):
+    # None = leave unchanged, so each toggle can be flipped independently.
+    photo_public: Optional[bool] = None
+    hidden_profile: Optional[bool] = None
 
 
 # ---------- Reports / blocks ----------

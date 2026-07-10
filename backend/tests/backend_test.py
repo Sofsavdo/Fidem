@@ -110,7 +110,12 @@ def onboarded(session, user_creds):
         "search_region": "Toshkent",
         "photo_url": "https://example.com/p.jpg",
         "bio": "Hello",
+        "terms_accepted": True,
     }
+    # First onboarding without consent must be refused (legal gate)
+    no_consent = {**payload, "terms_accepted": False}
+    r = session.post(f"{API}/profile/onboard", json=no_consent, headers=_auth_header(user_creds["token"]))
+    assert r.status_code == 400 and r.json()["detail"] == "terms_required"
     r = session.post(f"{API}/profile/onboard", json=payload, headers=_auth_header(user_creds["token"]))
     assert r.status_code == 200, r.text
     body = r.json()
@@ -365,3 +370,96 @@ def test_no_admin_confirm_payment_endpoint(session, admin_token):
     not confirm CLICK payments or top-ups."""
     r = session.post(f"{API}/payments/admin-confirm/anything", headers=_auth_header(admin_token))
     assert r.status_code == 404
+
+
+# ---------- Privacy: open photo / hidden profile / boost conflict ----------
+def test_privacy_settings_roundtrip(session, user_creds):
+    tok = user_creds["token"]
+    r = session.post(f"{API}/settings/privacy", json={"photo_public": True},
+                     headers=_auth_header(tok))
+    assert r.status_code == 200 and r.json()["photo_public"] is True
+    r = session.get(f"{API}/settings/privacy", headers=_auth_header(tok))
+    assert r.status_code == 200 and r.json()["photo_public"] is True
+    # /auth/me carries the flags so the frontend toggles render from `user`
+    me = session.get(f"{API}/auth/me", headers=_auth_header(tok)).json()
+    assert me.get("photo_public") is True
+    assert me.get("hidden_profile") is False
+    # partial update: flipping one flag must not touch the other
+    r = session.post(f"{API}/settings/privacy", json={"photo_public": False},
+                     headers=_auth_header(tok))
+    assert r.json()["photo_public"] is False and r.json()["hidden_profile"] is False
+
+
+def test_privacy_hidden_requires_paid_plan(session, user_creds, admin_token):
+    """Hidden mode is a paid feature: free plan gets a 403 upsell, any paid
+    plan can enable it."""
+    tok = user_creds["token"]
+    session.patch(f"{API}/admin/users/{user_creds['user_id']}",
+                  json={"plan": "free"}, headers=_auth_header(admin_token))
+    r = session.post(f"{API}/settings/privacy", json={"hidden_profile": True},
+                     headers=_auth_header(tok))
+    assert r.status_code == 403 and r.json()["detail"] == "privacy_requires_plan"
+    # photo_public stays free
+    r = session.post(f"{API}/settings/privacy", json={"photo_public": True},
+                     headers=_auth_header(tok))
+    assert r.status_code == 200
+    session.post(f"{API}/settings/privacy", json={"photo_public": False},
+                 headers=_auth_header(tok))
+    # smallest paid tier unlocks it
+    session.patch(f"{API}/admin/users/{user_creds['user_id']}",
+                  json={"plan": "standard"}, headers=_auth_header(admin_token))
+    r = session.post(f"{API}/settings/privacy", json={"hidden_profile": True},
+                     headers=_auth_header(tok))
+    assert r.status_code == 200 and r.json()["hidden_profile"] is True
+    session.post(f"{API}/settings/privacy", json={"hidden_profile": False},
+                 headers=_auth_header(tok))
+
+
+def test_vip_photo_peek_gated(session, user_creds, admin_token):
+    """/photo-peek requires vip plan AND hidden mode on."""
+    tok = user_creds["token"]
+    # standard plan, hidden off -> refused
+    r = session.post(f"{API}/photo-peek/some-user-id", headers=_auth_header(tok))
+    assert r.status_code == 403 and r.json()["detail"] == "peek_requires_vip"
+
+
+def test_hidden_profile_blocks_boost(session, user_creds, admin_token):
+    """Boost sells visibility; a hidden profile has none - both boost paths
+    must refuse instead of taking money."""
+    tok = user_creds["token"]
+    session.patch(f"{API}/admin/users/{user_creds['user_id']}",
+                  json={"plan": "standard"}, headers=_auth_header(admin_token))
+    r = session.post(f"{API}/settings/privacy", json={"hidden_profile": True},
+                     headers=_auth_header(tok))
+    assert r.status_code == 200 and r.json()["hidden_profile"] is True
+
+    r = session.post(f"{API}/boost/activate", json={"use_balance": True},
+                     headers=_auth_header(tok))
+    assert r.status_code == 400 and r.json()["detail"] == "boost_hidden"
+
+    r = session.post(f"{API}/payments/create", json={"purpose": "boost"},
+                     headers=_auth_header(tok))
+    assert r.status_code == 400 and r.json()["detail"] == "boost_hidden"
+
+    r = session.post(f"{API}/settings/privacy", json={"hidden_profile": False},
+                     headers=_auth_header(tok))
+    assert r.status_code == 200 and r.json()["hidden_profile"] is False
+
+
+def test_boost_active_blocks_hiding(session, user_creds, admin_token):
+    """The mirror rule: while a paid boost is running, hiding the profile is
+    refused (it would waste the boost the user just paid for)."""
+    tok = user_creds["token"]
+    session.patch(f"{API}/admin/users/{user_creds['user_id']}",
+                  json={"add_balance": 10000, "plan": "standard"}, headers=_auth_header(admin_token))
+    r = session.post(f"{API}/boost/activate", json={"use_balance": True},
+                     headers=_auth_header(tok))
+    assert r.status_code == 200, r.text
+
+    r = session.post(f"{API}/settings/privacy", json={"hidden_profile": True},
+                     headers=_auth_header(tok))
+    assert r.status_code == 400 and r.json()["detail"] == "privacy_boost_active"
+    # photo_public alone stays allowed while boosted
+    r = session.post(f"{API}/settings/privacy", json={"photo_public": False},
+                     headers=_auth_header(tok))
+    assert r.status_code == 200

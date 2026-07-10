@@ -12,28 +12,34 @@ import { tapMedium, tapLight, notify } from "@/lib/haptics";
 const CHAT_UNLOCK_PRICE = 9900; // mirrors backend PRICE_CHAT_UNLOCK_UZS (comparison only)
 
 const PLANS = [
+  // The weekly free conversation belongs to the FREE tier (backend
+  // FREE_WEEKLY_INITIATIONS) - paid plans have unlimited messaging, so
+  // advertising "1 free chat/week" on Standard was wrong.
   { key: "free", title: "Free", price: 0, accent: "border-border",
-    perks: ["profile", "candidates", "likes_matches", "chat_replies"] },
+    perks: ["profile", "candidates", "likes_matches", "chat_replies", "chat_free_weekly_perk"] },
   { key: "standard", title: "Standard", price: 34900, badge: "✅", accent: "border-secondary/50",
-    perks: ["chat_unlimited", "more_filters", "chat_free_weekly_perk"] },
+    perks: ["chat_unlimited", "more_filters", "privacy_hidden"] },
   { key: "premium", title: "Premium", price: 79000, badge: "💎", popular: true, accent: "border-gold",
-    perks: ["chat_unlimited", "who_viewed", "who_saved", "boost_visibility"] },
+    perks: ["chat_unlimited", "who_viewed", "who_saved", "boost_visibility", "privacy_incognito"] },
   { key: "vip", title: "VIP", price: 199000, badge: "👑", dark: true, accent: "border-white/10",
-    perks: ["max_visibility", "stealth_view", "priority", "family_share"] },
+    perks: ["max_visibility", "stealth_view", "photo_peek", "priority", "family_share"] },
 ];
 
 const PERK = {
   uz: { profile: "Profil", candidates: "Nomzodlar", likes_matches: "Yoqtirish va moslik", chat_replies: "Kelgan xabarga bepul javob",
-    chat_unlimited: "Cheksiz yozishish", chat_free_weekly_perk: "Haftada 1 bepul suhbat", more_filters: "Ko'proq filtrlar",
+    chat_unlimited: "Cheksiz yozishish", chat_free_weekly_perk: "Haftada 1 bepul suhbat boshlash", more_filters: "Ko'proq filtrlar",
     who_viewed: "Kim ko'rdi", who_saved: "Kim saqladi", boost_visibility: "Ko'rinish oshadi",
+    privacy_hidden: "Maxfiy rejim (ko'rinmaslik)", privacy_incognito: "Incognito ko'rish (iz qoldirmaydi)", photo_peek: "Yopiq rasmni 5 soniya ochish",
     max_visibility: "Maksimal ko'rinish", stealth_view: "Maxfiy ko'rish", priority: "Ustuvorlik", family_share: "Oila ulashish" },
   ru: { profile: "Профиль", candidates: "Кандидаты", likes_matches: "Лайки и совпадения", chat_replies: "Бесплатный ответ на входящие",
     chat_unlimited: "Безлимит сообщений", chat_free_weekly_perk: "1 бесплатный чат в неделю", more_filters: "Больше фильтров",
     who_viewed: "Кто смотрел", who_saved: "Кто сохранил", boost_visibility: "Больше видимости",
+    privacy_hidden: "Скрытый режим (невидимость)", privacy_incognito: "Инкогнито-просмотр (без следов)", photo_peek: "Открыть закрытое фото на 5 секунд",
     max_visibility: "Максимум видимости", stealth_view: "Скрытый просмотр", priority: "Приоритет", family_share: "Семейный доступ" },
   en: { profile: "Profile", candidates: "Candidates", likes_matches: "Likes & matches", chat_replies: "Free reply to incoming",
     chat_unlimited: "Unlimited messaging", chat_free_weekly_perk: "1 free chat / week", more_filters: "More filters",
     who_viewed: "Who viewed", who_saved: "Who saved", boost_visibility: "More visibility",
+    privacy_hidden: "Hidden mode (invisibility)", privacy_incognito: "Incognito viewing (no traces)", photo_peek: "Open a locked photo for 5s",
     max_visibility: "Max visibility", stealth_view: "Stealth view", priority: "Priority", family_share: "Family sharing" },
 };
 

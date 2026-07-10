@@ -1,6 +1,7 @@
 """Auth, profile, file upload routes."""
 from __future__ import annotations
 
+import asyncio
 import os
 from datetime import timedelta
 from typing import Optional
@@ -130,10 +131,19 @@ async def notify_new_profile_to_relevant_users(new_user: dict) -> None:
         ]
     }
 
+    # Only people the newcomer actually fits: opposite gender (a man never
+    # gets a male anketa), the recipient is searching for the newcomer's
+    # gender, the newcomer's age is inside the recipient's range, same
+    # region, not blocked, and match-notifications not muted.
     query = {
         "onboarded": True,
         "gender": target_gender,
+        "search_gender": gender,
+        "search_age_min": {"$lte": age},
+        "search_age_max": {"$gte": age},
         "region": region,
+        "blocked": {"$ne": True},
+        "notification_prefs.disable_match": {"$ne": True},
         "telegram_id": {"$exists": True, "$ne": None},
         "id": {"$ne": uid},
     }
@@ -342,6 +352,17 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
     user = await get_user(uid)
     was_onboarded = bool(user.get("onboarded"))
 
+    # Legal consent gate: the first onboarding is the platform's "signature
+    # moment" - terms of use, privacy policy and the serious-intent pledge
+    # must be explicitly accepted (checkboxes in the consent screen). The
+    # acceptance timestamp + version are stored as the durable record.
+    consented = bool(update.pop("terms_accepted", False))
+    if not was_onboarded:
+        if not consented:
+            raise HTTPException(400, "terms_required")
+        update["terms_accepted_at"] = iso(now_utc())
+        update["terms_version"] = "1.0"
+
     if was_onboarded:
         # Name is an identity-anchor field: once onboarding is complete,
         # letting this "complete/edit profile" endpoint silently rename the
@@ -401,8 +422,11 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
     )
 
     if not was_onboarded:
-        await notify_new_profile_to_relevant_users(fresh)
-        
+        # Fire-and-forget: up to 50 Telegram sends must not delay the
+        # newcomer's own onboarding response.
+        asyncio.create_task(notify_new_profile_to_relevant_users(fresh))
+
+
         # Referral signup reward
         # 100 so'm to inviter's referral earnings if inviter account age >= 30 days and user has 80%+ profile
         referred_by = fresh.get("referred_by")

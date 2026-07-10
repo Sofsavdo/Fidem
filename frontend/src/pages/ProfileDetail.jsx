@@ -7,7 +7,7 @@ import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot, LocationBadge } f
 import CompatibilityCard from "@/components/CompatibilityCard";
 import { photoSrc } from "@/lib/photo";
 import { formatLastActive } from "@/lib/time";
-import { Heart, MessageCircle, ArrowLeft, Lock, Clock, Shield, Share2, Crown } from "lucide-react";
+import { Heart, MessageCircle, ArrowLeft, Lock, Clock, Shield, Share2, Crown, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { useCandidateDetail, useSaved, useToggleSave, QK } from "@/hooks/queries";
 import { useQueryClient } from "@tanstack/react-query";
@@ -89,6 +89,40 @@ export default function ProfileDetail() {
     } catch (e) { toast.error(t("error_generic")); }
   }, [id, t, queryClient]);
 
+  // VIP privacy perk: peek this profile's locked photo once, for 5 seconds.
+  // The backend enforces "once per profile"; the timer here just ends the
+  // showing — re-requesting returns 409 (peek_used).
+  const canPeek = !!user?.hidden_profile && user?.plan === "vip";
+  const [peekUrl, setPeekUrl] = useState(null);
+  const [peekLeft, setPeekLeft] = useState(0);
+  const [peeking, setPeeking] = useState(false);
+  useEffect(() => {
+    if (!peekUrl) return undefined;
+    if (peekLeft <= 0) { setPeekUrl(null); return undefined; }
+    const tick = setTimeout(() => setPeekLeft((s) => s - 1), 1000);
+    return () => clearTimeout(tick);
+  }, [peekUrl, peekLeft]);
+  const peekPhoto = useCallback(async () => {
+    if (peeking) return;
+    setPeeking(true);
+    try {
+      const r = await api.post(`/photo-peek/${id}`);
+      if (r.data?.photo_url) {
+        setPeekUrl(r.data.photo_url);
+        setPeekLeft(r.data.seconds || 5);
+      } else {
+        toast.error(t("error_generic"));
+      }
+    } catch (e) {
+      const detail = (e?.response?.data?.detail || "").toString();
+      if (detail === "peek_used") toast.error(t("peek_used"));
+      else if (detail === "peek_requires_vip") toast.error(t("peek_requires_vip"));
+      else toast.error(t("error_generic"));
+    } finally {
+      setPeeking(false);
+    }
+  }, [id, peeking, t]);
+
   const toggleSave = useCallback(() => {
     toggleSaveMutation.mutate(
       { candidate: c, isSaved: saved },
@@ -123,8 +157,11 @@ export default function ProfileDetail() {
     );
   }
 
-  const blurred = !c.photo_unlocked;
-  const photoUrl = photoSrc(c.photo_url) || "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=900";
+  const peekActive = !!peekUrl && peekLeft > 0;
+  const blurred = !c.photo_unlocked && !peekActive;
+  const photoUrl = peekActive
+    ? photoSrc(peekUrl)
+    : (photoSrc(c.photo_url) || "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=900");
   const matchLabel = c.match_score >= 80 ? t("match_label_80") : c.match_score >= 60 ? t("match_label_60") : c.match_score >= 40 ? t("match_label_40") : t("match_label_0");
 
   return (
@@ -139,9 +176,32 @@ export default function ProfileDetail() {
           <MatchBadge score={c.match_score} />
         </div>
         {blurred && (
-          <button data-testid="unlock-photo" onClick={unlockPhoto} className="absolute inset-0 m-auto h-fit w-fit glass-dark text-white rounded-2xl px-5 py-3 flex items-center gap-2">
-            <Lock className="w-4 h-4" /> {c.photo_unlock_status === "pending" ? t("photo_requested") : t("unlock_photo")}
-          </button>
+          <div className="absolute inset-0 m-auto h-fit w-fit flex flex-col items-center gap-2">
+            <button data-testid="unlock-photo" onClick={unlockPhoto} className="glass-dark text-white rounded-2xl px-5 py-3 flex items-center gap-2">
+              <Lock className="w-4 h-4" /> {c.photo_unlock_status === "pending" ? t("photo_requested") : t("unlock_photo")}
+            </button>
+            {canPeek && (
+              <button
+                data-testid="peek-photo"
+                onClick={peekPhoto}
+                disabled={peeking}
+                className="glass-dark text-white rounded-2xl px-4 py-2 flex items-center gap-2 text-xs disabled:opacity-50 border border-gold/50"
+              >
+                <Eye className="w-3.5 h-3.5 text-gold" /> {t("peek_cta")} · {t("peek_once_note")}
+              </button>
+            )}
+          </div>
+        )}
+        {peekActive && (
+          <div data-testid="peek-countdown" className="absolute top-4 left-1/2 -translate-x-1/2 glass-dark text-white rounded-full px-3.5 py-1.5 text-xs font-semibold flex items-center gap-1.5">
+            <Eye className="w-3.5 h-3.5 text-gold" /> {peekLeft}s
+          </div>
+        )}
+        {/* Incognito reminder: this visit leaves no trace (premium/vip + hidden mode) */}
+        {!!user?.hidden_profile && ["premium", "vip"].includes(user?.plan) && (
+          <div data-testid="incognito-pill" className="absolute bottom-20 left-4 glass-dark text-white/90 rounded-full px-3 py-1.5 text-[10px] flex items-center gap-1.5">
+            <EyeOff className="w-3 h-3" /> {t("privacy_incognito_active")}
+          </div>
         )}
         <div className="absolute bottom-4 left-4 right-4 text-white flex items-end justify-between">
           <div>
