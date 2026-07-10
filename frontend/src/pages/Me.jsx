@@ -13,7 +13,18 @@ import { useQueryClient, useMutation } from "@tanstack/react-query";
 
 // Static support contact - a real Telegram account admins actually monitor,
 // not the bot (which only understands the mini-app commands).
-const ADMIN_TELEGRAM_USERNAME = process.env.REACT_APP_ADMIN_TELEGRAM_USERNAME || "Fidem_Admin";
+const ADMIN_TELEGRAM_USERNAME = process.env.REACT_APP_ADMIN_TELEGRAM_USERNAME || "FidemAppSupport";
+
+// Inside the Telegram Mini App webview a plain target=_blank anchor to t.me
+// is silently swallowed - Telegram links must go through openTelegramLink.
+function openSupportChat() {
+  const url = `https://t.me/${ADMIN_TELEGRAM_USERNAME}`;
+  const tg = window.Telegram?.WebApp;
+  if (tg?.openTelegramLink) {
+    try { tg.openTelegramLink(url); return; } catch { /* fall through */ }
+  }
+  window.open(url, "_blank", "noopener");
+}
 
 export default function Me() {
   const { user, t, logout, refresh, wsEvent } = useApp();
@@ -347,16 +358,15 @@ export default function Me() {
           {user.is_admin && (
             <NavRow to="/admin" testid="link-admin" icon={<SettingsIcon className="w-4 h-4" />} label={t("admin_panel")} />
           )}
-          <a
-            href={`https://t.me/${ADMIN_TELEGRAM_USERNAME}`}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            type="button"
+            onClick={openSupportChat}
             data-testid="link-contact-admin"
-            className="flex items-center justify-between p-4"
+            className="flex items-center justify-between p-4 w-full text-left"
           >
             <span className="flex items-center gap-3 text-sm"><MessageCircle className="w-4 h-4 text-secondary" /> {t("contact_admin")}</span>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </a>
+          </button>
           <button data-testid="btn-logout" onClick={logout} className="flex items-center justify-between p-4 w-full text-left">
             <span className="flex items-center gap-3 text-sm text-foreground"><LogOut className="w-4 h-4" /> {t("logout")}</span>
           </button>

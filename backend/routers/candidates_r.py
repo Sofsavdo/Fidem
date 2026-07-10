@@ -301,15 +301,32 @@ async def candidates(
 
         enriched.append(pub)
 
+    docs_by_id = {dd["id"]: dd for dd in docs}
+
     if sort == "match":
+        # Default feed order, in strict priority tiers:
+        #   1. Boosted profiles — boost buys the very top, above everything.
+        #   2. The viewer's own region (a Farg'ona user sees Farg'ona people
+        #      first) — explicit region/travel filters upstream still win
+        #      because they narrow the query itself.
+        #   3. Match score, with a freshness bonus so brand-new profiles get
+        #      early visibility (+15 first 3 days, +8 first week).
+        #   4. Profile completeness as the tie-breaker.
         now_iso = iso(now_utc())
+        my_region = me_doc.get("region") or ""
+        fresh_3d = iso(now_utc() - timedelta(days=3))
+        fresh_7d = iso(now_utc() - timedelta(days=7))
 
         def _rank(x):
-            d = next((dd for dd in docs if dd["id"] == x["id"]), {})
+            d = docs_by_id.get(x["id"], {})
             boosted = d.get("boost_until", "") > now_iso
+            same_region = bool(my_region) and d.get("region", "") == my_region
+            created = d.get("created_at", "")
+            fresh_bonus = 15 if created >= fresh_3d else (8 if created >= fresh_7d else 0)
             return (
-                -1 if boosted else 0,
-                -x.get("match_score", 0),
+                0 if boosted else 1,
+                0 if same_region else 1,
+                -(x.get("match_score", 0) + fresh_bonus),
                 -x.get("completeness", 0),
             )
 
@@ -319,7 +336,8 @@ async def candidates(
         enriched.sort(key=lambda x: (not x.get("online", False), x.get("last_active", "")), reverse=False)
 
     elif sort == "new":
-        enriched.sort(key=lambda x: x.get("last_active", ""), reverse=True)
+        # Genuinely new profiles (signup date), not merely recently active.
+        enriched.sort(key=lambda x: docs_by_id.get(x["id"], {}).get("created_at", ""), reverse=True)
 
     result = enriched[:limit]
 

@@ -100,6 +100,17 @@ async def startup() -> None:
     # interval for the life of the process, no external cron needed.
     asyncio.create_task(winback_loop())
 
+    # AI photo verification (ai_service.verify_face_photo) needs this key.
+    # Without it every verification call fails as "verification_unavailable",
+    # which deliberately lets users through UNVERIFIED so signups don't break
+    # - but it means no photo is actually being checked. Shout about it.
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        log.warning(
+            "ANTHROPIC_API_KEY is not set - AI photo verification is effectively "
+            "DISABLED (all photos pass through unverified). Set the key in the "
+            "environment to enable real photo checks."
+        )
+
     # Indexes
     await db.users.create_index("id", unique=True)
     await db.users.create_index("email", sparse=True)

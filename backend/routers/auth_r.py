@@ -1,6 +1,7 @@
 """Auth, profile, file upload routes."""
 from __future__ import annotations
 
+import asyncio
 import os
 from datetime import timedelta
 from typing import Optional
@@ -130,10 +131,19 @@ async def notify_new_profile_to_relevant_users(new_user: dict) -> None:
         ]
     }
 
+    # Only people the newcomer actually fits: opposite gender (a man never
+    # gets a male anketa), the recipient is searching for the newcomer's
+    # gender, the newcomer's age is inside the recipient's range, same
+    # region, not blocked, and match-notifications not muted.
     query = {
         "onboarded": True,
         "gender": target_gender,
+        "search_gender": gender,
+        "search_age_min": {"$lte": age},
+        "search_age_max": {"$gte": age},
         "region": region,
+        "blocked": {"$ne": True},
+        "notification_prefs.disable_match": {"$ne": True},
         "telegram_id": {"$exists": True, "$ne": None},
         "id": {"$ne": uid},
     }
@@ -401,8 +411,11 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
     )
 
     if not was_onboarded:
-        await notify_new_profile_to_relevant_users(fresh)
-        
+        # Fire-and-forget: up to 50 Telegram sends must not delay the
+        # newcomer's own onboarding response.
+        asyncio.create_task(notify_new_profile_to_relevant_users(fresh))
+
+
         # Referral signup reward
         # 100 so'm to inviter's referral earnings if inviter account age >= 30 days and user has 80%+ profile
         referred_by = fresh.get("referred_by")
