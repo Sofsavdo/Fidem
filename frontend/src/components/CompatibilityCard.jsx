@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { Sparkles, Lock } from "lucide-react";
@@ -11,7 +11,7 @@ export default function CompatibilityCard({ targetId }) {
   const [loading, setLoading] = useState(true);
   const [unlocking, setUnlocking] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const r = await api.get(`/personality/compatibility/${targetId}?lang=${lang}`);
@@ -19,9 +19,9 @@ export default function CompatibilityCard({ targetId }) {
     } catch (e) {
       setData({ error: true });
     } finally { setLoading(false); }
-  };
+  }, [targetId, lang]);
 
-  useEffect(() => { load(); }, [targetId, lang]);
+  useEffect(() => { load(); }, [load]);
 
   const unlock = async () => {
     setUnlocking(true);

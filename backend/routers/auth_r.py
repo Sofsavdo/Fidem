@@ -27,6 +27,7 @@ from core import (
     log,
     now_utc,
     parse_dt,
+    push_notif,
     rate_limit_auth,
     user_public,
 )
@@ -330,11 +331,20 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request):
         ref_owner = await db.users.find_one({"referral_id": ref_code})
         if not ref_owner:
             ref_owner = await db.users.find_one({"referral_username_lower": ref_code.lower()})
-        
+
         # Block self-referral (same telegram_id)
         if ref_owner and ref_owner.get("telegram_id") == tg_id:
             await db.pending_refs.delete_one({"telegram_id": tg_id})
         else:
+            # Attribution only - no reward here. The actual referral economy
+            # is entirely the referral_earnings pipeline (tier-capped 50% of
+            # the invitee's first subscription in payments_r.py, plus the
+            # 100 so'm "signup_free" bonus below once they complete
+            # onboarding) - the only rewards ever shown on the Referral page.
+            # An earlier, separate instant-balance click-bonus used to fire
+            # right here; it was never surfaced in any UI/i18n string and
+            # duplicated the real reward system, so it has been removed
+            # rather than kept as an invisible, undocumented perk.
             await db.users.update_one({"id": uid}, {"$set": {"referred_by": ref_code}})
             await db.pending_refs.delete_one({"telegram_id": tg_id})
 

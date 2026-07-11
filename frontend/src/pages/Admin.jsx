@@ -257,7 +257,10 @@ function AdminBroadcast() {
     if (!window.confirm(`${preview ?? "?"} ta foydalanuvchiga yuborilsinmi? Bu qaytarib bo'lmaydi.`)) return;
     broadcast.mutate({ text, dryRun: false }, {
       onSuccess: (data) => {
-        toast.success(`Yuborildi: ${data.sent} ta (${data.skipped_daily_cap} tasi kunlik limitga tushib qoldi)`);
+        // Fanout runs in the background on the server (can take minutes at
+        // scale) - the request returns as soon as it's queued, not once
+        // every notification is actually sent.
+        toast.success(`Navbatga qo'yildi: ${data.queued} ta foydalanuvchiga yuborilmoqda`);
         setText("");
         setPreview(null);
       },

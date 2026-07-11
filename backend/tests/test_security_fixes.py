@@ -352,3 +352,202 @@ def test_free_weekly_left_zero_for_paid_and_when_disabled(monkeypatch):
     assert chat_r.free_weekly_left({"plan": "premium"}) == 0
     monkeypatch.setattr(chat_r, "FREE_WEEKLY_INITIATIONS", 0)
     assert chat_r.free_weekly_left({"plan": "free"}) == 0
+
+
+# ---------- rate limiter: X-Forwarded-For spoofing + memory leak (audit fix) ----------
+class _FakeClient:
+    host = "10.0.0.1"  # the actual TCP peer - always our own edge proxy
+
+
+class _FakeRequest:
+    def __init__(self, headers: dict):
+        self.client = _FakeClient()
+        self.headers = headers
+
+
+def test_client_ip_uses_rightmost_xff_entry_not_leftmost():
+    """The leftmost X-Forwarded-For entry is whatever the caller claims and
+    can be forged fresh on every request; only the rightmost hop (appended
+    by our own trusted edge proxy) can't be spoofed by the client. Trusting
+    the leftmost entry let anyone bypass rate limiting for free."""
+    spoofed = _FakeRequest({"x-forwarded-for": "1.2.3.4, 10.0.0.1"})
+    assert core._client_ip(spoofed) == "10.0.0.1"
+
+
+def test_client_ip_falls_back_to_tcp_peer_without_header():
+    req = _FakeRequest({})
+    assert core._client_ip(req) == "10.0.0.1"
+
+
+def test_rate_limiter_blocks_after_max_attempts_from_same_key():
+    limiter = core.RateLimiter(max_attempts=3, window_sec=60)
+    for _ in range(3):
+        limiter.check("k")
+    with pytest.raises(Exception):
+        limiter.check("k")
+
+
+def test_rate_limiter_spoofed_xff_no_longer_bypasses_limit():
+    """Regression for the fix above: rotating a fake X-Forwarded-For per
+    request used to mint a fresh rate-limit bucket every time."""
+    limiter = core.RateLimiter(max_attempts=2, window_sec=60)
+    for i in range(2):
+        req = _FakeRequest({"x-forwarded-for": f"{i}.{i}.{i}.{i}, 10.0.0.1"})
+        limiter.check(f"auth:{core._client_ip(req)}")
+    req = _FakeRequest({"x-forwarded-for": "9.9.9.9, 10.0.0.1"})
+    with pytest.raises(Exception):
+        limiter.check(f"auth:{core._client_ip(req)}")
+
+
+def test_rate_limiter_gc_drops_only_stale_buckets():
+    limiter = core.RateLimiter(max_attempts=5, window_sec=1)
+    limiter.check("stale")
+    limiter.check("fresh")
+    time.sleep(1.1)
+    limiter.check("fresh")  # keeps "fresh" alive past the window
+    limiter.gc()
+    assert "stale" not in limiter.hits
+    assert "fresh" in limiter.hits
+
+
+# ---------- telegram webhook: referral bonus must not pay on a bare /start ----------
+class _FakeUsersCollection:
+    def __init__(self):
+        self.inc_calls = []
+
+    async def find_one(self, query, *_a, **_kw):
+        if query.get("telegram_id") == "999":
+            return None  # not yet a real account
+        if query.get("referral_id") == "ABC123":
+            return {"id": "owner-1", "telegram_id": "owner-tg"}
+        return None
+
+    async def update_one(self, query, update):
+        if "$inc" in update:
+            self.inc_calls.append((query, update["$inc"]))
+        return type("Res", (), {"modified_count": 1})()
+
+
+class _FakePendingRefs:
+    def __init__(self):
+        self.upserts = []
+
+    async def update_one(self, query, update, upsert=False):
+        self.upserts.append((query, update))
+        return type("Res", (), {"modified_count": 1})()
+
+
+class _FakeWebhookRequest:
+    def __init__(self, body: dict):
+        self._body = body
+
+    async def json(self):
+        return self._body
+
+
+def test_telegram_start_with_referral_does_not_credit_balance(monkeypatch):
+    """A bare bot '/start CODE' message requires no real account and no
+    verified Telegram WebApp session - scripting throwaway accounts to send
+    it used to farm free non-withdrawable balance. Attribution should still
+    be recorded (for the real reward paid at actual signup), but no balance
+    may move here."""
+    from routers import telegram_r
+
+    fake_users = _FakeUsersCollection()
+    fake_pending = _FakePendingRefs()
+    fake_db = type("FakeDb", (), {})()
+    fake_db.users = fake_users
+    fake_db.pending_refs = fake_pending
+    monkeypatch.setattr(telegram_r, "db", fake_db)
+    monkeypatch.setattr(telegram_r, "TELEGRAM_WEBHOOK_SECRET", "test-secret")
+
+    async def _noop_send(*_a, **_kw):
+        return None
+    monkeypatch.setattr(telegram_r, "send_telegram_message", _noop_send)
+
+    body = {"message": {"text": "/start ABC123", "chat": {"id": 1}, "from": {"id": 999}}}
+    req = _FakeWebhookRequest(body)
+    asyncio.run(telegram_r.telegram_webhook(req, secret="test-secret"))
+
+    assert fake_users.inc_calls == [], "balance/ref_count must not be credited on a bare /start"
+    assert len(fake_pending.upserts) == 1, "attribution should still be recorded for later real-signup payout"
+
+
+# ---------- /auth/telegram: real signup must not pay an undocumented instant
+# balance bonus either (the only referral economy is the referral_earnings
+# pipeline shown on the Referral page - tier-capped subscription share +
+# the 100 so'm signup_free bonus, both in auth_r.py/payments_r.py) ----------
+class _FakeAuthUsersCollection:
+    def __init__(self, ref_owner):
+        self._ref_owner = ref_owner
+        self.inserted = []
+        self.inc_calls = []
+        self.set_calls = []
+
+    async def find_one(self, query, *_a, **_kw):
+        if "telegram_id" in query:
+            return None  # brand new account
+        if query.get("referral_id") == self._ref_owner["referral_id"]:
+            return dict(self._ref_owner)
+        if "ip_address" in query:
+            return None
+        return None
+
+    async def count_documents(self, *_a, **_kw):
+        return 0
+
+    async def insert_one(self, doc):
+        self.inserted.append(doc)
+
+    async def update_one(self, query, update):
+        if "$inc" in update:
+            self.inc_calls.append((query, update["$inc"]))
+        if "$set" in update:
+            self.set_calls.append((query, update["$set"]))
+        return type("Res", (), {"modified_count": 1})()
+
+
+class _FakeAuthPendingRefs:
+    def __init__(self, ref_code):
+        self._ref_code = ref_code
+
+    async def find_one(self, query, *_a, **_kw):
+        return {"telegram_id": query.get("telegram_id"), "ref_code": self._ref_code}
+
+    async def delete_one(self, *_a, **_kw):
+        return None
+
+
+class _FakeAuthRequest:
+    def __init__(self):
+        self.client = _FakeClient()
+        self.headers = {}
+
+
+def test_auth_telegram_real_signup_does_not_pay_instant_balance_bonus(monkeypatch):
+    """A separate, undocumented +1000 so'm instant balance bonus used to fire
+    here too (on top of the bare-/start version already closed above). It
+    was never shown anywhere in the UI/i18n and duplicated the real,
+    tier-capped referral_earnings system - removed outright rather than kept
+    as an invisible perk."""
+    from routers import auth_r
+
+    ref_owner = {"id": "owner-1", "referral_id": "OWNER123", "telegram_id": "owner-tg"}
+    fake_users = _FakeAuthUsersCollection(ref_owner)
+    fake_pending = _FakeAuthPendingRefs("OWNER123")
+    fake_db = type("FakeDb", (), {})()
+    fake_db.users = fake_users
+    fake_db.pending_refs = fake_pending
+    monkeypatch.setattr(auth_r, "db", fake_db)
+    monkeypatch.setattr(auth_r, "TELEGRAM_BOT_TOKEN", "123456:FAKE-BOT-TOKEN-FOR-TESTS")
+
+    from models import TelegramAuthRequest
+    user_json = '{"id": 777, "first_name": "New"}'
+    init_data = _build_valid_init_data("123456:FAKE-BOT-TOKEN-FOR-TESTS", user_json)
+    req = TelegramAuthRequest(init_data=init_data)
+
+    asyncio.run(auth_r.auth_telegram(req, _FakeAuthRequest()))
+
+    assert fake_users.inc_calls == [], "no balance/ref_count $inc should happen on real signup either"
+    referred_by_writes = [s for q, s in fake_users.set_calls if "referred_by" in s]
+    assert referred_by_writes == [{"referred_by": "OWNER123"}], "attribution should still be recorded"

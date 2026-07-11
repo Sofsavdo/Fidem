@@ -24,6 +24,7 @@ from core import (
     parse_dt,
     push_notif,
     rate_limit_payment,
+    rate_limit_verification,
 )
 from models import CreatePaymentRequest, VerificationRequest, new_id
 from services import CLICK_SECRET_KEY, click_pay_link, verify_click_sign
@@ -147,7 +148,8 @@ async def _ai_review_verification(doc: dict) -> None:
 
 
 @router.post("/verification/request")
-async def request_verification(req: VerificationRequest, uid: str = Depends(get_current_user_id)):
+async def request_verification(req: VerificationRequest, request: Request, uid: str = Depends(get_current_user_id)):
+    rate_limit_verification(request)
     doc = {
         "id": new_id(),
         "user_id": uid,

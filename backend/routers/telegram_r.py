@@ -113,6 +113,15 @@ async def telegram_webhook(request: Request, secret: Optional[str] = Query(None)
                 )
 
             if ref_owner and (not existing or existing["id"] != ref_owner["id"]):
+                # Just record the attribution here - do NOT pay any bonus yet.
+                # A bare "/start CODE" text message costs the sender nothing
+                # and proves nothing (no Mini App session, no real account),
+                # so paying out on it is a free-money farm: script N throwaway
+                # Telegram accounts to message /start, collect N x reward,
+                # never touch the app again. The click-bonus is paid instead
+                # in routers/auth_r.py at real account creation (/auth/telegram),
+                # which requires a verified Telegram WebApp session and runs
+                # through the existing IP-based fraud scoring.
                 if existing:
                     await db.users.update_one(
                         {"id": existing["id"]},
@@ -130,18 +139,6 @@ async def telegram_webhook(request: Request, secret: Optional[str] = Query(None)
                         },
                         upsert=True,
                     )
-
-                await db.users.update_one(
-                    {"id": ref_owner["id"]},
-                    {"$inc": {"balance": 1000, "ref_count": 1}},
-                )
-
-                await push_notif(
-                    ref_owner["id"],
-                    "referral",
-                    "🎁 Yangi taklif bonusi\n\nSizning havolangiz orqali yangi foydalanuvchi qo‘shildi.\n\n+1000 so‘m bonus hisoblandi.",
-                    link="/referral",
-                )
 
         webapp_url = get_webapp_url()
 

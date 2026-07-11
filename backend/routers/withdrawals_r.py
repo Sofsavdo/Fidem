@@ -226,16 +226,19 @@ async def admin_reject_withdrawal(
     w = await db.withdrawals.find_one({"id": wid})
     if not w:
         raise HTTPException(404, "Not found")
-    if w["status"] != "pending":
+    # Atomically claim the pending->rejected transition first (matching the
+    # same guard pattern as approve) - two concurrent reject calls (double
+    # click, retried request) must not both refund the same withdrawal.
+    claim = await db.withdrawals.update_one(
+        {"id": wid, "status": "pending"},
+        {"$set": {"status": "rejected", "rejection_reason": reason, "processed_at": iso(now_utc())}},
+    )
+    if claim.modified_count == 0:
         raise HTTPException(400, "Already processed")
     # Return funds to referral earnings
     await db.users.update_one(
         {"id": w["user_id"]},
         {"$inc": {"referral_earnings_withdrawable": w["amount"], "withdrawals_pending": -w["amount"]}},
-    )
-    await db.withdrawals.update_one(
-        {"id": wid},
-        {"$set": {"status": "rejected", "rejection_reason": reason, "processed_at": iso(now_utc())}},
     )
     reason_text = reason or "ko'rsatilmagan"
     await push_notif(

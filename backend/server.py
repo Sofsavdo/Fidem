@@ -33,6 +33,7 @@ from core import (  # noqa: E402  (must load env first)
     hash_pw,
     iso,
     now_utc,
+    rate_limiter_gc_loop,
 )
 from models import new_id  # noqa: E402
 from routers.admin_r import router as admin_router  # noqa: E402
@@ -107,6 +108,9 @@ async def startup() -> None:
 
     # Plan expiry reminders/downgrades, daily picks pushes, weekly digests.
     asyncio.create_task(lifecycle_loop())
+
+    # Keeps the in-memory rate-limit buckets from growing forever.
+    asyncio.create_task(rate_limiter_gc_loop())
 
     # AI photo verification (ai_service.verify_face_photo) needs this key.
     # Without it every verification call fails as "verification_unavailable",
@@ -204,6 +208,34 @@ async def startup() -> None:
     await db.profile_views.create_index([("target_id", 1), ("at", -1)], name="ix_profile_views_target_at")
     await db.messages.create_index([("to_user_id", 1), ("created_at", -1)], name="ix_msg_to_user_time")
     await db.chat_unlocks.create_index([("user_id", 1), ("target_id", 1)], name="ix_chat_unlocks_user_target")
+    # Verifications: looked up by id on every decide, by user_id for
+    # /verification/mine, and by status+created_at for the admin queue -
+    # none of these had an index, so every one of those was a full scan.
+    await db.verifications.create_index("id", unique=True, name="ix_verif_id")
+    await db.verifications.create_index([("user_id", 1), ("created_at", -1)], name="ix_verif_user_time")
+    await db.verifications.create_index([("status", 1), ("created_at", -1)], name="ix_verif_status_time")
+    # Gifts: leaderboard aggregates $match on created_at then $group by
+    # from_user_id for period filters (day/week/month).
+    await db.gifts.create_index([("created_at", -1)], name="ix_gifts_time")
+    await db.gifts.create_index([("from_user_id", 1)], name="ix_gifts_from_user")
+    # Daily picks: unique per user per day. Without a unique index, two
+    # concurrent /daily-picks requests on a cache-miss can both pass the
+    # find_one-then-upsert race and insert two docs for the same day. A
+    # unique-index create fails outright if any duplicate already exists in
+    # the live collection - non-fatal here, same fallback pattern as the
+    # referral_username_lower index below, so a pre-existing duplicate can
+    # never take the whole app down at boot.
+    try:
+        await db.daily_picks.create_index([("user_id", 1), ("date", 1)], unique=True, name="ix_daily_picks_user_date")
+    except Exception as e:
+        log.warning(f"Warning: Failed to create unique daily_picks index (likely pre-existing duplicates): {e}")
+        await db.daily_picks.create_index([("user_id", 1), ("date", 1)], name="ix_daily_picks_user_date_nonunique")
+    await db.reports.create_index([("status", 1), ("created_at", -1)], name="ix_reports_status_time")
+    try:
+        await db.pending_refs.create_index("telegram_id", unique=True, name="ix_pending_refs_tg")
+    except Exception as e:
+        log.warning(f"Warning: Failed to create unique pending_refs index (likely pre-existing duplicates): {e}")
+        await db.pending_refs.create_index("telegram_id", name="ix_pending_refs_tg_nonunique")
 
     # Initialize referral_id for existing users (first 8 chars of id) - only if needed
     sample_referral = await db.users.find_one({"referral_id": {"$exists": True}}, {"referral_id": 1})
