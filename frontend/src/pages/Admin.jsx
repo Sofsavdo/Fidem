@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ShieldCheck, Wallet, Users as UsersIcon, DollarSign, TrendingUp, BarChart3, LayoutDashboard, Search, MessageSquare, Settings, ChevronRight, MapPin, Activity, AlertTriangle, Send } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
+import { PURPOSE_UZ, REF_TYPE_UZ, VERIF_KIND_UZ } from "@/lib/labels";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
 import {
   useAdminStats, useAdminUsers, useAdminRegions, useAdminUserSearch, useUpdateAdminUser,
@@ -14,27 +15,27 @@ import {
 } from "@/hooks/queries";
 
 const menuItems = [
-  { id: "dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { id: "analytics", icon: BarChart3, label: "Analytics" },
-  { id: "users", icon: UsersIcon, label: "Users" },
-  { id: "broadcast", icon: Send, label: "Broadcast" },
-  { id: "payments", icon: DollarSign, label: "Payments" },
-  { id: "verifications", icon: ShieldCheck, label: "Verifications" },
-  { id: "withdrawals", icon: Wallet, label: "Withdrawals" },
-  { id: "referrals", icon: TrendingUp, label: "Referrals" },
-  { id: "messages", icon: MessageSquare, label: "Chat" },
+  { id: "dashboard", icon: LayoutDashboard, label: "Boshqaruv" },
+  { id: "analytics", icon: BarChart3, label: "Analitika" },
+  { id: "users", icon: UsersIcon, label: "Foydalanuvchilar" },
+  { id: "broadcast", icon: Send, label: "Xabar yuborish" },
+  { id: "payments", icon: DollarSign, label: "To'lovlar" },
+  { id: "verifications", icon: ShieldCheck, label: "Tasdiqlashlar" },
+  { id: "withdrawals", icon: Wallet, label: "Yechib olishlar" },
+  { id: "referrals", icon: TrendingUp, label: "Referallar" },
+  { id: "messages", icon: MessageSquare, label: "Chat nazorati" },
   { id: "concierge", icon: Search, label: "Concierge" },
-  { id: "fraud", icon: AlertTriangle, label: "Fraud" },
-  { id: "reports", icon: Settings, label: "Reports" },
+  { id: "fraud", icon: AlertTriangle, label: "Firibgarlik" },
+  { id: "reports", icon: Settings, label: "Shikoyatlar" },
 ];
 
 function AdminPagination({ page, setPage, total, limit }) {
   if (total <= limit) return null;
   return (
     <div className="flex justify-center gap-2 mt-4">
-      <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Prev</button>
+      <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Oldingi</button>
       <span className="px-3 py-1 text-xs">{page} / {Math.ceil(total / limit)}</span>
-      <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Next</button>
+      <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 rounded-full border border-border text-xs disabled:opacity-50">Keyingi</button>
     </div>
   );
 }
@@ -56,7 +57,7 @@ export default function Admin() {
       <aside className={`lg:fixed lg:left-0 lg:top-0 lg:h-full bg-card border-r border-border transition-all duration-300 z-50 ${sidebarOpen ? "lg:w-64 w-full" : "lg:w-16 w-full"}`}>
         <div className="p-4 border-b border-border flex items-center justify-between">
           <h1 className={`font-heading font-semibold ${sidebarOpen ? "text-xl" : "text-center text-sm"}`}>
-            {sidebarOpen ? "Admin Panel" : "AP"}
+            {sidebarOpen ? "Boshqaruv paneli" : "BP"}
           </h1>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -140,9 +141,9 @@ function AdminDashboard({ stats, go }) {
   const rev = stats.revenue || {};
   const money = (n) => `${(n || 0).toLocaleString()} so'm`;
   const attention = [
-    { label: "Pending payments", value: stats.pending_payments || 0, tab: "payments", Icon: DollarSign },
-    { label: "Pending verifications", value: stats.pending_verifications || 0, tab: "verifications", Icon: ShieldCheck },
-    { label: "Open reports", value: stats.open_reports || 0, tab: "reports", Icon: AlertTriangle },
+    { label: "Kutilayotgan to'lovlar", value: stats.pending_payments || 0, tab: "payments", Icon: DollarSign },
+    { label: "Kutilayotgan tasdiqlashlar", value: stats.pending_verifications || 0, tab: "verifications", Icon: ShieldCheck },
+    { label: "Ochiq shikoyatlar", value: stats.open_reports || 0, tab: "reports", Icon: AlertTriangle },
   ];
   const regions = stats.top_regions || [];
   const regionMax = regions.length ? (regions[0].count || 1) : 1;
@@ -150,15 +151,15 @@ function AdminDashboard({ stats, go }) {
     <div className="space-y-6" data-testid="admin-stats">
       {/* Revenue */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <RevenueTile label="Total revenue" value={money(rev.total)} accent />
-        <RevenueTile label="Today" value={money(rev.today)} />
-        <RevenueTile label="This week" value={money(rev.week)} />
-        <RevenueTile label="This month" value={money(rev.month)} />
+        <RevenueTile label="Jami daromad" value={money(rev.total)} accent />
+        <RevenueTile label="Bugun" value={money(rev.today)} />
+        <RevenueTile label="Shu hafta" value={money(rev.week)} />
+        <RevenueTile label="Shu oy" value={money(rev.month)} />
       </div>
 
       {/* Needs attention — actionable */}
       <div>
-        <p className="field-label mb-2 px-1">Needs attention</p>
+        <p className="field-label mb-2 px-1">E'tibor kerak</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {attention.map((a) => (
             <button
@@ -179,22 +180,22 @@ function AdminDashboard({ stats, go }) {
 
       {/* Overview metrics */}
       <div>
-        <p className="field-label mb-2 px-1">Overview</p>
+        <p className="field-label mb-2 px-1">Umumiy ko'rinish</p>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          <StatCard label="Users" value={(stats.total_users || 0).toLocaleString()} icon={<UsersIcon className="w-4 h-4" />} />
-          <StatCard label="Onboarded" value={(stats.onboarded || 0).toLocaleString()} />
+          <StatCard label="Foydalanuvchilar" value={(stats.total_users || 0).toLocaleString()} icon={<UsersIcon className="w-4 h-4" />} />
+          <StatCard label="Anketa to'ldirganlar" value={(stats.onboarded || 0).toLocaleString()} />
           <StatCard label="DAU" value={stats.dau} />
           <StatCard label="WAU" value={stats.wau} />
           <StatCard label="MAU" value={stats.mau} />
-          <StatCard label="Conversion" value={`${stats.conversion_premium}%`} />
+          <StatCard label="Konversiya" value={`${stats.conversion_premium}%`} />
           <StatCard label="Premium" value={stats.premium} />
           <StatCard label="VIP" value={stats.vip} />
-          <StatCard label="M / F" value={`${stats.males} / ${stats.females}`} />
-          <StatCard label="Referrals" value={stats.referrals?.total || 0} />
-          <StatCard label="Messages today" value={stats.messages?.today || 0} />
-          {stats.quality && <StatCard label="Avg completion" value={`${stats.quality.avg_completion}%`} />}
-          {stats.quality && <StatCard label="Retention" value={`${stats.quality.retention_rate}%`} />}
-          {stats.quality && <StatCard label="Msgs / user" value={stats.quality.avg_messages_per_user} />}
+          <StatCard label="Erkak / Ayol" value={`${stats.males} / ${stats.females}`} />
+          <StatCard label="Referallar" value={stats.referrals?.total || 0} />
+          <StatCard label="Bugungi xabarlar" value={stats.messages?.today || 0} />
+          {stats.quality && <StatCard label="O'rtacha to'liqlik" value={`${stats.quality.avg_completion}%`} />}
+          {stats.quality && <StatCard label="Qaytish (retention)" value={`${stats.quality.retention_rate}%`} />}
+          {stats.quality && <StatCard label="Xabar / user" value={stats.quality.avg_messages_per_user} />}
         </div>
       </div>
 
@@ -305,7 +306,7 @@ function AdminAnalytics({ stats }) {
   ];
 
   const purposeData = (stats.revenue?.by_purpose || []).map(p => ({
-    name: p._id,
+    name: PURPOSE_UZ[p._id] || p._id,
     value: p.total,
     count: p.count,
   }));
@@ -410,7 +411,14 @@ const USER_SEGMENTS = [
 ];
 
 function AdminUsers() {
+  // Search is debounced: typing used to fire a server query on EVERY
+  // keystroke, which is a big part of why the panel felt frozen.
+  const [qInput, setQInput] = useState("");
   const [q, setQ] = useState("");
+  React.useEffect(() => {
+    const id = setTimeout(() => setQ(qInput.trim()), 350);
+    return () => clearTimeout(id);
+  }, [qInput]);
   const [segment, setSegment] = useState("all");
   const [filters, setFilters] = useState({ gender: "", region: "", age_min: "", age_max: "", marital_status: "" });
   const [page, setPage] = useState(1);
@@ -433,7 +441,7 @@ function AdminUsers() {
 
   const patch = (id, p) => {
     updateUser.mutate({ id, patch: p }, {
-      onSuccess: () => toast.success("Updated"),
+      onSuccess: () => toast.success("Yangilandi ✓"),
       onError: () => toast.error("Foydalanuvchilarni yuklashda xatolik"),
     });
   };
@@ -442,7 +450,7 @@ function AdminUsers() {
     <div className="space-y-4" data-testid="admin-users">
       {/* Search and Filters */}
       <div className="space-y-3">
-        <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search by name, email, username..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" data-testid="admin-user-search" />
+        <input value={qInput} onChange={(e) => { setQInput(e.target.value); setPage(1); }} placeholder="Ism, email yoki username bo'yicha qidirish..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" data-testid="admin-user-search" />
         <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1">
           {USER_SEGMENTS.map((s) => (
             <button
@@ -569,19 +577,19 @@ function AdminUsers() {
               {/* Device & Session Info */}
               <div className="grid grid-cols-1 gap-4">
                 <div className="p-3 bg-muted rounded-xl">
-                  <p className="text-xs text-muted-foreground">IP Address</p>
+                  <p className="text-xs text-muted-foreground">IP manzil</p>
                   <p className="font-medium font-mono text-sm">{selectedUser.ip_address || "Unknown"}</p>
                 </div>
                 <div className="p-3 bg-muted rounded-xl">
-                  <p className="text-xs text-muted-foreground">User Agent</p>
+                  <p className="text-xs text-muted-foreground">Qurilma (User Agent)</p>
                   <p className="font-medium text-xs break-all">{selectedUser.user_agent || "Unknown"}</p>
                 </div>
                 <div className="p-3 bg-muted rounded-xl">
-                  <p className="text-xs text-muted-foreground">Last Active</p>
+                  <p className="text-xs text-muted-foreground">Oxirgi faollik</p>
                   <p className="font-medium text-sm">{selectedUser.last_active ? new Date(selectedUser.last_active).toLocaleString("uz-UZ") : "Unknown"}</p>
                 </div>
                 <div className="p-3 bg-muted rounded-xl">
-                  <p className="text-xs text-muted-foreground">Created At</p>
+                  <p className="text-xs text-muted-foreground">Qo'shilgan sana</p>
                   <p className="font-medium text-sm">{selectedUser.created_at ? new Date(selectedUser.created_at).toLocaleString("uz-UZ") : "Unknown"}</p>
                 </div>
               </div>
@@ -589,11 +597,11 @@ function AdminUsers() {
               {/* Account Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-muted rounded-xl">
-                  <p className="text-xs text-muted-foreground">Plan</p>
+                  <p className="text-xs text-muted-foreground">Tarif</p>
                   <p className="font-medium">{selectedUser.plan}</p>
                 </div>
                 <div className="p-3 bg-muted rounded-xl">
-                  <p className="text-xs text-muted-foreground">Balance</p>
+                  <p className="text-xs text-muted-foreground">Balans</p>
                   <p className="font-medium">{selectedUser.balance?.toLocaleString()} so'm</p>
                 </div>
                 <div className="p-3 bg-muted rounded-xl">
@@ -658,8 +666,8 @@ function AdminPayments() {
   const total = data?.total || 0;
   const blockMutation = useAdminPaymentBlock();
 
-  const blockPayment = (id) => blockMutation.mutate({ id, block: true }, { onSuccess: () => toast.success("Blocked") });
-  const unblockPayment = (id) => blockMutation.mutate({ id, block: false }, { onSuccess: () => toast.success("Unblocked") });
+  const blockPayment = (id) => blockMutation.mutate({ id, block: true }, { onSuccess: () => toast.success("Bloklandi") });
+  const unblockPayment = (id) => blockMutation.mutate({ id, block: false }, { onSuccess: () => toast.success("Blokdan chiqarildi") });
 
   const statusPill = (s) => {
     if (s === "success" || s === "paid") return <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">✓ {s === "paid" ? "Balansdan" : "CLICK"}</span>;
@@ -695,15 +703,15 @@ function AdminPayments() {
                   {p.user_name || p.user_id?.slice(0, 8)}
                   {p.user_telegram ? <span className="text-muted-foreground font-normal"> · @{p.user_telegram}</span> : null}
                 </p>
-                <p className="text-sm">{p.purpose} · <span className="font-semibold tabular-nums">{p.amount?.toLocaleString()} so'm</span>{p.balance_used > 0 && p.click_amount > 0 ? <span className="text-[10px] text-muted-foreground"> (balans {p.balance_used?.toLocaleString()} + CLICK {p.click_amount?.toLocaleString()})</span> : null}</p>
-                <p className="text-[10px] text-muted-foreground">{p.created_at ? new Date(p.created_at).toLocaleString("uz-UZ") : "—"} {p.blocked_by_admin && "· 🚫 Blocked"}</p>
+                <p className="text-sm">{PURPOSE_UZ[p.purpose] || p.purpose} · <span className="font-semibold tabular-nums">{p.amount?.toLocaleString()} so'm</span>{p.balance_used > 0 && p.click_amount > 0 ? <span className="text-[10px] text-muted-foreground"> (balans {p.balance_used?.toLocaleString()} + CLICK {p.click_amount?.toLocaleString()})</span> : null}</p>
+                <p className="text-[10px] text-muted-foreground">{p.created_at ? new Date(p.created_at).toLocaleString("uz-UZ") : "—"} {p.blocked_by_admin && "· 🚫 Bloklangan"}</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {statusPill(p.status)}
                 {p.blocked_by_admin ? (
-                  <button onClick={() => unblockPayment(p.id)} className="text-xs rounded-full bg-emerald-100 text-emerald-700 px-3 py-1.5">Unblock</button>
+                  <button onClick={() => unblockPayment(p.id)} className="text-xs rounded-full bg-emerald-100 text-emerald-700 px-3 py-1.5">Blokdan chiqarish</button>
                 ) : (
-                  <button onClick={() => blockPayment(p.id)} className="text-xs rounded-full bg-red-50 text-red-700 px-3 py-1.5">Block</button>
+                  <button onClick={() => blockPayment(p.id)} className="text-xs rounded-full bg-red-50 text-red-700 px-3 py-1.5">Bloklash</button>
                 )}
               </div>
             </div>
@@ -726,11 +734,11 @@ function AdminVerifications() {
 
   return (
     <div className="space-y-2" data-testid="admin-verifs">
-      {list.length === 0 && <p className="text-sm text-muted-foreground">No pending</p>}
+      {list.length === 0 && <p className="text-sm text-muted-foreground">Kutilayotganlar yo'q</p>}
       {list.map((v) => (
         <div key={v.id} className="rounded-2xl bg-card border border-border p-3 flex items-center justify-between" data-testid={`adm-verif-${v.id}`}>
           <div>
-            <p className="text-sm">{v.kind} — {v.user_id?.slice(0, 8)}</p>
+            <p className="text-sm">{VERIF_KIND_UZ[v.kind] || v.kind} — {v.user_id?.slice(0, 8)}</p>
             <p className="text-xs text-muted-foreground">{v.note}</p>
           </div>
           <div className="flex gap-1">
@@ -748,7 +756,7 @@ function AdminReports() {
   const { data: list = [] } = useAdminReports();
   return (
     <div className="space-y-2" data-testid="admin-reports">
-      {list.length === 0 && <p className="text-sm text-muted-foreground">No reports</p>}
+      {list.length === 0 && <p className="text-sm text-muted-foreground">Shikoyatlar yo'q</p>}
       {list.map((r) => (
         <div key={r.id} className="rounded-2xl bg-card border border-border p-3">
           <p className="text-sm">{r.reason}</p>
@@ -1003,7 +1011,7 @@ function AdminReferrals() {
         <div key={r.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`adm-ref-${r.id}`}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium">{r.type} · <span className="text-foreground">{r.amount?.toLocaleString()} so'm</span></p>
+              <p className="text-sm font-medium">{REF_TYPE_UZ[r.type] || r.type} · <span className="text-foreground">{r.amount?.toLocaleString()} so'm</span></p>
               <p className="text-xs text-muted-foreground">{r.user_id?.slice(0, 8)} → {r.referred_user_id?.slice(0, 8)}</p>
               <p className="text-[10px] text-muted-foreground">{new Date(r.created_at).toLocaleString("uz-UZ")} · {r.status}</p>
             </div>
@@ -1085,15 +1093,15 @@ function AdminFraud() {
   const total = data?.total || 0;
   const markSafeMutation = useAdminMarkSafe();
 
-  const markSafe = (uid) => markSafeMutation.mutate(uid, { onSuccess: () => toast.success("Marked as safe") });
+  const markSafe = (uid) => markSafeMutation.mutate(uid, { onSuccess: () => toast.success("Xavfsiz deb belgilandi") });
 
   return (
     <div className="space-y-4" data-testid="admin-fraud">
       <div className="flex gap-2 items-center">
-        <label className="text-sm">Min fraud score:</label>
+        <label className="text-sm">Minimal fraud ball:</label>
         <input type="number" value={minScore} onChange={(e) => { setMinScore(Number(e.target.value)); setPage(1); }} className="rounded-xl border border-border bg-card px-3 py-2 text-sm w-24" />
       </div>
-      {list.length === 0 && <p className="text-sm text-muted-foreground">No suspicious users found</p>}
+      {list.length === 0 && <p className="text-sm text-muted-foreground">Shubhali foydalanuvchilar topilmadi</p>}
       <div className="space-y-2">
         {list.map((u) => (
           <div key={u.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`adm-fraud-${u.id}`}>
@@ -1104,7 +1112,7 @@ function AdminFraud() {
                 </div>
                 <div>
                   <p className="text-sm font-medium">{u.name} · Score: {u.fraud_score || 0}</p>
-                  <p className="text-xs text-muted-foreground">{u.email} · {u.ip_address || "Unknown IP"}</p>
+                  <p className="text-xs text-muted-foreground">{u.email} · {u.ip_address || "IP noma'lum"}</p>
                   {u.fraud_reasons && u.fraud_reasons.length > 0 && (
                     <p className="text-[10px] text-red-600">{u.fraud_reasons.join(", ")}</p>
                   )}
@@ -1112,7 +1120,7 @@ function AdminFraud() {
               </div>
               <div className="flex gap-1">
                 {u.flagged_as_bot && <span className="text-[10px] px-2 py-1 rounded-full bg-red-100 text-red-700">🤖 Bot</span>}
-                <button onClick={() => markSafe(u.id)} className="text-xs rounded-full bg-emerald-100 text-emerald-700 px-2 py-1">Mark Safe</button>
+                <button onClick={() => markSafe(u.id)} className="text-xs rounded-full bg-emerald-100 text-emerald-700 px-2 py-1">Xavfsiz</button>
               </div>
             </div>
           </div>

@@ -336,6 +336,8 @@ export function useAdminStats() {
   return useQuery({
     queryKey: QK.adminStats,
     queryFn: () => api.get("/admin/stats").then((r) => r.data),
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -343,6 +345,8 @@ export function useAdminUsers(params) {
   return useQuery({
     queryKey: QK.adminUsers(params),
     queryFn: () => api.get("/admin/users", { params }).then((r) => r.data),
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -377,6 +381,8 @@ export function useAdminPayments(params) {
   return useQuery({
     queryKey: QK.adminPayments(params),
     queryFn: () => api.get("/admin/payments", { params }).then((r) => r.data),
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -392,6 +398,8 @@ export function useAdminVerifications(params) {
   return useQuery({
     queryKey: QK.adminVerifications(params),
     queryFn: () => api.get("/admin/verifications", { params }).then((r) => r.data),
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -407,6 +415,8 @@ export function useAdminReports() {
   return useQuery({
     queryKey: QK.adminReports,
     queryFn: () => api.get("/admin/reports").then((r) => r.data || []),
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -414,6 +424,8 @@ export function useAdminWithdrawals(params) {
   return useQuery({
     queryKey: QK.adminWithdrawals(params),
     queryFn: () => api.get("/admin/withdrawals", { params }).then((r) => r.data),
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -432,6 +444,8 @@ export function useAdminConcierge() {
   return useQuery({
     queryKey: QK.adminConcierge,
     queryFn: () => api.get("/admin/concierge").then((r) => r.data || []),
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -448,6 +462,8 @@ export function useAdminReferrals(params) {
   return useQuery({
     queryKey: QK.adminReferrals(params),
     queryFn: () => api.get("/admin/referrals", { params }).then((r) => r.data || []),
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -456,6 +472,8 @@ export function useAdminReferrers() {
   return useQuery({
     queryKey: QK.adminReferrers,
     queryFn: () => api.get("/admin/referrers").then((r) => r.data || []),
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -471,6 +489,8 @@ export function useAdminMessages(params) {
   return useQuery({
     queryKey: QK.adminMessages(params),
     queryFn: () => api.get("/admin/messages", { params }).then((r) => r.data),
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -486,6 +506,8 @@ export function useAdminFraud(params) {
   return useQuery({
     queryKey: QK.adminFraud(params),
     queryFn: () => api.get("/admin/fraud", { params }).then((r) => r.data),
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 

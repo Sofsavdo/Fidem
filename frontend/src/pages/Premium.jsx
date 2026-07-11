@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { usePayments, QK } from "@/hooks/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { PageHead, Segmented, Price, SectionLabel } from "@/components/kit";
+import { purposeLabel } from "@/lib/labels";
 import { tapMedium, tapLight, notify } from "@/lib/haptics";
 
 const CHAT_UNLOCK_PRICE = 9900; // mirrors backend PRICE_CHAT_UNLOCK_UZS (comparison only)
@@ -291,7 +292,7 @@ export default function Premium() {
               {successfulPayments.slice(0, 8).map((p) => (
                 <div key={p.id} className="rounded-2xl bg-card border border-border p-3 flex items-center justify-between" data-testid={`payment-${p.id}`}>
                   <div>
-                    <p className="text-sm font-medium capitalize">{p.purpose?.replace(/_/g, " ")}</p>
+                    <p className="text-sm font-medium">{purposeLabel(p.purpose, t)}</p>
                     <p className="text-xs text-muted-foreground tabular-nums">{Number(p.amount || 0).toLocaleString()} {t("sum")}</p>
                   </div>
                   <span className="text-[11px] font-medium px-2 py-1 rounded-full bg-secondary/10 text-secondary">

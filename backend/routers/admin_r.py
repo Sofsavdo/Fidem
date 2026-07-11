@@ -1,6 +1,7 @@
 """Admin endpoints."""
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -16,76 +17,72 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 @router.get("/stats")
 async def admin_stats(_: str = Depends(get_current_admin)):
-    total = await db.users.count_documents({})
-    males = await db.users.count_documents({"gender": "male"})
-    females = await db.users.count_documents({"gender": "female"})
-    onboarded = await db.users.count_documents({"onboarded": True})
-    premium = await db.users.count_documents({"plan": "premium"})
-    vip = await db.users.count_documents({"plan": "vip"})
+    """Dashboard metrics. Everything runs CONCURRENTLY via asyncio.gather -
+    this endpoint used to fire ~22 sequential DB roundtrips, which made the
+    whole admin panel feel frozen on every open."""
     today_iso = iso(datetime.now(timezone.utc) - timedelta(days=1))
     week_iso = iso(datetime.now(timezone.utc) - timedelta(days=7))
     month_iso = iso(datetime.now(timezone.utc) - timedelta(days=30))
-    dau = await db.users.count_documents({"last_active": {"$gte": today_iso}})
-    wau = await db.users.count_documents({"last_active": {"$gte": week_iso}})
-    mau = await db.users.count_documents({"last_active": {"$gte": month_iso}})
-    rev_agg = await db.payments.aggregate([
-        {"$match": {"status": "success"}},
-        {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
-    ]).to_list(1)
+
+    def _rev(match):
+        return db.payments.aggregate([
+            {"$match": match},
+            {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
+        ]).to_list(1)
+
+    (
+        total, males, females, onboarded, premium, vip,
+        dau, wau, mau,
+        rev_agg, rev_today, rev_week, rev_month, rev_by_purpose,
+        top_regions, total_messages, messages_today, total_referrals,
+        avg_completeness, new_users,
+        pending_payments, pending_verifications, open_reports,
+    ) = await asyncio.gather(
+        db.users.count_documents({}),
+        db.users.count_documents({"gender": "male"}),
+        db.users.count_documents({"gender": "female"}),
+        db.users.count_documents({"onboarded": True}),
+        db.users.count_documents({"plan": "premium"}),
+        db.users.count_documents({"plan": "vip"}),
+        db.users.count_documents({"last_active": {"$gte": today_iso}}),
+        db.users.count_documents({"last_active": {"$gte": week_iso}}),
+        db.users.count_documents({"last_active": {"$gte": month_iso}}),
+        _rev({"status": "success"}),
+        _rev({"status": "success", "created_at": {"$gte": today_iso}}),
+        _rev({"status": "success", "created_at": {"$gte": week_iso}}),
+        _rev({"status": "success", "created_at": {"$gte": month_iso}}),
+        db.payments.aggregate([
+            {"$match": {"status": "success"}},
+            {"$group": {"_id": "$purpose", "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
+            {"$sort": {"total": -1}},
+        ]).to_list(20),
+        db.users.aggregate([
+            {"$match": {"onboarded": True, "region": {"$ne": None}}},
+            {"$group": {"_id": "$region", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+            {"$limit": 10},
+        ]).to_list(10),
+        db.messages.count_documents({}),
+        db.messages.count_documents({"created_at": {"$gte": today_iso}}),
+        db.users.count_documents({"referred_by": {"$ne": None}}),
+        db.users.aggregate([
+            {"$match": {"onboarded": True}},
+            {"$group": {"_id": None, "avg": {"$avg": "$completeness"}}},
+        ]).to_list(1),
+        db.users.find({"created_at": {"$gte": month_iso}}, {"_id": 0, "id": 1, "last_active": 1}).to_list(1000),
+        db.payments.count_documents({"status": "pending"}),
+        db.verifications.count_documents({"status": "pending"}),
+        db.reports.count_documents({"status": "open"}),
+    )
+
     revenue = rev_agg[0]["total"] if rev_agg else 0
-    
-    # Revenue by period
-    rev_today = await db.payments.aggregate([
-        {"$match": {"status": "success", "created_at": {"$gte": today_iso}}},
-        {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
-    ]).to_list(1)
-    rev_week = await db.payments.aggregate([
-        {"$match": {"status": "success", "created_at": {"$gte": week_iso}}},
-        {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
-    ]).to_list(1)
-    rev_month = await db.payments.aggregate([
-        {"$match": {"status": "success", "created_at": {"$gte": month_iso}}},
-        {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
-    ]).to_list(1)
-    
-    # Revenue by purpose
-    rev_by_purpose = await db.payments.aggregate([
-        {"$match": {"status": "success"}},
-        {"$group": {"_id": "$purpose", "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
-        {"$sort": {"total": -1}},
-    ]).to_list(20)
-    
-    # Top regions
-    top_regions = await db.users.aggregate([
-        {"$match": {"onboarded": True, "region": {"$ne": None}}},
-        {"$group": {"_id": "$region", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}},
-        {"$limit": 10},
-    ]).to_list(10)
-    
-    # Messages stats
-    total_messages = await db.messages.count_documents({})
-    messages_today = await db.messages.count_documents({"created_at": {"$gte": today_iso}})
-    
-    # Referral stats
-    total_referrals = await db.users.count_documents({"referred_by": {"$ne": None}})
-    
-    # User quality metrics
-    avg_completeness = await db.users.aggregate([
-        {"$match": {"onboarded": True}},
-        {"$group": {"_id": None, "avg": {"$avg": "$completeness"}}}
-    ]).to_list(1)
     avg_completion = avg_completeness[0]["avg"] if avg_completeness else 0
-    
-    # Retention: users who onboarded in last 30 days and still active
+
     from core import parse_dt
-    new_users = await db.users.find({"created_at": {"$gte": month_iso}}, {"_id": 0, "id": 1, "last_active": 1}).to_list(1000)
     retained = sum(1 for u in new_users if u.get("last_active") and parse_dt(u["last_active"]) >= datetime.fromisoformat(today_iso.replace('Z', '+00:00')))
     retention_rate = (retained / len(new_users) * 100) if new_users else 0
-
-    # Usage: average messages per active user
     avg_messages_per_user = messages_today / dau if dau > 0 else 0
-    
+
     return {
         "total_users": total, "males": males, "females": females,
         "onboarded": onboarded, "premium": premium, "vip": vip,
@@ -98,9 +95,9 @@ async def admin_stats(_: str = Depends(get_current_admin)):
             "by_purpose": rev_by_purpose,
         },
         "conversion_premium": round((premium + vip) / total * 100, 2) if total else 0,
-        "pending_payments": await db.payments.count_documents({"status": "pending"}),
-        "pending_verifications": await db.verifications.count_documents({"status": "pending"}),
-        "open_reports": await db.reports.count_documents({"status": "open"}),
+        "pending_payments": pending_payments,
+        "pending_verifications": pending_verifications,
+        "open_reports": open_reports,
         "top_regions": top_regions,
         "messages": {
             "total": total_messages,
