@@ -431,27 +431,75 @@ class RateLimiter:
         now = time.monotonic()
         bucket = self.hits[key]
         cutoff = now - self.window
-        self.hits[key] = [t for t in bucket if t > cutoff]
-        if len(self.hits[key]) >= self.max:
+        fresh = [t for t in bucket if t > cutoff]
+        if len(fresh) >= self.max:
+            # Don't write the trimmed-but-still-over-limit bucket back — keep
+            # the caller's rejected attempt out of the window so a client that
+            # stops retrying ages out normally instead of freezing the count.
+            self.hits[key] = fresh
             raise HTTPException(429, "Too many attempts. Try again later.")
-        self.hits[key].append(now)
+        fresh.append(now)
+        self.hits[key] = fresh
+
+    def gc(self) -> None:
+        """Drop buckets that are now empty (client IP idle past the window).
+        Without this, self.hits keeps one entry per distinct IP forever —
+        an unbounded, never-shrinking dict is a slow memory leak on a
+        long-lived process serving many unique clients over time."""
+        now = time.monotonic()
+        cutoff = now - self.window
+        dead = [k for k, bucket in self.hits.items() if not any(t > cutoff for t in bucket)]
+        for k in dead:
+            del self.hits[k]
 
 
 auth_limiter = RateLimiter(max_attempts=10, window_sec=300)
 payment_limiter = RateLimiter(max_attempts=5, window_sec=60)
+verification_limiter = RateLimiter(max_attempts=5, window_sec=600)
+
+
+def _client_ip(request: Request) -> str:
+    ip = request.client.host if request.client else "unknown"
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        # The first entry in X-Forwarded-For is whatever the CONNECTING
+        # CLIENT claims (a client can send this header directly, with any
+        # value it likes, unless a trusted proxy overwrites it). Proxies that
+        # relay the header instead append to it, so the rightmost entry is
+        # the one *our* edge proxy actually observed — the only hop that
+        # can't be spoofed by the caller. Using [0] let anyone bypass rate
+        # limiting for free by sending a fresh fake X-Forwarded-For on every
+        # request.
+        parts = [p.strip() for p in forwarded.split(",") if p.strip()]
+        if parts:
+            ip = parts[-1]
+    return ip
 
 
 def rate_limit_auth(request: Request) -> None:
-    ip = request.client.host if request.client else "unknown"
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        ip = forwarded.split(",")[0].strip()
-    auth_limiter.check(f"auth:{ip}")
+    auth_limiter.check(f"auth:{_client_ip(request)}")
 
 
 def rate_limit_payment(request: Request) -> None:
-    ip = request.client.host if request.client else "unknown"
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        ip = forwarded.split(",")[0].strip()
-    payment_limiter.check(f"payment:{ip}")
+    payment_limiter.check(f"payment:{_client_ip(request)}")
+
+
+def rate_limit_verification(request: Request) -> None:
+    # /verification/request triggers a Gemini/Claude vision API call per
+    # submission - unlimited submissions is an unbounded-cost / provider-DoS
+    # vector, not just a UX nuisance.
+    verification_limiter.check(f"verification:{_client_ip(request)}")
+
+
+async def rate_limiter_gc_loop() -> None:
+    """Runs for the life of the process; keeps the in-memory rate-limit
+    tables from growing forever on a long-lived server with many unique
+    visitor IPs over time."""
+    while True:
+        await asyncio.sleep(900)
+        try:
+            auth_limiter.gc()
+            payment_limiter.gc()
+            verification_limiter.gc()
+        except Exception:
+            log.warning("rate limiter gc failed", exc_info=True)

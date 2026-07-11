@@ -27,6 +27,7 @@ from core import (
     log,
     now_utc,
     parse_dt,
+    push_notif,
     rate_limit_auth,
     user_public,
 )
@@ -330,13 +331,29 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request):
         ref_owner = await db.users.find_one({"referral_id": ref_code})
         if not ref_owner:
             ref_owner = await db.users.find_one({"referral_username_lower": ref_code.lower()})
-        
+
         # Block self-referral (same telegram_id)
         if ref_owner and ref_owner.get("telegram_id") == tg_id:
             await db.pending_refs.delete_one({"telegram_id": tg_id})
         else:
             await db.users.update_one({"id": uid}, {"$set": {"referred_by": ref_code}})
             await db.pending_refs.delete_one({"telegram_id": tg_id})
+            # Small instant "you brought someone in" bonus - paid HERE (real
+            # account creation, through a verified Telegram WebApp session
+            # and the fraud scoring above) rather than on the bot's bare
+            # /start text, which anyone could script for free with
+            # throwaway accounts and no real signup.
+            if ref_owner and not flagged_as_bot:
+                await db.users.update_one(
+                    {"id": ref_owner["id"]},
+                    {"$inc": {"balance": 1000, "ref_count": 1}},
+                )
+                await push_notif(
+                    ref_owner["id"],
+                    "referral",
+                    "🎁 Yangi taklif bonusi\n\nSizning havolangiz orqali yangi foydalanuvchi qo'shildi.\n\n+1000 so'm bonus hisoblandi.",
+                    link="/referral",
+                )
 
     return AuthResponse(token=create_token(uid), user_id=uid, onboarded=False, user=_build_me_payload(doc))
 

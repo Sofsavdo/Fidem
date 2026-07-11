@@ -352,19 +352,30 @@ async def admin_reports(_: str = Depends(get_current_admin)):
     return rows
 
 
-@router.post("/notification/broadcast")
-async def admin_broadcast(text: str = Body(..., embed=True), dry_run: bool = Body(False, embed=True), _: str = Depends(get_current_admin)):
-    users = await db.users.find({"onboarded": True, "blocked": {"$ne": True}}, {"_id": 0, "id": 1}).to_list(10000)
-    if dry_run:
-        return {"would_send": len(users), "dry_run": True}
+async def _run_broadcast(user_ids: list[str], text: str) -> None:
     sent, skipped = 0, 0
-    for u in users:
-        ok = await push_notif(u["id"], "marketing", text, marketing=True)
+    for uid in user_ids:
+        ok = await push_notif(uid, "marketing", text, marketing=True)
         if ok:
             sent += 1
         else:
             skipped += 1
-    return {"sent": sent, "skipped_daily_cap": skipped}
+    log.info(f"broadcast finished: sent={sent} skipped_daily_cap={skipped} total={len(user_ids)}")
+
+
+@router.post("/notification/broadcast")
+async def admin_broadcast(text: str = Body(..., embed=True), dry_run: bool = Body(False, embed=True), _: str = Depends(get_current_admin)):
+    users = await db.users.find({"onboarded": True, "blocked": {"$ne": True}}, {"_id": 0, "id": 1}).to_list(200000)
+    if dry_run:
+        return {"would_send": len(users), "dry_run": True}
+    # One push_notif per user is a real DB round trip each - at 10K-1M users
+    # that loop can run for minutes. Running it inline would hold the admin's
+    # HTTP request open (and the connection pool slot) until every send
+    # finishes, freezing the admin panel exactly like the /admin/stats
+    # sequential-query issue this audit already fixed. Fire it in the
+    # background and let the admin keep working.
+    asyncio.create_task(_run_broadcast([u["id"] for u in users], text))
+    return {"queued": len(users), "dry_run": False}
 
 
 @router.get("/referrals")

@@ -686,9 +686,16 @@ async def leaderboard(period: str = "all", uid: str = Depends(get_current_user_i
         cutoff = iso(datetime.now(timezone.utc) - timedelta(days=30))
         pipeline.insert(0, {"$match": {"created_at": {"$gte": cutoff}}})
 
+    groups = await db.gifts.aggregate(pipeline).to_list(50)
+    # One batched lookup instead of a query per leaderboard row.
+    users = await db.users.find(
+        {"id": {"$in": [g["_id"] for g in groups]}}, {"_id": 0, "password_hash": 0}
+    ).to_list(len(groups)) if groups else []
+    by_id = {u["id"]: u for u in users}
+
     rows = []
-    async for r in db.gifts.aggregate(pipeline):
-        u = await db.users.find_one({"id": r["_id"]}, {"_id": 0, "password_hash": 0})
+    for r in groups:
+        u = by_id.get(r["_id"])
         # Hidden profiles opted out of all public visibility — rankings too.
         if u and not u.get("hidden_profile"):
             rows.append({"user": user_public(u), "total": r["total"], "count": r["count"]})
