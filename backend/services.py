@@ -21,16 +21,31 @@ CLICK_RETURN_URL = os.environ.get("CLICK_RETURN_URL", "")
 
 
 async def send_telegram_message(chat_id: int, text: str, reply_markup: Optional[dict] = None) -> bool:
-    """Send a message via Telegram Bot API. Returns True on success, False otherwise."""
+    """Send a message via Telegram Bot API. Returns True on success, False otherwise.
+
+    No parse_mode: every caller sends plain human-typed text (notification
+    copy, admin-authored announcement titles/text) with no intentional HTML
+    formatting anywhere in the codebase. parse_mode="HTML" used to be set
+    regardless, so any stray '<', '>' or '&' in that text (trivially common
+    in free-form admin-typed announcements) made Telegram reject the whole
+    message as unparsable HTML - and the failure was silent (see below),
+    so it looked like the bot just never sent anything.
+    """
     if not TG_BOT_TOKEN:
         log.warning("TELEGRAM_BOT_TOKEN not set; skipping notification")
         return False
-    payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+    payload = {"chat_id": chat_id, "text": text}
     if reply_markup:
         payload["reply_markup"] = reply_markup
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             r = await client.post(f"{TG_API}/sendMessage", json=payload)
+            if r.status_code != 200:
+                # Previously not logged at all - a non-exception failure
+                # (bad chat_id, user blocked the bot, rate limit, malformed
+                # payload...) was completely invisible; the caller went on
+                # to mark the notification as delivered regardless.
+                log.warning(f"Telegram sendMessage failed: {r.status_code} {r.text[:300]}")
             return r.status_code == 200
     except Exception as e:
         log.error(f"Telegram send failed: {e}")

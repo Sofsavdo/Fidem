@@ -326,17 +326,24 @@ async def notify_telegram(uid: str, text: str, link: Optional[str] = None, kind:
             ]
         }
 
-        await send_telegram_message(
+        sent = await send_telegram_message(
             int(user["telegram_id"]),
             text,
             reply_markup=reply_markup,
         )
-        
-        # Update last notification time
-        await db.users.update_one(
-            {"id": uid},
-            {"$set": {last_notif_key: iso(now_utc())}}
-        )
+
+        # Only mark as sent (and start the cooldown window) if it actually
+        # went out. send_telegram_message returning False (bad chat_id, user
+        # blocked the bot, malformed payload...) used to be treated exactly
+        # like a success here, so a real delivery failure both stayed
+        # invisible AND blocked the next 20 minutes of that kind's retries.
+        if sent:
+            await db.users.update_one(
+                {"id": uid},
+                {"$set": {last_notif_key: iso(now_utc())}}
+            )
+        else:
+            log.warning(f"telegram notify: send_telegram_message returned False for user {uid} kind={kind}")
     except Exception as e:
         log.warning(f"telegram notify failed: {e}")
 
@@ -382,7 +389,15 @@ async def push_notif(
     await db.notifications.insert_one(notif)
     notif.pop("_id", None)
 
-    asyncio.create_task(notify_telegram(uid, text, link))
+    # kind must be forwarded - notify_telegram's 20-min cooldown is keyed
+    # per-kind (last_notif_{kind}). Without this, every push_notif call
+    # silently fell back to notify_telegram's own "general" default, so ALL
+    # notification kinds (referral, gift, boost, marketing/announcements...)
+    # shared one Telegram cooldown bucket: any Telegram send of any kind
+    # blocked every other kind's Telegram delivery for the next 20 minutes,
+    # while the in-app notification (this insert, above) still went through
+    # every time - explaining "it showed in the app but the bot never sent it".
+    asyncio.create_task(notify_telegram(uid, text, link, kind=kind))
     asyncio.create_task(manager.send_to_user(uid, {"type": "notification", "data": notif, "payload": payload or {}}))
 
     return True
