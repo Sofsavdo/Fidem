@@ -471,3 +471,83 @@ def test_telegram_start_with_referral_does_not_credit_balance(monkeypatch):
 
     assert fake_users.inc_calls == [], "balance/ref_count must not be credited on a bare /start"
     assert len(fake_pending.upserts) == 1, "attribution should still be recorded for later real-signup payout"
+
+
+# ---------- /auth/telegram: real signup must not pay an undocumented instant
+# balance bonus either (the only referral economy is the referral_earnings
+# pipeline shown on the Referral page - tier-capped subscription share +
+# the 100 so'm signup_free bonus, both in auth_r.py/payments_r.py) ----------
+class _FakeAuthUsersCollection:
+    def __init__(self, ref_owner):
+        self._ref_owner = ref_owner
+        self.inserted = []
+        self.inc_calls = []
+        self.set_calls = []
+
+    async def find_one(self, query, *_a, **_kw):
+        if "telegram_id" in query:
+            return None  # brand new account
+        if query.get("referral_id") == self._ref_owner["referral_id"]:
+            return dict(self._ref_owner)
+        if "ip_address" in query:
+            return None
+        return None
+
+    async def count_documents(self, *_a, **_kw):
+        return 0
+
+    async def insert_one(self, doc):
+        self.inserted.append(doc)
+
+    async def update_one(self, query, update):
+        if "$inc" in update:
+            self.inc_calls.append((query, update["$inc"]))
+        if "$set" in update:
+            self.set_calls.append((query, update["$set"]))
+        return type("Res", (), {"modified_count": 1})()
+
+
+class _FakeAuthPendingRefs:
+    def __init__(self, ref_code):
+        self._ref_code = ref_code
+
+    async def find_one(self, query, *_a, **_kw):
+        return {"telegram_id": query.get("telegram_id"), "ref_code": self._ref_code}
+
+    async def delete_one(self, *_a, **_kw):
+        return None
+
+
+class _FakeAuthRequest:
+    def __init__(self):
+        self.client = _FakeClient()
+        self.headers = {}
+
+
+def test_auth_telegram_real_signup_does_not_pay_instant_balance_bonus(monkeypatch):
+    """A separate, undocumented +1000 so'm instant balance bonus used to fire
+    here too (on top of the bare-/start version already closed above). It
+    was never shown anywhere in the UI/i18n and duplicated the real,
+    tier-capped referral_earnings system - removed outright rather than kept
+    as an invisible perk."""
+    from routers import auth_r
+
+    ref_owner = {"id": "owner-1", "referral_id": "OWNER123", "telegram_id": "owner-tg"}
+    fake_users = _FakeAuthUsersCollection(ref_owner)
+    fake_pending = _FakeAuthPendingRefs("OWNER123")
+    fake_db = type("FakeDb", (), {})()
+    fake_db.users = fake_users
+    fake_db.pending_refs = fake_pending
+    monkeypatch.setattr(auth_r, "db", fake_db)
+    monkeypatch.setattr(auth_r, "TELEGRAM_BOT_TOKEN", "123456:FAKE-BOT-TOKEN-FOR-TESTS")
+
+    from models import TelegramAuthRequest
+    user_json = '{"id": 777, "first_name": "New"}'
+    init_data = _build_valid_init_data("123456:FAKE-BOT-TOKEN-FOR-TESTS", user_json)
+    req = TelegramAuthRequest(init_data=init_data)
+
+    asyncio.run(auth_r.auth_telegram(req, _FakeAuthRequest()))
+
+    assert fake_users.inc_calls == [], "no balance/ref_count $inc should happen on real signup either"
+    referred_by_writes = [s for q, s in fake_users.set_calls if "referred_by" in s]
+    assert referred_by_writes == [{"referred_by": "OWNER123"}], "attribution should still be recorded"

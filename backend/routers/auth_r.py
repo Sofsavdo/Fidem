@@ -336,24 +336,17 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request):
         if ref_owner and ref_owner.get("telegram_id") == tg_id:
             await db.pending_refs.delete_one({"telegram_id": tg_id})
         else:
+            # Attribution only - no reward here. The actual referral economy
+            # is entirely the referral_earnings pipeline (tier-capped 50% of
+            # the invitee's first subscription in payments_r.py, plus the
+            # 100 so'm "signup_free" bonus below once they complete
+            # onboarding) - the only rewards ever shown on the Referral page.
+            # An earlier, separate instant-balance click-bonus used to fire
+            # right here; it was never surfaced in any UI/i18n string and
+            # duplicated the real reward system, so it has been removed
+            # rather than kept as an invisible, undocumented perk.
             await db.users.update_one({"id": uid}, {"$set": {"referred_by": ref_code}})
             await db.pending_refs.delete_one({"telegram_id": tg_id})
-            # Small instant "you brought someone in" bonus - paid HERE (real
-            # account creation, through a verified Telegram WebApp session
-            # and the fraud scoring above) rather than on the bot's bare
-            # /start text, which anyone could script for free with
-            # throwaway accounts and no real signup.
-            if ref_owner and not flagged_as_bot:
-                await db.users.update_one(
-                    {"id": ref_owner["id"]},
-                    {"$inc": {"balance": 1000, "ref_count": 1}},
-                )
-                await push_notif(
-                    ref_owner["id"],
-                    "referral",
-                    "🎁 Yangi taklif bonusi\n\nSizning havolangiz orqali yangi foydalanuvchi qo'shildi.\n\n+1000 so'm bonus hisoblandi.",
-                    link="/referral",
-                )
 
     return AuthResponse(token=create_token(uid), user_id=uid, onboarded=False, user=_build_me_payload(doc))
 
