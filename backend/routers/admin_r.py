@@ -321,41 +321,28 @@ async def admin_verifications(status: str = "pending", page: int = 1, limit: int
     skip = (page - 1) * limit
     total = await db.verifications.count_documents(q)
     rows = await db.verifications.find(q, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
-    out = []
+    # One batched lookup instead of a query per row.
+    user_ids = list({r["user_id"] for r in rows})
+    users = await db.users.find(
+        {"id": {"$in": user_ids}},
+        {"_id": 0, "name": 1, "email": 1, "photo_url": 1, "id": 1, "verified_financial": 1, "verified_identity": 1, "verified_selfie": 1},
+    ).to_list(len(user_ids)) if user_ids else []
+    by_id = {u["id"]: u for u in users}
     for r in rows:
-        u = await db.users.find_one({"id": r["user_id"]}, {"_id": 0, "name": 1, "email": 1, "photo_url": 1, "id": 1, "verified_financial": 1, "verified_identity": 1, "verified_selfie": 1})
-        r["user"] = u or {}
-        out.append(r)
-    return {"verifications": out, "total": total, "page": page, "limit": limit}
+        r["user"] = by_id.get(r["user_id"], {})
+    return {"verifications": rows, "total": total, "page": page, "limit": limit}
 
 
 @router.post("/verifications/{vid}/decide")
 async def admin_decide_verif(vid: str, approve: bool = Body(..., embed=True), reason: str = Body("", embed=True), _: str = Depends(get_current_admin)):
+    # Same side-effects as the AI auto-reviewer (single shared helper).
+    from routers.payments_r import apply_verification_decision
     v = await db.verifications.find_one({"id": vid})
     if not v:
         raise HTTPException(404, "Not found")
-    await db.verifications.update_one(
-        {"id": vid},
-        {"$set": {
-            "status": "approved" if approve else "rejected",
-            "decided_at": iso(now_utc()),
-            "rejection_reason": reason if not approve else None,
-        }},
-    )
-    if approve:
-        field = {"identity": "verified_identity", "selfie": "verified_selfie", "financial": "verified_financial"}.get(v.get("kind"), None)
-        if field:
-            await db.users.update_one({"id": v["user_id"]}, {"$set": {field: True}})
-            # Auto-grant financial badge
-            if v.get("kind") == "financial":
-                await db.users.update_one(
-                    {"id": v["user_id"]},
-                    {"$addToSet": {"badges": "b_financial"}},
-                )
-        await push_notif(v["user_id"], "verified", f"✅ Verification tasdiqlandi: {v.get('kind')}")
-    else:
-        reason_txt = reason or "sabab ko'rsatilmagan"
-        await push_notif(v["user_id"], "verified", f"❌ Verification rad etildi: {reason_txt}")
+    ok = await apply_verification_decision(vid, approve, reason=reason, decided_by="admin")
+    if not ok:
+        raise HTTPException(409, "Already decided")
     return {"ok": True}
 
 

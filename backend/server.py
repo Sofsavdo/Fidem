@@ -54,6 +54,7 @@ from routers.face_r import router as face_router  # noqa: E402
 from routers.location_r import router as location_router  # noqa: E402
 from routers.settings_r import router as settings_router  # noqa: E402
 from routers.picks_r import router as picks_router  # noqa: E402
+from routers.announcements_r import router as announcements_router  # noqa: E402
 from lifecycle import lifecycle_loop  # noqa: E402
 from services import compute_completeness  # noqa: E402
 from storage import init_storage  # noqa: E402
@@ -81,6 +82,7 @@ api.include_router(face_router)
 api.include_router(location_router)
 api.include_router(settings_router)
 api.include_router(picks_router)
+api.include_router(announcements_router)
 app.include_router(api)
 
 
@@ -110,11 +112,12 @@ async def startup() -> None:
     # Without it every verification call fails as "verification_unavailable",
     # which deliberately lets users through UNVERIFIED so signups don't break
     # - but it means no photo is actually being checked. Shout about it.
-    if not os.environ.get("ANTHROPIC_API_KEY"):
+    if not os.environ.get("GEMINI_API_KEY") and not os.environ.get("ANTHROPIC_API_KEY"):
         log.warning(
-            "ANTHROPIC_API_KEY is not set - AI photo verification is effectively "
-            "DISABLED (all photos pass through unverified). Set the key in the "
-            "environment to enable real photo checks."
+            "Neither GEMINI_API_KEY nor ANTHROPIC_API_KEY is set - AI photo "
+            "verification and AI verification review are effectively DISABLED "
+            "(all photos pass through unverified, all verifications stay "
+            "pending for manual review). Set GEMINI_API_KEY to enable them."
         )
 
     # Indexes

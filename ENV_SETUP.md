@@ -26,10 +26,13 @@ ENVIRONMENT=production
 JWT_SECRET=long_random_string
 ADMIN_PASSWORD=strong_admin_password
 
-# AI photo verification + AI match/compatibility texts.
-# Without this key photo verification is effectively DISABLED (all photos
-# pass through unverified) and a warning is logged at startup.
-ANTHROPIC_API_KEY=sk-ant-...
+# AI verification (photo checks + selfie/identity/financial review).
+# PRIMARY provider: Gemini (Google AI Studio) - set GEMINI_API_KEY.
+# ANTHROPIC_API_KEY is an optional automatic fallback. If NEITHER is set,
+# AI checks are effectively disabled and a warning is logged at startup.
+GEMINI_API_KEY=AIza...
+# GEMINI_MODEL=gemini-2.0-flash   # optional override
+ANTHROPIC_API_KEY=sk-ant-...      # optional fallback
 ```
 
 ## Frontend Environment Variables

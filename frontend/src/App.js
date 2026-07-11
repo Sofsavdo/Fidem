@@ -36,6 +36,7 @@ const Terms = lazy(() => import("@/pages/Terms"));
 const Privacy = lazy(() => import("@/pages/Privacy"));
 const MeSettings = lazy(() => import("@/pages/MeSettings"));
 const PrivacyCenter = lazy(() => import("@/pages/PrivacyCenter"));
+const Announcements = lazy(() => import("@/pages/Announcements"));
 
 function isTelegramWebApp() {
   return Boolean(window.Telegram?.WebApp?.initData);
@@ -155,6 +156,7 @@ function Inner() {
           <Route path="/me" element={<Me />} />
           <Route path="/me/settings" element={<MeSettings />} />
           <Route path="/privacy-center" element={<PrivacyCenter />} />
+          <Route path="/announcements" element={<Announcements />} />
           <Route path="/premium" element={<Premium />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/notifications" element={<Notifications />} />

@@ -2,11 +2,14 @@ import React, { useState } from "react";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ShieldCheck, Wallet, Users as UsersIcon, DollarSign, TrendingUp, BarChart3, LayoutDashboard, Search, MessageSquare, Settings, ChevronRight, MapPin, Activity, AlertTriangle, Send } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Wallet, Users as UsersIcon, DollarSign, TrendingUp, BarChart3, LayoutDashboard, Search, MessageSquare, Settings, ChevronRight, MapPin, Activity, AlertTriangle, Send, Megaphone, Trash2, Bot } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
+import api from "@/lib/api";
 import { PURPOSE_UZ, REF_TYPE_UZ, VERIF_KIND_UZ } from "@/lib/labels";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
+import { useQueryClient } from "@tanstack/react-query";
 import {
+  useAnnouncements,
   useAdminStats, useAdminUsers, useAdminRegions, useAdminUserSearch, useUpdateAdminUser,
   useAdminPayments, useAdminPaymentBlock, useAdminVerifications, useAdminDecideVerification,
   useAdminReports, useAdminWithdrawals, useAdminWithdrawalDecision, useAdminConcierge,
@@ -19,6 +22,7 @@ const menuItems = [
   { id: "analytics", icon: BarChart3, label: "Analitika" },
   { id: "users", icon: UsersIcon, label: "Foydalanuvchilar" },
   { id: "broadcast", icon: Send, label: "Xabar yuborish" },
+  { id: "anons", icon: Megaphone, label: "Anonslar" },
   { id: "payments", icon: DollarSign, label: "To'lovlar" },
   { id: "verifications", icon: ShieldCheck, label: "Tasdiqlashlar" },
   { id: "withdrawals", icon: Wallet, label: "Yechib olishlar" },
@@ -112,6 +116,7 @@ export default function Admin() {
           {activeTab === "analytics" && stats && <AdminAnalytics stats={stats} />}
           {activeTab === "users" && <AdminUsers />}
           {activeTab === "broadcast" && <AdminBroadcast />}
+          {activeTab === "anons" && <AdminAnnouncements />}
           {activeTab === "payments" && <AdminPayments />}
           {activeTab === "verifications" && <AdminVerifications />}
           {activeTab === "withdrawals" && <AdminWithdrawals />}
@@ -655,6 +660,94 @@ function AdminUsers() {
   );
 }
 
+// Anonslar: create photo+text news posts; optional in-app notification fanout.
+function AdminAnnouncements() {
+  const queryClient = useQueryClient();
+  const { data: items = [] } = useAnnouncements();
+  const [title, setTitle] = useState("");
+  const [text, setText] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [notify, setNotify] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const fileRef = React.useRef(null);
+
+  const pickImage = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const up = await api.post("/files/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setImageUrl(up.data.url);
+      toast.success("Rasm yuklandi ✓");
+    } catch {
+      toast.error("Rasm yuklashda xatolik");
+    } finally { setBusy(false); }
+  };
+
+  const publish = async () => {
+    if (!title.trim() || busy) return;
+    setBusy(true);
+    try {
+      await api.post("/admin/announcements", { title: title.trim(), text: text.trim(), image_url: imageUrl || null, notify });
+      toast.success("Anons e'lon qilindi ✓");
+      setTitle(""); setText(""); setImageUrl("");
+      queryClient.invalidateQueries({ queryKey: ["announcements"] });
+    } catch {
+      toast.error("Xatolik");
+    } finally { setBusy(false); }
+  };
+
+  const remove = async (id) => {
+    try {
+      await api.delete(`/admin/announcements/${id}`);
+      toast.success("O'chirildi");
+      queryClient.invalidateQueries({ queryKey: ["announcements"] });
+    } catch { toast.error("Xatolik"); }
+  };
+
+  return (
+    <div className="space-y-4 max-w-2xl" data-testid="admin-anons">
+      <div className="rounded-3xl bg-card border border-border p-4 space-y-3">
+        <p className="text-sm font-medium">Yangi anons</p>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Sarlavha" className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-sm" data-testid="anons-title" />
+        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} placeholder="Matn (ixtiyoriy)" className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-sm" data-testid="anons-text" />
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickImage} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={() => fileRef.current?.click()} disabled={busy} className="text-xs rounded-full border border-border px-3 py-2 disabled:opacity-50">
+            {imageUrl ? "Rasmni almashtirish" : "📷 Rasm biriktirish"}
+          </button>
+          {imageUrl && <img src={photoSrc(imageUrl)} alt="" className="h-10 w-16 object-cover rounded-lg border border-border" />}
+          <label className="flex items-center gap-1.5 text-xs ml-auto">
+            <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
+            Bildirishnoma yuborilsin
+          </label>
+        </div>
+        <button onClick={publish} disabled={busy || !title.trim()} data-testid="anons-publish" className="w-full rounded-2xl bg-primary text-white text-sm font-medium py-2.5 disabled:opacity-50">
+          {busy ? "..." : "E'lon qilish"}
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        {items.map((a) => (
+          <div key={a.id} className="rounded-2xl bg-card border border-border p-3 flex items-center gap-3" data-testid={`adm-anons-${a.id}`}>
+            {a.image_url && <img src={photoSrc(a.image_url)} alt="" className="h-12 w-16 object-cover rounded-lg border border-border shrink-0" />}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium truncate">{a.title}</p>
+              <p className="text-[10px] text-muted-foreground">{a.created_at ? new Date(a.created_at).toLocaleString("uz-UZ") : ""}</p>
+            </div>
+            <button onClick={() => remove(a.id)} className="shrink-0 p-2 rounded-full hover:bg-muted text-rose-600" title="O'chirish">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AdminPayments() {
   // Successful payments are the default view; pending/expired/failed noise
   // is collapsed behind a toggle. Every row names the paying user.
@@ -724,30 +817,83 @@ function AdminPayments() {
 }
 
 function AdminVerifications() {
+  // Full evidence view: WHO is asking, WHAT they submitted (proof photo,
+  // tappable to zoom) and the AI reviewer's verdict. Confident AI verdicts
+  // are auto-applied server-side - this queue holds only the unclear ones.
   const [page, setPage] = useState(1);
+  const [status, setStatus] = useState("pending");
+  const [zoom, setZoom] = useState(null);
   const limit = 20;
-  const { data } = useAdminVerifications({ page, limit });
+  const { data } = useAdminVerifications({ page, limit, status });
   const list = data?.verifications || [];
   const total = data?.total || 0;
   const decideMutation = useAdminDecideVerification();
-  const decide = (id, approve) => decideMutation.mutate({ id, approve });
+  const decide = (id, approve) => {
+    const reason = approve ? "" : (prompt("Rad etish sababi:") || "");
+    decideMutation.mutate({ id, approve, reason }, {
+      onSuccess: () => toast.success(approve ? "Tasdiqlandi ✓" : "Rad etildi"),
+      onError: () => toast.error("Xatolik"),
+    });
+  };
+
+  const aiBadge = (v) => {
+    if (!v.ai_verdict) return <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground inline-flex items-center gap-1"><Bot className="w-3 h-3" /> AI: tekshirilmagan</span>;
+    if (v.ai_verdict === "approve") return <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 inline-flex items-center gap-1"><Bot className="w-3 h-3" /> AI: tasdiqlagan ({v.ai_confidence}%)</span>;
+    if (v.ai_verdict === "reject") return <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 inline-flex items-center gap-1"><Bot className="w-3 h-3" /> AI: rad etgan ({v.ai_confidence}%)</span>;
+    return <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 inline-flex items-center gap-1"><Bot className="w-3 h-3" /> AI: ishonchsiz — o'zingiz ko'ring</span>;
+  };
 
   return (
-    <div className="space-y-2" data-testid="admin-verifs">
-      {list.length === 0 && <p className="text-sm text-muted-foreground">Kutilayotganlar yo'q</p>}
+    <div className="space-y-3" data-testid="admin-verifs">
+      <div className="flex gap-1.5">
+        {[["pending", "Kutilmoqda"], ["all", "Barchasi"]].map(([k, label]) => (
+          <button key={k} onClick={() => { setStatus(k); setPage(1); }} className={`text-xs rounded-full px-3 py-1.5 border ${status === k ? "bg-foreground text-background border-foreground" : "bg-card border-border"}`}>{label}</button>
+        ))}
+      </div>
+      {list.length === 0 && <p className="text-sm text-muted-foreground py-6 text-center">Kutilayotganlar yo'q</p>}
       {list.map((v) => (
-        <div key={v.id} className="rounded-2xl bg-card border border-border p-3 flex items-center justify-between" data-testid={`adm-verif-${v.id}`}>
-          <div>
-            <p className="text-sm">{VERIF_KIND_UZ[v.kind] || v.kind} — {v.user_id?.slice(0, 8)}</p>
-            <p className="text-xs text-muted-foreground">{v.note}</p>
-          </div>
-          <div className="flex gap-1">
-            <button data-testid={`adm-verif-yes-${v.id}`} onClick={() => decide(v.id, true)} className="text-xs rounded-full bg-secondary text-white px-3 py-1.5">✓</button>
-            <button data-testid={`adm-verif-no-${v.id}`} onClick={() => decide(v.id, false)} className="text-xs rounded-full border border-border px-3 py-1.5">✕</button>
+        <div key={v.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`adm-verif-${v.id}`}>
+          <div className="flex items-start gap-3">
+            {v.proof_url ? (
+              <img
+                src={photoSrc(v.proof_url)}
+                alt=""
+                onClick={() => setZoom(v.proof_url)}
+                className="w-20 h-20 object-cover rounded-xl border border-border cursor-zoom-in shrink-0"
+                data-testid={`adm-verif-proof-${v.id}`}
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-xl bg-muted grid place-items-center text-[10px] text-muted-foreground shrink-0">Dalil yo'q</div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">
+                {VERIF_KIND_UZ[v.kind] || v.kind}
+                <span className="text-muted-foreground font-normal"> · {v.user?.name || v.user_id?.slice(0, 8)}</span>
+                {v.status !== "pending" && (
+                  <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${v.status === "approved" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
+                    {v.status === "approved" ? "Tasdiqlangan" : "Rad etilgan"}{v.decided_by === "ai" ? " (AI)" : ""}
+                  </span>
+                )}
+              </p>
+              {v.note && <p className="text-xs text-muted-foreground mt-0.5">{v.note}</p>}
+              <div className="mt-1.5">{aiBadge(v)}</div>
+              {v.ai_reason && <p className="text-[11px] text-muted-foreground mt-1 leading-snug">{v.ai_reason}</p>}
+            </div>
+            {v.status === "pending" && (
+              <div className="flex flex-col gap-1.5 shrink-0">
+                <button data-testid={`adm-verif-yes-${v.id}`} onClick={() => decide(v.id, true)} className="text-xs rounded-full bg-secondary text-white px-4 py-1.5">✓ Tasdiqlash</button>
+                <button data-testid={`adm-verif-no-${v.id}`} onClick={() => decide(v.id, false)} className="text-xs rounded-full border border-border px-4 py-1.5">✕ Rad etish</button>
+              </div>
+            )}
           </div>
         </div>
       ))}
       <AdminPagination page={page} setPage={setPage} total={total} limit={limit} />
+      {zoom && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setZoom(null)}>
+          <img src={photoSrc(zoom)} alt="" className="max-w-full max-h-full rounded-2xl" />
+        </div>
+      )}
     </div>
   );
 }

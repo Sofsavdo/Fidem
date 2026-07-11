@@ -173,6 +173,22 @@ export default function ProfileDetail() {
       <div className="relative aspect-square bg-muted">
         <img loading="lazy" decoding="async" src={photoUrl} alt={c.name} className={`w-full h-full object-cover ${blurred ? "blur-photo" : ""}`} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/0 to-black/0" />
+        {/* Screenshot deterrent: a faint watermark with the VIEWER's identity
+            tiled over the photo. OS screenshots can't be blocked in a web
+            app, but any leaked screenshot now identifies who took it. */}
+        {!blurred && (
+          <div aria-hidden="true" className="absolute inset-0 pointer-events-none select-none overflow-hidden" data-testid="photo-watermark">
+            {[18, 48, 78].map((top) => (
+              <p
+                key={top}
+                className="absolute left-0 right-0 text-center text-white whitespace-nowrap"
+                style={{ top: `${top}%`, opacity: 0.07, fontSize: 13, letterSpacing: 2, transform: "rotate(-18deg)" }}
+              >
+                FIDEM · {user?.name || ""} · {(user?.id || "").slice(0, 6)} · FIDEM · {user?.name || ""} · {(user?.id || "").slice(0, 6)}
+              </p>
+            ))}
+          </div>
+        )}
         <button data-testid="back-btn" onClick={() => nav(-1)} className="absolute top-4 left-4 glass rounded-full p-2.5">
           <ArrowLeft className="w-4 h-4" />
         </button>

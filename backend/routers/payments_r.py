@@ -1,6 +1,7 @@
 """Payments (CLICK), verification, notifications, referral."""
 from __future__ import annotations
 
+import asyncio
 import random
 from datetime import datetime, timedelta
 
@@ -78,6 +79,73 @@ async def generate_payment_id() -> str:
             return pid
 
 
+async def apply_verification_decision(vid: str, approve: bool, reason: str = "", decided_by: str = "admin") -> bool:
+    """Shared approve/reject side effects - used by both the admin panel and
+    the AI auto-reviewer, so the two paths can never drift apart."""
+    v = await db.verifications.find_one({"id": vid})
+    if not v or v.get("status") != "pending":
+        return False
+    await db.verifications.update_one(
+        {"id": vid},
+        {"$set": {
+            "status": "approved" if approve else "rejected",
+            "decided_at": iso(now_utc()),
+            "decided_by": decided_by,
+            "rejection_reason": reason if not approve else None,
+        }},
+    )
+    if approve:
+        field = {"identity": "verified_identity", "selfie": "verified_selfie", "financial": "verified_financial"}.get(v.get("kind"))
+        if field:
+            await db.users.update_one({"id": v["user_id"]}, {"$set": {field: True}})
+            if v.get("kind") == "financial":
+                await db.users.update_one({"id": v["user_id"]}, {"$addToSet": {"badges": "b_financial"}})
+        await push_notif(v["user_id"], "verified", f"✅ Tasdiqlash muvaffaqiyatli o'tdi: {v.get('kind')}")
+    else:
+        await push_notif(v["user_id"], "verified", f"❌ Tasdiqlash rad etildi: {reason or 'sabab ko`rsatilmagan'}")
+    return True
+
+
+async def _ai_review_verification(doc: dict) -> None:
+    """Background AI review (Gemini, Claude fallback). Confident verdicts are
+    applied automatically; anything uncertain stays pending for the admin,
+    who sees the AI's verdict + reason next to the proof photo."""
+    try:
+        from ai_service import analyze_verification, _load_image_b64
+
+        proof = (doc.get("proof_url") or "").strip()
+        if not proof:
+            return
+        images: list = []
+        has_profile = False
+        if doc.get("kind") == "selfie":
+            owner = await db.users.find_one({"id": doc["user_id"]}, {"_id": 0, "photo_url": 1})
+            if owner and owner.get("photo_url"):
+                try:
+                    images.append(await _load_image_b64(owner["photo_url"], ""))
+                    has_profile = True
+                except Exception:
+                    pass
+        images.append(await _load_image_b64(proof, ""))
+
+        res = await analyze_verification(doc.get("kind", ""), images, has_profile_photo=has_profile)
+        await db.verifications.update_one(
+            {"id": doc["id"]},
+            {"$set": {
+                "ai_verdict": res["verdict"],
+                "ai_confidence": res["confidence"],
+                "ai_reason": res["reason"],
+            }},
+        )
+        if res["verdict"] == "approve" and res["confidence"] >= 80:
+            await apply_verification_decision(doc["id"], True, decided_by="ai")
+        elif res["verdict"] == "reject" and res["confidence"] >= 80:
+            await apply_verification_decision(doc["id"], False, reason=res["reason"], decided_by="ai")
+        # otherwise: stays pending, admin sees the AI hint
+    except Exception:
+        log.warning("ai verification review failed", exc_info=True)
+
+
 @router.post("/verification/request")
 async def request_verification(req: VerificationRequest, uid: str = Depends(get_current_user_id)):
     doc = {
@@ -90,6 +158,9 @@ async def request_verification(req: VerificationRequest, uid: str = Depends(get_
         "created_at": iso(now_utc()),
     }
     await db.verifications.insert_one(doc)
+    # AI reviews in the background - the user gets an instant answer when the
+    # model is confident, and the admin queue only holds the unclear cases.
+    asyncio.create_task(_ai_review_verification(doc))
     return {"ok": True, "id": doc["id"]}
 
 
