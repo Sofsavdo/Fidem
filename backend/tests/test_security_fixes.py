@@ -551,3 +551,91 @@ def test_auth_telegram_real_signup_does_not_pay_instant_balance_bonus(monkeypatc
     assert fake_users.inc_calls == [], "no balance/ref_count $inc should happen on real signup either"
     referred_by_writes = [s for q, s in fake_users.set_calls if "referred_by" in s]
     assert referred_by_writes == [{"referred_by": "OWNER123"}], "attribution should still be recorded"
+
+
+# ---------- Telegram push delivery: silent-failure fixes ----------
+def test_send_telegram_message_payload_has_no_parse_mode(monkeypatch):
+    """parse_mode='HTML' used to be sent unconditionally even though no
+    caller ever puts HTML tags in notification text. Any stray '<', '>' or
+    '&' in admin-typed content (e.g. an announcement) made Telegram reject
+    the whole message as unparsable HTML - a real, plausible failure mode
+    for free-form admin text, and one that was invisible (see below)."""
+    captured = {}
+
+    async def fake_post(_self, url, json=None):
+        captured["payload"] = json
+        return type("R", (), {"status_code": 200, "text": "ok"})()
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *_a):
+            return False
+        post = fake_post
+
+    monkeypatch.setattr(services.httpx, "AsyncClient", lambda **_kw: FakeClient())
+    monkeypatch.setattr(services, "TG_BOT_TOKEN", "123:fake")
+    monkeypatch.setattr(services, "TG_API", "https://api.telegram.org/bot123:fake")
+
+    asyncio.run(services.send_telegram_message(123, "hi <there> & more"))
+    assert "parse_mode" not in captured["payload"], captured["payload"]
+
+
+def test_send_telegram_message_logs_non_200_instead_of_swallowing(monkeypatch, caplog):
+    """A non-exception failure (bad chat_id, user blocked the bot, Telegram
+    400/403...) used to return False with zero logging - completely
+    invisible to anyone debugging 'the bot never sent it'."""
+    async def fake_post(_self, url, json=None):
+        return type("R", (), {"status_code": 400, "text": "Bad Request: can't parse entities"})()
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *_a):
+            return False
+        post = fake_post
+
+    monkeypatch.setattr(services.httpx, "AsyncClient", lambda **_kw: FakeClient())
+    monkeypatch.setattr(services, "TG_BOT_TOKEN", "123:fake")
+    monkeypatch.setattr(services, "TG_API", "https://api.telegram.org/bot123:fake")
+
+    with caplog.at_level("WARNING"):
+        ok = asyncio.run(services.send_telegram_message(123, "hi"))
+    assert ok is False
+    assert any("400" in r.message for r in caplog.records)
+
+
+def test_push_notif_forwards_real_kind_to_notify_telegram(monkeypatch):
+    """notify_telegram's 20-minute Telegram-delivery cooldown is keyed per
+    kind (last_notif_{kind}). push_notif used to call notify_telegram(uid,
+    text, link) without kind, so every call fell back to notify_telegram's
+    own 'general' default - every notification kind shared ONE Telegram
+    cooldown bucket, so a Telegram send of any kind silently blocked every
+    OTHER kind's Telegram delivery for the next 20 minutes, while the
+    in-app notification (a separate, unaffected insert) kept working fine."""
+    received_kinds = []
+
+    async def fake_notify_telegram(uid, text, link=None, kind="general"):
+        received_kinds.append(kind)
+
+    class FakeNotifications:
+        async def count_documents(self, *_a, **_kw):
+            return 0
+        async def insert_one(self, _doc):
+            return None
+
+    fake_db = type("FakeDb", (), {})()
+    fake_db.notifications = FakeNotifications()
+
+    monkeypatch.setattr(core, "notify_telegram", fake_notify_telegram)
+    monkeypatch.setattr(core, "db", fake_db)
+
+    async def _run():
+        # push_notif fires notify_telegram via asyncio.create_task (fire and
+        # forget) - it must be awaited within the SAME running loop, or the
+        # loop closes before the scheduled task ever executes.
+        await core.push_notif("u1", "referral", "test")
+        await asyncio.sleep(0.05)
+
+    asyncio.run(_run())
+    assert received_kinds == ["referral"], received_kinds

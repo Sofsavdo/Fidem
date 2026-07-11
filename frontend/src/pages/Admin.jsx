@@ -2,14 +2,14 @@ import React, { useState } from "react";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ShieldCheck, Wallet, Users as UsersIcon, DollarSign, TrendingUp, BarChart3, LayoutDashboard, Search, MessageSquare, Settings, ChevronRight, MapPin, Activity, AlertTriangle, Send, Megaphone, Trash2, Bot } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Wallet, Users as UsersIcon, DollarSign, TrendingUp, BarChart3, LayoutDashboard, Search, MessageSquare, Settings, ChevronRight, MapPin, Activity, AlertTriangle, Send, Megaphone, Trash2, Bot, Eye, Pencil, Link2 } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
 import api from "@/lib/api";
 import { PURPOSE_UZ, REF_TYPE_UZ, VERIF_KIND_UZ } from "@/lib/labels";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  useAnnouncements,
+  useAdminAnnouncements,
   useAdminStats, useAdminUsers, useAdminRegions, useAdminUserSearch, useUpdateAdminUser,
   useAdminPayments, useAdminPaymentBlock, useAdminVerifications, useAdminDecideVerification,
   useAdminReports, useAdminWithdrawals, useAdminWithdrawalDecision, useAdminConcierge,
@@ -664,21 +664,30 @@ function AdminUsers() {
 }
 
 // Anonslar: create photo+text news posts; optional in-app notification fanout.
-function AdminAnnouncements() {
-  const queryClient = useQueryClient();
-  const { data: items = [] } = useAnnouncements();
-  const [title, setTitle] = useState("");
-  const [text, setText] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [notify, setNotify] = useState(true);
-  const [busy, setBusy] = useState(false);
+// Common in-app sections admins actually want to send people to from a post
+// (e.g. "become an ambassador" -> Referral), so they don't have to remember
+// or type the path.
+const ANON_ACTION_PRESETS = [
+  { label: "Do'stlarni taklif qilish", url: "/referral" },
+  { label: "Tariflar", url: "/premium" },
+  { label: "Reyting", url: "/rankings" },
+];
+
+function AnnouncementForm({ initial, busy, onCancel, onSubmit, submitLabel }) {
+  const [title, setTitle] = useState(initial?.title || "");
+  const [text, setText] = useState(initial?.text || "");
+  const [imageUrl, setImageUrl] = useState(initial?.image_url || "");
+  const [actionUrl, setActionUrl] = useState(initial?.action_url || "");
+  const [actionLabel, setActionLabel] = useState(initial?.action_label || "");
+  const [notify, setNotify] = useState(initial ? false : true);
+  const [uploading, setUploading] = useState(false);
   const fileRef = React.useRef(null);
 
   const pickImage = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    setBusy(true);
+    setUploading(true);
     try {
       const fd = new FormData();
       fd.append("file", file);
@@ -687,17 +696,97 @@ function AdminAnnouncements() {
       toast.success("Rasm yuklandi ✓");
     } catch {
       toast.error("Rasm yuklashda xatolik");
+    } finally { setUploading(false); }
+  };
+
+  return (
+    <div className="space-y-3">
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Sarlavha" className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-sm" data-testid="anons-title" />
+      <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} placeholder="Matn (ixtiyoriy)" className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-sm" data-testid="anons-text" />
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickImage} />
+      <div className="flex items-center gap-2 flex-wrap">
+        <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} className="text-xs rounded-full border border-border px-3 py-2 disabled:opacity-50">
+          {imageUrl ? "Rasmni almashtirish" : "📷 Rasm biriktirish"}
+        </button>
+        {imageUrl && <img src={photoSrc(imageUrl)} alt="" className="h-10 w-16 object-cover rounded-lg border border-border" />}
+      </div>
+
+      <div className="rounded-2xl border border-dashed border-border p-3 space-y-2">
+        <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"><Link2 className="w-3.5 h-3.5" /> Tugma / havola (ixtiyoriy)</p>
+        <p className="text-[11px] text-muted-foreground">Post oxirida tugma chiqadi va bosilganda shu bo'limga yoki havolaga o'tkazadi (masalan Instagram post, yoki ilova ichidagi bo'lim).</p>
+        <div className="flex gap-2 flex-wrap">
+          {ANON_ACTION_PRESETS.map((p) => (
+            <button key={p.url} type="button" onClick={() => { setActionUrl(p.url); setActionLabel((v) => v || p.label); }}
+              className="text-[11px] rounded-full border border-border px-2.5 py-1 hover:bg-muted">
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <input value={actionUrl} onChange={(e) => setActionUrl(e.target.value)} placeholder="/referral yoki https://instagram.com/..." className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" data-testid="anons-action-url" />
+        <input value={actionLabel} onChange={(e) => setActionLabel(e.target.value)} placeholder="Tugma matni (masalan: Do'stlarni taklif qilish)" className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" data-testid="anons-action-label" />
+      </div>
+
+      {!initial && (
+        <label className="flex items-center gap-1.5 text-xs">
+          <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
+          Bildirishnoma yuborilsin (ilova ichida + Telegram bot)
+        </label>
+      )}
+
+      <div className="flex gap-2">
+        {onCancel && (
+          <button type="button" onClick={onCancel} disabled={busy} className="flex-1 rounded-2xl border border-border text-sm font-medium py-2.5">
+            Bekor qilish
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => onSubmit({ title: title.trim(), text: text.trim(), image_url: imageUrl || null, action_url: actionUrl.trim() || null, action_label: actionLabel.trim() || null, notify })}
+          disabled={busy || !title.trim() || uploading}
+          data-testid="anons-publish"
+          className="flex-1 rounded-2xl bg-primary text-white text-sm font-medium py-2.5 disabled:opacity-50"
+        >
+          {busy ? "..." : submitLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AdminAnnouncements() {
+  const queryClient = useQueryClient();
+  const { data: items = [] } = useAdminAnnouncements();
+  const [busy, setBusy] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["admin", "announcements"] });
+    queryClient.invalidateQueries({ queryKey: ["announcements"] });
+  };
+
+  const publish = async (payload) => {
+    setBusy(true);
+    try {
+      await api.post("/admin/announcements", payload);
+      toast.success("Anons e'lon qilindi ✓");
+      invalidate();
+    } catch {
+      toast.error("Xatolik");
     } finally { setBusy(false); }
   };
 
-  const publish = async () => {
-    if (!title.trim() || busy) return;
+  const saveEdit = async (id, payload) => {
     setBusy(true);
     try {
-      await api.post("/admin/announcements", { title: title.trim(), text: text.trim(), image_url: imageUrl || null, notify });
-      toast.success("Anons e'lon qilindi ✓");
-      setTitle(""); setText(""); setImageUrl("");
-      queryClient.invalidateQueries({ queryKey: ["announcements"] });
+      await api.patch(`/admin/announcements/${id}`, {
+        title: payload.title, text: payload.text,
+        image_url: payload.image_url, clear_image: !payload.image_url,
+        action_url: payload.action_url, action_label: payload.action_label,
+        clear_action: !payload.action_url,
+      });
+      toast.success("Yangilandi ✓");
+      setEditingId(null);
+      invalidate();
     } catch {
       toast.error("Xatolik");
     } finally { setBusy(false); }
@@ -707,43 +796,47 @@ function AdminAnnouncements() {
     try {
       await api.delete(`/admin/announcements/${id}`);
       toast.success("O'chirildi");
-      queryClient.invalidateQueries({ queryKey: ["announcements"] });
+      invalidate();
     } catch { toast.error("Xatolik"); }
   };
 
   return (
     <div className="space-y-4 max-w-2xl" data-testid="admin-anons">
-      <div className="rounded-3xl bg-card border border-border p-4 space-y-3">
-        <p className="text-sm font-medium">Yangi anons</p>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Sarlavha" className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-sm" data-testid="anons-title" />
-        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} placeholder="Matn (ixtiyoriy)" className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-sm" data-testid="anons-text" />
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickImage} />
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={() => fileRef.current?.click()} disabled={busy} className="text-xs rounded-full border border-border px-3 py-2 disabled:opacity-50">
-            {imageUrl ? "Rasmni almashtirish" : "📷 Rasm biriktirish"}
-          </button>
-          {imageUrl && <img src={photoSrc(imageUrl)} alt="" className="h-10 w-16 object-cover rounded-lg border border-border" />}
-          <label className="flex items-center gap-1.5 text-xs ml-auto">
-            <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
-            Bildirishnoma yuborilsin
-          </label>
-        </div>
-        <button onClick={publish} disabled={busy || !title.trim()} data-testid="anons-publish" className="w-full rounded-2xl bg-primary text-white text-sm font-medium py-2.5 disabled:opacity-50">
-          {busy ? "..." : "E'lon qilish"}
-        </button>
+      <div className="rounded-3xl bg-card border border-border p-4">
+        <p className="text-sm font-medium mb-3">Yangi anons</p>
+        <AnnouncementForm busy={busy} onSubmit={publish} submitLabel="E'lon qilish" />
       </div>
 
       <div className="space-y-2">
         {items.map((a) => (
-          <div key={a.id} className="rounded-2xl bg-card border border-border p-3 flex items-center gap-3" data-testid={`adm-anons-${a.id}`}>
-            {a.image_url && <img src={photoSrc(a.image_url)} alt="" className="h-12 w-16 object-cover rounded-lg border border-border shrink-0" />}
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium truncate">{a.title}</p>
-              <p className="text-[10px] text-muted-foreground">{a.created_at ? new Date(a.created_at).toLocaleString("uz-UZ") : ""}</p>
-            </div>
-            <button onClick={() => remove(a.id)} className="shrink-0 p-2 rounded-full hover:bg-muted text-rose-600" title="O'chirish">
-              <Trash2 className="w-4 h-4" />
-            </button>
+          <div key={a.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`adm-anons-${a.id}`}>
+            {editingId === a.id ? (
+              <AnnouncementForm
+                initial={a}
+                busy={busy}
+                onCancel={() => setEditingId(null)}
+                onSubmit={(payload) => saveEdit(a.id, payload)}
+                submitLabel="Saqlash"
+              />
+            ) : (
+              <div className="flex items-center gap-3">
+                {a.image_url && <img src={photoSrc(a.image_url)} alt="" className="h-12 w-16 object-cover rounded-lg border border-border shrink-0" />}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{a.title}</p>
+                  <div className="flex items-center gap-2.5 text-[10px] text-muted-foreground mt-0.5">
+                    <span>{a.created_at ? new Date(a.created_at).toLocaleString("uz-UZ") : ""}</span>
+                    <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> {a.view_count || 0} kishi ko'rdi</span>
+                    {a.action_url && <span className="flex items-center gap-1 text-primary"><Link2 className="w-3 h-3" /> {a.action_label || a.action_url}</span>}
+                  </div>
+                </div>
+                <button onClick={() => setEditingId(a.id)} className="shrink-0 p-2 rounded-full hover:bg-muted text-muted-foreground" title="Tahrirlash">
+                  <Pencil className="w-4 h-4" />
+                </button>
+                <button onClick={() => remove(a.id)} className="shrink-0 p-2 rounded-full hover:bg-muted text-rose-600" title="O'chirish">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>

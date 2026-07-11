@@ -3,6 +3,7 @@ import api from "@/lib/api";
 
 export const QK = {
   announcements: ["announcements"],
+  adminAnnouncements: ["admin", "announcements"],
   dailyPicks: ["daily-picks"],
   photoRequests: ["photo-unlock", "requests"],
   adminReferrers: ["admin", "referrers"],
@@ -61,6 +62,15 @@ export function useAnnouncements() {
     queryKey: QK.announcements,
     queryFn: () => api.get("/announcements").then((r) => r.data || []),
     staleTime: 5 * 60_000,
+  });
+}
+
+// Admin's own feed - same posts, plus a unique-viewer count per post.
+export function useAdminAnnouncements() {
+  return useQuery({
+    queryKey: QK.adminAnnouncements,
+    queryFn: () => api.get("/admin/announcements").then((r) => r.data || []),
+    staleTime: 30_000,
   });
 }
 

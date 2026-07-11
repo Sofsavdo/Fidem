@@ -236,6 +236,17 @@ async def startup() -> None:
     except Exception as e:
         log.warning(f"Warning: Failed to create unique pending_refs index (likely pre-existing duplicates): {e}")
         await db.pending_refs.create_index("telegram_id", name="ix_pending_refs_tg_nonunique")
+    # One view record per (announcement, viewer) - both to compute unique-
+    # viewer counts cheaply and to make the mark-viewed upsert idempotent.
+    try:
+        await db.announcement_views.create_index(
+            [("announcement_id", 1), ("user_id", 1)], unique=True, name="ix_anon_views_post_user"
+        )
+    except Exception as e:
+        log.warning(f"Warning: Failed to create unique announcement_views index (likely pre-existing duplicates): {e}")
+        await db.announcement_views.create_index(
+            [("announcement_id", 1), ("user_id", 1)], name="ix_anon_views_post_user_nonunique"
+        )
 
     # Initialize referral_id for existing users (first 8 chars of id) - only if needed
     sample_referral = await db.users.find_one({"referral_id": {"$exists": True}}, {"referral_id": 1})

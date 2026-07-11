@@ -1,7 +1,10 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
-import { Megaphone } from "lucide-react";
+import { ArrowRight, Megaphone } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
+import { openExternalLink } from "@/lib/telegram";
+import api from "@/lib/api";
 import { useAnnouncements } from "@/hooks/queries";
 import { EmptyState } from "@/components/kit";
 
@@ -9,7 +12,9 @@ import { EmptyState } from "@/components/kit";
 // match/wedding success stories.
 export default function Announcements() {
   const { t } = useApp();
+  const navigate = useNavigate();
   const { data: items = [], isLoading } = useAnnouncements();
+  const seenRef = useRef(new Set());
 
   // Mark the feed as seen so the bottom-nav dot clears.
   useEffect(() => {
@@ -18,6 +23,23 @@ export default function Announcements() {
       try { localStorage.setItem("fidem_anons_seen", latest); } catch { /* ignore */ }
     }
   }, [items]);
+
+  // Unique-viewer tracking for the admin's "necha kishi ko'rdi" count - fire
+  // once per post per page load, deduped locally so re-renders don't spam it
+  // (the backend upsert is idempotent too, this just saves the round trip).
+  useEffect(() => {
+    for (const a of items) {
+      if (seenRef.current.has(a.id)) continue;
+      seenRef.current.add(a.id);
+      api.post(`/announcements/${a.id}/view`).catch(() => {});
+    }
+  }, [items]);
+
+  const openAction = (url) => {
+    if (!url) return;
+    if (url.startsWith("/")) navigate(url);
+    else openExternalLink(url);
+  };
 
   return (
     <div className="px-4 md:px-8 pt-6 pb-8">
@@ -50,6 +72,17 @@ export default function Announcements() {
             <div className="p-4">
               <h2 className="font-heading text-lg font-semibold leading-snug">{a.title}</h2>
               {a.text && <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed whitespace-pre-line">{a.text}</p>}
+              {a.action_url && (
+                <button
+                  type="button"
+                  onClick={() => openAction(a.action_url)}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium active:scale-95 transition-transform"
+                  data-testid={`anons-action-${a.id}`}
+                >
+                  {a.action_label || t("anons_learn_more")}
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
               <p className="text-[11px] text-muted-foreground mt-2.5">
                 {a.created_at ? new Date(a.created_at).toLocaleDateString() : ""}
               </p>
