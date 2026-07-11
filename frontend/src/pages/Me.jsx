@@ -4,11 +4,11 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, PlanPill } from "@/components/Badges";
 import PhotoUpload from "@/components/PhotoUpload";
-import { ChevronRight, Crown, Wallet, Share2, Settings as SettingsIcon, LogOut, ShieldCheck, Clock, SlidersHorizontal, Brain, BookOpen, Phone, Trophy, Rocket, MessageCircle, EyeOff, Camera, Check, Lock } from "lucide-react";
+import { ChevronRight, Crown, Wallet, Share2, Settings as SettingsIcon, LogOut, ShieldCheck, Clock, SlidersHorizontal, Brain, BookOpen, Phone, Trophy, Rocket, MessageCircle, EyeOff, Camera } from "lucide-react";
 import BoostModal from "@/components/BoostModal";
 import LocationVerifyCard from "@/components/LocationVerifyCard";
 import { toast } from "sonner";
-import { useReferral, useDailyStatus, useSavedSummary, useLeaderboard, QK } from "@/hooks/queries";
+import { useReferral, useSavedSummary, useLeaderboard, QK } from "@/hooks/queries";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 
 // Static support contact - a real Telegram account admins actually monitor,
@@ -32,7 +32,6 @@ export default function Me() {
   const [boostOpen, setBoostOpen] = useState(false);
 
   const { data: referral } = useReferral();
-  const { data: daily } = useDailyStatus();
   const { data: interestedSummary } = useSavedSummary();
   const { data: leaders = [] } = useLeaderboard("all");
   const myRank = leaders.findIndex((row) => row.user?.id === user?.id);
@@ -56,24 +55,6 @@ export default function Me() {
       if (detail === "privacy_boost_active") toast.error(t("privacy_boost_active"));
       else if (detail === "privacy_requires_plan") toast.error(t("privacy_requires_plan"));
       else toast.error(t("error_generic"));
-    },
-  });
-
-  const claimDailyMutation = useMutation({
-    mutationFn: () => api.post("/daily/claim"),
-    onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: QK.dailyStatus });
-      const previous = queryClient.getQueryData(QK.dailyStatus);
-      queryClient.setQueryData(QK.dailyStatus, (old) => old ? { ...old, claimed_today: true } : old);
-      return { previous };
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previous) queryClient.setQueryData(QK.dailyStatus, context.previous);
-    },
-    onSuccess: (r) => {
-      toast.success(`+${r.data.bonus} ${t("sum")}`);
-      queryClient.invalidateQueries({ queryKey: QK.dailyStatus });
-      refresh();
     },
   });
 
@@ -119,6 +100,18 @@ export default function Me() {
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-medium text-lg truncate">{user.name}, {user.age}</p>
               <PlanPill plan={user.plan} />
+              {user.plan !== "free" && user.plan_until && (() => {
+                const daysLeft = Math.max(0, Math.ceil((new Date(user.plan_until) - Date.now()) / 86400000));
+                return (
+                  <Link
+                    to="/premium?tab=plans"
+                    data-testid="plan-days-left"
+                    className={`text-[10px] px-2 py-0.5 rounded-full border ${daysLeft <= 3 ? "bg-amber-50 text-amber-700 border-amber-300" : "bg-muted text-muted-foreground border-border"}`}
+                  >
+                    {daysLeft} {t("days_left_short")}
+                  </Link>
+                );
+              })()}
             </div>
             <p className="text-xs text-muted-foreground truncate">{user.region} · {user.profession || "—"}</p>
             <div className="flex gap-1 mt-1.5 flex-wrap">
@@ -195,48 +188,37 @@ export default function Me() {
             disabled={privacyMutation.isPending}
             onChange={(v) => privacyMutation.mutate({ photo_public: v })}
           />
-          <PrivacyToggle
-            testid="toggle-hidden-profile"
-            icon={<EyeOff className="w-4 h-4" />}
-            label={t("hidden_profile_label")}
-            hint={isPaidPlan ? t("hidden_profile_hint") : t("privacy_paid_hint")}
-            checked={!!user.hidden_profile}
-            disabled={privacyMutation.isPending || !isPaidPlan}
-            onChange={(v) => privacyMutation.mutate({ hidden_profile: v })}
-          />
-
-          {/* What each plan's privacy actually buys — the ladder itself is
-              the ad: every row you don't have yet is a reason to upgrade. */}
-          <div className="rounded-2xl bg-muted/50 border border-border p-3 space-y-2" data-testid="privacy-tiers">
-            {[
-              { key: "privacy_tier_standard", plans: ["standard", "premium", "vip"], name: "Standard" },
-              { key: "privacy_tier_premium", plans: ["premium", "vip"], name: "Premium" },
-              { key: "privacy_tier_vip", plans: ["vip"], name: "VIP" },
-            ].map((tier) => {
-              const included = tier.plans.includes(user.plan);
-              return (
-                <div key={tier.key} className="flex items-start gap-2">
-                  {included ? (
-                    <Check className="w-3.5 h-3.5 text-secondary shrink-0 mt-0.5" />
-                  ) : (
-                    <Lock className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
-                  )}
-                  <p className={`text-[11px] leading-relaxed ${included ? "" : "text-muted-foreground"}`}>
-                    <span className="font-semibold">{tier.name}:</span> {t(tier.key)}
+          {user.plan === "vip" ? (
+            // VIP: full privacy is theirs — the switch works right here.
+            <PrivacyToggle
+              testid="toggle-hidden-profile"
+              icon={<EyeOff className="w-4 h-4" />}
+              label={t("hidden_profile_label")}
+              hint={t("hidden_profile_hint")}
+              checked={!!user.hidden_profile}
+              disabled={privacyMutation.isPending}
+              onChange={(v) => privacyMutation.mutate({ hidden_profile: v })}
+            />
+          ) : (
+            // Everyone else: a live row (never a dead toggle) that opens the
+            // privacy center where each tier has its own working control.
+            <Link
+              to="/privacy-center"
+              data-testid="open-privacy-center"
+              className="flex items-start justify-between gap-3 active:scale-[0.99] transition"
+            >
+              <div className="flex items-start gap-2.5 min-w-0">
+                <span className="text-muted-foreground mt-0.5 shrink-0"><EyeOff className="w-4 h-4" /></span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{t("hidden_profile_label")}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                    {user.hidden_profile ? `✓ ${t("privacy_on_state")}` : t("privacy_paid_hint")}
                   </p>
                 </div>
-              );
-            })}
-            {user.plan !== "vip" && (
-              <Link
-                to="/premium?tab=plans"
-                data-testid="privacy-upgrade-cta"
-                className="mt-1 flex items-center justify-center gap-1.5 rounded-xl bg-primary/10 border border-primary/25 px-3 py-2 text-xs font-semibold text-primary active:scale-[0.98] transition"
-              >
-                {t("privacy_choose_plan")} <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
-            )}
-          </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
+            </Link>
+          )}
         </div>
       </div>
 
@@ -288,31 +270,8 @@ export default function Me() {
       </div>
       {boostOpen && <BoostModal onClose={() => setBoostOpen(false)} />}
 
-      {/* Daily streak — reward is credited to the app balance (for gifts,
-          boost, plans). Missing a day restarts the streak. */}
-      {daily && (
-        <div className="rounded-3xl bg-gradient-to-r from-gold/15 to-card border border-gold/30 p-4" data-testid="daily-strip">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("daily_streak")}</p>
-              <p className="font-heading text-2xl">{daily.streak} {t("day_word")} 🔥</p>
-            </div>
-            {daily.claimed_today ? (
-              <span className="text-xs text-secondary font-medium">✓ {t("daily")}</span>
-            ) : (
-              <button
-                data-testid="daily-claim-inline"
-                onClick={() => claimDailyMutation.mutate()}
-                disabled={claimDailyMutation.isPending}
-                className="rounded-xl bg-gold text-ink px-4 py-2 text-sm font-medium disabled:opacity-60"
-              >
-                +{daily.next_bonus} {t("sum")}
-              </button>
-            )}
-          </div>
-          <p className="text-[11px] text-muted-foreground mt-2 leading-snug">{t("streak_explain")}</p>
-        </div>
-      )}
+      {/* Daily streak lives in Sozlamalar (/me/settings) now — Me stays a
+          clean overview page. */}
 
       {/* Invite friends → unified single entrypoint */}
       {referral && (
@@ -354,7 +313,7 @@ export default function Me() {
         <p className="field-label mb-2 px-1">{t("me_group_app")}</p>
         <div className="rounded-3xl bg-card border border-border divide-y">
           <NavRow to="/stories" testid="link-stories" icon={<BookOpen className="w-4 h-4 text-foreground" />} label={t("success_stories")} />
-          <NavRow to="/settings" testid="link-settings" icon={<SlidersHorizontal className="w-4 h-4" />} label={t("who_can_message_me")} />
+          <NavRow to="/me/settings" testid="link-settings" icon={<SlidersHorizontal className="w-4 h-4" />} label={t("me_settings_title")} />
           {user.is_admin && (
             <NavRow to="/admin" testid="link-admin" icon={<SettingsIcon className="w-4 h-4" />} label={t("admin_panel")} />
           )}
@@ -367,7 +326,6 @@ export default function Me() {
             <span className="flex items-center gap-3 text-sm"><MessageCircle className="w-4 h-4 text-secondary" /> {t("contact_admin")}</span>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </button>
-          <NavRow to="/terms" testid="link-terms" icon={<ShieldCheck className="w-4 h-4 text-muted-foreground" />} label={t("legal_links_title")} />
           <button data-testid="btn-logout" onClick={logout} className="flex items-center justify-between p-4 w-full text-left">
             <span className="flex items-center gap-3 text-sm text-foreground"><LogOut className="w-4 h-4" /> {t("logout")}</span>
           </button>

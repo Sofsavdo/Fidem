@@ -76,6 +76,10 @@ class OnboardingProfile(BaseModel):
     # all confirmed with checkboxes before the wizard. Required for FIRST
     # onboarding (auth_r enforces); ignored on the edit/complete flow.
     terms_accepted: bool = False
+    # Optional "who invited you?" - a referral id or username entered on the
+    # consent screen. Only honored on first onboarding when the account has
+    # no referred_by yet (Telegram deep-link attribution always wins).
+    referral_code: Optional[str] = None
 
 
 class UserPublic(BaseModel):
@@ -139,6 +143,15 @@ class UpdateProfileRequest(BaseModel):
     smoking: Optional[Literal["no", "sometimes", "yes"]] = None
     alcohol: Optional[Literal["no", "sometimes", "yes"]] = None
     relocation: Optional[bool] = None
+    # Owner's shareable contact details (Sozlamalar > aloqa ma'lumotlari).
+    # PRIVATE: never in user_public - only surfaced back to the owner via
+    # /auth/me and sent into a chat when the owner explicitly shares them.
+    contact_phone: Optional[str] = None
+    contact_telegram: Optional[str] = None
+    contact_instagram: Optional[str] = None
+    # 15-second video intro (VIP perk; auth_r enforces the plan gate).
+    # Empty string clears it; shown publicly on the profile detail page.
+    video_intro_url: Optional[str] = None
 
 
 class MessageFilters(BaseModel):

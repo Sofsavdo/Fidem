@@ -9,7 +9,7 @@ import {
   useAdminStats, useAdminUsers, useAdminRegions, useAdminUserSearch, useUpdateAdminUser,
   useAdminPayments, useAdminPaymentBlock, useAdminVerifications, useAdminDecideVerification,
   useAdminReports, useAdminWithdrawals, useAdminWithdrawalDecision, useAdminConcierge,
-  useAdminConciergeMatch, useAdminReferrals, useAdminMessages, useAdminDeleteMessage,
+  useAdminConciergeMatch, useAdminReferrals, useAdminReferrers, useAdminReferrerDetail, useAdminMessages, useAdminDeleteMessage,
   useAdminFraud, useAdminMarkSafe, useAdminBroadcast,
 } from "@/hooks/queries";
 
@@ -400,15 +400,25 @@ function AdminAnalytics({ stats }) {
   );
 }
 
+// Quick audience segments: joined recently / active recently / paying.
+const USER_SEGMENTS = [
+  { k: "all", label: "Hammasi", params: {} },
+  { k: "new", label: "🆕 Yangi (7 kun)", params: { joined_within_days: 7, sort: "new" } },
+  { k: "active", label: "🟢 Faol (7 kun)", params: { active_within_days: 7, sort: "active" } },
+  { k: "regular", label: "🔁 Doimiy (bugun faol)", params: { active_within_days: 1, sort: "active" } },
+  { k: "paid", label: "💎 To'lovchilar", params: { plan: "paid" } },
+];
+
 function AdminUsers() {
   const [q, setQ] = useState("");
+  const [segment, setSegment] = useState("all");
   const [filters, setFilters] = useState({ gender: "", region: "", age_min: "", age_max: "", marital_status: "" });
   const [page, setPage] = useState(1);
   const [selectedUser, setSelectedUser] = useState(null);
   const [zoomPhoto, setZoomPhoto] = useState(null);
   const limit = 20;
 
-  const params = { q, page, limit };
+  const params = { q, page, limit, ...(USER_SEGMENTS.find((s) => s.k === segment)?.params || {}) };
   if (filters.gender) params.gender = filters.gender;
   if (filters.region) params.region = filters.region;
   if (filters.marital_status) params.marital_status = filters.marital_status;
@@ -433,6 +443,18 @@ function AdminUsers() {
       {/* Search and Filters */}
       <div className="space-y-3">
         <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search by name, email, username..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" data-testid="admin-user-search" />
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1">
+          {USER_SEGMENTS.map((s) => (
+            <button
+              key={s.k}
+              data-testid={`admin-user-seg-${s.k}`}
+              onClick={() => { setSegment(s.k); setPage(1); }}
+              className={`whitespace-nowrap text-xs rounded-full px-3 py-1.5 border ${segment === s.k ? "bg-foreground text-background border-foreground" : "bg-card border-border"}`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
         <div className="flex flex-wrap gap-2">
           <select value={filters.gender} onChange={(e) => setFilters(f => ({ ...f, gender: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm min-w-[120px]">
             <option value="">Jins: Hammasi</option>
@@ -484,7 +506,11 @@ function AdminUsers() {
                 </p>
                 <p className="text-xs text-muted-foreground truncate">{u.region} · age {u.age} · {u.gender} · {u.marital_status || "Noma'lum"}</p>
                 <p className="text-[10px] text-muted-foreground">{u.email} · {u.phone || "Telefon yo'q"}</p>
-                <p className="text-[10px] text-muted-foreground">{u.online ? "Hozir onlayn" : `Oxirgi faollik: ${u.last_active_label || "—"}`}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {u.online ? "Hozir onlayn" : `Oxirgi faollik: ${u.last_active_label || "—"}`}
+                  {u.created_at ? ` · Qo'shilgan: ${new Date(u.created_at).toLocaleDateString("uz-UZ")}` : ""}
+                  {u.days_in_app != null ? ` (${u.days_in_app} kun)` : ""}
+                </p>
               </div>
               <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
             </div>
@@ -622,9 +648,12 @@ function AdminUsers() {
 }
 
 function AdminPayments() {
+  // Successful payments are the default view; pending/expired/failed noise
+  // is collapsed behind a toggle. Every row names the paying user.
+  const [showOther, setShowOther] = useState(false);
   const [page, setPage] = useState(1);
   const limit = 20;
-  const { data } = useAdminPayments({ page, limit });
+  const { data } = useAdminPayments({ page, limit, status: showOther ? "other" : "successful" });
   const list = data?.payments || [];
   const total = data?.total || 0;
   const blockMutation = useAdminPaymentBlock();
@@ -632,25 +661,55 @@ function AdminPayments() {
   const blockPayment = (id) => blockMutation.mutate({ id, block: true }, { onSuccess: () => toast.success("Blocked") });
   const unblockPayment = (id) => blockMutation.mutate({ id, block: false }, { onSuccess: () => toast.success("Unblocked") });
 
+  const statusPill = (s) => {
+    if (s === "success" || s === "paid") return <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">✓ {s === "paid" ? "Balansdan" : "CLICK"}</span>;
+    if (s === "pending") return <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Kutilmoqda</span>;
+    return <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">{s}</span>;
+  };
+
   return (
-    <div className="space-y-2" data-testid="admin-payments">
-      {list.map((p) => (
-        <div key={p.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`adm-pay-${p.id}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm">{p.purpose} · {p.amount?.toLocaleString()} so'm</p>
-              <p className="text-xs text-muted-foreground">{p.status} {p.blocked_by_admin && "🚫 Blocked"}</p>
-            </div>
-            <div className="flex gap-1">
-              {p.blocked_by_admin ? (
-                <button onClick={() => unblockPayment(p.id)} className="text-xs rounded-full bg-emerald-100 text-emerald-700 px-3 py-1.5">Unblock</button>
-              ) : (
-                <button onClick={() => blockPayment(p.id)} className="text-xs rounded-full bg-red-50 text-red-700 px-3 py-1.5">Block</button>
-              )}
+    <div className="space-y-3" data-testid="admin-payments">
+      <div className="flex gap-1.5">
+        <button
+          onClick={() => { setShowOther(false); setPage(1); }}
+          className={`text-xs rounded-full px-3 py-1.5 border ${!showOther ? "bg-foreground text-background border-foreground" : "bg-card border-border"}`}
+          data-testid="adm-pay-tab-success"
+        >
+          ✓ Muvaffaqiyatli
+        </button>
+        <button
+          onClick={() => { setShowOther(true); setPage(1); }}
+          className={`text-xs rounded-full px-3 py-1.5 border ${showOther ? "bg-foreground text-background border-foreground" : "bg-card border-border"}`}
+          data-testid="adm-pay-tab-other"
+        >
+          Jarayonda / muvaffaqiyatsiz
+        </button>
+      </div>
+      {list.length === 0 && <p className="text-sm text-muted-foreground py-6 text-center">To'lovlar yo'q</p>}
+      <div className="space-y-2">
+        {list.map((p) => (
+          <div key={p.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`adm-pay-${p.id}`}>
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">
+                  {p.user_name || p.user_id?.slice(0, 8)}
+                  {p.user_telegram ? <span className="text-muted-foreground font-normal"> · @{p.user_telegram}</span> : null}
+                </p>
+                <p className="text-sm">{p.purpose} · <span className="font-semibold tabular-nums">{p.amount?.toLocaleString()} so'm</span>{p.balance_used > 0 && p.click_amount > 0 ? <span className="text-[10px] text-muted-foreground"> (balans {p.balance_used?.toLocaleString()} + CLICK {p.click_amount?.toLocaleString()})</span> : null}</p>
+                <p className="text-[10px] text-muted-foreground">{p.created_at ? new Date(p.created_at).toLocaleString("uz-UZ") : "—"} {p.blocked_by_admin && "· 🚫 Blocked"}</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {statusPill(p.status)}
+                {p.blocked_by_admin ? (
+                  <button onClick={() => unblockPayment(p.id)} className="text-xs rounded-full bg-emerald-100 text-emerald-700 px-3 py-1.5">Unblock</button>
+                ) : (
+                  <button onClick={() => blockPayment(p.id)} className="text-xs rounded-full bg-red-50 text-red-700 px-3 py-1.5">Block</button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
       <AdminPagination page={page} setPage={setPage} total={total} limit={limit} />
     </div>
   );
@@ -865,17 +924,82 @@ function AdminConcierge() {
 }
 
 function AdminReferrals() {
-  const [filter, setFilter] = useState("all");
-  const { data: list = [] } = useAdminReferrals({ type: filter || undefined });
+  // Referrer-centric view: WHO is distributing links, how many they brought
+  // in, and per-invitee paid/free status. The raw earnings ledger stays
+  // available behind a toggle.
+  const [openId, setOpenId] = useState(null);
+  const [showLedger, setShowLedger] = useState(false);
+  const { data: referrers = [], isLoading } = useAdminReferrers();
+  const { data: detail } = useAdminReferrerDetail(openId);
+  const { data: ledger = [] } = useAdminReferrals({});
+
   return (
-    <div className="space-y-2" data-testid="admin-referrals">
-      <div className="flex gap-1">
-        {["all", "signup_free", "paid_subscription", "multi_level_2"].map((f) => (
-          <button key={f} onClick={() => setFilter(f)} className={`text-xs rounded-full px-3 py-1.5 border ${filter === f ? "bg-foreground text-background" : "bg-card"}`}>{f}</button>
-        ))}
-      </div>
-      {list.length === 0 && <p className="text-sm text-muted-foreground">Yo'q</p>}
-      {list.map((r) => (
+    <div className="space-y-3" data-testid="admin-referrals">
+      {isLoading && <p className="text-sm text-muted-foreground py-4 text-center">Yuklanmoqda...</p>}
+      {!isLoading && referrers.length === 0 && (
+        <p className="text-sm text-muted-foreground py-6 text-center">Hozircha hech kim referal orqali odam taklif qilmagan</p>
+      )}
+
+      {referrers.map((r) => {
+        const rid = r.referrer?.id;
+        const isOpen = openId === rid;
+        return (
+          <div key={r.code} className="rounded-2xl bg-card border border-border" data-testid={`adm-referrer-${r.code}`}>
+            <button
+              className="w-full text-left p-3 flex items-center justify-between gap-2"
+              onClick={() => setOpenId(isOpen ? null : rid)}
+              disabled={!rid}
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">
+                  {r.referrer?.name}
+                  {r.referrer?.telegram_username ? <span className="text-muted-foreground font-normal"> · @{r.referrer.telegram_username}</span> : null}
+                  {r.referrer?.plan && r.referrer.plan !== "free" ? <span className="text-[10px] ml-1 px-1.5 py-0.5 rounded-full bg-gold/15 text-gold-dark uppercase">{r.referrer.plan}</span> : null}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Taklif qilgan: <strong className="text-foreground">{r.invited}</strong> · To'lovga o'tgan: <strong className="text-foreground">{r.paid}</strong>
+                  {r.referrer?.earnings_pending > 0 && ` · Hold: ${r.referrer.earnings_pending.toLocaleString()} so'm`}
+                  {r.referrer?.earnings_withdrawable > 0 && ` · Yechishga tayyor: ${r.referrer.earnings_withdrawable.toLocaleString()} so'm`}
+                </p>
+              </div>
+              <ChevronRight className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+            </button>
+
+            {isOpen && detail && (
+              <div className="border-t border-border/60 p-3 space-y-1.5" data-testid="adm-referrer-detail">
+                <p className="text-[11px] text-muted-foreground">
+                  Jami {detail.invited_total} ta taklif · {detail.invited_paid} tasi pullik tarifda
+                </p>
+                {detail.invited.map((u) => (
+                  <div key={u.id} className="flex items-center justify-between gap-2 py-1.5 border-b border-border/40 last:border-0">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium truncate">{u.name || u.id.slice(0, 8)} <span className="text-muted-foreground font-normal">· {u.region || "—"}</span></p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {u.created_at ? new Date(u.created_at).toLocaleDateString("uz-UZ") : "—"}
+                        {u.onboarded ? " · anketa to'liq" : " · anketa chala"}
+                      </p>
+                    </div>
+                    {u.is_paid ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium shrink-0">💎 {u.plan}</span>
+                    ) : (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground shrink-0">free</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      <button
+        onClick={() => setShowLedger((v) => !v)}
+        className="text-xs text-muted-foreground underline"
+        data-testid="adm-ref-ledger-toggle"
+      >
+        {showLedger ? "Daromad yozuvlarini yashirish" : "Daromad yozuvlarini ko'rsatish"}
+      </button>
+      {showLedger && ledger.map((r) => (
         <div key={r.id} className="rounded-2xl bg-card border border-border p-3" data-testid={`adm-ref-${r.id}`}>
           <div className="flex items-center justify-between">
             <div>

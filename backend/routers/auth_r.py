@@ -189,6 +189,12 @@ def _build_me_payload(user: dict) -> dict:
     pub["search_gender"] = user.get("search_gender")
     pub["looking_for"] = user.get("looking_for")
     pub["language"] = user.get("language", "uz")
+    # Owner-only shareable contacts (Sozlamalar) - never in user_public.
+    pub["contact_phone"] = user.get("contact_phone", "")
+    pub["contact_telegram"] = user.get("contact_telegram", "")
+    pub["contact_instagram"] = user.get("contact_instagram", "")
+    # Paid-plan period end (None for grandfathered/legacy purchases).
+    pub["plan_until"] = user.get("plan_until")
     return pub
 
 
@@ -357,11 +363,21 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
     # must be explicitly accepted (checkboxes in the consent screen). The
     # acceptance timestamp + version are stored as the durable record.
     consented = bool(update.pop("terms_accepted", False))
+    referral_code = (update.pop("referral_code", None) or "").strip().lstrip("@")
     if not was_onboarded:
         if not consented:
             raise HTTPException(400, "terms_required")
         update["terms_accepted_at"] = iso(now_utc())
         update["terms_version"] = "1.0"
+
+        # Optional manual referral attribution ("Sizni kim taklif qildi?").
+        # Deep-link attribution from registration wins; self-referral is a no-op.
+        if referral_code and not user.get("referred_by"):
+            ref_owner = await db.users.find_one({"referral_id": referral_code})
+            if not ref_owner:
+                ref_owner = await db.users.find_one({"referral_username_lower": referral_code.lower()})
+            if ref_owner and ref_owner.get("id") != uid:
+                update["referred_by"] = ref_owner.get("referral_id") or referral_code
 
     if was_onboarded:
         # Name is an identity-anchor field: once onboarding is complete,
@@ -483,6 +499,11 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
 async def update_profile(req: UpdateProfileRequest, uid: str = Depends(get_current_user_id)):
     user = await get_user(uid)
     update = {k: v for k, v in req.model_dump().items() if v is not None}
+    # Video intro is a VIP perk: setting a NEW video requires the plan;
+    # clearing (empty string) is always allowed so a downgraded user can
+    # remove theirs.
+    if update.get("video_intro_url") and user.get("plan") != "vip":
+        raise HTTPException(403, "video_requires_vip")
     locked = {"height_cm", "weight_kg", "marital_status", "has_children", "children_count"}
 
     if user.get("onboarded") and any(k in update for k in locked):

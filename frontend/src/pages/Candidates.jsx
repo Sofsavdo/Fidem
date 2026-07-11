@@ -8,7 +8,8 @@ import { X, SlidersHorizontal, MapPin, Lock, Crown, EyeOff } from "lucide-react"
 import { toast } from "sonner";
 import CountrySelect from "@/components/CountrySelect";
 import RegionSelect from "@/components/RegionSelect";
-import { useCandidates, useSaved, useToggleSave } from "@/hooks/queries";
+import { useCandidates, useSaved, useToggleSave, useDailyPicks } from "@/hooks/queries";
+import { photoSrc } from "@/lib/photo";
 import { MATCH_EVENT } from "@/components/MatchCelebration";
 import { tapMedium } from "@/lib/haptics";
 import { EmptyState } from "@/components/kit";
@@ -59,6 +60,43 @@ function PlanPromoCard({ kind = "plans" }) {
         <span className="p-2 rounded-full bg-gold/15 text-gold-dark">{isPrivacy ? <EyeOff className="w-4 h-4" /> : <Crown className="w-4 h-4" />}</span>
       </div>
     </Link>
+  );
+}
+
+function DailyPicksStrip({ t }) {
+  const { data: picks = [] } = useDailyPicks();
+  if (picks.length === 0) return null;
+  return (
+    <div className="mb-4" data-testid="daily-picks">
+      <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 flex items-center gap-1.5">
+        ✨ {t("daily_picks_title")}
+      </p>
+      <div className="flex gap-2.5 overflow-x-auto no-scrollbar -mx-4 px-4">
+        {picks.map((p) => (
+          <Link
+            key={p.id}
+            to={`/candidate/${p.id}`}
+            data-testid={`daily-pick-${p.id}`}
+            className="shrink-0 w-32 rounded-3xl bg-card border border-gold/30 overflow-hidden active:scale-[0.97] transition"
+          >
+            <div className="relative aspect-[4/5] bg-muted">
+              {p.photo_url ? (
+                <img loading="lazy" decoding="async" src={photoSrc(p.photo_url)} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <div className="absolute inset-0 grid place-items-center">
+                  <Lock className="w-5 h-5 text-muted-foreground" />
+                </div>
+              )}
+              <span className="absolute top-1.5 right-1.5 rounded-full bg-gold text-ink text-[10px] font-bold px-1.5 py-0.5">{p.match_score}%</span>
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-5 text-white">
+                <p className="text-xs font-semibold truncate">{p.name}, {p.age}</p>
+                <p className="text-[10px] text-white/80 truncate">{p.region}</p>
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -187,6 +225,10 @@ export default function Candidates() {
           )}
         </div>
       )}
+
+      {/* Bugungi tanlov — the day's 3 best matches, stable all day (server
+          caches per calendar day) so opening the app daily becomes a habit. */}
+      <DailyPicksStrip t={t} />
 
       {isLoading ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">

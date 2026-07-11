@@ -107,19 +107,45 @@ def _fallback_icebreakers(lang: str) -> list[str]:
 # ---------- 3) Moderation ----------
 BAD_WORDS_UZ = [
     "axmoq", "ahmoq", "tentak", "jinni", "xromoy", "fohisha", "qahba", "jalab",
-    "pisi", "kuc̈hak", "yotamiz", "yotaylik", "yotib", "telefon raqam", "raqam yuboring",
-    "instagramga", "tg ga", "telegramga", "ko'kragim", "ko'krak rasm", "rasm berasanmi",
+    "pisi", "kuc̈hak", "yotamiz", "yotaylik", "yotib", "ko'kragim", "ko'krak rasm",
+    "rasm berasanmi",
 ]
+
+# Off-platform contact exchange. This is the free tier's main monetization
+# leak: two free users use the weekly free chat to swap Telegram/phone and
+# leave without ever paying. Detection is a plain algorithm (regex), no AI:
+#   - phone numbers in common local formats (+998..., 90 123 45 67, digit runs)
+#   - t.me / wa.me / instagram.com links and @usernames
+#   - "let's move to telegram/instagram/whatsapp" keywords and
+#     number-begging phrases in Uzbek/Russian.
+# chat_r decides what a hit means: FREE senders are blocked with an upsell;
+# PAID senders are allowed (the frontend shows a small confirm first).
+_CONTACT_PATTERNS = [
+    r"\+?998[\s\-]?\d{2}[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}",  # +998 xx xxx xx xx
+    r"(?<!\d)\d{2}[\s\-]\d{3}[\s\-]\d{2}[\s\-]\d{2}(?!\d)",      # 90 123 45 67
+    r"(?<!\d)\d{9,12}(?!\d)",                                     # bare digit runs
+    r"t\.me/|telegram\.me/|wa\.me/|instagram\.com/|ig\.me/",
+    r"@[a-z0-9_.]{4,}",
+    r"\btelegram\w*", r"\btg\b|\btg\s*ga\b", r"\binsta\w*",
+    r"\bwhats?app\w*", r"\bvatsap\w*", r"\bviber\w*", r"\bimo\b",
+    r"raqam\w*\s*(?:ber|yubor|yoz|tashla)", r"\bnomer\w*",
+    r"телефон\w*", r"номер\w*", r"телеграм\w*", r"инстаграм\w*", r"ватсап\w*",
+    # Spelled-out digit runs ("to'qson bir uch yetti...", "девять ноль один"):
+    # 4+ consecutive number words is virtually always a dictated phone number.
+    r"(?:\b(?:nol|bir|ikki|uch|to[':’ʻ`]?rt|besh|olti|yetti|sakkiz|to[':’ʻ`]?qqiz|o[':’ʻ`]?n|yigirma|o[':’ʻ`]?ttiz|qirq|ellik|oltmish|yetmish|sakson|to[':’ʻ`]?qson|yuz)\b[\s,.-]*){4,}",
+    r"(?:\b(?:ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто)\b[\s,.-]*){4,}",
+]
+_CONTACT_RE = re.compile("|".join(f"(?:{p})" for p in _CONTACT_PATTERNS), re.IGNORECASE)
+
+
+def detect_contact_info(text: str) -> bool:
+    """True when the message looks like an attempt to exchange off-platform
+    contact info (phone / telegram / instagram / whatsapp / usernames)."""
+    return bool(_CONTACT_RE.search((text or "").lower()))
 
 
 def quick_moderation(text: str) -> tuple[bool, str]:
     t = (text or "").lower()
-
-    if re.search(r"\+?998\s*\d{2}[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}", t):
-        return False, "Telefon raqamlarni almashish chatda ruxsat etilmagan. Avval tanishing."
-
-    if re.search(r"@[a-z0-9_]{4,}", t):
-        return False, "Tashqi havolalar ruxsat etilmagan. Iltimos, FIDEM ichida suhbatlashing."
 
     for bw in BAD_WORDS_UZ:
         if bw in t:

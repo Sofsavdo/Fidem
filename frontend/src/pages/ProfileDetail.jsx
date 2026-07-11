@@ -84,6 +84,10 @@ export default function ProfileDetail() {
   const unlockPhoto = useCallback(async () => {
     try {
       const r = await api.post("/photo-unlock/request", { target_user_id: id });
+      if (r.data.status === "rejected_wait") {
+        toast.error(t("photo_request_rejected_wait"));
+        return;
+      }
       toast.success(r.data.status === "approved" ? t("photo_unlocked_toast") : t("photo_request_sent_toast"));
       queryClient.invalidateQueries({ queryKey: QK.candidateDetail(id) });
     } catch (e) { toast.error(t("error_generic")); }
@@ -214,6 +218,22 @@ export default function ProfileDetail() {
       </div>
 
       <div className="px-5 pt-5 space-y-4">
+        {/* 15s VIP video intro — plays inline, never autoplays with sound */}
+        {c.video_intro_url && (
+          <div data-testid="profile-video-intro">
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5 flex items-center gap-1.5">
+              🎬 {t("video_intro_title")}
+            </p>
+            <video
+              src={photoSrc(c.video_intro_url)}
+              controls
+              playsInline
+              preload="metadata"
+              className="w-full rounded-3xl bg-black max-h-72"
+            />
+          </div>
+        )}
+
         {/* Verification badges row */}
         {(c.verified_selfie || c.verified_financial || c.verified_identity || c.location_verified) && (
           <div className="flex gap-2 flex-wrap" data-testid="profile-badges">

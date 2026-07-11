@@ -5,7 +5,7 @@ import { useApp } from "@/contexts/AppContext";
 import GiftModal from "@/components/GiftModal";
 import GiftCelebration, { tierFromPrice } from "@/components/GiftCelebration";
 import ChatVoiceRecorder from "@/components/ChatVoiceRecorder";
-import { ArrowLeft, Send, Gift, MoreVertical, Ban, Flag, Wand2, Play, Check, CheckCheck } from "lucide-react";
+import { ArrowLeft, Send, Gift, MoreVertical, Ban, Flag, Wand2, Play, Check, CheckCheck, Contact, AlertTriangle, X } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
 import { formatLastActive } from "@/lib/time";
 import { tapLight } from "@/lib/haptics";
@@ -36,7 +36,6 @@ export default function Chat() {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
-  const [showTemplates, setShowTemplates] = useState(true);
   const [access, setAccess] = useState(null);
   const [unlocking, setUnlocking] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -44,8 +43,10 @@ export default function Chat() {
   const [reportOpen, setReportOpen] = useState(false);
   const [icebreakers, setIcebreakers] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
+  const [messagesLoaded, setMessagesLoaded] = useState(false);
   const [celebration, setCelebration] = useState(null);
   const endRef = useRef(null);
+  const aiAutoRef = useRef(false);
 
   const chatId = user && otherId ? [user.id, otherId].sort().join("_") : null;
   const { wsEvent, lang } = useApp();
@@ -60,7 +61,14 @@ export default function Chat() {
   const load = () => {
     api.get(`/candidates/${otherId}`).then((c) => setOther(c.data)).catch(() => {});
     api.get(`/chat/access/${otherId}`).then((a) => setAccess(a.data)).catch(() => {});
-    if (chatId) api.get(`/messages/${chatId}`).then((m) => setMessages(m.data || [])).catch(() => {});
+    if (chatId) {
+      api.get(`/messages/${chatId}`)
+        .then((m) => setMessages(m.data || []))
+        .catch(() => {})
+        .finally(() => setMessagesLoaded(true));
+    } else {
+      setMessagesLoaded(true);
+    }
   };
 
   const refreshAccess = async () => {
@@ -159,9 +167,37 @@ export default function Chat() {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  const send = async (txt) => {
+  // Empty chat: fetch AI-personalized first-message suggestions automatically
+  // (once per chat open) so the user doesn't have to know a button exists.
+  useEffect(() => {
+    if (aiAutoRef.current) return;
+    if (!messagesLoaded || messages.length > 0) return;
+    if (!access || access.requires_unlock) return;
+    aiAutoRef.current = true;
+    genAiIcebreakers();
+    // eslint-disable-next-line
+  }, [messagesLoaded, messages.length, access]);
+
+  // Off-platform contact detection (mirrors backend detect_contact_info).
+  // Free plan: sharing contacts is a paid perk — blocked with an upsell.
+  // Paid plans: allowed, but a compact confirm bar appears first so nobody
+  // leaks their phone number with an accidental Enter.
+  const CONTACT_RE = /(\+?998[\s-]?\d{2}[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2})|(\d{2}[\s-]\d{3}[\s-]\d{2}[\s-]\d{2})|(\d{9,12})|(t\.me\/|telegram\.me\/|wa\.me\/|instagram\.com\/)|(@[a-z0-9_.]{4,})|(telegram)|(\btg\b)|(insta)|(whats?app)|(vatsap)|(viber)|(\bimo\b)|(raqam\w*\s*(ber|yubor|yoz|tashla))|(nomer)|(телефон)|(номер)|(телеграм)|(инстаграм)|(ватсап)|((?:\b(?:nol|bir|ikki|uch|to['’ʻ`]?rt|besh|olti|yetti|sakkiz|to['’ʻ`]?qqiz|o['’ʻ`]?n|yigirma|o['’ʻ`]?ttiz|qirq|ellik|oltmish|yetmish|sakson|to['’ʻ`]?qson|yuz)\b[\s,.-]*){4,})|((?:\b(?:ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто)\b[\s,.-]*){4,})/i;
+  const [contactConfirm, setContactConfirm] = useState(null); // text awaiting confirm
+  const [shareOpen, setShareOpen] = useState(false);
+  const isPaidPlan = ["standard", "premium", "vip"].includes(user?.plan);
+
+  const send = async (txt, opts = {}) => {
     const finalText = txt ?? text;
     if (!finalText.trim()) return;
+    if (!opts.skipContactCheck && CONTACT_RE.test(finalText)) {
+      if (!isPaidPlan) {
+        toast.error(t("contact_free_blocked_error"));
+        return;
+      }
+      setContactConfirm(finalText);
+      return;
+    }
     tapLight();
 
     // Optimistic UI update - show message immediately
@@ -175,7 +211,6 @@ export default function Chat() {
     };
     setMessages((prev) => [...prev, tempMsg]);
     setText("");
-    setShowTemplates(false);
 
     setSending(true);
     try {
@@ -186,11 +221,28 @@ export default function Chat() {
       setMessages((prev) => prev.map((m) => (m.id === tempMsg.id ? r.data : m)));
     } catch (e) {
       console.error("Send message error:", e);
-      const errorMsg = e.response?.data?.detail || e.message || t("error");
-      toast.error(errorMsg);
+      const detail = (e.response?.data?.detail || "").toString();
+      toast.error(detail === "contact_free_blocked" ? t("contact_free_blocked_error") : (detail || e.message || t("error")));
       setMessages((prev) => prev.filter((m) => m.id !== tempMsg.id));
       load();
     } finally { setSending(false); }
+  };
+
+  // "Share my contact" — composes a message from the contacts saved in
+  // Sozlamalar (phone / telegram / instagram) and sends it through the same
+  // confirm flow.
+  const savedContacts = [
+    user?.contact_phone && `📞 ${user.contact_phone}`,
+    user?.contact_telegram && `Telegram: @${String(user.contact_telegram).replace(/^@/, "")}`,
+    user?.contact_instagram && `Instagram: @${String(user.contact_instagram).replace(/^@/, "")}`,
+  ].filter(Boolean);
+  const shareContacts = () => {
+    if (!isPaidPlan) {
+      toast.error(t("contact_free_blocked_error"));
+      return;
+    }
+    setShareOpen(false);
+    setContactConfirm(savedContacts.join(" · "));
   };
 
   const sendVoice = async ({ voice_url, voice_duration }) => {
@@ -206,8 +258,7 @@ export default function Chat() {
       // Show the confirmed message immediately rather than waiting on the
       // WebSocket echo (same fix as text messages).
       setMessages((prev) => (prev.some((m) => m.id === r.data.id) ? prev : [...prev, r.data]));
-      setShowTemplates(false);
-      toast.success("✅");
+        toast.success("✅");
     } catch (e) {
       console.error("Send voice error:", e);
       const errorMsg = e.response?.data?.detail || e.message || t("error");
@@ -341,49 +392,35 @@ export default function Chat() {
         <div ref={endRef} />
       </div>
 
-      {showTemplates && messages.length === 0 && (
-        <div className="px-4 pb-2 space-y-1.5">
-          {[t("greeting_1"), t("greeting_2"), t("greeting_3")].map((g, i) => (
+      {/* Empty chat: AI writes the first message for you — suggestions load
+          automatically (see the auto-effect above), tap one to put it in the
+          composer, edit if you like, send. The old canned template texts are
+          gone on purpose. */}
+      {messagesLoaded && messages.length === 0 && !access?.requires_unlock && (
+        <div className="px-4 pb-2 space-y-1.5" data-testid="ai-first-message">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] uppercase tracking-wider text-secondary font-semibold inline-flex items-center gap-1">
+              <Wand2 className="w-3 h-3" /> {t("ai_first_message_title")}
+            </p>
+            <button data-testid="ai-icebreaker-btn" onClick={genAiIcebreakers} disabled={aiLoading} className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-secondary disabled:opacity-50">
+              ↻ {t("ai_generate_short")}
+            </button>
+          </div>
+          {aiLoading && icebreakers.length === 0 && (
+            <div className="rounded-2xl bg-secondary/5 border border-dashed border-secondary/30 px-3 py-2.5 text-xs text-secondary animate-pulse">
+              {t("ai_preparing")}
+            </div>
+          )}
+          {icebreakers.slice(0, 3).map((q, i) => (
             <button
               key={i}
-              data-testid={`template-${i}`}
-              onClick={() => send(g)}
-              className="w-full text-left bg-muted hover:bg-border rounded-2xl px-3 py-2 text-sm"
+              data-testid={`icebreaker-${i}`}
+              onClick={() => setText(q)}
+              className="w-full text-left rounded-2xl border border-secondary/25 bg-secondary/5 hover:bg-secondary/10 px-3 py-2.5 text-sm"
             >
-              {g}
+              {q}
             </button>
           ))}
-        </div>
-      )}
-
-      {messages.length > 0 && messages.length < 6 && icebreakers.length > 0 && (
-        <div className="px-4 pb-2" data-testid="icebreaker-chips">
-          <div className="flex items-center justify-between mb-1.5">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("suggestion_chip")}</p>
-            <button data-testid="ai-icebreaker-btn" onClick={genAiIcebreakers} disabled={aiLoading} className="text-[10px] uppercase tracking-wider text-secondary hover:underline disabled:opacity-50 inline-flex items-center gap-1">
-              <Wand2 className="w-3 h-3" /> {aiLoading ? t("ai_preparing") : t("ai_generate_short")}
-            </button>
-          </div>
-          <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
-            {icebreakers.slice(0, 5).map((q, i) => (
-              <button
-                key={i}
-                data-testid={`icebreaker-${i}`}
-                onClick={() => setText(q)}
-                className="whitespace-nowrap rounded-full border border-border bg-card hover:bg-muted px-3 py-1.5 text-xs"
-              >
-                {q.length > 35 ? q.slice(0, 35) + "…" : q}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {messages.length === 0 && (
-        <div className="px-4 pb-2">
-          <button data-testid="ai-icebreaker-empty-btn" onClick={genAiIcebreakers} disabled={aiLoading} className="w-full rounded-2xl border border-dashed border-secondary/40 bg-secondary/5 hover:bg-secondary/10 py-2.5 text-xs text-secondary font-medium inline-flex items-center justify-center gap-1.5 disabled:opacity-50">
-            <Wand2 className="w-3.5 h-3.5" /> {aiLoading ? t("ai_preparing") : t("ai_suggest")}
-          </button>
         </div>
       )}
 
@@ -448,10 +485,50 @@ export default function Chat() {
           {access?.uses_free_weekly && (
             <p data-testid="chat-free-weekly-hint" className="text-[11px] text-secondary text-center">{t("chat_free_weekly_hint")}</p>
           )}
+          {/* Contact-share confirm — compact one-liner, never covers the chat */}
+          {contactConfirm && (
+            <div data-testid="contact-confirm" className="flex items-center gap-2 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 px-3 py-2">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <p className="text-[11px] text-amber-800 dark:text-amber-300 flex-1 min-w-0 truncate">{t("contact_confirm_hint")}</p>
+              <button
+                data-testid="contact-confirm-send"
+                onClick={() => { const msg = contactConfirm; setContactConfirm(null); setText(""); send(msg, { skipContactCheck: true }); }}
+                className="shrink-0 rounded-full bg-amber-600 text-white text-[11px] font-semibold px-3 py-1"
+              >
+                {t("send")}
+              </button>
+              <button data-testid="contact-confirm-cancel" onClick={() => setContactConfirm(null)} className="shrink-0 p-1 rounded-full hover:bg-amber-100 dark:hover:bg-amber-900">
+                <X className="w-3.5 h-3.5 text-amber-700" />
+              </button>
+            </div>
+          )}
+          {/* Contact-share sheet — compact */}
+          {shareOpen && (
+            <div data-testid="contact-share-panel" className="flex items-center gap-2 rounded-2xl bg-card border border-border px-3 py-2">
+              {savedContacts.length > 0 ? (
+                <>
+                  <p className="text-[11px] text-muted-foreground flex-1 min-w-0 truncate">{savedContacts.join(" · ")}</p>
+                  <button data-testid="contact-share-send" onClick={shareContacts} className="shrink-0 rounded-full bg-primary text-white text-[11px] font-semibold px-3 py-1">{t("contact_share_cta")}</button>
+                </>
+              ) : (
+                <Link to="/me/settings" className="text-[11px] text-primary underline flex-1">{t("contact_share_empty")}</Link>
+              )}
+              <button onClick={() => setShareOpen(false)} className="shrink-0 p-1 rounded-full hover:bg-muted"><X className="w-3.5 h-3.5" /></button>
+            </div>
+          )}
           {/* Always-visible message composer (disabled when locked) */}
           <div className="flex items-end gap-1.5 min-w-0">
             <button data-testid="gift-open" onClick={() => setGiftOpen(true)} disabled={access?.requires_unlock} className="shrink-0 w-10 h-10 grid place-items-center rounded-full bg-muted hover:bg-border disabled:opacity-40" title={t("send_gift")}>
               <Gift className="w-4 h-4" />
+            </button>
+            <button
+              data-testid="contact-share-open"
+              onClick={() => { setShareOpen((v) => !v); setContactConfirm(null); }}
+              disabled={access?.requires_unlock}
+              className="shrink-0 w-10 h-10 grid place-items-center rounded-full bg-muted hover:bg-border disabled:opacity-40"
+              title={t("contact_share_cta")}
+            >
+              <Contact className="w-4 h-4" />
             </button>
             {!access?.requires_unlock && <div className="shrink-0"><ChatVoiceRecorder onSend={sendVoice} /></div>}
             <input

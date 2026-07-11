@@ -53,6 +53,8 @@ from routers.boost_analytics_r import router as boost_analytics_router  # noqa: 
 from routers.face_r import router as face_router  # noqa: E402
 from routers.location_r import router as location_router  # noqa: E402
 from routers.settings_r import router as settings_router  # noqa: E402
+from routers.picks_r import router as picks_router  # noqa: E402
+from lifecycle import lifecycle_loop  # noqa: E402
 from services import compute_completeness  # noqa: E402
 from storage import init_storage  # noqa: E402
 from winback import winback_loop  # noqa: E402
@@ -78,6 +80,7 @@ api.include_router(boost_analytics_router)
 api.include_router(face_router)
 api.include_router(location_router)
 api.include_router(settings_router)
+api.include_router(picks_router)
 app.include_router(api)
 
 
@@ -99,6 +102,9 @@ async def startup() -> None:
     # Re-engagement notifications for inactive users - runs on its own
     # interval for the life of the process, no external cron needed.
     asyncio.create_task(winback_loop())
+
+    # Plan expiry reminders/downgrades, daily picks pushes, weekly digests.
+    asyncio.create_task(lifecycle_loop())
 
     # AI photo verification (ai_service.verify_face_photo) needs this key.
     # Without it every verification call fails as "verification_unavailable",

@@ -232,6 +232,8 @@ def user_public(u: dict, include_private: bool = False) -> dict:
         # out of candidate feeds / viewer lists (they can still browse).
         "photo_public": bool(u.get("photo_public", False)),
         "hidden_profile": bool(u.get("hidden_profile", False)),
+        # 15s VIP video intro - public on the profile page by design.
+        "video_intro_url": u.get("video_intro_url") or None,
     }
     if include_private:
         # Contact info, device/IP data and fraud-review fields - only for the
