@@ -100,6 +100,18 @@ export default function Me() {
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-medium text-lg truncate">{user.name}, {user.age}</p>
               <PlanPill plan={user.plan} />
+              {user.plan !== "free" && user.plan_until && (() => {
+                const daysLeft = Math.max(0, Math.ceil((new Date(user.plan_until) - Date.now()) / 86400000));
+                return (
+                  <Link
+                    to="/premium?tab=plans"
+                    data-testid="plan-days-left"
+                    className={`text-[10px] px-2 py-0.5 rounded-full border ${daysLeft <= 3 ? "bg-amber-50 text-amber-700 border-amber-300" : "bg-muted text-muted-foreground border-border"}`}
+                  >
+                    {daysLeft} {t("days_left_short")}
+                  </Link>
+                );
+              })()}
             </div>
             <p className="text-xs text-muted-foreground truncate">{user.region} · {user.profession || "—"}</p>
             <div className="flex gap-1 mt-1.5 flex-wrap">

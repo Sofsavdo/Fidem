@@ -496,6 +496,15 @@ async def request_photo_unlock(req: PhotoUnlockRequest, uid: str = Depends(get_c
     if existing and existing.get("status") == "pending":
         return {"status": "pending"}
 
+    # Rejected recently: don't let the requester spam the same person with a
+    # new popup every minute - one re-ask per week.
+    if existing and existing.get("status") == "rejected" and existing.get("decided_at"):
+        try:
+            if now_utc() - parse_dt(existing["decided_at"]) < timedelta(days=7):
+                return {"status": "rejected_wait"}
+        except Exception:
+            pass
+
     doc = {
         "id": new_id(),
         "requester_id": uid,

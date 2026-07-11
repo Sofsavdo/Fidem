@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tansta
 import api from "@/lib/api";
 
 export const QK = {
+  dailyPicks: ["daily-picks"],
   photoRequests: ["photo-unlock", "requests"],
   adminReferrers: ["admin", "referrers"],
   adminReferrerDetail: (id) => ["admin", "referrers", id],
@@ -49,6 +50,16 @@ export function useReferral() {
   return useQuery({
     queryKey: QK.referral,
     queryFn: () => api.get("/referral/mine").then((r) => r.data),
+  });
+}
+
+// Bugungi tanlov — server caches per calendar day, so a long staleTime is
+// correct AND fast: one fetch per session, instant paint afterwards.
+export function useDailyPicks() {
+  return useQuery({
+    queryKey: QK.dailyPicks,
+    queryFn: () => api.get("/daily-picks").then((r) => r.data || []),
+    staleTime: 60 * 60_000,
   });
 }
 

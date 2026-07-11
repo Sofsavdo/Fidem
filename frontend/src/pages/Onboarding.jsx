@@ -59,6 +59,9 @@ export default function Onboarding() {
     terms: false, privacy: false, intent: false, done: false,
     ...(draft?.consent || {}),
   }));
+  // Optional "who invited you?" referral code (consent screen; persisted in
+  // the draft; only honored server-side if the account has no referred_by).
+  const [refCode, setRefCode] = useState(() => draft?.ref_code || "");
   const [photoStatus, setPhotoStatus] = useState({ state: "idle", code: "", reason: "" });
   const [submitting, setSubmitting] = useState(false);
   // Prefill from the existing profile so this screen doubles as a safe
@@ -100,11 +103,11 @@ export default function Onboarding() {
     if (isEdit || user?.onboarded) return undefined;
     const id = setTimeout(() => {
       try {
-        localStorage.setItem(draftKey, JSON.stringify({ step, data, consent, saved_at: Date.now() }));
+        localStorage.setItem(draftKey, JSON.stringify({ step, data, consent, ref_code: refCode, saved_at: Date.now() }));
       } catch { /* storage full/unavailable — draft is best-effort */ }
     }, 400);
     return () => clearTimeout(id);
-  }, [data, step, consent, isEdit, draftKey, user?.onboarded]);
+  }, [data, step, consent, refCode, isEdit, draftKey, user?.onboarded]);
 
   // Same "empty" rule the backend uses for completeness (services.py
   // PROFILE_FIELDS): booleans always count as answered, everything else is
@@ -175,7 +178,11 @@ export default function Onboarding() {
     if (submitting) return;
     setSubmitting(true);
     try {
-      await api.post("/profile/onboard", { ...buildPayload(data), terms_accepted: !!consent.done });
+      await api.post("/profile/onboard", {
+        ...buildPayload(data),
+        terms_accepted: !!consent.done,
+        referral_code: refCode.trim() || null,
+      });
       try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
       toast.success(t("onboard_complete"));
       // Let the brand-new user actually see their first candidates screen
@@ -362,6 +369,18 @@ export default function Onboarding() {
             <Row k="terms">{linkify(t("consent_terms"), t("consent_terms_link"), "/terms")}</Row>
             <Row k="privacy">{linkify(t("consent_privacy"), t("consent_privacy_link"), "/privacy")}</Row>
             <Row k="intent">{t("consent_intent")}</Row>
+            {!user?.referred_by && (
+              <label className="block rounded-2xl border border-border bg-card p-4">
+                <span className="text-[13px] font-medium">{t("consent_ref_label")}</span>
+                <input
+                  data-testid="consent-ref-code"
+                  className="mt-2 w-full px-3.5 py-2 rounded-xl border border-input bg-background text-sm"
+                  placeholder={t("consent_ref_placeholder")}
+                  value={refCode}
+                  onChange={(e) => setRefCode(e.target.value)}
+                />
+              </label>
+            )}
           </div>
 
           <div className="fixed bottom-0 left-0 right-0 pointer-events-none" style={{ zIndex: 10000 }}>

@@ -130,6 +130,10 @@ _CONTACT_PATTERNS = [
     r"\bwhats?app\w*", r"\bvatsap\w*", r"\bviber\w*", r"\bimo\b",
     r"raqam\w*\s*(?:ber|yubor|yoz|tashla)", r"\bnomer\w*",
     r"телефон\w*", r"номер\w*", r"телеграм\w*", r"инстаграм\w*", r"ватсап\w*",
+    # Spelled-out digit runs ("to'qson bir uch yetti...", "девять ноль один"):
+    # 4+ consecutive number words is virtually always a dictated phone number.
+    r"(?:\b(?:nol|bir|ikki|uch|to[':’ʻ`]?rt|besh|olti|yetti|sakkiz|to[':’ʻ`]?qqiz|o[':’ʻ`]?n|yigirma|o[':’ʻ`]?ttiz|qirq|ellik|oltmish|yetmish|sakson|to[':’ʻ`]?qson|yuz)\b[\s,.-]*){4,}",
+    r"(?:\b(?:ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто)\b[\s,.-]*){4,}",
 ]
 _CONTACT_RE = re.compile("|".join(f"(?:{p})" for p in _CONTACT_PATTERNS), re.IGNORECASE)
 

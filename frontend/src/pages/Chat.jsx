@@ -182,7 +182,7 @@ export default function Chat() {
   // Free plan: sharing contacts is a paid perk — blocked with an upsell.
   // Paid plans: allowed, but a compact confirm bar appears first so nobody
   // leaks their phone number with an accidental Enter.
-  const CONTACT_RE = /(\+?998[\s-]?\d{2}[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2})|(\d{2}[\s-]\d{3}[\s-]\d{2}[\s-]\d{2})|(\d{9,12})|(t\.me\/|telegram\.me\/|wa\.me\/|instagram\.com\/)|(@[a-z0-9_.]{4,})|(telegram)|(\btg\b)|(insta)|(whats?app)|(vatsap)|(viber)|(\bimo\b)|(raqam\w*\s*(ber|yubor|yoz|tashla))|(nomer)|(телефон)|(номер)|(телеграм)|(инстаграм)|(ватсап)/i;
+  const CONTACT_RE = /(\+?998[\s-]?\d{2}[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2})|(\d{2}[\s-]\d{3}[\s-]\d{2}[\s-]\d{2})|(\d{9,12})|(t\.me\/|telegram\.me\/|wa\.me\/|instagram\.com\/)|(@[a-z0-9_.]{4,})|(telegram)|(\btg\b)|(insta)|(whats?app)|(vatsap)|(viber)|(\bimo\b)|(raqam\w*\s*(ber|yubor|yoz|tashla))|(nomer)|(телефон)|(номер)|(телеграм)|(инстаграм)|(ватсап)|((?:\b(?:nol|bir|ikki|uch|to['’ʻ`]?rt|besh|olti|yetti|sakkiz|to['’ʻ`]?qqiz|o['’ʻ`]?n|yigirma|o['’ʻ`]?ttiz|qirq|ellik|oltmish|yetmish|sakson|to['’ʻ`]?qson|yuz)\b[\s,.-]*){4,})|((?:\b(?:ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто)\b[\s,.-]*){4,})/i;
   const [contactConfirm, setContactConfirm] = useState(null); // text awaiting confirm
   const [shareOpen, setShareOpen] = useState(false);
   const isPaidPlan = ["standard", "premium", "vip"].includes(user?.plan);
