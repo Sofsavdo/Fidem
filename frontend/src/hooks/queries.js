@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tansta
 import api from "@/lib/api";
 
 export const QK = {
+  announcements: ["announcements"],
   dailyPicks: ["daily-picks"],
   photoRequests: ["photo-unlock", "requests"],
   adminReferrers: ["admin", "referrers"],
@@ -50,6 +51,16 @@ export function useReferral() {
   return useQuery({
     queryKey: QK.referral,
     queryFn: () => api.get("/referral/mine").then((r) => r.data),
+  });
+}
+
+// Anonslar — news feed; also powers the bottom-nav unread dot, so the
+// staleTime keeps that from re-fetching on every navigation.
+export function useAnnouncements() {
+  return useQuery({
+    queryKey: QK.announcements,
+    queryFn: () => api.get("/announcements").then((r) => r.data || []),
+    staleTime: 5 * 60_000,
   });
 }
 

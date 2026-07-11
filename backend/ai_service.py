@@ -16,6 +16,12 @@ log = logging.getLogger("fidem.ai")
 
 ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-8")
 
+# Primary vision provider: Gemini (Google AI Studio). All verification and
+# photo checks go through it when GEMINI_API_KEY is set; the Anthropic path
+# stays as an automatic fallback.
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+
 _client = None
 
 
@@ -25,6 +31,33 @@ def _get_client():
         import anthropic
         _client = anthropic.AsyncAnthropic()
     return _client
+
+
+async def _gemini_json(prompt: str, images: list[tuple[str, str]], schema: dict) -> dict:
+    """One Gemini generateContent call returning strict JSON.
+
+    images: list of (media_type, base64_data). schema: Gemini response
+    schema (uppercase type names). Raises on any transport/parse problem -
+    callers decide the fallback.
+    """
+    parts = [{"inlineData": {"mimeType": mt, "data": b64}} for mt, b64 in images]
+    parts.append({"text": prompt})
+    body = {
+        "contents": [{"role": "user", "parts": parts}],
+        "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": schema,
+            "maxOutputTokens": 500,
+            "temperature": 0,
+        },
+    }
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+    async with httpx.AsyncClient(timeout=30.0) as cl:
+        r = await cl.post(url, params={"key": GEMINI_API_KEY}, json=body)
+        r.raise_for_status()
+        data = r.json()
+    text = data["candidates"][0]["content"]["parts"][0]["text"]
+    return json.loads(text)
 
 
 # ---------- 1) Compatibility narrative ----------
@@ -187,6 +220,41 @@ async def verify_face_photo(image_url: str = "", image_base64: str = "") -> dict
         log.warning("face_verify: could not load photo: %s", e)
         return {"valid": False, "code": "not_a_photo", "reason": "Rasmni ochib bo'lmadi", "ai_generated": False}
 
+    _prompt = (
+        "This photo was submitted to a dating/marriage platform for profile-photo "
+        "verification. Check: (1) it shows exactly one real human face, clearly "
+        "visible and in focus - not zero faces, not a group photo; (2) it is an actual "
+        "photograph, not a screenshot, drawing, meme, logo, or AI-generated image; "
+        "(3) it contains no nudity or sexually explicit content. Respond with the "
+        "required JSON only. reason_uz should be a short explanation in Uzbek."
+    )
+
+    # Primary: Gemini
+    if GEMINI_API_KEY:
+        try:
+            parsed = await _gemini_json(
+                _prompt,
+                [(media_type, data_b64)],
+                {
+                    "type": "OBJECT",
+                    "properties": {
+                        "valid": {"type": "BOOLEAN"},
+                        "code": {"type": "STRING", "enum": ["ok", "no_face", "multiple_faces", "not_a_photo", "low_quality", "inappropriate"]},
+                        "reason_uz": {"type": "STRING"},
+                    },
+                    "required": ["valid", "code", "reason_uz"],
+                },
+            )
+            valid = bool(parsed.get("valid"))
+            return {
+                "valid": valid,
+                "code": parsed.get("code") or ("ok" if valid else "not_a_photo"),
+                "reason": parsed.get("reason_uz") or "",
+                "ai_generated": True,
+            }
+        except Exception as e:
+            log.warning("face_verify: gemini call failed, trying fallback: %s", e)
+
     try:
         client = _get_client()
         response = await client.messages.create(
@@ -268,3 +336,101 @@ def _sniff_media_type(b64: str) -> str:
     if head.startswith("UklGR"):
         return "image/webp"
     return "image/jpeg"
+
+
+# ---------- 5) Verification review (selfie / identity / financial) ----------
+_VERIF_PROMPTS = {
+    "selfie": (
+        "A dating-platform user submitted a verification selfie. "
+        "{profile_hint}Check: the proof image shows one real, live person "
+        "(a fresh selfie - not a photo of a screen, not a downloaded/celebrity "
+        "image, not AI-generated){match_clause}. Respond JSON only; reason_uz = short Uzbek explanation."
+    ),
+    "identity": (
+        "A dating-platform user submitted a photo as proof of identity. "
+        "Check: a real government-style ID document is clearly visible "
+        "(structured fields, portrait photo, official layout) - not a random "
+        "photo, meme or screenshot. Do NOT transcribe any personal data. "
+        "Respond JSON only; reason_uz = short Uzbek explanation."
+    ),
+    "financial": (
+        "A dating-platform user submitted a photo as proof of financial "
+        "standing (property, car, business, income document). Check: the "
+        "image plausibly shows such an asset/document and is not junk, a "
+        "meme, or an obviously downloaded stock image. This is a plausibility "
+        "check, not a forensic audit. Respond JSON only; reason_uz = short "
+        "Uzbek explanation."
+    ),
+}
+
+_VERIF_SCHEMA_GEMINI = {
+    "type": "OBJECT",
+    "properties": {
+        "verdict": {"type": "STRING", "enum": ["approve", "reject", "unsure"]},
+        "confidence": {"type": "NUMBER"},
+        "reason_uz": {"type": "STRING"},
+    },
+    "required": ["verdict", "confidence", "reason_uz"],
+}
+
+
+async def analyze_verification(kind: str, images: list[tuple[str, str]], has_profile_photo: bool = False) -> dict:
+    """AI review of a verification submission.
+
+    images: [(media_type, b64), ...] - for selfies, the user's profile photo
+    first (when available) then the proof, so the model can face-match.
+    Returns {"verdict": approve|reject|unsure, "confidence": 0-100,
+    "reason": uz-text, "ai_generated": bool}. Never raises: any failure
+    returns verdict=unsure so the item simply stays in the admin queue.
+    """
+    prompt_tpl = _VERIF_PROMPTS.get(kind) or _VERIF_PROMPTS["financial"]
+    prompt = prompt_tpl.format(
+        profile_hint="Image 1 is their existing profile photo; image 2 is the new verification selfie. " if has_profile_photo else "",
+        match_clause=" AND clearly the same person as the profile photo" if has_profile_photo else "",
+    ) if kind == "selfie" else prompt_tpl
+
+    if GEMINI_API_KEY:
+        try:
+            parsed = await _gemini_json(prompt, images, _VERIF_SCHEMA_GEMINI)
+            verdict = parsed.get("verdict") if parsed.get("verdict") in ("approve", "reject", "unsure") else "unsure"
+            return {
+                "verdict": verdict,
+                "confidence": int(parsed.get("confidence") or 0),
+                "reason": parsed.get("reason_uz") or "",
+                "ai_generated": True,
+            }
+        except Exception as e:
+            log.warning("analyze_verification: gemini failed: %s", e)
+
+    # Fallback: Claude vision (if configured)
+    try:
+        client = _get_client()
+        content = [{"type": "image", "source": {"type": "base64", "media_type": mt, "data": b64}} for mt, b64 in images]
+        content.append({"type": "text", "text": prompt})
+        response = await client.messages.create(
+            model=ANTHROPIC_MODEL,
+            max_tokens=300,
+            output_config={"format": {"type": "json_schema", "schema": {
+                "type": "object",
+                "properties": {
+                    "verdict": {"type": "string", "enum": ["approve", "reject", "unsure"]},
+                    "confidence": {"type": "number"},
+                    "reason_uz": {"type": "string"},
+                },
+                "required": ["verdict", "confidence", "reason_uz"],
+                "additionalProperties": False,
+            }}},
+            messages=[{"role": "user", "content": content}],
+        )
+        text = next((b.text for b in response.content if b.type == "text"), "")
+        parsed = json.loads(text) if text else {}
+        verdict = parsed.get("verdict") if parsed.get("verdict") in ("approve", "reject", "unsure") else "unsure"
+        return {
+            "verdict": verdict,
+            "confidence": int(parsed.get("confidence") or 0),
+            "reason": parsed.get("reason_uz") or "",
+            "ai_generated": True,
+        }
+    except Exception as e:
+        log.warning("analyze_verification: no provider available: %s", e)
+        return {"verdict": "unsure", "confidence": 0, "reason": "", "ai_generated": False}
