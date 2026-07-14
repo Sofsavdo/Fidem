@@ -56,7 +56,7 @@ export default function Rankings() {
       }
     } catch (e) {
       const detail = (e?.response?.data?.detail || "").toString();
-      toast.error(detail === "click_min_1000" ? t("click_min_error") : t("error_generic"));
+      toast.error(detail === "click_min_1000" ? t("click_min_error") : detail === "click_disabled" ? t("click_disabled_error") : t("error_generic"));
     } finally {
       setPaying(false);
     }

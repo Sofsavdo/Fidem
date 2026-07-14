@@ -9,7 +9,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 
 from auth import get_current_admin
 from core import db, iso, now_utc, push_notif, user_public
-from models import AdminUpdateUserRequest
+from models import AdminUpdateUserRequest, new_id
 from routers.payments_r import process_completed_payment
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -496,3 +496,92 @@ async def admin_regions(_: str = Depends(get_current_admin)):
     """Get list of all regions for filtering."""
     regions = await db.users.distinct("region", {"region": {"$ne": "", "$ne": None}})
     return {"regions": sorted(regions)}
+
+
+# --- Manual (P2P) top-up moderation — see payments_r.py for the user side.
+
+@router.get("/topup-config")
+async def admin_get_topup_config(_: str = Depends(get_current_admin)):
+    cfg = await db.settings.find_one({"id": "topup_config"}, {"_id": 0}) or {}
+    return {
+        "p2p_enabled": bool(cfg.get("p2p_enabled")),
+        "card_number": cfg.get("card_number", ""),
+        "card_holder": cfg.get("card_holder", ""),
+    }
+
+
+@router.post("/topup-config")
+async def admin_set_topup_config(
+    p2p_enabled: bool = Body(..., embed=True),
+    card_number: str = Body("", embed=True),
+    card_holder: str = Body("", embed=True),
+    _: str = Depends(get_current_admin),
+):
+    digits = "".join(ch for ch in card_number if ch.isdigit())
+    if p2p_enabled and len(digits) != 16:
+        raise HTTPException(400, "card_number must be 16 digits")
+    await db.settings.update_one(
+        {"id": "topup_config"},
+        {"$set": {
+            "p2p_enabled": p2p_enabled,
+            "card_number": digits,
+            "card_holder": card_holder.strip(),
+            "updated_at": iso(now_utc()),
+        }},
+        upsert=True,
+    )
+    return {"ok": True}
+
+
+@router.get("/manual-topups")
+async def admin_manual_topups(status: Optional[str] = "pending", page: int = 1, limit: int = 20, _: str = Depends(get_current_admin)):
+    q = {"status": status} if status else {}
+    skip = (page - 1) * limit
+    total = await db.manual_topups.count_documents(q)
+    rows = await db.manual_topups.find(q, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    # Attach requester name/phone so the admin can match the transfer
+    uids = list({r["user_id"] for r in rows})
+    users = await db.users.find({"id": {"$in": uids}}, {"_id": 0, "id": 1, "name": 1, "telegram_id": 1, "balance": 1}).to_list(len(uids))
+    umap = {u["id"]: u for u in users}
+    for r in rows:
+        r["user"] = umap.get(r["user_id"], {})
+    return {"items": rows, "total": total, "page": page, "limit": limit}
+
+
+@router.post("/manual-topups/{tid}/decide")
+async def admin_decide_manual_topup(
+    tid: str,
+    approve: bool = Body(..., embed=True),
+    reason: str = Body("", embed=True),
+    _: str = Depends(get_current_admin),
+):
+    # Atomic pending->decided flip so a double-click can't credit twice
+    res = await db.manual_topups.find_one_and_update(
+        {"id": tid, "status": "pending"},
+        {"$set": {
+            "status": "approved" if approve else "rejected",
+            "decided_at": iso(now_utc()),
+            "rejection_reason": (reason or "").strip() if not approve else None,
+        }},
+    )
+    if not res:
+        raise HTTPException(404, "Not found or already decided")
+    if approve:
+        await db.users.update_one({"id": res["user_id"]}, {"$inc": {"balance": res["amount"]}})
+        await db.payments.insert_one({
+            "id": new_id(),
+            "user_id": res["user_id"],
+            "purpose": "balance_topup",
+            "amount": res["amount"],
+            "balance_used": 0,
+            "click_amount": 0,
+            "status": "paid",
+            "method": "manual_p2p",
+            "manual_topup_id": tid,
+            "created_at": iso(now_utc()),
+            "updated_at": iso(now_utc()),
+        })
+        await push_notif(res["user_id"], "balance", f"✅ To'lovingiz tasdiqlandi — balansingizga {res['amount']:,} so'm tushdi")
+    else:
+        await push_notif(res["user_id"], "balance", f"❌ Balans to'ldirish rad etildi: {(reason or 'sabab ko`rsatilmagan')}")
+    return {"ok": True}

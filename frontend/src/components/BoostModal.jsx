@@ -46,7 +46,7 @@ export default function BoostModal({ onClose }) {
       }
     } catch (e) {
       const detail = (e?.response?.data?.detail || "").toString();
-      toast.error(detail === "boost_hidden" ? t("boost_hidden_error") : detail || t("error_generic"));
+      toast.error(detail === "boost_hidden" ? t("boost_hidden_error") : detail === "click_disabled" ? t("click_disabled_error") : detail || t("error_generic"));
     } finally {
       setPaying(false);
     }

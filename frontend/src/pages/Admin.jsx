@@ -24,6 +24,7 @@ const menuItems = [
   { id: "broadcast", icon: Send, label: "Xabar yuborish" },
   { id: "anons", icon: Megaphone, label: "Anonslar" },
   { id: "payments", icon: DollarSign, label: "To'lovlar" },
+  { id: "p2p", icon: Wallet, label: "P2P To'ldirish" },
   { id: "verifications", icon: ShieldCheck, label: "Tasdiqlashlar" },
   { id: "withdrawals", icon: Wallet, label: "Yechib olishlar" },
   { id: "referrals", icon: TrendingUp, label: "Referallar" },
@@ -118,6 +119,7 @@ export default function Admin() {
           {activeTab === "broadcast" && <AdminBroadcast />}
           {activeTab === "anons" && <AdminAnnouncements />}
           {activeTab === "payments" && <AdminPayments />}
+          {activeTab === "p2p" && <AdminManualTopups />}
           {activeTab === "verifications" && <AdminVerifications />}
           {activeTab === "withdrawals" && <AdminWithdrawals />}
           {activeTab === "referrals" && <AdminReferrals />}
@@ -835,6 +837,124 @@ function AdminAnnouncements() {
                 <button onClick={() => remove(a.id)} className="shrink-0 p-2 rounded-full hover:bg-muted text-rose-600" title="O'chirish">
                   <Trash2 className="w-4 h-4" />
                 </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AdminManualTopups() {
+  // Temporary P2P top-up moderation while CLICK is down: admin publishes a
+  // card number, users transfer + attach a receipt, admin credits balances.
+  const [cfg, setCfg] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [items, setItems] = useState([]);
+  const [status, setStatus] = useState("pending");
+  const [busy, setBusy] = useState(null);
+
+  const loadItems = React.useCallback((s) => {
+    api.get(`/admin/manual-topups?status=${s}&limit=50`).then((r) => setItems(r.data.items || [])).catch(() => {});
+  }, []);
+  React.useEffect(() => {
+    api.get("/admin/topup-config").then((r) => setCfg(r.data)).catch(() => {});
+  }, []);
+  React.useEffect(() => { loadItems(status); }, [status, loadItems]);
+
+  const saveCfg = async () => {
+    setSaving(true);
+    try {
+      await api.post("/admin/topup-config", {
+        p2p_enabled: !!cfg.p2p_enabled,
+        card_number: cfg.card_number || "",
+        card_holder: cfg.card_holder || "",
+      });
+      toast.success("Saqlandi");
+    } catch (e) {
+      toast.error((e?.response?.data?.detail || "Xatolik").toString());
+    } finally { setSaving(false); }
+  };
+
+  const decide = async (id, approve) => {
+    let reason = "";
+    if (!approve) {
+      reason = window.prompt("Rad etish sababi (foydalanuvchiga ko'rinadi):") || "";
+      if (!reason.trim()) return;
+    } else if (!window.confirm("Pul kartaga KELGANINI bank ilovangizda tekshirdingizmi? Tasdiq balansga darhol tushiradi.")) {
+      return;
+    }
+    setBusy(id);
+    try {
+      await api.post(`/admin/manual-topups/${id}/decide`, { approve, reason });
+      toast.success(approve ? "Tasdiqlandi — balans tushdi" : "Rad etildi");
+      loadItems(status);
+    } catch {
+      toast.error("Xatolik");
+    } finally { setBusy(null); }
+  };
+
+  return (
+    <div className="max-w-2xl space-y-4">
+      {/* Config: toggle + receiving card */}
+      <div className="rounded-3xl bg-card border border-border p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold">P2P rejimi (Click o'rniga)</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Yoqilsa — foydalanuvchilar Click o'rniga kartaga o'tkazib, chek yuboradi. Click tuzalgach o'chirib qo'ying.</p>
+          </div>
+          <button
+            onClick={() => setCfg((c) => ({ ...(c || {}), p2p_enabled: !c?.p2p_enabled }))}
+            className={`shrink-0 w-12 h-7 rounded-full transition relative ${cfg?.p2p_enabled ? "bg-secondary" : "bg-muted"}`}
+            data-testid="p2p-toggle"
+          >
+            <span className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-all ${cfg?.p2p_enabled ? "left-[22px]" : "left-0.5"}`} />
+          </button>
+        </div>
+        <input
+          value={cfg?.card_number || ""}
+          onChange={(e) => setCfg((c) => ({ ...(c || {}), card_number: e.target.value.replace(/\D/g, "").slice(0, 16) }))}
+          placeholder="Karta raqami (16 raqam)"
+          inputMode="numeric"
+          className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-sm tabular-nums outline-none focus:border-primary"
+        />
+        <input
+          value={cfg?.card_holder || ""}
+          onChange={(e) => setCfg((c) => ({ ...(c || {}), card_holder: e.target.value }))}
+          placeholder="Karta egasi (masalan: AZIZ V.)"
+          className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-primary"
+        />
+        <button onClick={saveCfg} disabled={saving || !cfg} className="rounded-2xl bg-primary text-white text-sm font-medium px-5 py-2.5 disabled:opacity-50">
+          {saving ? "..." : "Saqlash"}
+        </button>
+      </div>
+
+      {/* Queue */}
+      <div className="flex gap-2">
+        {[["pending", "Kutilmoqda"], ["approved", "Tasdiqlangan"], ["rejected", "Rad etilgan"]].map(([k, l]) => (
+          <button key={k} onClick={() => setStatus(k)}
+            className={`px-4 py-2 rounded-full text-xs font-medium ${status === k ? "bg-primary text-white" : "bg-muted/40 text-muted-foreground"}`}>
+            {l}
+          </button>
+        ))}
+      </div>
+      <div className="space-y-2">
+        {items.length === 0 && <p className="text-sm text-muted-foreground py-6 text-center">So'rovlar yo'q</p>}
+        {items.map((r) => (
+          <div key={r.id} className="rounded-2xl bg-card border border-border p-4 flex items-center gap-3 flex-wrap">
+            <div className="flex-1 min-w-[160px]">
+              <p className="text-sm font-medium">{r.user?.name || r.user_id} · <span className="tabular-nums font-semibold">{Number(r.amount).toLocaleString()} so'm</span></p>
+              <p className="text-xs text-muted-foreground mt-0.5">{new Date(r.created_at).toLocaleString()} · balans: {Number(r.user?.balance || 0).toLocaleString()}</p>
+              {r.rejection_reason && <p className="text-xs text-primary mt-0.5">{r.rejection_reason}</p>}
+            </div>
+            <a href={r.proof_url} target="_blank" rel="noreferrer" className="text-xs text-secondary underline shrink-0">Chekni ko'rish</a>
+            {r.status === "pending" && (
+              <div className="flex gap-2 shrink-0">
+                <button onClick={() => decide(r.id, true)} disabled={busy === r.id}
+                  className="rounded-full bg-secondary text-white text-xs font-semibold px-4 py-2 disabled:opacity-50">Tasdiqlash</button>
+                <button onClick={() => decide(r.id, false)} disabled={busy === r.id}
+                  className="rounded-full border border-border text-xs font-semibold px-4 py-2 disabled:opacity-50">Rad etish</button>
               </div>
             )}
           </div>

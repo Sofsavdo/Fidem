@@ -28,7 +28,10 @@ export default function Concierge() {
       queryClient.invalidateQueries({ queryKey: QK.conciergeInfo });
       queryClient.invalidateQueries({ queryKey: QK.conciergeMine });
     },
-    onError: () => toast.error(t("error_generic")),
+    onError: (e) => {
+      const detail = (e?.response?.data?.detail || "").toString();
+      toast.error(detail === "click_disabled" ? t("click_disabled_error") : detail || t("error_generic"));
+    },
   });
 
   const order = (method) => orderMutation.mutate(method);

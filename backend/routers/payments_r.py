@@ -5,7 +5,7 @@ import asyncio
 import random
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from starlette.responses import JSONResponse
 
 from auth import get_current_user_id
@@ -296,6 +296,14 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
         # Process the purchase immediately
         await process_completed_payment(uid, req.purpose, amount, balance_used, req.target_user_id, req.order_id)
         return {"ok": True, "payment_id": pid, "status": "paid", "balance_used": balance_used, "click_amount": 0}
+
+    # While P2P mode is on (CLICK temporarily disabled by the admin), nothing
+    # may route to CLICK — users top the balance up via card transfer instead
+    # and every purchase is balance-funded. Frontends map this code to a
+    # "top up your balance first" hint instead of a dead CLICK redirect.
+    cfg = await db.settings.find_one({"id": "topup_config"}) or {}
+    if cfg.get("p2p_enabled"):
+        raise HTTPException(400, "click_disabled")
 
     pid = await generate_payment_id()
 
@@ -618,6 +626,61 @@ async def process_completed_payment(uid: str, purpose: str, amount: int, balance
 # purchases complete instantly at create time. The only money the admin ever
 # approves/rejects is a referral-earnings WITHDRAWAL request (see
 # routers/withdrawals_r.py: /admin/withdrawals/{id}/approve|reject).
+
+
+# --- Manual (P2P card transfer) top-up — temporary fallback while CLICK is
+# --- being sorted out. Admin sets a card number and toggles p2p_enabled; the
+# --- user transfers money card-to-card, attaches a receipt screenshot, and an
+# --- admin credits the balance after checking the actual card statement.
+
+@router.get("/payments/topup-config")
+async def topup_config(uid: str = Depends(get_current_user_id)):
+    cfg = await db.settings.find_one({"id": "topup_config"}, {"_id": 0}) or {}
+    enabled = bool(cfg.get("p2p_enabled"))
+    out = {"p2p_enabled": enabled}
+    if enabled:
+        out["card_number"] = cfg.get("card_number", "")
+        out["card_holder"] = cfg.get("card_holder", "")
+    return out
+
+
+@router.post("/payments/manual-topup")
+async def manual_topup(
+    request: Request,
+    amount: int = Body(..., embed=True),
+    proof_url: str = Body(..., embed=True),
+    uid: str = Depends(get_current_user_id),
+):
+    rate_limit_payment(request)
+    cfg = await db.settings.find_one({"id": "topup_config"}) or {}
+    if not cfg.get("p2p_enabled"):
+        raise HTTPException(400, "p2p_disabled")
+    if amount < 1000:
+        raise HTTPException(400, "Minimum top-up is 1000")
+    if not (proof_url or "").strip():
+        raise HTTPException(400, "proof_required")
+    # Cap open requests so a user can't flood the admin queue
+    pending = await db.manual_topups.count_documents({"user_id": uid, "status": "pending"})
+    if pending >= 3:
+        raise HTTPException(429, "too_many_pending")
+    doc = {
+        "id": new_id(),
+        "user_id": uid,
+        "amount": amount,
+        "proof_url": proof_url.strip(),
+        "status": "pending",
+        "created_at": iso(now_utc()),
+        "decided_at": None,
+        "rejection_reason": None,
+    }
+    await db.manual_topups.insert_one(doc)
+    return {"ok": True, "id": doc["id"]}
+
+
+@router.get("/payments/manual-topup/mine")
+async def my_manual_topups(uid: str = Depends(get_current_user_id)):
+    rows = await db.manual_topups.find({"user_id": uid}, {"_id": 0}).sort("created_at", -1).to_list(20)
+    return rows
 
 
 @router.get("/payments/mine")

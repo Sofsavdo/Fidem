@@ -116,7 +116,8 @@ export default function Chat() {
         await refreshAccess();
       }
     } catch (err) {
-      toast.error("Error");
+      const detail = (err?.response?.data?.detail || "").toString();
+      toast.error(detail === "click_disabled" ? t("click_disabled_error") : "Error");
     } finally {
       setUnlocking(false);
     }
@@ -146,7 +147,8 @@ export default function Chat() {
         toast.info(t("redirecting_payment") || "To'lov sahifasiga o'tilmoqda...");
       }
     } catch (err) {
-      toast.error(t("error_generic") || "Error");
+      const detail = (err?.response?.data?.detail || "").toString();
+      toast.error(detail === "click_disabled" ? t("click_disabled_error") : (t("error_generic") || "Error"));
     } finally {
       setUnlocking(false);
     }
