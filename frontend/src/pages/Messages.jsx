@@ -22,6 +22,15 @@ export default function Messages() {
     queryClient.invalidateQueries({ queryKey: QK.messagesApplications });
   };
 
+  // Refresh chats when a match happens
+  React.useEffect(() => {
+    const handleMatch = () => {
+      reload();
+    };
+    window.addEventListener("fidem:match", handleMatch);
+    return () => window.removeEventListener("fidem:match", handleMatch);
+  }, [queryClient]);
+
   const matches = chats.filter((c) => c.status === "match");
 
   return (

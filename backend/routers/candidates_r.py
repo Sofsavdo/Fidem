@@ -610,6 +610,14 @@ async def save_user(req: SaveRequest, uid: str = Depends(get_current_user_id)):
     if is_new:
         mutual_match = await db.saved.find_one({"owner_id": req.user_id, "target_id": uid}) is not None
 
+        # Mark all messages in this chat as "match" status for Matches tab visibility
+        if mutual_match:
+            cid = chat_id_for(uid, req.user_id)
+            await db.messages.update_many(
+                {"chat_id": cid},
+                {"$set": {"status": "match"}},
+            )
+
     if is_new:
         try:
             target = await get_user(req.user_id)
