@@ -235,12 +235,33 @@ async def _onboarding_nudges() -> None:
         await send_telegram_message(chat_id, text, reply_markup=_webapp_keyboard("✍️ Anketani tugatish"))
 
 
+async def _admin_daily_digest() -> None:
+    """Once per calendar day, push the owner stats (/stats content) to every
+    admin's Telegram — signups by hour, actives, pending P2P queue, money."""
+    today = now_utc().date().isoformat()
+    marker = await db.settings.find_one({"id": "admin_digest"}) or {}
+    if marker.get("sent_on") == today:
+        return
+    await db.settings.update_one(
+        {"id": "admin_digest"}, {"$set": {"sent_on": today}}, upsert=True
+    )
+    from admin_bot import build_stats_text, get_admin_chat_ids
+
+    admins = await get_admin_chat_ids()
+    if not admins:
+        return
+    text = await build_stats_text()
+    for chat_id in admins:
+        await send_telegram_message(chat_id, text)
+
+
 async def _run_pass() -> None:
     await _plan_reminders()
     await _plan_expiry()
     await _daily_picks_push()
     await _weekly_digest()
     await _onboarding_nudges()
+    await _admin_daily_digest()
 
 
 async def lifecycle_loop() -> None:

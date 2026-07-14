@@ -674,6 +674,11 @@ async def manual_topup(
         "rejection_reason": None,
     }
     await db.manual_topups.insert_one(doc)
+    # Real-time admin review card in Telegram (receipt photo + inline
+    # approve/reject) — the admin decides from the phone without opening
+    # the panel, so the user isn't left waiting.
+    from admin_bot import notify_admins_manual_topup
+    asyncio.create_task(notify_admins_manual_topup({k: v for k, v in doc.items() if k != "_id"}))
     return {"ok": True, "id": doc["id"]}
 
 
@@ -681,6 +686,43 @@ async def manual_topup(
 async def my_manual_topups(uid: str = Depends(get_current_user_id)):
     rows = await db.manual_topups.find({"user_id": uid}, {"_id": 0}).sort("created_at", -1).to_list(20)
     return rows
+
+
+async def decide_manual_topup(tid: str, approve: bool, reason: str = "", decided_by: str = "admin"):
+    """Shared approve/reject for a P2P top-up — used by both the admin panel
+    endpoint and the admin's Telegram inline buttons, so the two paths can
+    never drift. Returns the request doc, or None if it was already decided
+    (the atomic pending->decided flip makes double-taps harmless)."""
+    res = await db.manual_topups.find_one_and_update(
+        {"id": tid, "status": "pending"},
+        {"$set": {
+            "status": "approved" if approve else "rejected",
+            "decided_at": iso(now_utc()),
+            "decided_by": decided_by,
+            "rejection_reason": (reason or "").strip() if not approve else None,
+        }},
+    )
+    if not res:
+        return None
+    if approve:
+        await db.users.update_one({"id": res["user_id"]}, {"$inc": {"balance": res["amount"]}})
+        await db.payments.insert_one({
+            "id": new_id(),
+            "user_id": res["user_id"],
+            "purpose": "balance_topup",
+            "amount": res["amount"],
+            "balance_used": 0,
+            "click_amount": 0,
+            "status": "paid",
+            "method": "manual_p2p",
+            "manual_topup_id": tid,
+            "created_at": iso(now_utc()),
+            "updated_at": iso(now_utc()),
+        })
+        await push_notif(res["user_id"], "balance", f"✅ To'lovingiz tasdiqlandi — balansingizga {res['amount']:,} so'm tushdi")
+    else:
+        await push_notif(res["user_id"], "balance", f"❌ Balans to'ldirish rad etildi: {(reason or 'sabab ko`rsatilmagan')}")
+    return res
 
 
 @router.get("/payments/mine")

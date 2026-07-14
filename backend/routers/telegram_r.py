@@ -51,7 +51,7 @@ async def setup_telegram_webhook() -> None:
                 f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setWebhook",
                 json={
                     "url": webhook_url,
-                    "allowed_updates": ["message"],
+                    "allowed_updates": ["message", "callback_query"],
                 },
             )
             log.info(f"Telegram webhook set: {r.status_code} {r.text[:200]}")
@@ -80,6 +80,19 @@ async def telegram_webhook(request: Request, secret: Optional[str] = Query(None)
         raise HTTPException(403, "bad secret")
 
     body = await request.json()
+
+    # Admin inline buttons (P2P top-up approve/reject) arrive as
+    # callback_query updates, not messages.
+    cb = body.get("callback_query")
+    if cb:
+        from admin_bot import handle_admin_callback
+
+        try:
+            await handle_admin_callback(cb)
+        except Exception:
+            log.warning("admin callback failed", exc_info=True)
+        return {"ok": True}
+
     msg = body.get("message")
 
     if not msg:
@@ -88,6 +101,14 @@ async def telegram_webhook(request: Request, secret: Optional[str] = Query(None)
     text = (msg.get("text") or "").strip()
     chat_id = msg["chat"]["id"]
     tg_user_id = str(msg["from"]["id"])
+
+    # Admin-only /stats: owner metrics straight in the bot chat
+    if text.startswith("/stats"):
+        from admin_bot import build_stats_text, is_admin_tg
+
+        if await is_admin_tg(int(tg_user_id)):
+            await send_telegram_message(chat_id, await build_stats_text())
+        return {"ok": True}
 
     if text.startswith("/start"):
         parts = text.split(maxsplit=1)
