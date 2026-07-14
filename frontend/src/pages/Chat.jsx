@@ -483,7 +483,7 @@ export default function Chat() {
               {access.balance < access.price_uzs && (
                 <Link to="/premium?tab=balance" data-testid="chat-topup-balance"
                   className="block w-full rounded-xl border border-primary/40 bg-primary/5 text-primary text-sm py-2.5 font-medium text-center hover:bg-primary/10 active:scale-[0.98] transition">
-                  💳 {t("balance_too_low")} → {t("topup_cta")}
+                  💳 {t("insufficient_balance")} → {t("topup_balance")}
                 </Link>
               )}
 
