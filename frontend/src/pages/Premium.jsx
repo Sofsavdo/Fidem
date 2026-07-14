@@ -63,6 +63,11 @@ export default function Premium() {
     return () => clearTimeout(timer);
   }, [hl, tab]);
   const [topupAmount, setTopupAmount] = useState(50000);
+  // Free-form top-up amount — the preset chips are shortcuts, not a limit.
+  // CLICK can't process < 1000 so'm, so that's the real floor (backend
+  // enforces the same in /payments/create for balance_topup).
+  const [customTopup, setCustomTopup] = useState("");
+  const effectiveTopup = customTopup !== "" ? (parseInt(customTopup, 10) || 0) : topupAmount;
   const [creating, setCreating] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const perk = PERK[lang] || PERK.uz;
@@ -231,22 +236,33 @@ export default function Premium() {
                 <button
                   key={v}
                   data-testid={`topup-${v}`}
-                  onClick={() => { tapLight(); setTopupAmount(v); }}
+                  onClick={() => { tapLight(); setTopupAmount(v); setCustomTopup(""); }}
                   className={`rounded-2xl border py-3 text-sm font-semibold tabular-nums transition active:scale-[0.97] ${
-                    topupAmount === v ? "bg-primary text-white border-primary shadow-sm" : "bg-card border-border hover:border-primary/40"
+                    customTopup === "" && topupAmount === v ? "bg-primary text-white border-primary shadow-sm" : "bg-card border-border hover:border-primary/40"
                   }`}
                 >
                   {(v / 1000).toFixed(0)}k
                 </button>
               ))}
             </div>
+            <input
+              data-testid="topup-custom"
+              inputMode="numeric"
+              placeholder={t("topup_custom_placeholder")}
+              className="w-full mt-2 px-3.5 py-2.5 rounded-2xl border border-border bg-background text-sm tabular-nums outline-none focus:border-primary"
+              value={customTopup}
+              onChange={(e) => setCustomTopup(e.target.value.replace(/\D/g, ""))}
+            />
+            {customTopup !== "" && effectiveTopup < 1000 && (
+              <p className="text-[11px] text-primary mt-1">{t("topup_min_error")}</p>
+            )}
             <button
               data-testid="topup-pay"
-              onClick={() => runPayment("balance_topup", topupAmount)}
-              disabled={creating}
+              onClick={() => runPayment("balance_topup", effectiveTopup)}
+              disabled={creating || effectiveTopup < 1000}
               className="btn-primary mt-3.5"
             >
-              {t("pay_with_click")} · {topupAmount.toLocaleString()} {t("sum")}
+              {t("pay_with_click")} · {effectiveTopup.toLocaleString()} {t("sum")}
             </button>
             <p className="text-[11px] text-muted-foreground text-center mt-2">{t("topup_click_note")}</p>
           </div>
