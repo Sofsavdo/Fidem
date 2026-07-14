@@ -215,48 +215,62 @@ async def chat_unlock(
 
 # ---------- Messages ----------
 @router.get("/messages/chats")
-async def list_chats(uid: str = Depends(get_current_user_id)):
+async def list_chats(uid: str = Depends(get_current_user_id), limit: int = Query(20)):
+    """List user's chats with pagination. Optimized with parallel queries."""
+    limit = min(limit, 100)  # Cap at 100 per request
+
     pipeline = [
         {"$match": {"$or": [{"from_user_id": uid}, {"to_user_id": uid}]}},
         {"$sort": {"created_at": -1}},
         {"$group": {"_id": "$chat_id", "last": {"$first": "$$ROOT"}}},
         {"$sort": {"last.created_at": -1}},
+        {"$limit": limit},
     ]
     cursor = db.messages.aggregate(pipeline)
-    items = []
     rows_data = []
     async for row in cursor:
         rows_data.append(row)
-    other_ids = []
-    for row in rows_data:
-        last = row["last"]
-        other_id = last["to_user_id"] if last["from_user_id"] == uid else last["from_user_id"]
-        other_ids.append(other_id)
-    unlocks = await db.photo_unlocks.find(
+
+    if not rows_data:
+        return []
+
+    other_ids = [
+        row["last"]["to_user_id"] if row["last"]["from_user_id"] == uid else row["last"]["from_user_id"]
+        for row in rows_data
+    ]
+    chat_ids = [row["_id"] for row in rows_data]
+
+    # Parallel queries instead of sequential
+    unlocks_task = db.photo_unlocks.find(
         {"requester_id": uid, "target_id": {"$in": other_ids}, "approved": True},
         {"_id": 0, "target_id": 1},
-    ).to_list(500) if other_ids else []
-    unlocked_set = {p["target_id"] for p in unlocks}
+    ).to_list(len(other_ids))
 
-    users = await db.users.find(
+    users_task = db.users.find(
         {"id": {"$in": other_ids}}, {"_id": 0, "password_hash": 0}
-    ).to_list(len(other_ids)) if other_ids else []
+    ).to_list(len(other_ids))
+
+    # For unread: use a simple count per chat, not full aggregation
+    unread_tasks = [
+        db.messages.count_documents({"chat_id": cid, "to_user_id": uid, "read": {"$ne": True}})
+        for cid in chat_ids
+    ]
+
+    unlocks, users, *unread_counts = await asyncio.gather(
+        unlocks_task, users_task, *unread_tasks
+    )
+
+    unlocked_set = {p["target_id"] for p in unlocks}
     users_by_id = {u["id"]: u for u in users}
+    unread_by_chat = {cid: count for cid, count in zip(chat_ids, unread_counts)}
 
-    chat_ids = [row["_id"] for row in rows_data]
-    unread_agg = await db.messages.aggregate([
-        {"$match": {"chat_id": {"$in": chat_ids}, "to_user_id": uid, "read": {"$ne": True}}},
-        {"$group": {"_id": "$chat_id", "count": {"$sum": 1}}},
-    ]).to_list(len(chat_ids)) if chat_ids else []
-    unread_by_chat = {a["_id"]: a["count"] for a in unread_agg}
-
+    items = []
     for row in rows_data:
         last = row["last"]
         other_id = last["to_user_id"] if last["from_user_id"] == uid else last["from_user_id"]
         u = users_by_id.get(other_id)
         if not u:
             continue
-        unread = unread_by_chat.get(row["_id"], 0)
         pub = user_public(u)
         pub["photo_unlocked"] = other_id in unlocked_set
         items.append({
@@ -269,7 +283,7 @@ async def list_chats(uid: str = Depends(get_current_user_id)):
                 "to_user_id": last["to_user_id"],
                 "created_at": parse_dt(last["created_at"]),
             },
-            "unread": unread,
+            "unread": unread_by_chat.get(row["_id"], 0),
             "status": last.get("status", "chat"),
         })
     return items
@@ -308,11 +322,16 @@ async def decide_application(app_id: str, approve: bool = Body(..., embed=True),
 
 
 @router.get("/messages/{chat_id}")
-async def chat_history(chat_id: str, uid: str = Depends(get_current_user_id)):
+async def chat_history(chat_id: str, uid: str = Depends(get_current_user_id), limit: int = Query(50)):
+    """Load chat messages with pagination. Limit per request: 50 (capped at 100)."""
     a, b = chat_id.split("_", 1)
     if uid not in (a, b):
         raise HTTPException(403, "Not your chat")
-    rows = await db.messages.find({"chat_id": chat_id}, {"_id": 0}).sort("created_at", 1).to_list(500)
+    limit = min(limit, 100)
+    rows = await db.messages.find({"chat_id": chat_id}, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    # Reverse to get chronological order (oldest first)
+    rows.reverse()
+
     result = await db.messages.update_many(
         {"chat_id": chat_id, "to_user_id": uid, "read": {"$ne": True}},
         {"$set": {"read": True}},

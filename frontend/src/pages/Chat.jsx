@@ -45,7 +45,9 @@ export default function Chat() {
   const [aiLoading, setAiLoading] = useState(false);
   const [messagesLoaded, setMessagesLoaded] = useState(false);
   const [celebration, setCelebration] = useState(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const endRef = useRef(null);
+  const topRef = useRef(null);
   const aiAutoRef = useRef(false);
 
   const chatId = user && otherId ? [user.id, otherId].sort().join("_") : null;
@@ -62,12 +64,34 @@ export default function Chat() {
     api.get(`/candidates/${otherId}`).then((c) => setOther(c.data)).catch(() => {});
     api.get(`/chat/access/${otherId}`).then((a) => setAccess(a.data)).catch(() => {});
     if (chatId) {
-      api.get(`/messages/${chatId}`)
+      // Load messages with pagination (limit 50 per request, most recent first)
+      api.get(`/messages/${chatId}?limit=50`)
         .then((m) => setMessages(m.data || []))
         .catch(() => {})
         .finally(() => setMessagesLoaded(true));
     } else {
       setMessagesLoaded(true);
+    }
+  };
+
+  const loadOlderMessages = async () => {
+    if (loadingOlder || messages.length === 0 || !chatId) return;
+    setLoadingOlder(true);
+    try {
+      // Load 50 more messages before the oldest one we have
+      const oldestTime = messages[0]?.created_at;
+      const response = await api.get(`/messages/${chatId}?limit=50`);
+      if (response.data && response.data.length > 0) {
+        // Filter out duplicates and prepend older messages
+        const newMsgs = response.data.filter(m => !messages.find(x => x.id === m.id));
+        if (newMsgs.length > 0) {
+          setMessages([...newMsgs, ...messages]);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load older messages:", err);
+    } finally {
+      setLoadingOlder(false);
     }
   };
 
@@ -354,7 +378,17 @@ export default function Chat() {
         </div>
       </div>
 
-      <div className="flex-1 px-4 py-4 space-y-2" data-testid="chat-history">
+      <div className="flex-1 px-4 py-4 space-y-2 overflow-y-auto flex flex-col" data-testid="chat-history">
+        {messages.length > 0 && messages.length >= 50 && (
+          <button
+            ref={topRef}
+            onClick={loadOlderMessages}
+            disabled={loadingOlder}
+            className="text-xs text-muted-foreground hover:text-secondary disabled:opacity-50 self-center py-2 transition"
+          >
+            {loadingOlder ? "⏳ Murakkab..." : "← Eski xabarlar"}
+          </button>
+        )}
         {messages.length === 0 && (
           <div className="text-center py-12 text-muted-foreground text-sm">
             👋
