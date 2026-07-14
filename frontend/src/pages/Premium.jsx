@@ -136,7 +136,12 @@ export default function Premium() {
       queryClient.invalidateQueries({ queryKey: QK.payments });
     } catch (e) {
       const detail = (e?.response?.data?.detail || "").toString();
-      toast.error(detail === "click_disabled" ? t("click_disabled_error") : t("error_generic"));
+      if (detail === "click_disabled") {
+        toast.info(t("click_disabled_error"));
+        setSearchParams({ tab: "balance" });
+      } else {
+        toast.error(t("error_generic"));
+      }
     } finally { setCreating(false); }
   };
 

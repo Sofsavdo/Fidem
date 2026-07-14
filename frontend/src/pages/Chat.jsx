@@ -117,7 +117,12 @@ export default function Chat() {
       }
     } catch (err) {
       const detail = (err?.response?.data?.detail || "").toString();
-      toast.error(detail === "click_disabled" ? t("click_disabled_error") : "Error");
+      if (detail === "click_disabled") {
+        toast.info(t("click_disabled_error"));
+        nav("/premium?tab=balance");
+      } else {
+        toast.error("Error");
+      }
     } finally {
       setUnlocking(false);
     }
@@ -148,7 +153,12 @@ export default function Chat() {
       }
     } catch (err) {
       const detail = (err?.response?.data?.detail || "").toString();
-      toast.error(detail === "click_disabled" ? t("click_disabled_error") : (t("error_generic") || "Error"));
+      if (detail === "click_disabled") {
+        toast.info(t("click_disabled_error"));
+        nav("/premium?tab=balance");
+      } else {
+        toast.error(t("error_generic") || "Error");
+      }
     } finally {
       setUnlocking(false);
     }

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ChevronLeft, Trophy, Medal, Gift, Wallet, Rocket } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { useLeaderboard, QK } from "@/hooks/queries";
@@ -15,6 +15,7 @@ const BOOST_PRESETS = [10000, 30000, 50000, 100000];
 
 export default function Rankings() {
   const { t, user, refresh } = useApp();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [period, setPeriod] = useState("all");
   const [amount, setAmount] = useState(BOOST_PRESETS[0]);
@@ -56,7 +57,12 @@ export default function Rankings() {
       }
     } catch (e) {
       const detail = (e?.response?.data?.detail || "").toString();
-      toast.error(detail === "click_min_1000" ? t("click_min_error") : detail === "click_disabled" ? t("click_disabled_error") : t("error_generic"));
+      if (detail === "click_disabled") {
+        toast.info(t("click_disabled_error"));
+        navigate("/premium?tab=balance");
+      } else {
+        toast.error(detail === "click_min_1000" ? t("click_min_error") : t("error_generic"));
+      }
     } finally {
       setPaying(false);
     }
