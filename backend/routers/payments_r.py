@@ -229,14 +229,34 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
         # profile has none — don't take the money.
         raise HTTPException(400, "boost_hidden")
     balance = me.get("balance", 0) or 0
-    balance_used = min(balance, amount)
-    click_amount = amount - balance_used
 
-    # CLICK cannot process sub-1000-so'm charges. Anything the balance fully
-    # covers sails through below; only a tiny CLICK *remainder* is refused,
-    # with a code the frontend maps to a helpful message.
-    if 0 < click_amount < 1000:
-        raise HTTPException(400, "click_min_1000")
+    # CLICK cannot process sub-1000-so'm charges. If the amount is 1000+,
+    # we can use balance to reduce the Click charge. If the amount is <1000,
+    # we must use balance only (can't send partial amounts to Click).
+    if amount < 1000:
+        # Full amount must come from balance (Click doesn't support <1000)
+        balance_used = amount
+        click_amount = 0
+    else:
+        # Amount >= 1000: use balance first, Click pays remainder
+        balance_used = min(balance, amount)
+        click_amount = amount - balance_used
+        # If Click remainder is still sub-1000, reduce balance_used so the
+        # full amount goes to Click (which can handle >= 1000)
+        if 0 < click_amount < 1000:
+            # Adjust: use more balance to make Click amount exactly 0,
+            # or use no balance and send full amount to Click if possible
+            if balance >= amount:
+                # We have enough balance for full amount
+                balance_used = amount
+                click_amount = 0
+            else:
+                # Balance insufficient for full amount, but Click minimum blocks it
+                # Send full amount via Click instead
+                balance_used = 0
+                click_amount = amount
+                if click_amount < 1000:
+                    raise HTTPException(400, "click_min_1000")
 
     # If balance covers full amount, no Click payment needed
     if click_amount <= 0:

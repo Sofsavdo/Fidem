@@ -12,6 +12,7 @@ import { tapLight } from "@/lib/haptics";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { QK } from "@/hooks/queries";
+import { openExternalLink } from "@/lib/telegram";
 
 // Mirrors the Standard plan price in Premium.jsx — shown next to the one-time
 // unlock so the user can compare "pay once" vs "unlimited messaging".
@@ -107,7 +108,7 @@ export default function Chat() {
     try {
       if (method === "click") {
         const r = await api.post("/payments/create", { purpose: "chat_unlock", target_user_id: otherId });
-        if (r.data?.payment_link) window.open(r.data.payment_link, "_blank");
+        if (r.data?.payment_link) openExternalLink(r.data.payment_link);
         toast.info(t("redirecting_payment") || "To'lov sahifasiga o'tilmoqda...");
       } else {
         await api.post("/chat/unlock", { target_id: otherId, method });
@@ -141,7 +142,7 @@ export default function Chat() {
         toast.success(t("payment_success"));
         await refreshAccess();
       } else if (r.data?.payment_link) {
-        window.open(r.data.payment_link, "_blank");
+        openExternalLink(r.data.payment_link);
         toast.info(t("redirecting_payment") || "To'lov sahifasiga o'tilmoqda...");
       }
     } catch (err) {
@@ -476,6 +477,14 @@ export default function Chat() {
                   className="w-full rounded-xl bg-secondary text-white text-sm py-2.5 font-medium disabled:opacity-50">
                   🎁 {t("use_free_credit")} ({access.free_credits})
                 </button>
+              )}
+
+              {/* Quick top-up balance link if balance is insufficient */}
+              {access.balance < access.price_uzs && (
+                <Link to="/premium?tab=balance" data-testid="chat-topup-balance"
+                  className="block w-full rounded-xl border border-primary/40 bg-primary/5 text-primary text-sm py-2.5 font-medium text-center hover:bg-primary/10 active:scale-[0.98] transition">
+                  💳 {t("insufficient_balance")} → {t("topup_balance")}
+                </Link>
               )}
 
               {/* Drawn comparison: pay-once vs unlimited */}

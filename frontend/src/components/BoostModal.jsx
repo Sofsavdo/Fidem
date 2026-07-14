@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { tapMedium, notify } from "@/lib/haptics";
+import { openExternalLink } from "@/lib/telegram";
 
 function hoursLeft(untilIso) {
   if (!untilIso) return 0;
@@ -40,7 +41,7 @@ export default function BoostModal({ onClose }) {
         queryClient.invalidateQueries({ queryKey: QK.boostStatus });
         refresh();
       } else {
-        if (r.data.payment_link) window.open(r.data.payment_link, "_blank");
+        if (r.data.payment_link) openExternalLink(r.data.payment_link);
         toast.info(t("redirecting_payment"));
       }
     } catch (e) {

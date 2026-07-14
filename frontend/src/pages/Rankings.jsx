@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { photoSrc } from "@/lib/photo";
 import { Skeleton, EmptyState } from "@/components/kit";
 import { tapMedium, notify } from "@/lib/haptics";
+import { openExternalLink } from "@/lib/telegram";
 
 const BOOST_PRESETS = [10000, 30000, 50000, 100000];
 
@@ -51,7 +52,7 @@ export default function Rankings() {
         } else {
           toast.success(t("pay_with_click"));
         }
-        if (r.data.payment_link) window.open(r.data.payment_link, "_blank");
+        if (r.data.payment_link) openExternalLink(r.data.payment_link);
       }
     } catch (e) {
       const detail = (e?.response?.data?.detail || "").toString();
