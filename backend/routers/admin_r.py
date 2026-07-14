@@ -363,19 +363,72 @@ async def _run_broadcast(user_ids: list[str], text: str) -> None:
     log.info(f"broadcast finished: sent={sent} skipped_daily_cap={skipped} total={len(user_ids)}")
 
 
-@router.post("/notification/broadcast")
-async def admin_broadcast(text: str = Body(..., embed=True), dry_run: bool = Body(False, embed=True), _: str = Depends(get_current_admin)):
+async def _run_tg_broadcast(chat_ids: list[int], text: str, button_text: str) -> None:
+    """Direct Telegram sends for people who can't receive in-app notifs
+    (no finished account). Always carries a Mini App button."""
+    from core import get_webapp_url
+    from services import send_telegram_message
+
+    kb = {"inline_keyboard": [[{"text": button_text, "web_app": {"url": get_webapp_url()}}]]}
+    sent = 0
+    for cid in chat_ids:
+        if await send_telegram_message(cid, text, reply_markup=kb):
+            sent += 1
+        await asyncio.sleep(0.05)  # ~20 msg/s, under Telegram's 30/s cap
+    log.info(f"tg broadcast finished: sent={sent} total={len(chat_ids)}")
+
+
+async def _broadcast_targets(audience: str):
+    """Resolve an audience segment to (user_ids, chat_ids)."""
+    if audience == "incomplete":
+        # Account exists, profile never finished — reach them via Telegram
+        rows = await db.users.find(
+            {"telegram_id": {"$nin": [None, ""]}, "onboarded": {"$ne": True}, "blocked": {"$ne": True}},
+            {"_id": 0, "telegram_id": 1},
+        ).to_list(200000)
+        chat_ids = []
+        for u in rows:
+            try:
+                chat_ids.append(int(u["telegram_id"]))
+            except (TypeError, ValueError):
+                pass
+        return [], chat_ids
+    if audience == "bot_only":
+        # Pressed /start but never opened the Mini App at all
+        starts = await db.bot_starts.find({}, {"_id": 0, "telegram_id": 1, "chat_id": 1}).to_list(200000)
+        with_acct = {
+            u["telegram_id"]
+            for u in await db.users.find({"telegram_id": {"$nin": [None, ""]}}, {"_id": 0, "telegram_id": 1}).to_list(200000)
+        }
+        return [], [s["chat_id"] for s in starts if s["telegram_id"] not in with_acct]
+    # default: fully onboarded users, via the normal notification pipeline
     users = await db.users.find({"onboarded": True, "blocked": {"$ne": True}}, {"_id": 0, "id": 1}).to_list(200000)
+    return [u["id"] for u in users], []
+
+
+@router.post("/notification/broadcast")
+async def admin_broadcast(
+    text: str = Body(..., embed=True),
+    dry_run: bool = Body(False, embed=True),
+    audience: str = Body("onboarded", embed=True),
+    _: str = Depends(get_current_admin),
+):
+    user_ids, chat_ids = await _broadcast_targets(audience)
+    total = len(user_ids) + len(chat_ids)
     if dry_run:
-        return {"would_send": len(users), "dry_run": True}
+        return {"would_send": total, "dry_run": True, "audience": audience}
     # One push_notif per user is a real DB round trip each - at 10K-1M users
     # that loop can run for minutes. Running it inline would hold the admin's
     # HTTP request open (and the connection pool slot) until every send
     # finishes, freezing the admin panel exactly like the /admin/stats
     # sequential-query issue this audit already fixed. Fire it in the
     # background and let the admin keep working.
-    asyncio.create_task(_run_broadcast([u["id"] for u in users], text))
-    return {"queued": len(users), "dry_run": False}
+    if user_ids:
+        asyncio.create_task(_run_broadcast(user_ids, text))
+    if chat_ids:
+        button = "✍️ Anketani tugatish" if audience == "incomplete" else "💖 FIDEM'ni ochish"
+        asyncio.create_task(_run_tg_broadcast(chat_ids, text, button))
+    return {"queued": total, "dry_run": False, "audience": audience}
 
 
 @router.get("/referrals")

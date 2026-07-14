@@ -534,7 +534,7 @@ export function useAdminFraud(params) {
 
 export function useAdminBroadcast() {
   return useMutation({
-    mutationFn: ({ text, dryRun }) => api.post("/admin/notification/broadcast", { text, dry_run: !!dryRun }).then((r) => r.data),
+    mutationFn: ({ text, dryRun, audience }) => api.post("/admin/notification/broadcast", { text, dry_run: !!dryRun, audience: audience || "onboarded" }).then((r) => r.data),
   });
 }
 

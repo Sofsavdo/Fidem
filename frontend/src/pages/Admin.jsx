@@ -244,11 +244,18 @@ const StatCard = React.memo(function StatCard({ label, value, icon }) {
 function AdminBroadcast() {
   const [text, setText] = useState("");
   const [preview, setPreview] = useState(null);
+  const [audience, setAudience] = useState("onboarded");
   const broadcast = useAdminBroadcast();
+
+  const AUDIENCES = [
+    ["onboarded", "Anketali a'zolar", "Onboarding'dan o'tganlar — ilova ichida + Telegram"],
+    ["incomplete", "Anketasi chala", "Hisob ochgan, lekin anketani tugatmaganlar — Telegram + «Anketani tugatish» tugmasi"],
+    ["bot_only", "Faqat bot (app ochmagan)", "/start bosgan, lekin ilovani umuman ochmaganlar — Telegram + «FIDEM'ni ochish» tugmasi"],
+  ];
 
   const checkAudience = () => {
     if (!text.trim()) return;
-    broadcast.mutate({ text, dryRun: true }, {
+    broadcast.mutate({ text, dryRun: true, audience }, {
       onSuccess: (data) => setPreview(data.would_send),
       onError: () => toast.error("Xatolik"),
     });
@@ -257,7 +264,7 @@ function AdminBroadcast() {
   const send = () => {
     if (!text.trim()) return;
     if (!window.confirm(`${preview ?? "?"} ta foydalanuvchiga yuborilsinmi? Bu qaytarib bo'lmaydi.`)) return;
-    broadcast.mutate({ text, dryRun: false }, {
+    broadcast.mutate({ text, dryRun: false, audience }, {
       onSuccess: (data) => {
         // Fanout runs in the background on the server (can take minutes at
         // scale) - the request returns as soon as it's queued, not once
@@ -273,6 +280,20 @@ function AdminBroadcast() {
   return (
     <div className="max-w-xl space-y-4">
       <div className="rounded-3xl bg-card border border-border p-5">
+        <p className="text-sm font-medium mb-2">Kimga yuboriladi</p>
+        <div className="space-y-1.5 mb-4">
+          {AUDIENCES.map(([k, label, hint]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => { setAudience(k); setPreview(null); }}
+              className={`w-full text-left rounded-2xl border px-3 py-2.5 transition ${audience === k ? "border-primary bg-primary/5" : "border-border bg-card hover:bg-muted"}`}
+            >
+              <p className="text-sm font-medium">{label}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{hint}</p>
+            </button>
+          ))}
+        </div>
         <p className="text-sm font-medium mb-2">Xabar matni</p>
         <textarea
           value={text}
@@ -282,7 +303,7 @@ function AdminBroadcast() {
           className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary resize-none"
         />
         <p className="text-xs text-muted-foreground mt-2">
-          Onboarding'dan o'tgan va bloklanmagan barcha foydalanuvchilarga yuboriladi - ilova ichida (Bildirishnomalar) va Telegram orqali.
+          Yuqorida tanlangan segmentga yuboriladi. Avval «Auditoriyani tekshirish» bilan nechta odamga borishini ko'ring.
         </p>
         <div className="flex gap-2 mt-4">
           <button
