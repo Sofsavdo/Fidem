@@ -233,7 +233,13 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
     # CLICK cannot process sub-1000-so'm charges. If the amount is 1000+,
     # we can use balance to reduce the Click charge. If the amount is <1000,
     # we must use balance only (can't send partial amounts to Click).
-    if amount < 1000:
+    if req.purpose == "balance_topup":
+        # A top-up must bring NEW money in — paying it from the balance is a
+        # no-op (deduct N, credit N back) that reported "success" without ever
+        # opening CLICK. Top-ups therefore always go 100% through CLICK.
+        balance_used = 0
+        click_amount = amount
+    elif amount < 1000:
         # Full amount must come from balance (Click doesn't support <1000)
         balance_used = amount
         click_amount = 0
