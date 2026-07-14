@@ -355,6 +355,14 @@ async def click_callback(request: Request):
         return JSONResponse({"error": -6, "error_note": "Payment blocked by admin"})
 
     if action == "0":
+        # CLICK expects the merchant to validate the amount at prepare time
+        # (error -2 on mismatch). Amount arrives as a decimal string.
+        try:
+            prepare_amount = int(float(form.get("amount", "0") or 0))
+        except (TypeError, ValueError):
+            return JSONResponse({"error": -2, "error_note": "Incorrect parameter amount"})
+        if prepare_amount != payment.get("click_amount", 0):
+            return JSONResponse({"error": -2, "error_note": "Incorrect parameter amount"})
         await db.payments.update_one(
             {"id": pid},
             {"$set": {"status": "prepared", "click_trans_id": form.get("click_trans_id")}},
@@ -368,11 +376,17 @@ async def click_callback(request: Request):
         })
 
     if action == "1":
-        # Verify payment amount matches expected amount
+        # Verify payment amount matches expected amount. CLICK sends the
+        # amount as a decimal string ("1000.00") — int() on that raises
+        # ValueError, which 500'd the callback and made CLICK treat every
+        # completion as failed.
         expected_amount = payment.get("click_amount", 0)
-        received_amount = int(form.get("amount", "0"))
+        try:
+            received_amount = int(float(form.get("amount", "0") or 0))
+        except (TypeError, ValueError):
+            return JSONResponse({"error": -2, "error_note": "Incorrect parameter amount"})
         if received_amount != expected_amount:
-            return JSONResponse({"error": -7, "error_note": "Amount mismatch"})
+            return JSONResponse({"error": -2, "error_note": "Incorrect parameter amount"})
 
         # Late completion: if this payment already expired, the balance
         # portion was refunded to the user (see /payments/mine). CLICK still
