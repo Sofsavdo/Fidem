@@ -13,7 +13,8 @@ import asyncio
 import logging
 from datetime import timedelta
 
-from core import PAID_PLANS, db, iso, now_utc, parse_dt, push_notif
+from core import PAID_PLANS, db, get_webapp_url, iso, now_utc, parse_dt, push_notif
+from services import send_telegram_message
 
 log = logging.getLogger("fidem.lifecycle")
 
@@ -144,11 +145,102 @@ async def _weekly_digest() -> None:
         )
 
 
+def _webapp_keyboard(button_text: str) -> dict:
+    return {"inline_keyboard": [[{"text": button_text, "web_app": {"url": get_webapp_url()}}]]}
+
+
+# Bot /start but Mini App never opened: up to 3 nudges, then silence forever.
+# Hours are measured from the FIRST /start.
+BOT_NUDGES = [
+    (3, "👋 FIDEM'da sizni kutishyapti!\n\n"
+        "Anketa yaratish atigi 2 daqiqa — mos nomzodlarni bepul ko'rasiz.\n\n"
+        "👇 Bir bosishda oching"),
+    (24, "💛 Bugun FIDEM'ga yangi a'zolar qo'shildi.\n\n"
+         "Sizga mos insonlar allaqachon qidiryapti. Anketa ochish — bepul."),
+    (72, "⏳ Oxirgi eslatma: FIDEM'dagi imkoniyatingiz kutmoqda.\n\n"
+         "2 daqiqada anketani to'ldiring — balki taqdiringiz shu yerdadir 💖"),
+]
+
+# Account created but the profile was never finished: 2 nudges.
+PROFILE_NUDGES = [
+    (24, "✍️ Anketangiz chala qoldi.\n\n"
+         "Tugatmaguningizcha nomzodlar sizni ko'ra olmaydi. Tugatish — 2 daqiqa!"),
+    (72, "💔 Anketangiz hali ham chala.\n\n"
+         "A'zolar har kuni juftini topmoqda — siz esa ro'yxatda ko'rinmayapsiz. Hoziroq tugating!"),
+]
+
+
+async def _onboarding_nudges() -> None:
+    """Re-engage the two funnel drop-offs: (a) pressed /start in the bot but
+    never opened the Mini App, (b) opened it and created an account but left
+    the profile unfinished. Each nudge fires once (stage counter), the chain
+    is short and then goes silent — no infinite spam."""
+    now = now_utc()
+
+    # (a) bot /start, no account yet
+    rows = await db.bot_starts.find(
+        {"nudge_stage": {"$lt": len(BOT_NUDGES)}},
+        {"_id": 0, "telegram_id": 1, "chat_id": 1, "first_start_at": 1, "nudge_stage": 1},
+    ).limit(BATCH).to_list(BATCH)
+    for s in rows:
+        # Opened the app since? Move them off this track for good.
+        if await db.users.find_one({"telegram_id": s["telegram_id"]}, {"_id": 1}):
+            await db.bot_starts.update_one(
+                {"telegram_id": s["telegram_id"]}, {"$set": {"nudge_stage": 99}}
+            )
+            continue
+        stage = s.get("nudge_stage", 0)
+        hours_due, text = BOT_NUDGES[stage]
+        try:
+            started = parse_dt(s["first_start_at"])
+        except Exception:
+            continue
+        if now - started < timedelta(hours=hours_due):
+            continue
+        # Bump first so a send failure (user blocked the bot etc.) never
+        # turns into a retry loop on every pass.
+        await db.bot_starts.update_one(
+            {"telegram_id": s["telegram_id"], "nudge_stage": stage},
+            {"$set": {"nudge_stage": stage + 1, "last_nudge_at": iso(now)}},
+        )
+        await send_telegram_message(s["chat_id"], text, reply_markup=_webapp_keyboard("💖 FIDEM'ni ochish"))
+
+    # (b) account exists, profile unfinished
+    rows = await db.users.find(
+        {
+            "telegram_id": {"$nin": [None, ""]},
+            "onboarded": {"$ne": True},
+            "blocked": {"$ne": True},
+            "profile_nudge_stage": {"$not": {"$gte": len(PROFILE_NUDGES)}},
+        },
+        {"_id": 0, "id": 1, "telegram_id": 1, "created_at": 1, "profile_nudge_stage": 1},
+    ).limit(BATCH).to_list(BATCH)
+    for u in rows:
+        stage = u.get("profile_nudge_stage", 0) or 0
+        hours_due, text = PROFILE_NUDGES[stage]
+        try:
+            created = parse_dt(u["created_at"])
+        except Exception:
+            continue
+        if now - created < timedelta(hours=hours_due):
+            continue
+        await db.users.update_one(
+            {"id": u["id"]},
+            {"$set": {"profile_nudge_stage": stage + 1, "profile_nudge_at": iso(now)}},
+        )
+        try:
+            chat_id = int(u["telegram_id"])
+        except (TypeError, ValueError):
+            continue
+        await send_telegram_message(chat_id, text, reply_markup=_webapp_keyboard("✍️ Anketani tugatish"))
+
+
 async def _run_pass() -> None:
     await _plan_reminders()
     await _plan_expiry()
     await _daily_picks_push()
     await _weekly_digest()
+    await _onboarding_nudges()
 
 
 async def lifecycle_loop() -> None:

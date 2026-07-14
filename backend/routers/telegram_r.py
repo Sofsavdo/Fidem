@@ -93,6 +93,21 @@ async def telegram_webhook(request: Request, secret: Optional[str] = Query(None)
         parts = text.split(maxsplit=1)
         ref_code = parts[1].strip() if len(parts) > 1 else None
 
+        # Record every /start so the onboarding funnel is measurable and the
+        # lifecycle nudger can re-engage people who never open the Mini App.
+        await db.bot_starts.update_one(
+            {"telegram_id": tg_user_id},
+            {
+                "$set": {"chat_id": chat_id, "last_start_at": iso(now_utc())},
+                "$setOnInsert": {
+                    "telegram_id": tg_user_id,
+                    "first_start_at": iso(now_utc()),
+                    "nudge_stage": 0,
+                },
+            },
+            upsert=True,
+        )
+
         existing = await db.users.find_one(
             {"telegram_id": tg_user_id},
             {"_id": 0, "id": 1, "referred_by": 1},

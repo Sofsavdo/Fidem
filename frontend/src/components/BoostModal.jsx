@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { X, Rocket, Check, Clock, EyeOff } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { useBoostStatus, useBoostAnalytics, QK } from "@/hooks/queries";
@@ -16,6 +17,7 @@ function hoursLeft(untilIso) {
 
 export default function BoostModal({ onClose }) {
   const { t, user, refresh } = useApp();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: status } = useBoostStatus();
   const { data: analytics } = useBoostAnalytics(!!status?.active);
@@ -46,7 +48,13 @@ export default function BoostModal({ onClose }) {
       }
     } catch (e) {
       const detail = (e?.response?.data?.detail || "").toString();
-      toast.error(detail === "boost_hidden" ? t("boost_hidden_error") : detail || t("error_generic"));
+      if (detail === "click_disabled") {
+        toast.info(t("click_disabled_error"));
+        onClose?.();
+        navigate("/premium?tab=balance");
+      } else {
+        toast.error(detail === "boost_hidden" ? t("boost_hidden_error") : detail || t("error_generic"));
+      }
     } finally {
       setPaying(false);
     }

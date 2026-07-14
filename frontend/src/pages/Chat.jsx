@@ -116,7 +116,13 @@ export default function Chat() {
         await refreshAccess();
       }
     } catch (err) {
-      toast.error("Error");
+      const detail = (err?.response?.data?.detail || "").toString();
+      if (detail === "click_disabled") {
+        toast.info(t("click_disabled_error"));
+        nav("/premium?tab=balance");
+      } else {
+        toast.error("Error");
+      }
     } finally {
       setUnlocking(false);
     }
@@ -146,7 +152,13 @@ export default function Chat() {
         toast.info(t("redirecting_payment") || "To'lov sahifasiga o'tilmoqda...");
       }
     } catch (err) {
-      toast.error(t("error_generic") || "Error");
+      const detail = (err?.response?.data?.detail || "").toString();
+      if (detail === "click_disabled") {
+        toast.info(t("click_disabled_error"));
+        nav("/premium?tab=balance");
+      } else {
+        toast.error(t("error_generic") || "Error");
+      }
     } finally {
       setUnlocking(false);
     }

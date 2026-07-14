@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import api from "@/lib/api";
+import api, { API } from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { Crown, Check, Wallet, ArrowUpRight, Sparkles, Plus, Receipt, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
@@ -69,6 +69,45 @@ export default function Premium() {
   const [customTopup, setCustomTopup] = useState("");
   const effectiveTopup = customTopup !== "" ? (parseInt(customTopup, 10) || 0) : topupAmount;
   const [creating, setCreating] = useState(false);
+  // Manual P2P top-up (temporary CLICK fallback) — the admin toggles it and
+  // sets the receiving card; while enabled, the balance tab collects a
+  // card-transfer receipt instead of opening CLICK.
+  const [topupCfg, setTopupCfg] = useState(null);
+  const [receipt, setReceipt] = useState(null);
+  const [myTopups, setMyTopups] = useState([]);
+  const [submittingP2p, setSubmittingP2p] = useState(false);
+  useEffect(() => {
+    if (tab !== "balance") return;
+    api.get("/payments/topup-config").then((r) => setTopupCfg(r.data)).catch(() => setTopupCfg({ p2p_enabled: false }));
+    api.get("/payments/manual-topup/mine").then((r) => setMyTopups(r.data || [])).catch(() => {});
+  }, [tab]);
+
+  const copyCard = () => {
+    const num = topupCfg?.card_number || "";
+    try { navigator.clipboard.writeText(num); toast.success(t("copied")); } catch { /* older webviews */ }
+  };
+
+  const submitManualTopup = async () => {
+    if (submittingP2p || effectiveTopup < 1000) return;
+    if (!receipt) { toast.error(t("p2p_receipt_required")); return; }
+    setSubmittingP2p(true);
+    tapMedium();
+    try {
+      const fd = new FormData();
+      fd.append("file", receipt);
+      const up = await api.post("/files/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      const proof_url = `${API.replace(/\/api$/, "")}${up.data.url}`;
+      await api.post("/payments/manual-topup", { amount: effectiveTopup, proof_url });
+      notify("success");
+      toast.success(t("p2p_sent"));
+      setReceipt(null);
+      const r = await api.get("/payments/manual-topup/mine");
+      setMyTopups(r.data || []);
+    } catch (e) {
+      const d = (e?.response?.data?.detail || "").toString();
+      toast.error(d === "too_many_pending" ? t("p2p_too_many") : t("error_generic"));
+    } finally { setSubmittingP2p(false); }
+  };
   const [showHistory, setShowHistory] = useState(false);
   const perk = PERK[lang] || PERK.uz;
 
@@ -96,7 +135,13 @@ export default function Premium() {
       }
       queryClient.invalidateQueries({ queryKey: QK.payments });
     } catch (e) {
-      toast.error(t("error_generic"));
+      const detail = (e?.response?.data?.detail || "").toString();
+      if (detail === "click_disabled") {
+        toast.info(t("click_disabled_error"));
+        setSearchParams({ tab: "balance" });
+      } else {
+        toast.error(t("error_generic"));
+      }
     } finally { setCreating(false); }
   };
 
@@ -256,16 +301,70 @@ export default function Premium() {
             {customTopup !== "" && effectiveTopup < 1000 && (
               <p className="text-[11px] text-primary mt-1">{t("topup_min_error")}</p>
             )}
-            <button
-              data-testid="topup-pay"
-              onClick={() => runPayment("balance_topup", effectiveTopup)}
-              disabled={creating || effectiveTopup < 1000}
-              className="btn-primary mt-3.5"
-            >
-              {t("pay_with_click")} · {effectiveTopup.toLocaleString()} {t("sum")}
-            </button>
-            <p className="text-[11px] text-muted-foreground text-center mt-2">{t("topup_click_note")}</p>
+            {topupCfg?.p2p_enabled ? (
+              <div className="mt-3.5 space-y-2.5" data-testid="p2p-topup">
+                <p className="text-[11px] text-muted-foreground leading-relaxed">{t("p2p_topup_hint")}</p>
+                <button type="button" onClick={copyCard} data-testid="p2p-card"
+                  className="w-full rounded-2xl border border-secondary/40 bg-secondary/5 p-3 text-left active:scale-[0.99] transition">
+                  <p className="font-heading text-lg font-semibold tabular-nums tracking-wider">
+                    {(topupCfg.card_number || "").replace(/(\d{4})(?=\d)/g, "$1 ")}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {topupCfg.card_holder} · {t("copy")}
+                  </p>
+                </button>
+                <label className={`block w-full rounded-2xl border border-dashed px-3 py-2.5 text-sm text-center cursor-pointer transition ${receipt ? "border-secondary/60 bg-secondary/10 text-secondary" : "border-border text-muted-foreground hover:border-primary/40"}`}>
+                  {receipt ? `✓ ${t("p2p_receipt_attached")}` : `📎 ${t("p2p_receipt_btn")}`}
+                  <input type="file" accept="image/*" className="hidden" data-testid="p2p-receipt"
+                    onChange={(e) => setReceipt(e.target.files?.[0] || null)} />
+                </label>
+                <button
+                  data-testid="p2p-submit"
+                  onClick={submitManualTopup}
+                  disabled={submittingP2p || effectiveTopup < 1000 || !receipt}
+                  className="btn-primary"
+                >
+                  {submittingP2p ? "..." : `${t("p2p_submit")} · ${effectiveTopup.toLocaleString()} ${t("sum")}`}
+                </button>
+              </div>
+            ) : (
+              <>
+                <button
+                  data-testid="topup-pay"
+                  onClick={() => runPayment("balance_topup", effectiveTopup)}
+                  disabled={creating || effectiveTopup < 1000}
+                  className="btn-primary mt-3.5"
+                >
+                  {t("pay_with_click")} · {effectiveTopup.toLocaleString()} {t("sum")}
+                </button>
+                <p className="text-[11px] text-muted-foreground text-center mt-2">{t("topup_click_note")}</p>
+              </>
+            )}
           </div>
+
+          {/* My pending/decided manual top-up requests */}
+          {topupCfg?.p2p_enabled && myTopups.length > 0 && (
+            <div className="rounded-3xl bg-card border border-border p-4" data-testid="p2p-my-requests">
+              <SectionLabel>{t("p2p_my_requests")}</SectionLabel>
+              <div className="space-y-2 mt-2">
+                {myTopups.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between rounded-2xl bg-muted/30 border border-border px-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold tabular-nums">{Number(r.amount).toLocaleString()} {t("sum")}</p>
+                      {r.status === "rejected" && r.rejection_reason && (
+                        <p className="text-[11px] text-primary mt-0.5">{r.rejection_reason}</p>
+                      )}
+                    </div>
+                    <span className={`shrink-0 text-[11px] font-medium px-2 py-1 rounded-full ${
+                      r.status === "approved" ? "bg-secondary/10 text-secondary" : r.status === "rejected" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                    }`}>
+                      {r.status === "approved" ? t("status_approved_word") : r.status === "rejected" ? t("status_rejected_word") : t("status_pending_word")}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Referral earnings — shown ONLY to users who actually have referral
               money. A non-referrer never sees a withdrawal block they don't need. */}

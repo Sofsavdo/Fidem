@@ -9,7 +9,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 
 from auth import get_current_admin
 from core import db, iso, now_utc, push_notif, user_public
-from models import AdminUpdateUserRequest
+from models import AdminUpdateUserRequest, new_id
 from routers.payments_r import process_completed_payment
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -363,19 +363,72 @@ async def _run_broadcast(user_ids: list[str], text: str) -> None:
     log.info(f"broadcast finished: sent={sent} skipped_daily_cap={skipped} total={len(user_ids)}")
 
 
-@router.post("/notification/broadcast")
-async def admin_broadcast(text: str = Body(..., embed=True), dry_run: bool = Body(False, embed=True), _: str = Depends(get_current_admin)):
+async def _run_tg_broadcast(chat_ids: list[int], text: str, button_text: str) -> None:
+    """Direct Telegram sends for people who can't receive in-app notifs
+    (no finished account). Always carries a Mini App button."""
+    from core import get_webapp_url
+    from services import send_telegram_message
+
+    kb = {"inline_keyboard": [[{"text": button_text, "web_app": {"url": get_webapp_url()}}]]}
+    sent = 0
+    for cid in chat_ids:
+        if await send_telegram_message(cid, text, reply_markup=kb):
+            sent += 1
+        await asyncio.sleep(0.05)  # ~20 msg/s, under Telegram's 30/s cap
+    log.info(f"tg broadcast finished: sent={sent} total={len(chat_ids)}")
+
+
+async def _broadcast_targets(audience: str):
+    """Resolve an audience segment to (user_ids, chat_ids)."""
+    if audience == "incomplete":
+        # Account exists, profile never finished — reach them via Telegram
+        rows = await db.users.find(
+            {"telegram_id": {"$nin": [None, ""]}, "onboarded": {"$ne": True}, "blocked": {"$ne": True}},
+            {"_id": 0, "telegram_id": 1},
+        ).to_list(200000)
+        chat_ids = []
+        for u in rows:
+            try:
+                chat_ids.append(int(u["telegram_id"]))
+            except (TypeError, ValueError):
+                pass
+        return [], chat_ids
+    if audience == "bot_only":
+        # Pressed /start but never opened the Mini App at all
+        starts = await db.bot_starts.find({}, {"_id": 0, "telegram_id": 1, "chat_id": 1}).to_list(200000)
+        with_acct = {
+            u["telegram_id"]
+            for u in await db.users.find({"telegram_id": {"$nin": [None, ""]}}, {"_id": 0, "telegram_id": 1}).to_list(200000)
+        }
+        return [], [s["chat_id"] for s in starts if s["telegram_id"] not in with_acct]
+    # default: fully onboarded users, via the normal notification pipeline
     users = await db.users.find({"onboarded": True, "blocked": {"$ne": True}}, {"_id": 0, "id": 1}).to_list(200000)
+    return [u["id"] for u in users], []
+
+
+@router.post("/notification/broadcast")
+async def admin_broadcast(
+    text: str = Body(..., embed=True),
+    dry_run: bool = Body(False, embed=True),
+    audience: str = Body("onboarded", embed=True),
+    _: str = Depends(get_current_admin),
+):
+    user_ids, chat_ids = await _broadcast_targets(audience)
+    total = len(user_ids) + len(chat_ids)
     if dry_run:
-        return {"would_send": len(users), "dry_run": True}
+        return {"would_send": total, "dry_run": True, "audience": audience}
     # One push_notif per user is a real DB round trip each - at 10K-1M users
     # that loop can run for minutes. Running it inline would hold the admin's
     # HTTP request open (and the connection pool slot) until every send
     # finishes, freezing the admin panel exactly like the /admin/stats
     # sequential-query issue this audit already fixed. Fire it in the
     # background and let the admin keep working.
-    asyncio.create_task(_run_broadcast([u["id"] for u in users], text))
-    return {"queued": len(users), "dry_run": False}
+    if user_ids:
+        asyncio.create_task(_run_broadcast(user_ids, text))
+    if chat_ids:
+        button = "✍️ Anketani tugatish" if audience == "incomplete" else "💖 FIDEM'ni ochish"
+        asyncio.create_task(_run_tg_broadcast(chat_ids, text, button))
+    return {"queued": total, "dry_run": False, "audience": audience}
 
 
 @router.get("/referrals")
@@ -496,3 +549,92 @@ async def admin_regions(_: str = Depends(get_current_admin)):
     """Get list of all regions for filtering."""
     regions = await db.users.distinct("region", {"region": {"$ne": "", "$ne": None}})
     return {"regions": sorted(regions)}
+
+
+# --- Manual (P2P) top-up moderation — see payments_r.py for the user side.
+
+@router.get("/topup-config")
+async def admin_get_topup_config(_: str = Depends(get_current_admin)):
+    cfg = await db.settings.find_one({"id": "topup_config"}, {"_id": 0}) or {}
+    return {
+        "p2p_enabled": bool(cfg.get("p2p_enabled")),
+        "card_number": cfg.get("card_number", ""),
+        "card_holder": cfg.get("card_holder", ""),
+    }
+
+
+@router.post("/topup-config")
+async def admin_set_topup_config(
+    p2p_enabled: bool = Body(..., embed=True),
+    card_number: str = Body("", embed=True),
+    card_holder: str = Body("", embed=True),
+    _: str = Depends(get_current_admin),
+):
+    digits = "".join(ch for ch in card_number if ch.isdigit())
+    if p2p_enabled and len(digits) != 16:
+        raise HTTPException(400, "card_number must be 16 digits")
+    await db.settings.update_one(
+        {"id": "topup_config"},
+        {"$set": {
+            "p2p_enabled": p2p_enabled,
+            "card_number": digits,
+            "card_holder": card_holder.strip(),
+            "updated_at": iso(now_utc()),
+        }},
+        upsert=True,
+    )
+    return {"ok": True}
+
+
+@router.get("/manual-topups")
+async def admin_manual_topups(status: Optional[str] = "pending", page: int = 1, limit: int = 20, _: str = Depends(get_current_admin)):
+    q = {"status": status} if status else {}
+    skip = (page - 1) * limit
+    total = await db.manual_topups.count_documents(q)
+    rows = await db.manual_topups.find(q, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    # Attach requester name/phone so the admin can match the transfer
+    uids = list({r["user_id"] for r in rows})
+    users = await db.users.find({"id": {"$in": uids}}, {"_id": 0, "id": 1, "name": 1, "telegram_id": 1, "balance": 1}).to_list(len(uids))
+    umap = {u["id"]: u for u in users}
+    for r in rows:
+        r["user"] = umap.get(r["user_id"], {})
+    return {"items": rows, "total": total, "page": page, "limit": limit}
+
+
+@router.post("/manual-topups/{tid}/decide")
+async def admin_decide_manual_topup(
+    tid: str,
+    approve: bool = Body(..., embed=True),
+    reason: str = Body("", embed=True),
+    _: str = Depends(get_current_admin),
+):
+    # Atomic pending->decided flip so a double-click can't credit twice
+    res = await db.manual_topups.find_one_and_update(
+        {"id": tid, "status": "pending"},
+        {"$set": {
+            "status": "approved" if approve else "rejected",
+            "decided_at": iso(now_utc()),
+            "rejection_reason": (reason or "").strip() if not approve else None,
+        }},
+    )
+    if not res:
+        raise HTTPException(404, "Not found or already decided")
+    if approve:
+        await db.users.update_one({"id": res["user_id"]}, {"$inc": {"balance": res["amount"]}})
+        await db.payments.insert_one({
+            "id": new_id(),
+            "user_id": res["user_id"],
+            "purpose": "balance_topup",
+            "amount": res["amount"],
+            "balance_used": 0,
+            "click_amount": 0,
+            "status": "paid",
+            "method": "manual_p2p",
+            "manual_topup_id": tid,
+            "created_at": iso(now_utc()),
+            "updated_at": iso(now_utc()),
+        })
+        await push_notif(res["user_id"], "balance", f"✅ To'lovingiz tasdiqlandi — balansingizga {res['amount']:,} so'm tushdi")
+    else:
+        await push_notif(res["user_id"], "balance", f"❌ Balans to'ldirish rad etildi: {(reason or 'sabab ko`rsatilmagan')}")
+    return {"ok": True}

@@ -4,13 +4,14 @@ import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { Sparkles, Crown, CheckCircle2, Clock, Heart } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useConciergeInfo, useConciergeMine, QK } from "@/hooks/queries";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { openExternalLink } from "@/lib/telegram";
 
 export default function Concierge() {
   const { t } = useApp();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data: info } = useConciergeInfo();
@@ -28,7 +29,15 @@ export default function Concierge() {
       queryClient.invalidateQueries({ queryKey: QK.conciergeInfo });
       queryClient.invalidateQueries({ queryKey: QK.conciergeMine });
     },
-    onError: () => toast.error(t("error_generic")),
+    onError: (e) => {
+      const detail = (e?.response?.data?.detail || "").toString();
+      if (detail === "click_disabled") {
+        toast.info(t("click_disabled_error"));
+        navigate("/premium?tab=balance");
+      } else {
+        toast.error(detail || t("error_generic"));
+      }
+    },
   });
 
   const order = (method) => orderMutation.mutate(method);

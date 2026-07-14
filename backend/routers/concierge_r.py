@@ -70,6 +70,10 @@ async def create_concierge_order(
         return {"order": order, "payment_link": None}
 
     # CLICK payment flow
+    # P2P mode = CLICK is temporarily disabled by the admin; see payments_r.py
+    cfg = await db.settings.find_one({"id": "topup_config"}) or {}
+    if cfg.get("p2p_enabled"):
+        raise HTTPException(400, "click_disabled")
     pid = new_id()
     payment = {
         "id": pid,

@@ -458,6 +458,7 @@ def test_telegram_start_with_referral_does_not_credit_balance(monkeypatch):
     fake_db = type("FakeDb", (), {})()
     fake_db.users = fake_users
     fake_db.pending_refs = fake_pending
+    fake_db.bot_starts = _FakePendingRefs()  # /start funnel tracking upsert
     monkeypatch.setattr(telegram_r, "db", fake_db)
     monkeypatch.setattr(telegram_r, "TELEGRAM_WEBHOOK_SECRET", "test-secret")
 
