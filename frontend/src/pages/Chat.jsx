@@ -12,6 +12,7 @@ import { tapLight } from "@/lib/haptics";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { QK } from "@/hooks/queries";
+import { openExternalLink } from "@/lib/telegram";
 
 // Mirrors the Standard plan price in Premium.jsx — shown next to the one-time
 // unlock so the user can compare "pay once" vs "unlimited messaging".
@@ -107,7 +108,7 @@ export default function Chat() {
     try {
       if (method === "click") {
         const r = await api.post("/payments/create", { purpose: "chat_unlock", target_user_id: otherId });
-        if (r.data?.payment_link) window.open(r.data.payment_link, "_blank");
+        if (r.data?.payment_link) openExternalLink(r.data.payment_link);
         toast.info(t("redirecting_payment") || "To'lov sahifasiga o'tilmoqda...");
       } else {
         await api.post("/chat/unlock", { target_id: otherId, method });
@@ -141,7 +142,7 @@ export default function Chat() {
         toast.success(t("payment_success"));
         await refreshAccess();
       } else if (r.data?.payment_link) {
-        window.open(r.data.payment_link, "_blank");
+        openExternalLink(r.data.payment_link);
         toast.info(t("redirecting_payment") || "To'lov sahifasiga o'tilmoqda...");
       }
     } catch (err) {

@@ -9,6 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { PageHead, Segmented, Price, SectionLabel } from "@/components/kit";
 import { purposeLabel } from "@/lib/labels";
 import { tapMedium, tapLight, notify } from "@/lib/haptics";
+import { openExternalLink } from "@/lib/telegram";
 
 const CHAT_UNLOCK_PRICE = 9900; // mirrors backend PRICE_CHAT_UNLOCK_UZS (comparison only)
 
@@ -86,7 +87,7 @@ export default function Premium() {
         } else {
           toast.success(t("pay_with_click"));
         }
-        if (r.data.payment_link) window.open(r.data.payment_link, "_blank");
+        if (r.data.payment_link) openExternalLink(r.data.payment_link);
       }
       queryClient.invalidateQueries({ queryKey: QK.payments });
     } catch (e) {

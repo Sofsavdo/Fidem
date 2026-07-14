@@ -7,6 +7,7 @@ import { photoSrc } from "@/lib/photo";
 import { Link } from "react-router-dom";
 import { useConciergeInfo, useConciergeMine, QK } from "@/hooks/queries";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { openExternalLink } from "@/lib/telegram";
 
 export default function Concierge() {
   const { t } = useApp();
@@ -20,7 +21,7 @@ export default function Concierge() {
     onSuccess: (r) => {
       if (r.data.payment_link) {
         toast.info(t("redirecting_payment"));
-        setTimeout(() => { window.open(r.data.payment_link, "_blank"); }, 600);
+        setTimeout(() => { openExternalLink(r.data.payment_link); }, 600);
       } else {
         toast.success("🎉 " + t("order_concierge"));
       }
