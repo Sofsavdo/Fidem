@@ -608,33 +608,9 @@ async def admin_decide_manual_topup(
     reason: str = Body("", embed=True),
     _: str = Depends(get_current_admin),
 ):
-    # Atomic pending->decided flip so a double-click can't credit twice
-    res = await db.manual_topups.find_one_and_update(
-        {"id": tid, "status": "pending"},
-        {"$set": {
-            "status": "approved" if approve else "rejected",
-            "decided_at": iso(now_utc()),
-            "rejection_reason": (reason or "").strip() if not approve else None,
-        }},
-    )
-    if not res:
+    from routers.payments_r import decide_manual_topup
+
+    res = await decide_manual_topup(tid, approve, reason=reason, decided_by="panel")
+    if res is None:
         raise HTTPException(404, "Not found or already decided")
-    if approve:
-        await db.users.update_one({"id": res["user_id"]}, {"$inc": {"balance": res["amount"]}})
-        await db.payments.insert_one({
-            "id": new_id(),
-            "user_id": res["user_id"],
-            "purpose": "balance_topup",
-            "amount": res["amount"],
-            "balance_used": 0,
-            "click_amount": 0,
-            "status": "paid",
-            "method": "manual_p2p",
-            "manual_topup_id": tid,
-            "created_at": iso(now_utc()),
-            "updated_at": iso(now_utc()),
-        })
-        await push_notif(res["user_id"], "balance", f"✅ To'lovingiz tasdiqlandi — balansingizga {res['amount']:,} so'm tushdi")
-    else:
-        await push_notif(res["user_id"], "balance", f"❌ Balans to'ldirish rad etildi: {(reason or 'sabab ko`rsatilmagan')}")
     return {"ok": True}
