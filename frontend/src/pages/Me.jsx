@@ -137,6 +137,15 @@ export default function Me() {
           settings page, not a place to browse dozens of masked profiles).
           Tapping goes to the dedicated Saved > Interested page, which shows
           the actual list and the plan upsell in full. */}
+      {/* While the summary is loading, hold the slot with an equal-height
+          skeleton so the page doesn't jump when the banner pops in — the
+          "Me titraydi" bug was blocks mounting late and pushing everything
+          below them down. Collapses only for users with zero interest. */}
+      {!["premium", "vip"].includes(user.plan) && interestedSummary === undefined && (
+        <div className="rounded-3xl bg-card border border-border p-4 animate-pulse" aria-hidden="true">
+          <div className="h-5 w-2/3 rounded bg-muted" />
+        </div>
+      )}
       {!["premium", "vip"].includes(user.plan) && interestedSummary?.total > 0 && (
         <Link
           to="/saved?tab=interested"
@@ -273,21 +282,27 @@ export default function Me() {
       {/* Daily streak lives in Sozlamalar (/me/settings) now — Me stays a
           clean overview page. */}
 
-      {/* Invite friends → unified single entrypoint */}
-      {referral && (
-        <Link to="/referral" data-testid="invite-card" className="block rounded-3xl bg-gradient-to-r from-secondary/10 to-card border border-secondary/30 p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform">
-          <div className="flex items-center justify-between">
-            <div className="min-w-0">
-              <p className="font-heading text-lg flex items-center gap-2"><Share2 className="w-4 h-4 text-secondary" /> {t("invite_friends")}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{referral.invited_count || 0} {t("ref_invites")} · {referral.paid_referrals || 0} {t("ref_paid_referrals")}</p>
-              {referral.monthly_tier && (
-                <p className="text-xs text-secondary mt-0.5">{t("monthly_tier")}: {referral.monthly_tier} ({referral.monthly_count || 0}/{referral.next_tier_threshold || 300})</p>
-              )}
-            </div>
-            <span className="text-secondary font-medium">{t("share")} →</span>
+      {/* Invite friends → unified single entrypoint. The card frame renders
+          immediately (every user has referral data) with skeleton text while
+          it loads — mounting it late made the whole page below jump. */}
+      <Link to="/referral" data-testid="invite-card" className="block rounded-3xl bg-gradient-to-r from-secondary/10 to-card border border-secondary/30 p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform">
+        <div className="flex items-center justify-between">
+          <div className="min-w-0">
+            <p className="font-heading text-lg flex items-center gap-2"><Share2 className="w-4 h-4 text-secondary" /> {t("invite_friends")}</p>
+            {referral ? (
+              <>
+                <p className="text-xs text-muted-foreground mt-0.5">{referral.invited_count || 0} {t("ref_invites")} · {referral.paid_referrals || 0} {t("ref_paid_referrals")}</p>
+                {referral.monthly_tier && (
+                  <p className="text-xs text-secondary mt-0.5">{t("monthly_tier")}: {referral.monthly_tier} ({referral.monthly_count || 0}/{referral.next_tier_threshold || 300})</p>
+                )}
+              </>
+            ) : (
+              <div className="h-3.5 w-40 rounded bg-muted animate-pulse mt-1.5" aria-hidden="true" />
+            )}
           </div>
-        </Link>
-      )}
+          <span className="text-secondary font-medium shrink-0">{t("share")} →</span>
+        </div>
+      </Link>
 
       {/* Profil */}
       <div>
