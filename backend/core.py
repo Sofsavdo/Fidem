@@ -56,7 +56,9 @@ if not ADMIN_PASSWORD:
 PRICE_PREMIUM = int(os.environ.get("PRICE_PREMIUM_UZS", "79000"))
 PRICE_VIP = int(os.environ.get("PRICE_VIP_UZS", "199000"))
 PRICE_STANDARD = int(os.environ.get("PRICE_STANDARD_UZS", "34900"))
-PRICE_CHAT_UNLOCK = int(os.environ.get("PRICE_CHAT_UNLOCK_UZS", "9900"))
+# Temporarily lowered 9900 -> 4900 until the user base reaches ~500 (empty-
+# market paywall pricing, see FIDEM strategic audit 2026-07). Override via env.
+PRICE_CHAT_UNLOCK = int(os.environ.get("PRICE_CHAT_UNLOCK_UZS", "4900"))
 CHAT_UNLOCK_COINS = int(os.environ.get("CHAT_UNLOCK_COINS", "100"))
 CHAT_GUARANTEE_HOURS = int(os.environ.get("CHAT_GUARANTEE_HOURS", "48"))
 # Free users may start this many NEW conversations per week at no cost — a

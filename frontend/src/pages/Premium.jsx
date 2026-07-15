@@ -11,7 +11,7 @@ import { purposeLabel } from "@/lib/labels";
 import { tapMedium, tapLight, notify } from "@/lib/haptics";
 import { openExternalLink } from "@/lib/telegram";
 
-const CHAT_UNLOCK_PRICE = 9900; // mirrors backend PRICE_CHAT_UNLOCK_UZS (comparison only)
+const CHAT_UNLOCK_PRICE = 4900; // mirrors backend PRICE_CHAT_UNLOCK_UZS (comparison only)
 
 const PLANS = [
   // The weekly free conversation belongs to the FREE tier (backend
