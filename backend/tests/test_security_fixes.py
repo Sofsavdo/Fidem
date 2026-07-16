@@ -438,11 +438,26 @@ class _FakePendingRefs:
 
 
 class _FakeWebhookRequest:
-    def __init__(self, body: dict):
+    def __init__(self, body: dict, secret: str = ""):
         self._body = body
+        self.headers = {"X-Telegram-Bot-Api-Secret-Token": secret} if secret else {}
 
     async def json(self):
         return self._body
+
+
+class _FakeTelegramUpdates:
+    """Minimal update_id-dedup collection: first insert of a given
+    update_id succeeds, a second raises DuplicateKeyError like a real
+    unique-indexed Mongo collection would."""
+    def __init__(self):
+        self.seen = set()
+
+    async def insert_one(self, doc):
+        if doc["update_id"] in self.seen:
+            from pymongo.errors import DuplicateKeyError
+            raise DuplicateKeyError("E11000 duplicate key")
+        self.seen.add(doc["update_id"])
 
 
 def test_telegram_start_with_referral_does_not_credit_balance(monkeypatch):
@@ -459,6 +474,7 @@ def test_telegram_start_with_referral_does_not_credit_balance(monkeypatch):
     fake_db.users = fake_users
     fake_db.pending_refs = fake_pending
     fake_db.bot_starts = _FakePendingRefs()  # /start funnel tracking upsert
+    fake_db.telegram_updates = _FakeTelegramUpdates()  # update_id dedup
     monkeypatch.setattr(telegram_r, "db", fake_db)
     monkeypatch.setattr(telegram_r, "TELEGRAM_WEBHOOK_SECRET", "test-secret")
 
@@ -466,9 +482,9 @@ def test_telegram_start_with_referral_does_not_credit_balance(monkeypatch):
         return None
     monkeypatch.setattr(telegram_r, "send_telegram_message", _noop_send)
 
-    body = {"message": {"text": "/start ABC123", "chat": {"id": 1}, "from": {"id": 999}}}
-    req = _FakeWebhookRequest(body)
-    asyncio.run(telegram_r.telegram_webhook(req, secret="test-secret"))
+    body = {"update_id": 1, "message": {"text": "/start ABC123", "chat": {"id": 1}, "from": {"id": 999}}}
+    req = _FakeWebhookRequest(body, secret="test-secret")
+    asyncio.run(telegram_r.telegram_webhook(req))
 
     assert fake_users.inc_calls == [], "balance/ref_count must not be credited on a bare /start"
     assert len(fake_pending.upserts) == 1, "attribution should still be recorded for later real-signup payout"
@@ -563,20 +579,16 @@ def test_send_telegram_message_payload_has_no_parse_mode(monkeypatch):
     for free-form admin text, and one that was invisible (see below)."""
     captured = {}
 
-    async def fake_post(_self, url, json=None):
+    async def fake_post(url, json=None):
         captured["payload"] = json
         return type("R", (), {"status_code": 200, "text": "ok"})()
 
     class FakeClient:
-        async def __aenter__(self):
-            return self
-        async def __aexit__(self, *_a):
-            return False
-        post = fake_post
+        post = staticmethod(fake_post)
 
-    monkeypatch.setattr(services.httpx, "AsyncClient", lambda **_kw: FakeClient())
-    monkeypatch.setattr(services, "TG_BOT_TOKEN", "123:fake")
-    monkeypatch.setattr(services, "TG_API", "https://api.telegram.org/bot123:fake")
+    monkeypatch.setattr(services, "_http_client", FakeClient())
+    monkeypatch.setattr(services, "TELEGRAM_BOT_TOKEN", "123:fake")
+    monkeypatch.setattr(services, "_TG_API", "https://api.telegram.org/bot123:fake")
 
     asyncio.run(services.send_telegram_message(123, "hi <there> & more"))
     assert "parse_mode" not in captured["payload"], captured["payload"]
@@ -586,19 +598,15 @@ def test_send_telegram_message_logs_non_200_instead_of_swallowing(monkeypatch, c
     """A non-exception failure (bad chat_id, user blocked the bot, Telegram
     400/403...) used to return False with zero logging - completely
     invisible to anyone debugging 'the bot never sent it'."""
-    async def fake_post(_self, url, json=None):
+    async def fake_post(url, json=None):
         return type("R", (), {"status_code": 400, "text": "Bad Request: can't parse entities"})()
 
     class FakeClient:
-        async def __aenter__(self):
-            return self
-        async def __aexit__(self, *_a):
-            return False
-        post = fake_post
+        post = staticmethod(fake_post)
 
-    monkeypatch.setattr(services.httpx, "AsyncClient", lambda **_kw: FakeClient())
-    monkeypatch.setattr(services, "TG_BOT_TOKEN", "123:fake")
-    monkeypatch.setattr(services, "TG_API", "https://api.telegram.org/bot123:fake")
+    monkeypatch.setattr(services, "_http_client", FakeClient())
+    monkeypatch.setattr(services, "TELEGRAM_BOT_TOKEN", "123:fake")
+    monkeypatch.setattr(services, "_TG_API", "https://api.telegram.org/bot123:fake")
 
     with caplog.at_level("WARNING"):
         ok = asyncio.run(services.send_telegram_message(123, "hi"))

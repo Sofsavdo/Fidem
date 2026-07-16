@@ -16,6 +16,13 @@ from datetime import timedelta
 from core import PAID_PLANS, db, get_webapp_url, iso, now_utc, parse_dt, push_notif
 from services import send_telegram_message
 
+# Between-send pause in the bulk notification loops below. push_notif fires
+# its Telegram delivery as a fire-and-forget task, so a tight loop over
+# hundreds of users schedules that many concurrent Telegram API calls almost
+# at once - comfortably over Telegram's ~30 msg/sec global limit. This caps
+# the rate at which new sends get scheduled instead.
+SEND_PACING_SECONDS = 0.05
+
 log = logging.getLogger("fidem.lifecycle")
 
 CHECK_INTERVAL_SECONDS = 6 * 60 * 60
@@ -50,6 +57,7 @@ async def _plan_reminders() -> None:
             marketing=True,
         )
         await db.users.update_one({"id": u["id"]}, {"$set": {"plan_reminder_for": u["plan_until"]}})
+        await asyncio.sleep(SEND_PACING_SECONDS)
 
 
 async def _plan_expiry() -> None:
@@ -75,6 +83,7 @@ async def _plan_expiry() -> None:
                 "Imkoniyatlarni qaytarish uchun tarifni yangilang.",
                 link="/premium?tab=plans",
             )
+            await asyncio.sleep(SEND_PACING_SECONDS)
 
 
 async def _daily_picks_push() -> None:
@@ -110,6 +119,7 @@ async def _daily_picks_push() -> None:
             link="/",
             marketing=True,
         )
+        await asyncio.sleep(SEND_PACING_SECONDS)
 
 
 async def _weekly_digest() -> None:
@@ -143,6 +153,7 @@ async def _weekly_digest() -> None:
             link="/saved?tab=viewers",
             marketing=True,
         )
+        await asyncio.sleep(SEND_PACING_SECONDS)
 
 
 def _webapp_keyboard(button_text: str) -> dict:
@@ -204,6 +215,7 @@ async def _onboarding_nudges() -> None:
             {"$set": {"nudge_stage": stage + 1, "last_nudge_at": iso(now)}},
         )
         await send_telegram_message(s["chat_id"], text, reply_markup=_webapp_keyboard("💖 FIDEM'ni ochish"))
+        await asyncio.sleep(SEND_PACING_SECONDS)
 
     # (b) account exists, profile unfinished
     rows = await db.users.find(
@@ -233,6 +245,7 @@ async def _onboarding_nudges() -> None:
         except (TypeError, ValueError):
             continue
         await send_telegram_message(chat_id, text, reply_markup=_webapp_keyboard("✍️ Anketani tugatish"))
+        await asyncio.sleep(SEND_PACING_SECONDS)
 
 
 async def _admin_daily_digest() -> None:
@@ -255,6 +268,14 @@ async def _admin_daily_digest() -> None:
         await send_telegram_message(chat_id, text)
 
 
+async def _cleanup_telegram_updates() -> None:
+    """The webhook dedup table (routers/telegram_r.py) only needs to cover
+    Telegram's actual retry window, which is minutes not days - drop
+    anything older than a day so the collection doesn't grow forever."""
+    cutoff = iso(now_utc() - timedelta(days=1))
+    await db.telegram_updates.delete_many({"at": {"$lt": cutoff}})
+
+
 async def _run_pass() -> None:
     await _plan_reminders()
     await _plan_expiry()
@@ -262,6 +283,7 @@ async def _run_pass() -> None:
     await _weekly_digest()
     await _onboarding_nudges()
     await _admin_daily_digest()
+    await _cleanup_telegram_updates()
 
 
 async def lifecycle_loop() -> None:

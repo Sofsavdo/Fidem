@@ -16,6 +16,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from models import new_id, now_utc
 from services import (
+    TELEGRAM_BOT_TOKEN,  # noqa: F401 - re-exported for `from core import TELEGRAM_BOT_TOKEN` callers
     age_from_birth,
     compute_completeness,
     is_online,
@@ -29,7 +30,6 @@ log = logging.getLogger("fidem")
 client = AsyncIOMotorClient(os.environ["MONGO_URL"])
 db = client[os.environ["DB_NAME"]]
 
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_BOT_USERNAME = os.environ.get("TELEGRAM_BOT_USERNAME", "Fidem_Appbot")
 TELEGRAM_WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "fidem-tg")
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@fidem.uz")
