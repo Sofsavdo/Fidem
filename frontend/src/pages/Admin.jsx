@@ -1328,7 +1328,7 @@ function AdminManualTopups() {
               <p className="text-xs text-muted-foreground mt-0.5">{new Date(r.created_at).toLocaleString()} · balans: {Number(r.user?.balance || 0).toLocaleString()}</p>
               {r.rejection_reason && <p className="text-xs text-primary mt-0.5">{r.rejection_reason}</p>}
             </div>
-            <a href={r.proof_url} target="_blank" rel="noreferrer" className="text-xs text-secondary underline shrink-0">Chekni ko'rish</a>
+            <a href={photoSrc(r.proof_url)} target="_blank" rel="noreferrer" className="text-xs text-secondary underline shrink-0">Chekni ko'rish</a>
             {r.status === "pending" && (
               <div className="flex gap-2 shrink-0">
                 <button onClick={() => decide(r.id, true)} disabled={busy === r.id}

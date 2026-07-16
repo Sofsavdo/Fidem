@@ -189,6 +189,19 @@ export function AppProvider({ children }) {
     };
   }, [user]);
 
+  // Money/plan-affecting notifications (P2P top-up approved, plan granted,
+  // withdrawal decided, ...) can originate from an admin action the user
+  // never triggered themselves — nothing else in the app calls refresh() in
+  // that case, so balance/plan stayed stale until a manual page reload.
+  // Silently re-fetch /auth/me whenever one of these kinds arrives over WS.
+  useEffect(() => {
+    if (wsEvent?.type !== "notification") return;
+    const kind = wsEvent.data?.kind;
+    if (["balance", "premium", "boost", "withdraw", "referral"].includes(kind)) {
+      loadMe();
+    }
+  }, [wsEvent, loadMe]);
+
   // Online/offline detection with offline UI
   useEffect(() => {
     const handleOnline = () => {

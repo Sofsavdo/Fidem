@@ -21,6 +21,18 @@ TG_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TG_API = f"https://api.telegram.org/bot{TG_BOT_TOKEN}"
 
 
+def _bot_own_id() -> int | None:
+    """The numeric prefix of the bot token IS the bot's own Telegram user id
+    — a common copy-paste mistake is pasting that number into
+    ADMIN_TELEGRAM_IDS instead of a real admin's personal id. Telegram then
+    rejects every send with 'Forbidden: the bot can't send messages to the
+    bot', which otherwise looks identical to a misconfigured/missing admin."""
+    try:
+        return int(TG_BOT_TOKEN.split(":", 1)[0])
+    except (ValueError, IndexError):
+        return None
+
+
 async def get_admin_chat_ids() -> list[int]:
     ids: set[int] = set()
     for part in os.environ.get("ADMIN_TELEGRAM_IDS", "").split(","):
@@ -36,6 +48,15 @@ async def get_admin_chat_ids() -> list[int]:
             ids.add(int(r["telegram_id"]))
         except (TypeError, ValueError):
             pass
+    bot_id = _bot_own_id()
+    if bot_id is not None and bot_id in ids:
+        ids.discard(bot_id)
+        log.warning(
+            f"ADMIN_TELEGRAM_IDS (or an admin user's telegram_id) contains {bot_id}, "
+            "which is the BOT's own id (the number before ':' in TELEGRAM_BOT_TOKEN), "
+            "not a real admin's Telegram user id — ignoring it. Get your real id from "
+            "@userinfobot in Telegram and use that instead."
+        )
     return list(ids)
 
 
