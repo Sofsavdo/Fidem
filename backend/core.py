@@ -228,7 +228,6 @@ def user_public(u: dict, include_private: bool = False) -> dict:
         "blocked": u.get("blocked", False),
         "prompts": u.get("prompts") or [],
         "big5_scores": u.get("big5_scores") or {},
-        "balance": u.get("balance", 0),
         # Privacy settings: photo_public feeds strip_locked_photo (an opted-in
         # open photo renders for every viewer); hidden_profile keeps the user
         # out of candidate feeds / viewer lists (they can still browse).
@@ -241,6 +240,11 @@ def user_public(u: dict, include_private: bool = False) -> dict:
         # Contact info, device/IP data and fraud-review fields - only for the
         # account owner (self) or an admin, never for other end users.
         out.update({
+            # Wallet balance is the owner's business only — it used to sit in
+            # the public payload, visible on every candidate/chat/leaderboard
+            # row to anyone.
+            "balance": u.get("balance", 0),
+            "withdrawable_balance": int(u.get("referral_earnings_withdrawable", 0) or 0),
             "email": u.get("email", ""),
             "phone": u.get("phone", ""),
             "telegram_id": u.get("telegram_id", ""),

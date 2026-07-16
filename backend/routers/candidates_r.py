@@ -193,7 +193,17 @@ async def candidates(
 
     # hidden_profile users opted out of being discovered (they can still
     # browse and keep their existing chats) — never surface them in the feed.
-    query: dict = {"id": {"$ne": uid}, "onboarded": True, "blocked": {"$ne": True}, "hidden_profile": {"$ne": True}}
+    # Users blocked by me (or who blocked me) never appear either — blocks
+    # were previously recorded but not applied to the feed at all.
+    block_rows = await db.blocks.find(
+        {"$or": [{"owner_id": uid}, {"target_id": uid}]},
+        {"_id": 0, "owner_id": 1, "target_id": 1},
+    ).to_list(2000)
+    blocked_ids = {r["target_id"] if r["owner_id"] == uid else r["owner_id"] for r in block_rows}
+    id_filter: dict = {"$ne": uid}
+    if blocked_ids:
+        id_filter["$nin"] = list(blocked_ids)
+    query: dict = {"id": id_filter, "onboarded": True, "blocked": {"$ne": True}, "hidden_profile": {"$ne": True}}
 
     if me_doc.get("search_gender"):
         query["gender"] = me_doc["search_gender"]

@@ -120,7 +120,7 @@ export default function MeSettings() {
               <Lock className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
               <p className="text-[11px] text-muted-foreground leading-relaxed">
                 {t("contact_paid_note")}{" "}
-                <Link to="/premium?tab=plans" className="text-primary underline">{t("privacy_choose_plan")}</Link>
+                <Link to="/privacy-center" className="text-primary underline">{t("privacy_choose_plan")}</Link>
               </p>
             </div>
           )}

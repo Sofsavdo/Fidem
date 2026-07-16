@@ -1,5 +1,6 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { purchasePlan, PLAN_PRICES } from "@/lib/purchase";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
@@ -11,6 +12,16 @@ import { useMutation } from "@tanstack/react-query";
 // "this needs plan X" button — no dead toggles, no wall of text on Me.
 export default function PrivacyCenter() {
   const { t, user, refresh } = useApp();
+  const navigate = useNavigate();
+  const [buying, setBuying] = React.useState(false);
+
+  // One tap = the payment starts for THAT plan right here — bouncing to the
+  // generic plans page lost the intent ("fikr chalg'iydi... orqaga qaytadi").
+  const buyPlan = async (plan) => {
+    if (buying) return;
+    setBuying(true);
+    try { await purchasePlan(plan, { t, navigate, onPaid: refresh }); } finally { setBuying(false); }
+  };
 
   const privacyMutation = useMutation({
     mutationFn: (patch) => api.post("/settings/privacy", patch),
@@ -45,13 +56,15 @@ export default function PrivacyCenter() {
   );
 
   const upgradeBtn = (hl, label) => (
-    <Link
-      to={`/premium?tab=plans&hl=${hl}`}
+    <button
+      type="button"
+      onClick={() => buyPlan(hl)}
+      disabled={buying}
       data-testid={`privacy-upgrade-${hl}`}
-      className="flex items-center justify-center gap-1.5 rounded-2xl bg-primary/10 border border-primary/25 px-4 py-2.5 text-sm font-semibold text-primary active:scale-[0.98] transition"
+      className="w-full flex items-center justify-center gap-1.5 rounded-2xl bg-primary/10 border border-primary/25 px-4 py-2.5 text-sm font-semibold text-primary active:scale-[0.98] transition disabled:opacity-50"
     >
-      {label} <ChevronRight className="w-4 h-4" />
-    </Link>
+      {label} · {(PLAN_PRICES[hl] || 0).toLocaleString()} {t("sum")} <ChevronRight className="w-4 h-4" />
+    </button>
   );
 
   return (

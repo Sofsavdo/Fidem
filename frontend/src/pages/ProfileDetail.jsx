@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import posthog from "posthog-js";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
+import { purchasePlan } from "@/lib/purchase";
 import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot, LocationBadge } from "@/components/Badges";
 import CompatibilityCard from "@/components/CompatibilityCard";
 import { photoSrc } from "@/lib/photo";
@@ -15,7 +16,7 @@ import { MATCH_EVENT } from "@/components/MatchCelebration";
 
 export default function ProfileDetail() {
   const { id } = useParams();
-  const { t, user } = useApp();
+  const { t, user, refresh } = useApp();
   const nav = useNavigate();
   const queryClient = useQueryClient();
   const [famSending, setFamSending] = useState(false);
@@ -265,16 +266,19 @@ export default function ProfileDetail() {
         )}
 
         {showTierUpsell && (
-          <Link
-            to="/premium?tab=plans"
+          <button
+            type="button"
             data-testid="profile-tier-upsell"
-            onClick={() => posthog.capture("profile_tier_upsell_click", { candidate_id: c.id, candidate_plan: c.plan })}
+            onClick={() => {
+              posthog.capture("profile_tier_upsell_click", { candidate_id: c.id, candidate_plan: c.plan });
+              purchasePlan(c.plan === "vip" ? "vip" : "premium", { t, navigate: nav, onPaid: refresh });
+            }}
             className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-gold/15 to-card border border-gold/30 p-3.5 active:scale-[0.98] transition"
           >
             <Crown className="w-5 h-5 text-gold-dark shrink-0" />
             <p className="text-sm flex-1 min-w-0">{t("profile_tier_upsell_hint").replace("{plan}", c.plan === "vip" ? "VIP" : "Premium")}</p>
             <span className="text-xs font-semibold text-gold-dark shrink-0">{t("plan_choose_cta")}</span>
-          </Link>
+          </button>
         )}
 
         {/* ---- Section: basic info ---- */}

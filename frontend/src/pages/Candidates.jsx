@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import posthog from "posthog-js";
 import api from "@/lib/api";
 import CandidateCard from "@/components/CandidateCard";
 import { useApp } from "@/contexts/AppContext";
+import { purchasePlan } from "@/lib/purchase";
 import { X, SlidersHorizontal, MapPin, Lock, Crown, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import CountrySelect from "@/components/CountrySelect";
@@ -25,7 +26,8 @@ const PROMO_EVERY = 9;
 // kind="plans" pitches the paid tiers; kind="privacy" pitches paid hidden
 // mode ("see without being seen") - the feed alternates between the two.
 function PlanPromoCard({ kind = "plans" }) {
-  const { t } = useApp();
+  const { t, refresh } = useApp();
+  const navigate = useNavigate();
   // A/B experiment (PostHog flag "candidates-promo-copy"): does urgency-
   // flavored copy ("online now") convert better than the benefit-flavored
   // default? Falls back to "control" until the flag exists / loads, so the
@@ -38,11 +40,17 @@ function PlanPromoCard({ kind = "plans" }) {
   const hint = isPrivacy ? t("privacy_promo_hint") : t("candidates_promo_hint");
   useEffect(() => { posthog.capture("candidates_feed_promo_impression", { variant, kind }); }, [variant, kind]);
   return (
-    <Link
-      to="/premium?tab=plans"
+    <button
+      type="button"
       data-testid="candidates-promo-card"
-      onClick={() => posthog.capture("candidates_feed_promo_click", { variant, kind })}
-      className="block bg-card rounded-3xl overflow-hidden shadow-soft hover:shadow-elevated transition-shadow border border-gold/40"
+      onClick={() => {
+        posthog.capture("candidates_feed_promo_click", { variant, kind });
+        // Privacy promo opens the privacy center (its per-tier buttons buy
+        // directly); the plans promo starts the Premium purchase right away.
+        if (isPrivacy) navigate("/privacy-center");
+        else purchasePlan("premium", { t, navigate, onPaid: refresh });
+      }}
+      className="block w-full text-left bg-card rounded-3xl overflow-hidden shadow-soft hover:shadow-elevated transition-shadow border border-gold/40"
     >
       <div className="relative aspect-[4/5] overflow-hidden bg-muted">
         <HeroScene className="absolute inset-0" photo="/promo-hero.jpg" />
@@ -59,7 +67,7 @@ function PlanPromoCard({ kind = "plans" }) {
         <span className="text-xs font-medium text-primary">{t("plan_choose_cta")} →</span>
         <span className="p-2 rounded-full bg-gold/15 text-gold-dark">{isPrivacy ? <EyeOff className="w-4 h-4" /> : <Crown className="w-4 h-4" />}</span>
       </div>
-    </Link>
+    </button>
   );
 }
 
@@ -269,7 +277,8 @@ export default function Candidates() {
 }
 
 function FilterSheet({ filters, setFilters, onClose }) {
-  const { t, lang, user } = useApp();
+  const { t, lang, user, refresh } = useApp();
+  const navigate = useNavigate();
   const isPaid = ["standard", "premium", "vip"].includes(user?.plan);
   const [local, setLocal] = useState(filters);
   return (
@@ -328,15 +337,15 @@ function FilterSheet({ filters, setFilters, onClose }) {
                 onChange={(e) => setLocal({ ...local, district: e.target.value || undefined })}
               />
             ) : (
-              <Link
-                to="/premium?tab=plans"
+              <button
+                type="button"
                 data-testid="filter-district-locked"
-                onClick={onClose}
+                onClick={() => { onClose(); purchasePlan("standard", { t, navigate, onPaid: refresh }); }}
                 className="mt-1.5 flex items-center justify-between w-full rounded-2xl border border-dashed border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground"
               >
                 {t("more_filters_premium_hint") || t("upgrade")}
                 <Lock className="w-3.5 h-3.5" />
-              </Link>
+              </button>
             )}
           </label>
           <div className="grid grid-cols-2 gap-3">

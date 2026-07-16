@@ -17,19 +17,16 @@ export default function Messages() {
   const { data: apps = [], isLoading: loadingApps } = useMessagesApplications();
   const loading = loadingChats || loadingApps;
 
-  const reload = () => {
+  const reload = React.useCallback(() => {
     queryClient.invalidateQueries({ queryKey: QK.messagesChats });
     queryClient.invalidateQueries({ queryKey: QK.messagesApplications });
-  };
+  }, [queryClient]);
 
   // Refresh chats when a match happens
   React.useEffect(() => {
-    const handleMatch = () => {
-      reload();
-    };
-    window.addEventListener("fidem:match", handleMatch);
-    return () => window.removeEventListener("fidem:match", handleMatch);
-  }, [queryClient]);
+    window.addEventListener("fidem:match", reload);
+    return () => window.removeEventListener("fidem:match", reload);
+  }, [reload]);
 
   const matches = chats.filter((c) => c.status === "match");
 

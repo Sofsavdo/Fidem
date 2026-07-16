@@ -46,7 +46,7 @@ export default function Concierge() {
   const statusLabel = (s) => ({
     awaiting_payment: t("concierge_status_awaiting_payment"),
     in_progress: t("concierge_status_in_progress"),
-    active: "Active",
+    active: t("concierge_status_in_progress"),
     completed: t("concierge_status_completed"),
     expired: "—",
   })[s] || s;
@@ -70,14 +70,14 @@ export default function Concierge() {
               <Crown className="w-3 h-3" /> PREMIUM
             </div>
             <h2 className="text-3xl font-heading font-semibold mt-2">{info.price.toLocaleString()} {t("sum_word")}</h2>
-            <p className="text-sm text-muted-foreground">{info.days} {t("day_word")} · {info.max_matches} matches</p>
+            <p className="text-sm text-muted-foreground">{info.days} {t("day_word")} · {info.max_matches} {t("concierge_matches_word")}</p>
           </div>
           <Heart className="w-10 h-10 text-primary/30" fill="currentColor" />
         </div>
         <ul className="text-sm space-y-2">
           <li className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" /> {t("concierge_desc")}</li>
-          <li className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" /> {info.max_matches} × hand-picked</li>
-          <li className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" /> Personalized review</li>
+          <li className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" /> {info.max_matches} × {t("concierge_handpicked")}</li>
+          <li className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" /> {t("concierge_personal_review")}</li>
         </ul>
         {!info.active_order && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -102,7 +102,7 @@ export default function Concierge() {
                   <p className="text-sm"><span className="font-medium">{o.amount.toLocaleString()} {t("sum_word")}</span> · {new Date(o.created_at).toLocaleDateString()}</p>
                   <p className="text-xs text-muted-foreground">{statusLabel(o.status)}</p>
                 </div>
-                <span className="text-xs font-medium">{(o.matches || []).length}/{info.max_matches}</span>
+                <span className="text-xs font-medium">{(o.matches || []).length}/{info.max_matches} {t("concierge_matches_word")}</span>
               </div>
               {(o.match_users || []).length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

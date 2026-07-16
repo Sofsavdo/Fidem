@@ -16,9 +16,16 @@ router = APIRouter(tags=["growth"])
 BOOST_PRICE = 5000        # 24h boost in UZS (deducts from balance or paid via CLICK)
 # Daily check-in rewards are paid in so'm into the internal `balance` (spendable
 # on gifts/boost/plans, NOT withdrawable — only referral earnings withdraw).
-# Kept modest so the free rewards don't erode paid revenue.
-DAILY_SUM = 200           # +200 so'm to internal balance per daily check-in
-STREAK_7_SUM = 1000       # week-7 streak bonus (so'm to internal balance)
+# The reward DOUBLES each consecutive day (100 → 6,400 by day 7) and stays at
+# 6,400 while the chain holds; missing a day drops it back to 100. A flat
+# daily amount gave no reason to come back tomorrow — losing tomorrow's
+# bigger bonus does.
+STREAK_REWARDS = [100, 200, 400, 800, 1600, 3200, 6400]
+
+
+def _streak_reward(day: int) -> int:
+    """Reward for the given consecutive day (day 7+ stays at the max)."""
+    return STREAK_REWARDS[min(max(day, 1), len(STREAK_REWARDS)) - 1]
 
 
 # ---------- Daily check-in / Streak ----------
@@ -27,15 +34,24 @@ async def daily_status(uid: str = Depends(get_current_user_id)):
     me = await get_user(uid)
     last = me.get("daily_last_at")
     streak = me.get("daily_streak", 0)
-    today_iso = iso(now_utc().replace(hour=0, minute=0, second=0, microsecond=0))
+    today = now_utc().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_iso = iso(today)
+    yesterday_iso = iso(today - timedelta(days=1))
     claimed_today = last is not None and last >= today_iso
+    # The day the NEXT claim will count as: chain continues from yesterday,
+    # otherwise it restarts at day 1.
+    chain_alive = bool(last and last >= yesterday_iso)
+    next_streak = (streak + 1) if chain_alive else 1
     return {
         "claimed_today": claimed_today,
         "streak": streak,
-        "next_bonus": DAILY_SUM if not claimed_today else 0,
+        "next_streak": next_streak,
+        "next_bonus": 0 if claimed_today else _streak_reward(next_streak),
+        "tomorrow_bonus": _streak_reward(streak + 1 if claimed_today else next_streak + 1),
+        "max_bonus": STREAK_REWARDS[-1],
+        "rewards": STREAK_REWARDS,
         "currency": "sum",
         "balance": int(me.get("balance", 0) or 0),
-        "streak_7_bonus_in": max(0, 7 - (streak % 7 or 0)) if not claimed_today else None,
     }
 
 
@@ -48,15 +64,13 @@ async def daily_claim(uid: str = Depends(get_current_user_id)):
     last = me.get("daily_last_at")
     if last and last >= today_iso_str:
         raise HTTPException(400, "Bugun olingan")
-    # Streak math
+    # Streak math: consecutive day continues the chain, a gap restarts it
     streak = me.get("daily_streak", 0)
     if last and last >= yesterday_iso:
         streak += 1
     else:
         streak = 1
-    bonus = DAILY_SUM
-    if streak % 7 == 0:
-        bonus += STREAK_7_SUM
+    bonus = _streak_reward(streak)
     await db.users.update_one(
         {"id": uid},
         {
@@ -64,10 +78,11 @@ async def daily_claim(uid: str = Depends(get_current_user_id)):
             "$inc": {"balance": bonus, "xp": 20 + (50 if streak % 7 == 0 else 0)},
         },
     )
-    await push_notif(uid, "balance", f"🔥 {streak} kunlik streak! +{bonus:,} so'm balansingizga tushdi")
+    await push_notif(uid, "balance", f"🔥 {streak} kunlik streak! +{bonus:,} so'm balansingizga tushdi. Ertaga: +{_streak_reward(streak + 1):,} so'm")
     return {
         "streak": streak,
         "bonus": bonus,
+        "tomorrow_bonus": _streak_reward(streak + 1),
         "currency": "sum",
         "balance_after": int(me.get("balance", 0) or 0) + bonus,
     }

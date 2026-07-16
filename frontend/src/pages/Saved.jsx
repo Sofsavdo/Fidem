@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
+import { purchasePlan } from "@/lib/purchase";
 import { Lock, Bookmark, Crown, EyeOff, Camera, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { photoSrc } from "@/lib/photo";
@@ -19,7 +20,14 @@ const TABS = [
 const UNLOCK_PRICE = 79000;
 
 export default function Saved() {
-  const { t, user } = useApp();
+  const { t, user, refresh } = useApp();
+  const navigate = useNavigate();
+  const [buying, setBuying] = useState(false);
+  const buyPremium = async () => {
+    if (buying) return;
+    setBuying(true);
+    try { await purchasePlan("premium", { t, navigate, onPaid: refresh }); } finally { setBuying(false); }
+  };
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState("mine");
 
@@ -78,17 +86,19 @@ export default function Saved() {
       </div>
 
       {showPlanPromo && (
-        <Link
-          to="/premium?tab=plans"
+        <button
+          type="button"
+          onClick={buyPremium}
+          disabled={buying}
           data-testid="saved-plan-promo"
-          className="mb-4 flex items-center justify-between gap-3 rounded-3xl bg-gradient-to-r from-ink to-zinc-800 text-white p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform"
+          className="mb-4 w-full text-left flex items-center justify-between gap-3 rounded-3xl bg-gradient-to-r from-ink to-zinc-800 text-white p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform disabled:opacity-60"
         >
           <div className="min-w-0">
             <p className="font-heading text-base font-semibold flex items-center gap-1.5"><Crown className="w-4 h-4 text-gold" /> {t("who_viewed_unlock_hint")}</p>
             <p className="text-xs text-white/70 mt-0.5">{t("premium")} · {UNLOCK_PRICE.toLocaleString()} {t("sum")}{t("plan_per_month")}</p>
           </div>
           <span className="shrink-0 rounded-full bg-white text-ink text-xs font-semibold px-3.5 py-2">{t("plan_choose_cta")}</span>
-        </Link>
+        </button>
       )}
 
       {/* Privacy upsell — this page is exactly where "kim ko'rdi" is on the
@@ -177,7 +187,7 @@ export default function Saved() {
                   <Lock className="w-6 h-6 text-muted-foreground" />
                   <p className="text-sm font-medium mt-2">{c.name}, {c.age}</p>
                   <p className="text-[11px] text-muted-foreground">{c.region}</p>
-                  <Link data-testid="locked-upgrade" to="/premium?tab=plans" className="mt-3 text-xs font-medium text-foreground underline">{t("upgrade")}</Link>
+                  <button type="button" data-testid="locked-upgrade" onClick={buyPremium} disabled={buying} className="mt-3 text-xs font-medium text-foreground underline disabled:opacity-50">{t("upgrade")}</button>
                 </div>
               </div>
             );

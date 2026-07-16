@@ -17,7 +17,9 @@ router = APIRouter(tags=["withdrawals"])
 
 MIN_WITHDRAW_UZS_FREE = 100_000  # Free users: minimum 100,000
 MIN_WITHDRAW_UZS_PAID = 100_000  # Paid users: minimum 100,000
-MAX_WITHDRAW_UZS_PAID = 29_900  # Paid users: maximum 29,900
+# NOTE: there is deliberately NO maximum. A previous MAX_WITHDRAW_UZS_PAID of
+# 29,900 (a stray copy of the referral tier cap) combined with the 100,000
+# minimum made withdrawal mathematically impossible for premium/vip users.
 TAX_RATE = 0.12  # 12% tax withholding
 
 
@@ -40,7 +42,7 @@ async def withdraw_status(uid: str = Depends(get_current_user_id)):
     # Determine withdrawal limits based on user plan
     is_paid = me.get("plan") in ("premium", "vip")
     min_payout = MIN_WITHDRAW_UZS_PAID if is_paid else MIN_WITHDRAW_UZS_FREE
-    max_payout = MAX_WITHDRAW_UZS_PAID if is_paid else None
+    max_payout = None
     
     return {
         "referral_earnings_withdrawable": int(me.get("referral_earnings_withdrawable", 0) or 0),
@@ -68,7 +70,7 @@ async def request_withdrawal(
     # Determine withdrawal limits based on user plan
     is_paid = me.get("plan") in ("premium", "vip")
     min_payout = MIN_WITHDRAW_UZS_PAID if is_paid else MIN_WITHDRAW_UZS_FREE
-    max_payout = MAX_WITHDRAW_UZS_PAID if is_paid else None
+    max_payout = None
     
     if amount < min_payout:
         raise HTTPException(400, f"Minimal yechib olish: {min_payout:,} so'm")
@@ -160,9 +162,15 @@ async def admin_approve_withdrawal(wid: str, _: str = Depends(get_current_admin)
     w = await db.withdrawals.find_one({"id": wid})
     if not w:
         raise HTTPException(404, "Not found")
-    if w["status"] != "pending":
+    # Atomically claim pending->processing first (same guard as reject) — two
+    # concurrent approve calls must not both credit paid_out totals.
+    claim = await db.withdrawals.update_one(
+        {"id": wid, "status": "pending"},
+        {"$set": {"status": "processing"}},
+    )
+    if claim.modified_count == 0:
         raise HTTPException(400, "Already processed")
-    
+
     # Get user's referral earnings breakdown for source tracking
     user = await db.users.find_one({"id": w["user_id"]}, {"_id": 0, "referral_earnings": 1})
     source_breakdown = []
