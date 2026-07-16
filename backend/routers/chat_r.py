@@ -384,6 +384,8 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
         raise HTTPException(403, "blocked")
 
     sender_doc = await get_user(uid)
+    if sender_doc.get("muted"):
+        raise HTTPException(403, "muted")
     if not await can_initiate_chat(sender_doc, req.to_user_id):
         # Free-weekly allowance: a free user may open a limited number of new
         # conversations per week. Consume atomically, then record a free unlock

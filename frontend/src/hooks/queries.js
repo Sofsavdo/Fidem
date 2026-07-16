@@ -46,6 +46,14 @@ export const QK = {
   adminReferrals: (params) => ["admin", "referrals", params],
   adminMessages: (params) => ["admin", "messages", params],
   adminFraud: (params) => ["admin", "fraud", params],
+  adminCeo: ["admin", "ceo"],
+  adminFunnel: ["admin", "funnel"],
+  adminEngagement: ["admin", "engagement"],
+  adminRevenue: ["admin", "revenue"],
+  adminConciergeAnalytics: ["admin", "conciergeAnalytics"],
+  adminChatModAnalytics: ["admin", "chatModAnalytics"],
+  adminAuditLog: (params) => ["admin", "auditLog", params],
+  adminUserDetail: (id) => ["admin", "userDetail", id],
 };
 
 export function useReferral() {
@@ -359,6 +367,84 @@ export function useAdminStats() {
     queryFn: () => api.get("/admin/stats").then((r) => r.data),
     staleTime: 60_000,
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useAdminCeo() {
+  return useQuery({
+    queryKey: QK.adminCeo,
+    queryFn: () => api.get("/admin/ceo").then((r) => r.data),
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  });
+}
+
+export function useAdminFunnel() {
+  return useQuery({
+    queryKey: QK.adminFunnel,
+    queryFn: () => api.get("/admin/growth/funnel").then((r) => r.data),
+    staleTime: 60_000,
+  });
+}
+
+export function useAdminEngagement() {
+  return useQuery({
+    queryKey: QK.adminEngagement,
+    queryFn: () => api.get("/admin/growth/engagement").then((r) => r.data),
+    staleTime: 60_000,
+  });
+}
+
+export function useAdminRevenue() {
+  return useQuery({
+    queryKey: QK.adminRevenue,
+    queryFn: () => api.get("/admin/revenue").then((r) => r.data),
+    staleTime: 60_000,
+  });
+}
+
+export function useAdminConciergeAnalytics() {
+  return useQuery({
+    queryKey: QK.adminConciergeAnalytics,
+    queryFn: () => api.get("/admin/concierge/analytics").then((r) => r.data),
+    staleTime: 60_000,
+  });
+}
+
+export function useAdminChatModAnalytics() {
+  return useQuery({
+    queryKey: QK.adminChatModAnalytics,
+    queryFn: () => api.get("/admin/chat-moderation/analytics").then((r) => r.data),
+    staleTime: 60_000,
+  });
+}
+
+export function useAdminAuditLog(params) {
+  return useQuery({
+    queryKey: QK.adminAuditLog(params),
+    queryFn: () => api.get("/admin/audit-log", { params }).then((r) => r.data),
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useAdminUserDetail(id) {
+  return useQuery({
+    queryKey: QK.adminUserDetail(id),
+    queryFn: () => api.get(`/admin/users/${id}/detail`).then((r) => r.data),
+    enabled: !!id,
+    staleTime: 30_000,
+  });
+}
+
+export function useAdminUserAction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, action, days }) => api.post(`/admin/users/${id}/action`, { action, days: days || 30 }).then((r) => r.data),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: QK.adminUserDetail(vars.id) });
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+    },
   });
 }
 

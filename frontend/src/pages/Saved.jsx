@@ -163,7 +163,14 @@ export default function Saved() {
         </div>
       )}
 
-      {tab !== "requests" && isLoading && (
+      {tab !== "requests" && isLoading && tab === "interested" && (
+        <div className="space-y-3">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-24 rounded-3xl bg-muted animate-pulse" />
+          ))}
+        </div>
+      )}
+      {tab !== "requests" && isLoading && tab !== "interested" && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="aspect-[4/5] rounded-3xl bg-muted animate-pulse" />
@@ -176,52 +183,112 @@ export default function Saved() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 stagger" data-testid="saved-grid">
-        {tab !== "requests" && items.map((c, idx) => {
-          if (c.locked) {
-            // Age + region stay visible (masked name, locked photo) — a real
-            // teaser instead of a blank card, consistent with Me's preview.
-            return (
-              <div key={`locked-${tab}-${idx}`} className="aspect-[4/5] rounded-3xl bg-card border border-border overflow-hidden relative">
-                <div className="absolute inset-0 bg-gradient-to-b from-muted to-card flex flex-col items-center justify-center text-center p-4">
-                  <Lock className="w-6 h-6 text-muted-foreground" />
-                  <p className="text-sm font-medium mt-2">{c.name}, {c.age}</p>
-                  <p className="text-[11px] text-muted-foreground">{c.region}</p>
-                  <button type="button" data-testid="locked-upgrade" onClick={buyPremium} disabled={buying} className="mt-3 text-xs font-medium text-foreground underline disabled:opacity-50">{t("upgrade")}</button>
+      {/* "Kim menga qiziqdi" reads much better as a stacked list — the grid's
+          square tiles crammed name/age/region/unlock into too little space. */}
+      {tab === "interested" ? (
+        <div className="space-y-3 stagger" data-testid="saved-grid">
+          {items.map((c, idx) => {
+            if (c.locked) {
+              return (
+                <div
+                  key={`locked-${tab}-${idx}`}
+                  className="flex items-center gap-3 rounded-3xl bg-card border border-border p-3.5"
+                >
+                  <div className="shrink-0 w-16 h-16 rounded-2xl bg-gradient-to-b from-muted to-card grid place-items-center">
+                    <Lock className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{c.name}, {c.age}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{c.region}</p>
+                  </div>
+                  <button
+                    type="button"
+                    data-testid="locked-upgrade"
+                    onClick={buyPremium}
+                    disabled={buying}
+                    className="shrink-0 rounded-full bg-foreground text-background text-xs font-medium px-3.5 py-2 disabled:opacity-50"
+                  >
+                    {t("upgrade")}
+                  </button>
                 </div>
-              </div>
-            );
-          }
+              );
+            }
 
-          const photoLocked = c.photo_unlocked !== true;
-          const photoUrl = photoLocked ? null : photoSrc(c.photo_url);
+            const photoLocked = c.photo_unlocked !== true;
+            const photoUrl = photoLocked ? null : photoSrc(c.photo_url);
 
-          return (
-            <Link
-              key={c.id}
-              to={`/candidate/${c.id}`}
-              data-testid={`saved-card-${c.id}`}
-              className="block aspect-[4/5] rounded-3xl bg-card border border-border overflow-hidden relative hover:shadow-elevated transition-shadow"
-            >
-              {photoUrl ? (
-                <img src={photoUrl} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center">
-                  <Lock className="w-6 h-6 text-muted-foreground" />
-                  {photoLocked && (
-                    <p className="text-[10px] text-muted-foreground mt-2 px-2 text-center">{t("photo_locked")}</p>
+            return (
+              <Link
+                key={c.id}
+                to={`/candidate/${c.id}`}
+                data-testid={`saved-card-${c.id}`}
+                className="flex items-center gap-3 rounded-3xl bg-card border border-border p-3.5 hover:-translate-y-0.5 active:scale-[0.98] transition-transform"
+              >
+                <div className="shrink-0 w-16 h-16 rounded-2xl bg-muted overflow-hidden relative">
+                  {photoUrl ? (
+                    <img src={photoUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Lock className="w-5 h-5 text-muted-foreground" />
+                    </div>
                   )}
                 </div>
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/0 to-black/0 pointer-events-none" />
-              <div className="absolute bottom-2 left-3 right-3 text-white pointer-events-none">
-                <p className="font-medium text-sm">{c.name}, {c.age}</p>
-                <p className="text-[10px] text-white/85">{c.region}</p>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{c.name}, {c.age}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{c.region}</p>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 stagger" data-testid="saved-grid">
+          {tab !== "requests" && items.map((c, idx) => {
+            if (c.locked) {
+              // Age + region stay visible (masked name, locked photo) — a real
+              // teaser instead of a blank card, consistent with Me's preview.
+              return (
+                <div key={`locked-${tab}-${idx}`} className="aspect-[4/5] rounded-3xl bg-card border border-border overflow-hidden relative">
+                  <div className="absolute inset-0 bg-gradient-to-b from-muted to-card flex flex-col items-center justify-center text-center p-4">
+                    <Lock className="w-6 h-6 text-muted-foreground" />
+                    <p className="text-sm font-medium mt-2">{c.name}, {c.age}</p>
+                    <p className="text-[11px] text-muted-foreground">{c.region}</p>
+                    <button type="button" data-testid="locked-upgrade" onClick={buyPremium} disabled={buying} className="mt-3 text-xs font-medium text-foreground underline disabled:opacity-50">{t("upgrade")}</button>
+                  </div>
+                </div>
+              );
+            }
+
+            const photoLocked = c.photo_unlocked !== true;
+            const photoUrl = photoLocked ? null : photoSrc(c.photo_url);
+
+            return (
+              <Link
+                key={c.id}
+                to={`/candidate/${c.id}`}
+                data-testid={`saved-card-${c.id}`}
+                className="block aspect-[4/5] rounded-3xl bg-card border border-border overflow-hidden relative hover:shadow-elevated transition-shadow"
+              >
+                {photoUrl ? (
+                  <img src={photoUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center">
+                    <Lock className="w-6 h-6 text-muted-foreground" />
+                    {photoLocked && (
+                      <p className="text-[10px] text-muted-foreground mt-2 px-2 text-center">{t("photo_locked")}</p>
+                    )}
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/0 to-black/0 pointer-events-none" />
+                <div className="absolute bottom-2 left-3 right-3 text-white pointer-events-none">
+                  <p className="font-medium text-sm">{c.name}, {c.age}</p>
+                  <p className="text-[10px] text-white/85">{c.region}</p>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -365,6 +365,24 @@ async def notify_telegram_batch(uids: list[str], text: str, link: Optional[str] 
     return sent_count
 
 
+async def log_admin_action(admin_id: str, action: str, target_id: Optional[str] = None, details: Optional[dict] = None) -> None:
+    """Audit trail for every admin mutation: who did what, to whom, when.
+    Fire-and-forget from the caller's perspective — a logging failure must
+    never block the admin action itself, so this never raises."""
+    try:
+        from models import new_id
+        await db.admin_audit_log.insert_one({
+            "id": new_id(),
+            "admin_id": admin_id,
+            "action": action,
+            "target_id": target_id,
+            "details": details or {},
+            "at": iso(now_utc()),
+        })
+    except Exception:
+        log.warning("admin audit log write failed", exc_info=True)
+
+
 async def push_notif(
     uid: str,
     kind: str,
