@@ -130,7 +130,7 @@ export default function Saved() {
             <div key={request.id} className="rounded-3xl bg-card border border-border p-4" data-testid={`photo-request-${request.id}`}>
               <Link to={`/candidate/${requester.id}`} className="flex items-center gap-3">
                 {requester.photo_url ? (
-                  <img src={photoSrc(requester.photo_url)} alt="" className="w-12 h-12 rounded-2xl object-cover" />
+                  <img loading="lazy" decoding="async" src={photoSrc(requester.photo_url)} alt="" className="w-12 h-12 rounded-2xl object-cover" />
                 ) : (
                   <div className="w-12 h-12 rounded-2xl bg-muted grid place-items-center text-lg font-semibold">{(requester.name || "?")[0]}</div>
                 )}
@@ -226,7 +226,7 @@ export default function Saved() {
               >
                 <div className="shrink-0 w-16 h-16 rounded-2xl bg-muted overflow-hidden relative">
                   {photoUrl ? (
-                    <img src={photoUrl} alt="" className="w-full h-full object-cover" />
+                    <img loading="lazy" decoding="async" src={photoUrl} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Lock className="w-5 h-5 text-muted-foreground" />
@@ -270,7 +270,7 @@ export default function Saved() {
                 className="block aspect-[4/5] rounded-3xl bg-card border border-border overflow-hidden relative hover:shadow-elevated transition-shadow"
               >
                 {photoUrl ? (
-                  <img src={photoUrl} alt="" className="w-full h-full object-cover" />
+                  <img loading="lazy" decoding="async" src={photoUrl} alt="" className="w-full h-full object-cover" />
                 ) : (
                   <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center">
                     <Lock className="w-6 h-6 text-muted-foreground" />

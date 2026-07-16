@@ -249,6 +249,26 @@ async def startup() -> None:
         await db.announcement_views.create_index(
             [("announcement_id", 1), ("user_id", 1)], name="ix_anon_views_post_user_nonunique"
         )
+    # Blocks: _block_exists() runs on every message send + chat access check,
+    # and candidates() fetches every block row for the current user on every
+    # feed load - both were unindexed full collection scans on a collection
+    # with no natural size cap.
+    try:
+        await db.blocks.create_index([("owner_id", 1), ("target_id", 1)], unique=True, name="ix_blocks_owner_target")
+    except Exception as e:
+        log.warning(f"Warning: Failed to create unique blocks index (likely pre-existing duplicates): {e}")
+        await db.blocks.create_index([("owner_id", 1), ("target_id", 1)], name="ix_blocks_owner_target_nonunique")
+    await db.blocks.create_index("target_id", name="ix_blocks_target")
+    # bot_starts: upserted by telegram_id on every single /start command.
+    try:
+        await db.bot_starts.create_index("telegram_id", unique=True, name="ix_bot_starts_tg")
+    except Exception as e:
+        log.warning(f"Warning: Failed to create unique bot_starts index (likely pre-existing duplicates): {e}")
+        await db.bot_starts.create_index("telegram_id", name="ix_bot_starts_tg_nonunique")
+    # manual_topups: pending-count check on every P2P submission, admin queue
+    # filtered by status, /stats pending count.
+    await db.manual_topups.create_index([("user_id", 1), ("status", 1)], name="ix_manual_topups_user_status")
+    await db.manual_topups.create_index([("status", 1), ("created_at", -1)], name="ix_manual_topups_status_time")
 
     # Initialize referral_id for existing users (first 8 chars of id) - only if needed
     sample_referral = await db.users.find_one({"referral_id": {"$exists": True}}, {"referral_id": 1})
