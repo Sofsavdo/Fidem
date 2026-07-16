@@ -1,6 +1,6 @@
-"""AI services. Compatibility reports, icebreakers and moderation are
-lightweight template/regex fallbacks (no model call). Face verification is
-a real Claude vision call - see verify_face_photo below.
+"""AI services. Compatibility reports and moderation are lightweight
+template/regex fallbacks (no model call). Face verification is a real
+Claude vision call - see verify_face_photo below.
 """
 from __future__ import annotations
 
@@ -109,32 +109,6 @@ def _fallback_report(score: int, lang: str) -> dict:
     out["score"] = score
     out["ai_generated"] = False
     return out
-
-
-# ---------- 2) Icebreakers ----------
-async def personalized_icebreakers(viewer: dict, candidate: dict, lang: str = "uz") -> list[str]:
-    return _fallback_icebreakers(lang)
-
-
-def _fallback_icebreakers(lang: str) -> list[str]:
-    pools = {
-        "uz": [
-            "Profilingizdagi eng qiziq jihat haqida gapirib bering?",
-            "Hayotda nimaga ko'proq qiymat berasiz?",
-            "Ideal dam olish kuni qanday o'tadi?",
-        ],
-        "ru": [
-            "Что в вашем профиле самое интересное?",
-            "Что вы цените больше всего в жизни?",
-            "Как выглядит ваш идеальный выходной?",
-        ],
-        "en": [
-            "What's the most interesting thing about you?",
-            "What do you value most in life?",
-            "What does your ideal day off look like?",
-        ],
-    }
-    return pools.get(lang, pools["uz"])
 
 
 # ---------- 3) Moderation ----------

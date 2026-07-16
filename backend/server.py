@@ -45,7 +45,6 @@ from routers.growth_r import router as growth_router  # noqa: E402
 from routers.payments_r import router as payments_router  # noqa: E402
 from routers.telegram_r import router as telegram_router, setup_telegram_webhook  # noqa: E402
 from routers.personality_r import router as personality_router  # noqa: E402
-from routers.ai_r import router as ai_router  # noqa: E402
 from routers.prompts_r import router as prompts_router  # noqa: E402
 from routers.stories_r import router as stories_router  # noqa: E402
 from routers.withdrawals_r import router as withdrawals_router  # noqa: E402
@@ -74,7 +73,6 @@ api.include_router(admin_router)
 api.include_router(analytics_router)
 api.include_router(telegram_router)
 api.include_router(personality_router)
-api.include_router(ai_router)
 api.include_router(prompts_router)
 api.include_router(stories_router)
 api.include_router(withdrawals_router)

@@ -10,6 +10,7 @@ import { PageHead, Segmented, Price, SectionLabel } from "@/components/kit";
 import { purposeLabel } from "@/lib/labels";
 import { tapMedium, tapLight, notify } from "@/lib/haptics";
 import { openExternalLink } from "@/lib/telegram";
+import { PLAN_RANK } from "@/lib/purchase";
 
 const CHAT_UNLOCK_PRICE = 4900; // mirrors backend PRICE_CHAT_UNLOCK_UZS (comparison only)
 
@@ -162,6 +163,13 @@ export default function Premium() {
         <div className="space-y-3" id="premium-plans">
           {PLANS.map((p) => {
             const isCurrent = (user?.plan || "free") === p.key;
+            // VIP already includes everything Standard/Premium do - showing
+            // an active "buy" button for a tier the user has already
+            // surpassed reads as "you still need to pay for this", which is
+            // exactly backwards. Only genuine upgrades (a strictly higher
+            // tier) get a buy button; anything at or below the user's
+            // current tier shows as already included instead.
+            const alreadyIncluded = !isCurrent && p.key !== "free" && PLAN_RANK[p.key] <= PLAN_RANK[user?.plan || "free"];
             return (
               <div
                 key={p.key}
@@ -199,7 +207,7 @@ export default function Premium() {
                   ))}
                 </ul>
 
-                {p.key !== "free" && !isCurrent && (
+                {p.key !== "free" && !isCurrent && !alreadyIncluded && (
                   <button
                     data-testid={`buy-${p.key}`}
                     onClick={() => runPayment(p.key, p.price)}
@@ -214,6 +222,11 @@ export default function Premium() {
                 {isCurrent && (
                   <p className={`mt-3 text-xs font-semibold text-center ${p.dark ? "text-gold" : "text-secondary"}`}>
                     ✓ {t("current_plan")}
+                  </p>
+                )}
+                {alreadyIncluded && (
+                  <p className="mt-3 text-xs font-semibold text-center text-secondary">
+                    ✓ {t("plan_already_included")}
                   </p>
                 )}
               </div>
