@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Body, Depends, HTTPException
 
 from auth import get_current_admin
-from core import db, iso, now_utc, push_notif, user_public
+from core import db, iso, log_admin_action, now_utc, push_notif, user_public
 from models import AdminUpdateUserRequest, new_id
 from routers.payments_r import process_completed_payment
 
@@ -189,7 +189,7 @@ async def admin_list_users(
 
 
 @router.patch("/users/{target_id}")
-async def admin_update_user(target_id: str, req: AdminUpdateUserRequest, _: str = Depends(get_current_admin)):
+async def admin_update_user(target_id: str, req: AdminUpdateUserRequest, admin_id: str = Depends(get_current_admin)):
     update = {k: v for k, v in req.model_dump().items() if v is not None and k != "add_balance"}
     ops: dict = {}
     if update:
@@ -199,6 +199,107 @@ async def admin_update_user(target_id: str, req: AdminUpdateUserRequest, _: str 
     if not ops:
         return {"ok": True}
     await db.users.update_one({"id": target_id}, ops)
+    await log_admin_action(admin_id, "update_user", target_id, {**update, "add_balance": req.add_balance})
+    return {"ok": True}
+
+
+# ---------- User detail + one-tap moderation actions ----------
+@router.get("/users/{target_id}/detail")
+async def admin_user_detail(target_id: str, _: str = Depends(get_current_admin)):
+    """Everything an admin needs to decide on a user in one call: profile,
+    activity counts (matches/likes/messages/reports/referrals), payment
+    history summary."""
+    user = await db.users.find_one({"id": target_id}, {"_id": 0, "password_hash": 0})
+    if not user:
+        raise HTTPException(404, "User not found")
+
+    from routers.analytics_r import _matched_rows
+
+    (
+        likes_sent, likes_received, matches_as_owner_rows,
+        messages_sent, messages_received, chats_agg,
+        reports_against, reports_by,
+        referral_count, payments_total_agg, recent_payments,
+    ) = await asyncio.gather(
+        db.saved.count_documents({"owner_id": target_id}),
+        db.saved.count_documents({"target_id": target_id}),
+        _matched_rows(None, target_id),
+        db.messages.count_documents({"from_user_id": target_id}),
+        db.messages.count_documents({"to_user_id": target_id}),
+        db.messages.aggregate([
+            {"$match": {"$or": [{"from_user_id": target_id}, {"to_user_id": target_id}]}},
+            {"$group": {"_id": "$chat_id"}},
+        ]).to_list(1000),
+        db.reports.count_documents({"target_id": target_id}),
+        db.reports.count_documents({"reporter_id": target_id}),
+        db.users.count_documents({"referred_by": user.get("referral_code")}) if user.get("referral_code") else 0,
+        db.payments.aggregate([
+            {"$match": {"user_id": target_id, "status": {"$in": ["paid", "success"]}}},
+            {"$group": {"_id": None, "total": {"$sum": "$amount"}, "n": {"$sum": 1}}},
+        ]).to_list(1),
+        db.payments.find({"user_id": target_id}, {"_id": 0}).sort("created_at", -1).limit(10).to_list(10),
+    )
+
+    pub = user_public(user, include_private=True)
+    pub["matches_count"] = len(matches_as_owner_rows)
+    pub["likes_sent"] = likes_sent
+    pub["likes_received"] = likes_received
+    pub["messages_sent"] = messages_sent
+    pub["messages_received"] = messages_received
+    pub["chats_count"] = len(chats_agg)
+    pub["reports_against_count"] = reports_against
+    pub["reports_by_count"] = reports_by
+    pub["referral_count"] = referral_count
+    pub["lifetime_paid_total"] = payments_total_agg[0]["total"] if payments_total_agg else 0
+    pub["lifetime_paid_count"] = payments_total_agg[0]["n"] if payments_total_agg else 0
+    pub["recent_payments"] = recent_payments
+    pub["shadow_banned"] = bool(user.get("shadow_banned"))
+    pub["muted"] = bool(user.get("muted"))
+    return pub
+
+
+@router.post("/users/{target_id}/action")
+async def admin_user_action(
+    target_id: str,
+    action: str = Body(..., embed=True),
+    days: int = Body(30, embed=True),
+    admin_id: str = Depends(get_current_admin),
+):
+    """One-tap moderation/growth actions from the user detail drawer. Every
+    action is written to the audit log (see /admin/audit-log)."""
+    user = await db.users.find_one({"id": target_id})
+    if not user:
+        raise HTTPException(404, "User not found")
+
+    if action == "ban":
+        await db.users.update_one({"id": target_id}, {"$set": {"blocked": True}})
+    elif action == "unban":
+        await db.users.update_one({"id": target_id}, {"$set": {"blocked": False}})
+    elif action == "mute":
+        # Muted ≠ blocked: the profile stays visible and browsable, but the
+        # user cannot send new messages (enforced in chat_r.send_message).
+        await db.users.update_one({"id": target_id}, {"$set": {"muted": True}})
+    elif action == "unmute":
+        await db.users.update_one({"id": target_id}, {"$set": {"muted": False}})
+    elif action == "shadow_ban":
+        # Distinct from the user's own hidden_profile toggle: the user is
+        # never told, they just stop appearing in candidate feeds.
+        await db.users.update_one({"id": target_id}, {"$set": {"shadow_banned": True}})
+    elif action == "unshadow_ban":
+        await db.users.update_one({"id": target_id}, {"$set": {"shadow_banned": False}})
+    elif action in ("give_premium", "give_vip", "give_standard"):
+        plan = {"give_premium": "premium", "give_vip": "vip", "give_standard": "standard"}[action]
+        until = iso(now_utc() + timedelta(days=days))
+        await db.users.update_one({"id": target_id}, {"$set": {"plan": plan, "plan_until": until}})
+        await push_notif(target_id, "premium", f"🎁 Admin tomonidan {plan.upper()} tarif {days} kunga berildi")
+    elif action == "reset_balance":
+        await db.users.update_one({"id": target_id}, {"$set": {"balance": 0}})
+    elif action == "reset_likes":
+        await db.saved.delete_many({"owner_id": target_id})
+    else:
+        raise HTTPException(400, f"Unknown action: {action}")
+
+    await log_admin_action(admin_id, f"user_action:{action}", target_id, {"days": days} if "give_" in action else {})
     return {"ok": True}
 
 
@@ -606,11 +707,12 @@ async def admin_decide_manual_topup(
     tid: str,
     approve: bool = Body(..., embed=True),
     reason: str = Body("", embed=True),
-    _: str = Depends(get_current_admin),
+    admin_id: str = Depends(get_current_admin),
 ):
     from routers.payments_r import decide_manual_topup
 
     res = await decide_manual_topup(tid, approve, reason=reason, decided_by="panel")
     if res is None:
         raise HTTPException(404, "Not found or already decided")
+    await log_admin_action(admin_id, "p2p_topup_approve" if approve else "p2p_topup_reject", res.get("user_id"), {"amount": res.get("amount"), "topup_id": tid})
     return {"ok": True}

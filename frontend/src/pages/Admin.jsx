@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ShieldCheck, Wallet, Users as UsersIcon, DollarSign, TrendingUp, BarChart3, LayoutDashboard, Search, MessageSquare, Settings, ChevronRight, MapPin, Activity, AlertTriangle, Send, Megaphone, Trash2, Bot, Eye, Pencil, Link2 } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Wallet, Users as UsersIcon, DollarSign, TrendingUp, BarChart3, LayoutDashboard, Search, MessageSquare, Settings, ChevronRight, MapPin, Activity, AlertTriangle, Send, Megaphone, Trash2, Bot, Eye, Pencil, Link2, Heart, Crown, Gauge, ScrollText, Ban, VolumeX, EyeOff } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
 import api from "@/lib/api";
 import { PURPOSE_UZ, REF_TYPE_UZ, VERIF_KIND_UZ } from "@/lib/labels";
@@ -15,9 +15,15 @@ import {
   useAdminReports, useAdminWithdrawals, useAdminWithdrawalDecision, useAdminConcierge,
   useAdminConciergeMatch, useAdminReferrals, useAdminReferrers, useAdminReferrerDetail, useAdminMessages, useAdminDeleteMessage,
   useAdminFraud, useAdminMarkSafe, useAdminBroadcast,
+  useAdminCeo, useAdminFunnel, useAdminEngagement, useAdminRevenue,
+  useAdminConciergeAnalytics, useAdminChatModAnalytics, useAdminAuditLog,
+  useAdminUserDetail, useAdminUserAction,
 } from "@/hooks/queries";
 
 const menuItems = [
+  { id: "ceo", icon: Gauge, label: "CEO Dashboard" },
+  { id: "growth", icon: Heart, label: "O'sish (Funnel)" },
+  { id: "revenue", icon: DollarSign, label: "Daromad" },
   { id: "dashboard", icon: LayoutDashboard, label: "Boshqaruv" },
   { id: "analytics", icon: BarChart3, label: "Analitika" },
   { id: "users", icon: UsersIcon, label: "Foydalanuvchilar" },
@@ -32,6 +38,7 @@ const menuItems = [
   { id: "concierge", icon: Search, label: "Concierge" },
   { id: "fraud", icon: AlertTriangle, label: "Firibgarlik" },
   { id: "reports", icon: Settings, label: "Shikoyatlar" },
+  { id: "auditlog", icon: ScrollText, label: "Audit Log" },
 ];
 
 function AdminPagination({ page, setPage, total, limit }) {
@@ -47,7 +54,7 @@ function AdminPagination({ page, setPage, total, limit }) {
 
 export default function Admin() {
   const { user, t } = useApp();
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState("ceo");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { data: stats } = useAdminStats();
 
@@ -112,6 +119,10 @@ export default function Admin() {
             </div>
           </div>
 
+          {activeTab === "ceo" && <AdminCeoDashboard go={setActiveTab} />}
+          {activeTab === "growth" && <AdminGrowthDashboard />}
+          {activeTab === "revenue" && <AdminRevenueDashboard />}
+          {activeTab === "auditlog" && <AdminAuditLog />}
           {activeTab === "dashboard" && stats && <AdminDashboard stats={stats} go={setActiveTab} />}
 
           {activeTab === "analytics" && stats && <AdminAnalytics stats={stats} />}
@@ -138,6 +149,281 @@ function RevenueTile({ label, value, accent }) {
     <div className={`rounded-3xl border p-4 ${accent ? "bg-gradient-to-br from-primary/10 to-card border-primary/30" : "bg-card border-border"}`}>
       <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
       <p className="font-heading text-xl font-semibold mt-1 tabular-nums">{value}</p>
+    </div>
+  );
+}
+
+function KpiTile({ label, value, sub, accent }) {
+  return (
+    <div className={`rounded-2xl border p-3.5 ${accent ? "bg-gradient-to-br from-primary/10 to-card border-primary/30" : "bg-card border-border"}`}>
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground leading-tight">{label}</p>
+      <p className="font-heading text-lg font-semibold mt-1 tabular-nums leading-none">{value}</p>
+      {sub != null && <p className="text-[10px] text-muted-foreground mt-1">{sub}</p>}
+    </div>
+  );
+}
+
+const sumFmt = (n) => `${Number(n || 0).toLocaleString()} so'm`;
+
+// The CEO Dashboard: the four questions an owner asks every morning —
+// how many people came, how many matched, how many chatted, how much money
+// came in — answered in one screen, no digging through operator tabs.
+function AdminCeoDashboard({ go }) {
+  const { data, isLoading } = useAdminCeo();
+  if (isLoading || !data) return <div className="text-center py-12 text-muted-foreground">Yuklanmoqda...</div>;
+  const { revenue, users, active, matches, chats, monetization, retention } = data;
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl bg-gradient-to-br from-ink to-zinc-800 text-white p-5">
+        <p className="text-xs uppercase tracking-wider text-white/60">Bugun</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-3">
+          <div>
+            <p className="text-[10px] text-white/60">Yangi userlar</p>
+            <p className="font-heading text-2xl font-bold tabular-nums mt-0.5">{users.new_today}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-white/60">Matchlar</p>
+            <p className="font-heading text-2xl font-bold tabular-nums mt-0.5">{matches.today}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-white/60">Yangi chatlar</p>
+            <p className="font-heading text-2xl font-bold tabular-nums mt-0.5">{chats.new_today}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-white/60">Daromad</p>
+            <p className="font-heading text-2xl font-bold tabular-nums mt-0.5 text-gold">{sumFmt(revenue.today)}</p>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Daromad</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <KpiTile label="Bugun" value={sumFmt(revenue.today)} accent />
+          <KpiTile label="Bu hafta" value={sumFmt(revenue.week)} />
+          <KpiTile label="Bu oy" value={sumFmt(revenue.month)} />
+          <KpiTile label="Jami" value={sumFmt(revenue.total)} />
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Faol foydalanuvchilar</p>
+        <div className="grid grid-cols-3 gap-2.5">
+          <KpiTile label="DAU" value={active.dau} />
+          <KpiTile label="WAU" value={active.wau} />
+          <KpiTile label="MAU" value={active.mau} />
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Match va Chat</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <KpiTile label="Match (bugun)" value={matches.today} sub={matches.match_rate_today_pct != null ? `${matches.match_rate_today_pct}% yangi userdan` : null} />
+          <KpiTile label="Match (hafta)" value={matches.week} />
+          <KpiTile label="Match (oy)" value={matches.month} />
+          <KpiTile label="Chat rate" value={chats.chat_rate_today_pct != null ? `${chats.chat_rate_today_pct}%` : "—"} sub="matchdan chatga" />
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Monetizatsiya</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <KpiTile label="Konversiya" value={`${monetization.premium_conversion_pct}%`} sub={`${monetization.paying_users} to'lovchi`} />
+          <KpiTile label="ARPU" value={sumFmt(monetization.arpu)} />
+          <KpiTile label="ARPPU" value={sumFmt(monetization.arppu)} />
+          <KpiTile label="MRR" value={sumFmt(monetization.mrr)} sub="faol obunalar" />
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Saqlanish</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <KpiTile label="D1 Retention" value={retention.d1_pct != null ? `${retention.d1_pct}%` : "—"} sub={`kohorta: ${retention.d1_cohort_size} kishi`} />
+        </div>
+        {retention.note && <p className="text-[11px] text-muted-foreground mt-2">{retention.note}</p>}
+      </div>
+
+      <div className="flex gap-2 flex-wrap">
+        <button onClick={() => go("growth")} className="text-xs rounded-full border border-border px-4 py-2 hover:bg-muted">O'sish funnel'ini ko'rish →</button>
+        <button onClick={() => go("revenue")} className="text-xs rounded-full border border-border px-4 py-2 hover:bg-muted">Daromad tahlili →</button>
+      </div>
+    </div>
+  );
+}
+
+// Growth Dashboard: the acquisition->activation->engagement funnel, plus
+// like/match/chat KPI cards — the dating-app-specific numbers a generic
+// SaaS dashboard never shows.
+function AdminGrowthDashboard() {
+  const { data: funnel, isLoading: fLoading } = useAdminFunnel();
+  const { data: eng, isLoading: eLoading } = useAdminEngagement();
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Foydalanuvchi Funnel</p>
+        {fLoading || !funnel ? (
+          <div className="text-center py-8 text-muted-foreground">Yuklanmoqda...</div>
+        ) : (
+          <div className="rounded-3xl bg-card border border-border p-4 space-y-1.5">
+            {funnel.steps.map((s, i) => (
+              <div key={s.key}>
+                <div className="flex items-center justify-between text-sm py-2">
+                  <span className="font-medium">{i + 1}. {s.label}</span>
+                  <span className="tabular-nums">
+                    <strong>{s.count.toLocaleString()}</strong>
+                    <span className="text-muted-foreground text-xs ml-2">({s.pct_of_top}% boshidan)</span>
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${s.pct_of_top}%` }} />
+                </div>
+                {i < funnel.steps.length - 1 && (
+                  <p className="text-[10px] text-red-500 mt-1 mb-1">
+                    ↓ keyingi bosqichga: {s.pct_of_previous != null ? funnel.steps[i + 1].pct_of_previous : "—"}% o'tadi
+                    {funnel.steps[i + 1] && s.count > 0 && ` (${(s.count - funnel.steps[i + 1].count).toLocaleString()} kishi chiqib ketdi)`}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {eLoading || !eng ? (
+        <div className="text-center py-8 text-muted-foreground">Yuklanmoqda...</div>
+      ) : (
+        <>
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Like KPI</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <KpiTile label="Bugun" value={eng.likes.today} />
+              <KpiTile label="Bu hafta" value={eng.likes.week} />
+              <KpiTile label="Bu oy" value={eng.likes.month} />
+              <KpiTile label="O'zaro (hafta)" value={eng.likes.mutual_this_week} sub="= match" />
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Match KPI</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <KpiTile label="Bugun" value={eng.matches.today} />
+              <KpiTile label="Bu hafta" value={eng.matches.week} />
+              <KpiTile label="Bu oy" value={eng.matches.month} />
+              <KpiTile label="O'rtacha/user" value={eng.matches.avg_per_user} />
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Chat KPI</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              <KpiTile label="Yangi chatlar (bugun)" value={eng.chats.new_today} />
+              <KpiTile label="Faol chatlar (hafta)" value={eng.chats.active_this_week} />
+              <KpiTile label="Xabarlar (bugun)" value={eng.chats.messages_today} />
+              <KpiTile label="Javob berish %" value={eng.chats.reply_rate_pct != null ? `${eng.chats.reply_rate_pct}%` : "—"} />
+              <KpiTile label="O'rtacha xabar/chat" value={eng.chats.avg_messages_per_chat} />
+              <KpiTile label="Xabarlar (hafta)" value={eng.chats.messages_week} />
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Revenue Dashboard: REAL cash in (CLICK-completed + approved P2P — never
+// double-counts a balance-funded purchase that was already counted when
+// topped up) separated from the "what are people spending balance on"
+// breakdown, which are two different questions that must never be summed.
+function AdminRevenueDashboard() {
+  const { data, isLoading } = useAdminRevenue();
+  if (isLoading || !data) return <div className="text-center py-12 text-muted-foreground">Yuklanmoqda...</div>;
+  const { real_revenue, trend_30d, spend_by_feature, kpi, ltv_note } = data;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Haqiqiy pul kirimi (Real Revenue)</p>
+        <p className="text-[11px] text-muted-foreground mb-2">Faqat CLICK orqali muvaffaqiyatli va tasdiqlangan P2P to'lovlar — balansdan qilingan xaridlar bu yerga ikki marta hisoblanmaydi.</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <KpiTile label="Bugun" value={sumFmt(real_revenue.today)} accent />
+          <KpiTile label="Bu hafta" value={sumFmt(real_revenue.week)} />
+          <KpiTile label="Bu oy" value={sumFmt(real_revenue.month)} />
+          <KpiTile label="Jami" value={sumFmt(real_revenue.total)} />
+        </div>
+      </div>
+
+      {trend_30d.length > 1 && (
+        <div className="rounded-3xl bg-card border border-border p-4">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">30 kunlik trend</p>
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={trend_30d}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+              <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(d) => d.slice(5)} />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip formatter={(v) => sumFmt(v)} />
+              <Line type="monotone" dataKey="total" stroke="#F0269D" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">KPI</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <KpiTile label="ARPU" value={sumFmt(kpi.arpu)} sub={`${kpi.total_users} user`} />
+          <KpiTile label="ARPPU" value={sumFmt(kpi.arppu)} sub={`${kpi.paying_users} to'lovchi`} />
+          <KpiTile label="MRR" value={sumFmt(kpi.mrr)} sub="faol obunalar" />
+          <KpiTile label="Konversiya" value={`${kpi.premium_conversion_pct}%`} />
+        </div>
+        {ltv_note && <p className="text-[11px] text-muted-foreground mt-2">💡 {ltv_note}</p>}
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Balans sarfi — bo'lim bo'yicha</p>
+        <p className="text-[11px] text-muted-foreground mb-2">Bu — mahsulot ichida qayerga pul sarflanayotgani (yuqoridagi haqiqiy daromaddan farqli, chunki balansning o'zi allaqachon hisoblangan bo'lishi mumkin).</p>
+        <div className="rounded-3xl bg-card border border-border divide-y divide-border">
+          {spend_by_feature.length === 0 && <p className="p-4 text-sm text-muted-foreground text-center">Ma'lumot yo'q</p>}
+          {spend_by_feature.map((r) => (
+            <div key={r._id} className="flex items-center justify-between p-3.5">
+              <span className="text-sm font-medium">{PURPOSE_UZ[r._id] || r._id}</span>
+              <span className="text-sm tabular-nums"><strong>{sumFmt(r.total)}</strong> <span className="text-muted-foreground text-xs">· {r.count} ta</span></span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminAuditLog() {
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = useAdminAuditLog({ page, limit: 30 });
+  const items = data?.items || [];
+  const total = data?.total || 0;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">Har bir admin harakati — kim, nima, qachon, kimga.</p>
+      {isLoading && <div className="text-center py-8 text-muted-foreground">Yuklanmoqda...</div>}
+      <div className="rounded-3xl bg-card border border-border divide-y divide-border">
+        {!isLoading && items.length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">Yozuvlar yo'q</p>}
+        {items.map((r) => (
+          <div key={r.id} className="p-3.5 text-sm">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-medium">{r.admin_name || r.admin_id}</span>
+              <span className="text-[11px] text-muted-foreground tabular-nums">{new Date(r.at).toLocaleString("uz-UZ")}</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              <span className="font-mono text-[11px] bg-muted rounded px-1.5 py-0.5">{r.action}</span>
+              {r.target_name && <> → {r.target_name}</>}
+              {r.details && Object.keys(r.details).length > 0 && (
+                <span className="ml-1.5 text-[11px]">{JSON.stringify(r.details)}</span>
+              )}
+            </p>
+          </div>
+        ))}
+      </div>
+      <AdminPagination page={page} setPage={setPage} total={total} limit={30} />
     </div>
   );
 }
@@ -661,6 +947,10 @@ function AdminUsers() {
                 </div>
               </div>
 
+              {/* Activity stats — loaded from the detail endpoint (matches,
+                  likes, messages, reports, referrals, lifetime spend). */}
+              <AdminUserActivityPanel userId={selectedUser.id} />
+
               {/* Actions */}
               <div className="flex gap-2 flex-wrap">
                 <button onClick={() => patch(selectedUser.id, { verified_selfie: !selectedUser.verified_selfie })} className="text-xs rounded-full bg-secondary/10 text-secondary px-3 py-2">{selectedUser.verified_selfie ? "✓ Selfie" : "Verify selfie"}</button>
@@ -670,6 +960,9 @@ function AdminUsers() {
                 <button onClick={() => patch(selectedUser.id, { add_balance: 10000 })} className="text-xs rounded-full border border-border px-3 py-2">+10k</button>
                 <button onClick={() => patch(selectedUser.id, { blocked: !selectedUser.blocked })} className={`text-xs rounded-full px-3 py-2 ${selectedUser.blocked ? "bg-emerald-100 text-emerald-700" : "bg-red-50 text-red-700"}`}>{selectedUser.blocked ? "Unblock" : "Block"}</button>
               </div>
+
+              {/* Moderation / growth quick actions — one tap, all audit-logged */}
+              <AdminUserQuickActions userId={selectedUser.id} />
             </div>
           </div>
         </div>
@@ -682,6 +975,72 @@ function AdminUsers() {
           <button onClick={() => setZoomPhoto(null)} className="absolute top-4 right-4 p-2 rounded-full bg-white/20 text-white hover:bg-white/30">✕</button>
         </div>
       )}
+    </div>
+  );
+}
+
+function AdminUserActivityPanel({ userId }) {
+  const { data, isLoading } = useAdminUserDetail(userId);
+  if (isLoading || !data) return <div className="text-xs text-muted-foreground py-2">Faollik yuklanmoqda...</div>;
+  return (
+    <div>
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Faollik</p>
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+        <KpiTile label="Matchlar" value={data.matches_count} />
+        <KpiTile label="Like yuborgan" value={data.likes_sent} />
+        <KpiTile label="Like olgan" value={data.likes_received} />
+        <KpiTile label="Xabarlar" value={data.messages_sent} />
+        <KpiTile label="Chatlar" value={data.chats_count} />
+        <KpiTile label="Referallar" value={data.referral_count} />
+        <KpiTile label="Shikoyat (unga)" value={data.reports_against_count} accent={data.reports_against_count > 0} />
+        <KpiTile label="Shikoyat (undan)" value={data.reports_by_count} />
+        <KpiTile label="Jami to'lagan" value={sumFmt(data.lifetime_paid_total)} sub={`${data.lifetime_paid_count} ta to'lov`} />
+      </div>
+      {(data.shadow_banned || data.muted) && (
+        <p className="text-[11px] text-amber-600 mt-2">
+          {data.shadow_banned && "🕶 Shadow-banned (feed'da ko'rinmaydi) "}
+          {data.muted && "🔇 Mute (xabar yubora olmaydi)"}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function AdminUserQuickActions({ userId }) {
+  const { data } = useAdminUserDetail(userId);
+  const actionMut = useAdminUserAction();
+  const [days, setDays] = useState(30);
+
+  const run = (action, confirmMsg) => {
+    if (confirmMsg && !window.confirm(confirmMsg)) return;
+    actionMut.mutate({ id: userId, action, days }, {
+      onSuccess: () => toast.success("Bajarildi ✓"),
+      onError: () => toast.error("Xatolik"),
+    });
+  };
+
+  return (
+    <div>
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Tezkor harakatlar</p>
+      <div className="flex items-center gap-2 mb-2">
+        <label className="text-[11px] text-muted-foreground">Tarif muddati (kun):</label>
+        <input type="number" value={days} onChange={(e) => setDays(parseInt(e.target.value) || 30)} className="w-16 rounded-lg border border-border bg-background px-2 py-1 text-xs" />
+      </div>
+      <div className="flex gap-2 flex-wrap">
+        <button onClick={() => run("give_premium")} disabled={actionMut.isPending} className="text-xs rounded-full bg-gold-light text-yellow-900 px-3 py-2 inline-flex items-center gap-1 disabled:opacity-50"><Crown className="w-3 h-3" /> Premium berish</button>
+        <button onClick={() => run("give_vip")} disabled={actionMut.isPending} className="text-xs rounded-full bg-ink text-gold px-3 py-2 inline-flex items-center gap-1 disabled:opacity-50"><Crown className="w-3 h-3" /> VIP berish</button>
+        <button onClick={() => run("reset_balance", "Balansni 0 ga tushirishga ishonchingiz komilmi?")} disabled={actionMut.isPending} className="text-xs rounded-full border border-border px-3 py-2 disabled:opacity-50">Balansni tozalash</button>
+        <button onClick={() => run("reset_likes", "Barcha yoqtirishlarini o'chirishga ishonchingiz komilmi?")} disabled={actionMut.isPending} className="text-xs rounded-full border border-border px-3 py-2 disabled:opacity-50">Like'larni tozalash</button>
+        <button onClick={() => run(data?.muted ? "unmute" : "mute")} disabled={actionMut.isPending} className={`text-xs rounded-full px-3 py-2 inline-flex items-center gap-1 disabled:opacity-50 ${data?.muted ? "bg-emerald-100 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+          <VolumeX className="w-3 h-3" /> {data?.muted ? "Mute'ni olish" : "Mute qilish"}
+        </button>
+        <button onClick={() => run(data?.shadow_banned ? "unshadow_ban" : "shadow_ban")} disabled={actionMut.isPending} className={`text-xs rounded-full px-3 py-2 inline-flex items-center gap-1 disabled:opacity-50 ${data?.shadow_banned ? "bg-emerald-100 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+          <EyeOff className="w-3 h-3" /> {data?.shadow_banned ? "Shadow ban'ni olish" : "Shadow ban"}
+        </button>
+        <button onClick={() => run("ban", "Bu foydalanuvchini ban qilishga ishonchingiz komilmi?")} disabled={actionMut.isPending} className="text-xs rounded-full bg-red-50 text-red-700 px-3 py-2 inline-flex items-center gap-1 disabled:opacity-50">
+          <Ban className="w-3 h-3" /> Ban qilish
+        </button>
+      </div>
     </div>
   );
 }
@@ -1266,6 +1625,24 @@ function AdminWithdrawals() {
   );
 }
 
+function AdminConciergeAnalyticsPanel() {
+  const { data, isLoading } = useAdminConciergeAnalytics();
+  if (isLoading || !data) return null;
+  return (
+    <div className="rounded-3xl bg-card border border-border p-4">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Concierge Analitika</p>
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+        <KpiTile label="Arizalar" value={data.applications} />
+        <KpiTile label="To'lov kutmoqda" value={data.awaiting_payment} />
+        <KpiTile label="Jarayonda" value={data.in_progress} />
+        <KpiTile label="Yakunlangan" value={data.completed} />
+        <KpiTile label="Daromad" value={sumFmt(data.revenue_generated)} accent />
+        <KpiTile label="Konversiya" value={`${data.conversion_pct}%`} />
+      </div>
+    </div>
+  );
+}
+
 function AdminConcierge() {
   const [search, setSearch] = useState("");
   const { data: list = [] } = useAdminConcierge();
@@ -1283,6 +1660,7 @@ function AdminConcierge() {
 
   return (
     <div className="space-y-3" data-testid="admin-concierge">
+      <AdminConciergeAnalyticsPanel />
       <input placeholder="Foydalanuvchi qidirish (mos qo'shish uchun)..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm" />
       {list.length === 0 && <p className="text-sm text-muted-foreground">Buyurtma yo'q</p>}
       {list.map((o) => (
@@ -1408,6 +1786,47 @@ function AdminReferrals() {
   );
 }
 
+function AdminChatModAnalyticsPanel({ onOpenUser }) {
+  const { data, isLoading } = useAdminChatModAnalytics();
+  if (isLoading || !data) return null;
+  return (
+    <div className="rounded-3xl bg-card border border-border p-4 space-y-3">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Chat Analitika</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <KpiTile label="Bloklangan juftlar" value={data.blocked_relationships} />
+        <KpiTile label="Ochiq shikoyatlar" value={data.reports_open} accent={data.reports_open > 0} />
+        <KpiTile label="Jami shikoyatlar" value={data.reports_total} />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <p className="text-[11px] text-muted-foreground mb-1.5">Eng faol foydalanuvchilar (hafta)</p>
+          <div className="space-y-1">
+            {data.most_active_users.slice(0, 5).map((r) => (
+              <button key={r._id} onClick={() => onOpenUser(r._id)} className="w-full flex items-center justify-between text-xs rounded-lg hover:bg-muted px-2 py-1.5">
+                <span className="truncate">{r.user?.name || r._id}</span>
+                <span className="text-muted-foreground tabular-nums">{r.n} xabar</span>
+              </button>
+            ))}
+            {data.most_active_users.length === 0 && <p className="text-xs text-muted-foreground px-2">Ma'lumot yo'q</p>}
+          </div>
+        </div>
+        <div>
+          <p className="text-[11px] text-muted-foreground mb-1.5">Eng ko'p shikoyat qilinganlar</p>
+          <div className="space-y-1">
+            {data.most_reported_users.slice(0, 5).map((r) => (
+              <button key={r._id} onClick={() => onOpenUser(r._id)} className="w-full flex items-center justify-between text-xs rounded-lg hover:bg-muted px-2 py-1.5">
+                <span className="truncate">{r.user?.name || r._id}</span>
+                <span className="text-red-600 tabular-nums">{r.n} shikoyat</span>
+              </button>
+            ))}
+            {data.most_reported_users.length === 0 && <p className="text-xs text-muted-foreground px-2">Ma'lumot yo'q</p>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AdminMessages() {
   const [q, setQ] = useState("");
   const [userIdFilter, setUserIdFilter] = useState("");
@@ -1428,6 +1847,7 @@ function AdminMessages() {
 
   return (
     <div className="space-y-4" data-testid="admin-messages">
+      <AdminChatModAnalyticsPanel onOpenUser={setUserIdFilter} />
       <div className="space-y-2">
         <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search messages by text..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" />
         <input value={userIdFilter} onChange={(e) => { setUserIdFilter(e.target.value); setPage(1); }} placeholder="Filter by user ID..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" />

@@ -37,6 +37,7 @@ from core import (  # noqa: E402  (must load env first)
 )
 from models import new_id  # noqa: E402
 from routers.admin_r import router as admin_router  # noqa: E402
+from routers.analytics_r import router as analytics_router  # noqa: E402
 from routers.auth_r import router as auth_router  # noqa: E402
 from routers.candidates_r import router as candidates_router  # noqa: E402
 from routers.chat_r import router as chat_router  # noqa: E402
@@ -70,6 +71,7 @@ api.include_router(chat_router)
 api.include_router(growth_router)
 api.include_router(payments_router)
 api.include_router(admin_router)
+api.include_router(analytics_router)
 api.include_router(telegram_router)
 api.include_router(personality_router)
 api.include_router(ai_router)
