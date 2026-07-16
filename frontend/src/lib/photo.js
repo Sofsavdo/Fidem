@@ -1,5 +1,11 @@
 // Small UI helpers
-const BACKEND = process.env.REACT_APP_BACKEND_URL;
+import { API } from "@/lib/api";
+
+// Derive from the API constant (env with a hardcoded fallback) — reading
+// REACT_APP_BACKEND_URL directly returns undefined in a misconfigured build,
+// which made the prefix check below never match and served photos without
+// the auth token (401 on every image).
+const BACKEND = API.replace(/\/api$/, "");
 
 /** Return a usable image URL. If url is hosted on our backend's /api/files/ endpoint,
  *  append the current viewer's JWT as ?auth= so <img> tags can authenticate. */

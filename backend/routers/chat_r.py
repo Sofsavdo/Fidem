@@ -128,6 +128,20 @@ async def can_initiate_chat(sender: dict, target_id: str) -> bool:
 async def chat_access(target_id: str, uid: str = Depends(get_current_user_id)):
     if target_id == uid:
         raise HTTPException(400, "self")
+    # Blocked either way: the composer locks with a "blocked" state instead
+    # of misleadingly showing the paywall.
+    if await _block_exists(uid, target_id):
+        me0 = await get_user(uid)
+        return {
+            "can_message": False, "blocked": True, "is_reply": False,
+            "unlocked": False, "plan": me0.get("plan", "free"),
+            "plan_active": _plan_active(me0), "requires_unlock": False,
+            "price_uzs": 0, "price_coins": 0,
+            "balance": int(me0.get("balance", 0) or 0),
+            "coins": int(me0.get("coins", 0) or 0),
+            "free_credits": 0, "free_weekly_left": 0,
+            "uses_free_weekly": False, "guarantee_hours": CHAT_GUARANTEE_HOURS,
+        }
     await _maybe_refund_guarantee(uid, target_id)
     me = await get_user(uid)
     is_reply = (await _incoming_count(uid, target_id)) > 0
@@ -348,10 +362,26 @@ async def chat_history(chat_id: str, uid: str = Depends(get_current_user_id), li
     return rows
 
 
+async def _block_exists(a: str, b: str) -> bool:
+    """True when either side has blocked the other."""
+    row = await db.blocks.find_one({
+        "$or": [
+            {"owner_id": a, "target_id": b},
+            {"owner_id": b, "target_id": a},
+        ]
+    }, {"_id": 1})
+    return bool(row)
+
+
 @router.post("/messages/send")
 async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_user_id)):
     if req.to_user_id == uid:
         raise HTTPException(400, "Cannot message self")
+
+    # Blocks were recorded but never enforced anywhere — a blocked user could
+    # simply keep messaging. Refuse in both directions.
+    if await _block_exists(uid, req.to_user_id):
+        raise HTTPException(403, "blocked")
 
     sender_doc = await get_user(uid)
     if not await can_initiate_chat(sender_doc, req.to_user_id):
@@ -519,8 +549,9 @@ async def get_voice_file(
 ):
     """Serve voice file for a message if the user is a chat participant.
     Accepts auth via Authorization header OR auth query parameter (for audio elements)."""
-    from auth import decode_token
-    from core import get_object
+    # get_object lives in storage, not core — the old `from core import
+    # get_object` raised ImportError and 500'd EVERY voice message playback.
+    from storage import get_object
 
     # Extract token from header or query parameter
     token = None

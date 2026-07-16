@@ -16,6 +16,7 @@ from auth import (
     validate_telegram_init_data,
 )
 from core import (
+    _client_ip,
     ADMIN_EMAIL,
     TELEGRAM_BOT_TOKEN,
     check_pw,
@@ -207,7 +208,7 @@ async def register(req: RegisterRequest, request: Request):
         raise HTTPException(400, "Email already registered")
     
     # Get client IP and user agent for analytics
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = _client_ip(request)
     user_agent = request.headers.get("user-agent", "unknown")
     
     uid = new_id()
@@ -269,7 +270,7 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request):
         raise HTTPException(400, "No telegram user id")
 
     # Get client IP and user agent for analytics
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = _client_ip(request)
     user_agent = request.headers.get("user-agent", "unknown")
 
     existing = await db.users.find_one({"telegram_id": tg_id})

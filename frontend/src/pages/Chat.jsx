@@ -421,6 +421,18 @@ export default function Chat() {
                     <span className="text-[9px] uppercase tracking-wider opacity-70">🎙 · {m.meta.voice_duration || 0}s</span>
                     <audio controls preload="none" src={`/api/chat/voice/${m.id}?auth=${localStorage.getItem("fidem_token") || ""}`} className="h-8 max-w-full" />
                   </div>
+                ) : m.kind === "video" && m.meta?.video_url ? (
+                  // Video messages used to fall through to plain text and
+                  // render as the literal string "[video]".
+                  <video
+                    controls
+                    preload="none"
+                    playsInline
+                    src={photoSrc(m.meta.video_url)}
+                    poster={m.meta.video_thumbnail ? photoSrc(m.meta.video_thumbnail) : undefined}
+                    className="max-w-full max-h-64 rounded-xl"
+                    data-testid={`video-msg-${m.id}`}
+                  />
                 ) : (
                   m.text
                 )}
@@ -591,14 +603,14 @@ export default function Chat() {
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !access?.requires_unlock && send()}
-              disabled={!!access?.requires_unlock}
-              placeholder={access?.requires_unlock ? t("chat_locked_inline") : t("type_message")}
+              disabled={!!access?.requires_unlock || !!access?.blocked}
+              placeholder={access?.blocked ? t("user_blocked_error") : access?.requires_unlock ? t("chat_locked_inline") : t("type_message")}
               className="flex-1 min-w-0 rounded-full border border-border bg-card px-4 h-10 text-sm outline-none focus:border-primary disabled:opacity-60 disabled:cursor-not-allowed"
             />
             <button
               data-testid="chat-send"
               onClick={() => send()}
-              disabled={sending || !text.trim() || !!access?.requires_unlock}
+              disabled={sending || !text.trim() || !!access?.requires_unlock || !!access?.blocked}
               className="shrink-0 w-10 h-10 grid place-items-center rounded-full bg-primary text-white disabled:opacity-50"
             >
               <Send className="w-4 h-4" />
