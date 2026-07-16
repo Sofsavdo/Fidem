@@ -58,26 +58,31 @@ export default function DailyCheckIn() {
         </div>
         <h2 className="font-heading text-2xl font-semibold mt-3">{t("daily_bonus") || "Daily bonus"}</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          {status.streak} {t("day_word")} ·{" "}
-          <span className="text-foreground font-semibold">+{status.next_bonus} {t("sum")}</span>
+          {(status.next_streak || 1)}-{t("day_word")} ·{" "}
+          <span className="text-foreground font-semibold">+{(status.next_bonus || 0).toLocaleString()} {t("sum")}</span>
         </p>
-        <div className="flex justify-center gap-1.5 mt-4">
-          {Array.from({ length: 7 }).map((_, i) => {
-            const filled = i < (status.streak % 7);
-            const isToday = i === (status.streak % 7);
+        {/* Doubling ladder: today's step highlighted, so the user SEES what
+            tomorrow pays and what a missed day costs. */}
+        <div className="flex justify-center gap-1 mt-4">
+          {(status.rewards || [100, 200, 400, 800, 1600, 3200, 6400]).map((amt, i) => {
+            const day = Math.min(status.next_streak || 1, 7);
+            const filled = i < day - 1;
+            const isToday = i === day - 1;
             return (
-              <div
-                key={i}
-                className={`w-7 h-7 rounded-full grid place-items-center text-[10px] font-medium ${
-                  filled ? "bg-gold text-ink" : isToday ? "bg-primary text-white ring-2 ring-primary/30" : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {i + 1}
+              <div key={i} className="flex flex-col items-center gap-0.5">
+                <div
+                  className={`w-9 h-7 rounded-lg grid place-items-center text-[9px] font-semibold tabular-nums ${
+                    filled ? "bg-gold/70 text-ink" : isToday ? "bg-primary text-white ring-2 ring-primary/30" : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {amt >= 1000 ? `${(amt / 1000).toFixed(1).replace(".0", "")}k` : amt}
+                </div>
+                <span className={`text-[8px] ${isToday ? "text-primary font-semibold" : "text-muted-foreground"}`}>{i + 1}</span>
               </div>
             );
           })}
         </div>
-        <p className="text-[11px] text-muted-foreground mt-3">7 {t("day_word")} · +1000 {t("sum")} 🎁</p>
+        <p className="text-[11px] text-muted-foreground mt-3">{t("streak_tomorrow_hint").replace("{n}", (status.tomorrow_bonus || 0).toLocaleString())}</p>
         <button
           data-testid="daily-claim"
           onClick={claim}

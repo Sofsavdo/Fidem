@@ -61,13 +61,18 @@ export default function Announcements() {
         {items.map((a) => (
           <article key={a.id} className="rounded-3xl bg-card border border-border overflow-hidden" data-testid={`anons-${a.id}`}>
             {a.image_url && (
-              <img
-                loading="lazy"
-                decoding="async"
-                src={photoSrc(a.image_url)}
-                alt=""
-                className="w-full max-h-72 object-cover"
-              />
+              /* Fixed aspect box reserves the image's space BEFORE it loads —
+                 without it the text painted first and the page jumped when
+                 the image arrived. */
+              <div className="w-full aspect-[16/9] max-h-72 bg-muted overflow-hidden">
+                <img
+                  loading="lazy"
+                  decoding="async"
+                  src={photoSrc(a.image_url)}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+              </div>
             )}
             <div className="p-4">
               <h2 className="font-heading text-lg font-semibold leading-snug">{a.title}</h2>

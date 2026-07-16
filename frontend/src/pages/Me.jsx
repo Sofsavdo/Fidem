@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, PlanPill } from "@/components/Badges";
 import PhotoUpload from "@/components/PhotoUpload";
+import { photoSrc } from "@/lib/photo";
+import { purchasePlan } from "@/lib/purchase";
 import { ChevronRight, Crown, Wallet, Share2, Settings as SettingsIcon, LogOut, ShieldCheck, Clock, SlidersHorizontal, Brain, BookOpen, Phone, Trophy, Rocket, MessageCircle, EyeOff, Camera } from "lucide-react";
 import BoostModal from "@/components/BoostModal";
 import LocationVerifyCard from "@/components/LocationVerifyCard";
@@ -28,6 +30,7 @@ function openSupportChat() {
 
 export default function Me() {
   const { user, t, logout, refresh, wsEvent } = useApp();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [boostOpen, setBoostOpen] = useState(false);
 
@@ -103,13 +106,14 @@ export default function Me() {
               {user.plan !== "free" && user.plan_until && (() => {
                 const daysLeft = Math.max(0, Math.ceil((new Date(user.plan_until) - Date.now()) / 86400000));
                 return (
-                  <Link
-                    to="/premium?tab=plans"
+                  <button
+                    type="button"
+                    onClick={() => purchasePlan(user.plan, { t, navigate, onPaid: refresh })}
                     data-testid="plan-days-left"
                     className={`text-[10px] px-2 py-0.5 rounded-full border ${daysLeft <= 3 ? "bg-amber-50 text-amber-700 border-amber-300" : "bg-muted text-muted-foreground border-border"}`}
                   >
                     {daysLeft} {t("days_left_short")}
-                  </Link>
+                  </button>
                 );
               })()}
             </div>
@@ -150,11 +154,37 @@ export default function Me() {
         <Link
           to="/saved?tab=interested"
           data-testid="profile-teaser-banner"
-          className="block rounded-3xl bg-gradient-to-r from-primary/10 to-card border border-primary/30 p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform"
+          className="block rounded-3xl bg-gradient-to-r from-primary/15 via-primary/5 to-card border border-primary/30 p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform"
         >
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium leading-snug">{t("profile_teaser_title")} · {t("profile_teaser_subtitle").replace("{n}", interestedSummary.total)}</p>
-            <span className="shrink-0 text-xs font-semibold text-primary whitespace-nowrap">{t("profile_teaser_cta")} →</span>
+          <div className="flex items-center gap-3">
+            {/* Masked avatar stack — real (locked) people, not just a line of
+                text nobody reads. Photos are hidden for free users, so each
+                circle shows the masked initial on a warm gradient. */}
+            <div className="flex -space-x-3 shrink-0">
+              {(interestedSummary.items || []).slice(0, 3).map((p, i) => (
+                <div
+                  key={p.id || i}
+                  className="w-11 h-11 rounded-full ring-2 ring-card grid place-items-center font-heading font-semibold text-white text-sm bg-gradient-to-br from-primary to-rose-400 overflow-hidden"
+                  style={{ zIndex: 3 - i }}
+                >
+                  {p.photo_url ? (
+                    <img src={photoSrc(p.photo_url)} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    (p.name || "?")[0]
+                  )}
+                </div>
+              ))}
+              {interestedSummary.total > 3 && (
+                <div className="w-11 h-11 rounded-full ring-2 ring-card grid place-items-center bg-ink text-white text-xs font-bold" style={{ zIndex: 0 }}>
+                  +{interestedSummary.total - 3}
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold leading-snug">💘 {t("profile_teaser_title")}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{t("profile_teaser_subtitle").replace("{n}", interestedSummary.total)}</p>
+            </div>
+            <span className="shrink-0 rounded-full bg-primary text-white text-xs font-semibold px-3.5 py-2">{t("profile_teaser_cta")}</span>
           </div>
         </Link>
       )}
