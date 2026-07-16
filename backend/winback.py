@@ -58,6 +58,12 @@ async def _run_once() -> int:
         if ok:
             await db.users.update_one({"id": u["id"]}, {"$set": {"last_winback_sent_at": iso(now)}})
             sent += 1
+        # push_notif fires its Telegram send as a background task, so an
+        # unthrottled loop over every inactive user schedules that many
+        # concurrent Telegram API calls at once - well past Telegram's
+        # ~30 msg/sec limit once the inactive pool is more than a handful
+        # of users. This caps how fast new sends get scheduled.
+        await asyncio.sleep(0.05)
     return sent
 
 

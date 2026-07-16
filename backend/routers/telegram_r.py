@@ -4,22 +4,19 @@ from __future__ import annotations
 import hmac
 import logging
 import os
-from typing import Optional
 
-import httpx
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Request
+from pymongo.errors import DuplicateKeyError
 
 from core import (
     TELEGRAM_BOT_TOKEN,
-    TELEGRAM_BOT_USERNAME,
     TELEGRAM_WEBHOOK_SECRET,
     db,
     get_webapp_url,
     iso,
     now_utc,
-    push_notif,
 )
-from services import send_telegram_message
+from services import send_telegram_message, telegram_set_menu_button, telegram_set_webhook
 
 log = logging.getLogger("fidem.telegram")
 router = APIRouter(tags=["telegram"])
@@ -43,60 +40,131 @@ async def setup_telegram_webhook() -> None:
         return
 
     webapp_url = get_webapp_url()
-    webhook_url = f"{public_base}/api/telegram/webhook?secret={TELEGRAM_WEBHOOK_SECRET}"
+    webhook_url = f"{public_base}/api/telegram/webhook"
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as cl:
-            r = await cl.post(
-                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setWebhook",
-                json={
-                    "url": webhook_url,
-                    "allowed_updates": ["message", "callback_query"],
-                },
-            )
-            log.info(f"Telegram webhook set: {r.status_code} {r.text[:200]}")
-
-            menu = await cl.post(
-                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setChatMenuButton",
-                json={
-                    "menu_button": {
-                        "type": "web_app",
-                        "text": "💖 FIDEM",
-                        "web_app": {
-                            "url": webapp_url,
-                        },
-                    }
-                },
-            )
-            log.info(f"Telegram menu button set: {menu.status_code} {menu.text[:200]}")
-
+        await telegram_set_webhook(webhook_url, TELEGRAM_WEBHOOK_SECRET)
+        await telegram_set_menu_button(webapp_url)
     except Exception as e:
         log.warning(f"setWebhook/menu failed: {e}")
 
 
-@router.post("/telegram/webhook")
-async def telegram_webhook(request: Request, secret: Optional[str] = Query(None)):
-    if not secret or not hmac.compare_digest(secret, TELEGRAM_WEBHOOK_SECRET):
-        raise HTTPException(403, "bad secret")
+async def _handle_start(chat_id: int, tg_user_id: str, text: str) -> None:
+    """Everything a bare '/start [ref_code]' message does: record the
+    funnel event, attribute (but never pay) a referral code, and reply with
+    the Mini App button. Split out of the webhook route so it's a plain
+    function - the route itself should only parse the Telegram update and
+    dispatch, not carry this much domain logic inline."""
+    parts = text.split(maxsplit=1)
+    ref_code = parts[1].strip() if len(parts) > 1 else None
 
-    body = await request.json()
+    # Record every /start so the onboarding funnel is measurable and the
+    # lifecycle nudger can re-engage people who never open the Mini App.
+    await db.bot_starts.update_one(
+        {"telegram_id": tg_user_id},
+        {
+            "$set": {"chat_id": chat_id, "last_start_at": iso(now_utc())},
+            "$setOnInsert": {
+                "telegram_id": tg_user_id,
+                "first_start_at": iso(now_utc()),
+                "nudge_stage": 0,
+            },
+        },
+        upsert=True,
+    )
 
+    existing = await db.users.find_one(
+        {"telegram_id": tg_user_id},
+        {"_id": 0, "id": 1, "referred_by": 1},
+    )
+
+    if ref_code and (not existing or not existing.get("referred_by")):
+        # Try referral_id first (old system)
+        ref_owner = await db.users.find_one(
+            {"referral_id": ref_code},
+            {"_id": 0, "id": 1},
+        )
+
+        # Fallback to referral_username_lower (new custom username system)
+        if not ref_owner:
+            ref_owner = await db.users.find_one(
+                {"referral_username_lower": ref_code.lower()},
+                {"_id": 0, "id": 1},
+            )
+
+        if ref_owner and (not existing or existing["id"] != ref_owner["id"]):
+            # Just record the attribution here - do NOT pay any bonus yet.
+            # A bare "/start CODE" text message costs the sender nothing
+            # and proves nothing (no Mini App session, no real account),
+            # so paying out on it is a free-money farm: script N throwaway
+            # Telegram accounts to message /start, collect N x reward,
+            # never touch the app again. The click-bonus is paid instead
+            # in routers/auth_r.py at real account creation (/auth/telegram),
+            # which requires a verified Telegram WebApp session and runs
+            # through the existing IP-based fraud scoring.
+            if existing:
+                await db.users.update_one(
+                    {"id": existing["id"]},
+                    {"$set": {"referred_by": ref_code}},
+                )
+            else:
+                await db.pending_refs.update_one(
+                    {"telegram_id": tg_user_id},
+                    {
+                        "$set": {
+                            "telegram_id": tg_user_id,
+                            "ref_code": ref_code,
+                            "at": iso(now_utc()),
+                        }
+                    },
+                    upsert=True,
+                )
+
+    webapp_url = get_webapp_url()
+
+    reply = (
+        "💖 FIDEM\n\n"
+        "Jiddiy munosabat va oila qurish uchun platforma.\n\n"
+        "✅ Mos nomzodlar\n"
+        "✅ Xavfsiz chat\n"
+        "✅ Premium imkoniyatlar\n"
+        "✅ Telegram ichida ishlaydi\n\n"
+        "👇 Ilovani ochish uchun tugmani bosing"
+    )
+
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "💖 FIDEM'ni ochish",
+                    "web_app": {
+                        "url": webapp_url,
+                    },
+                }
+            ]
+        ]
+    }
+
+    await send_telegram_message(
+        chat_id,
+        reply,
+        reply_markup=keyboard,
+    )
+
+
+async def _dispatch(body: dict) -> None:
     # Admin inline buttons (P2P top-up approve/reject) arrive as
     # callback_query updates, not messages.
     cb = body.get("callback_query")
     if cb:
         from admin_bot import handle_admin_callback
 
-        try:
-            await handle_admin_callback(cb)
-        except Exception:
-            log.warning("admin callback failed", exc_info=True)
-        return {"ok": True}
+        await handle_admin_callback(cb)
+        return
 
     msg = body.get("message")
-
     if not msg:
-        return {"ok": True}
+        return
 
     text = (msg.get("text") or "").strip()
     chat_id = msg["chat"]["id"]
@@ -108,103 +176,43 @@ async def telegram_webhook(request: Request, secret: Optional[str] = Query(None)
 
         if await is_admin_tg(int(tg_user_id)):
             await send_telegram_message(chat_id, await build_stats_text())
-        return {"ok": True}
+        return
 
     if text.startswith("/start"):
-        parts = text.split(maxsplit=1)
-        ref_code = parts[1].strip() if len(parts) > 1 else None
+        await _handle_start(chat_id, tg_user_id, text)
 
-        # Record every /start so the onboarding funnel is measurable and the
-        # lifecycle nudger can re-engage people who never open the Mini App.
-        await db.bot_starts.update_one(
-            {"telegram_id": tg_user_id},
-            {
-                "$set": {"chat_id": chat_id, "last_start_at": iso(now_utc())},
-                "$setOnInsert": {
-                    "telegram_id": tg_user_id,
-                    "first_start_at": iso(now_utc()),
-                    "nudge_stage": 0,
-                },
-            },
-            upsert=True,
-        )
 
-        existing = await db.users.find_one(
-            {"telegram_id": tg_user_id},
-            {"_id": 0, "id": 1, "referred_by": 1},
-        )
+@router.post("/telegram/webhook")
+async def telegram_webhook(request: Request):
+    # Telegram's own webhook-authentication mechanism (Bot API 6.0+): the
+    # secret set via setWebhook's secret_token is echoed back on every call
+    # as this header. A URL query parameter was used here previously, which
+    # is what a hand-rolled (rather than Telegram-native) check looks like -
+    # it leaks the secret into access logs/proxies and isn't what Telegram
+    # itself verifies.
+    secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
+    if not secret or not hmac.compare_digest(secret, TELEGRAM_WEBHOOK_SECRET):
+        raise HTTPException(403, "bad secret")
 
-        if ref_code and (not existing or not existing.get("referred_by")):
-            # Try referral_id first (old system)
-            ref_owner = await db.users.find_one(
-                {"referral_id": ref_code},
-                {"_id": 0, "id": 1},
-            )
-            
-            # Fallback to referral_username_lower (new custom username system)
-            if not ref_owner:
-                ref_owner = await db.users.find_one(
-                    {"referral_username_lower": ref_code.lower()},
-                    {"_id": 0, "id": 1},
-                )
+    body = await request.json()
 
-            if ref_owner and (not existing or existing["id"] != ref_owner["id"]):
-                # Just record the attribution here - do NOT pay any bonus yet.
-                # A bare "/start CODE" text message costs the sender nothing
-                # and proves nothing (no Mini App session, no real account),
-                # so paying out on it is a free-money farm: script N throwaway
-                # Telegram accounts to message /start, collect N x reward,
-                # never touch the app again. The click-bonus is paid instead
-                # in routers/auth_r.py at real account creation (/auth/telegram),
-                # which requires a verified Telegram WebApp session and runs
-                # through the existing IP-based fraud scoring.
-                if existing:
-                    await db.users.update_one(
-                        {"id": existing["id"]},
-                        {"$set": {"referred_by": ref_code}},
-                    )
-                else:
-                    await db.pending_refs.update_one(
-                        {"telegram_id": tg_user_id},
-                        {
-                            "$set": {
-                                "telegram_id": tg_user_id,
-                                "ref_code": ref_code,
-                                "at": iso(now_utc()),
-                            }
-                        },
-                        upsert=True,
-                    )
+    # Telegram guarantees at-least-once delivery and retries any update that
+    # didn't get a fast 2xx - without tracking update_id, a slow response or
+    # a transient error reprocesses (and can re-send messages for) the same
+    # update. First-write-wins via a unique index makes this a no-op retry.
+    update_id = body.get("update_id")
+    if update_id is not None:
+        try:
+            await db.telegram_updates.insert_one({"update_id": update_id, "at": iso(now_utc())})
+        except DuplicateKeyError:
+            return {"ok": True}
 
-        webapp_url = get_webapp_url()
-
-        reply = (
-            "💖 FIDEM\n\n"
-            "Jiddiy munosabat va oila qurish uchun platforma.\n\n"
-            "✅ Mos nomzodlar\n"
-            "✅ Xavfsiz chat\n"
-            "✅ Premium imkoniyatlar\n"
-            "✅ Telegram ichida ishlaydi\n\n"
-            "👇 Ilovani ochish uchun tugmani bosing"
-        )
-
-        keyboard = {
-            "inline_keyboard": [
-                [
-                    {
-                        "text": "💖 FIDEM'ni ochish",
-                        "web_app": {
-                            "url": webapp_url,
-                        },
-                    }
-                ]
-            ]
-        }
-
-        await send_telegram_message(
-            chat_id,
-            reply,
-            reply_markup=keyboard,
-        )
+    try:
+        await _dispatch(body)
+    except Exception:
+        # Never let our own bug turn into a 500 - Telegram would just retry
+        # the same update indefinitely (and now duplicate-process it, since
+        # the dedup row above is already written).
+        log.warning("telegram webhook dispatch failed", exc_info=True)
 
     return {"ok": True}

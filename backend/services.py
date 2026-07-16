@@ -1,5 +1,15 @@
-"""External services: Telegram Bot, CLICK payment, matching, helpers."""
+"""External services: Telegram Bot, CLICK payment, matching, helpers.
+
+Telegram: this module is the ONLY place that reads TELEGRAM_BOT_TOKEN and
+talks to api.telegram.org. Every other module (core.py, admin_bot.py,
+routers/telegram_r.py) imports the token/helpers from here instead of
+re-reading the env var and hand-rolling its own httpx calls - previously
+three separate modules each defined their own TG_BOT_TOKEN/TG_API, which is
+exactly how config drift (e.g. an admin id silently pointing at the wrong
+value) creeps in unnoticed.
+"""
 from __future__ import annotations
+import asyncio
 import hashlib
 import logging
 import os
@@ -11,13 +21,55 @@ import httpx
 
 log = logging.getLogger(__name__)
 
-TG_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-TG_API = f"https://api.telegram.org/bot{TG_BOT_TOKEN}"
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+_TG_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
 CLICK_MERCHANT_ID = os.environ.get("CLICK_MERCHANT_ID", "")
 CLICK_SERVICE_ID = os.environ.get("CLICK_SERVICE_ID", "")
 CLICK_SECRET_KEY = os.environ.get("CLICK_SECRET_KEY", "")
 CLICK_RETURN_URL = os.environ.get("CLICK_RETURN_URL", "")
+
+# One pooled client for every Telegram API call in the process, instead of
+# opening a fresh TCP+TLS connection per send - matters a lot once bulk
+# passes (lifecycle nudges, winback, admin digest) fire dozens of sends back
+# to back. Created lazily so import order never depends on an event loop
+# already running.
+_http_client: Optional[httpx.AsyncClient] = None
+
+
+def _client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None:
+        _http_client = httpx.AsyncClient(timeout=20.0)
+    return _http_client
+
+
+async def _tg_call(method: str, **kwargs) -> Optional[httpx.Response]:
+    """POST to a Telegram Bot API method through the shared client, with a
+    single capped-wait retry on HTTP 429 (Telegram's own rate-limit
+    response, which carries the required backoff in
+    `parameters.retry_after`). Previously nothing in this codebase ever
+    looked at that field, so any burst that tripped Telegram's limiter
+    (bulk nudges, admin digests) just silently dropped the message."""
+    if not TELEGRAM_BOT_TOKEN:
+        log.warning("TELEGRAM_BOT_TOKEN not set; skipping Telegram API call")
+        return None
+    url = f"{_TG_API}/{method}"
+    try:
+        r = await _client().post(url, **kwargs)
+        if r.status_code == 429:
+            try:
+                retry_after = int(r.json().get("parameters", {}).get("retry_after", 1))
+            except Exception:
+                retry_after = 1
+            wait = min(max(retry_after, 1), 30)
+            log.warning(f"Telegram {method} rate-limited, retrying once after {wait}s")
+            await asyncio.sleep(wait)
+            r = await _client().post(url, **kwargs)
+        return r
+    except Exception as e:
+        log.error(f"Telegram {method} failed: {e}")
+        return None
 
 
 async def send_telegram_message(chat_id: int, text: str, reply_markup: Optional[dict] = None) -> bool:
@@ -31,25 +83,72 @@ async def send_telegram_message(chat_id: int, text: str, reply_markup: Optional[
     message as unparsable HTML - and the failure was silent (see below),
     so it looked like the bot just never sent anything.
     """
-    if not TG_BOT_TOKEN:
-        log.warning("TELEGRAM_BOT_TOKEN not set; skipping notification")
-        return False
     payload = {"chat_id": chat_id, "text": text}
     if reply_markup:
         payload["reply_markup"] = reply_markup
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            r = await client.post(f"{TG_API}/sendMessage", json=payload)
-            if r.status_code != 200:
-                # Previously not logged at all - a non-exception failure
-                # (bad chat_id, user blocked the bot, rate limit, malformed
-                # payload...) was completely invisible; the caller went on
-                # to mark the notification as delivered regardless.
-                log.warning(f"Telegram sendMessage failed: {r.status_code} {r.text[:300]}")
-            return r.status_code == 200
-    except Exception as e:
-        log.error(f"Telegram send failed: {e}")
+    r = await _tg_call("sendMessage", json=payload)
+    if r is None:
         return False
+    if r.status_code != 200:
+        # Previously not logged at all - a non-exception failure (bad
+        # chat_id, user blocked the bot, rate limit, malformed payload...)
+        # was completely invisible; the caller went on to mark the
+        # notification as delivered regardless.
+        log.warning(f"Telegram sendMessage failed: {r.status_code} {r.text[:300]}")
+    return r.status_code == 200
+
+
+async def send_telegram_photo(chat_id: int, photo: bytes, caption: str, reply_markup: Optional[dict] = None) -> bool:
+    import json as _json
+
+    data = {"chat_id": str(chat_id), "caption": caption}
+    if reply_markup:
+        data["reply_markup"] = _json.dumps(reply_markup)
+    r = await _tg_call("sendPhoto", data=data, files={"photo": ("receipt.jpg", photo)})
+    if r is None:
+        return False
+    if r.status_code != 200:
+        log.warning(f"Telegram sendPhoto failed: {r.status_code} {r.text[:200]}")
+    return r.status_code == 200
+
+
+async def answer_callback_query(callback_id: str, text: str) -> None:
+    await _tg_call("answerCallbackQuery", json={"callback_query_id": callback_id, "text": text})
+
+
+async def edit_message_caption(chat_id: int, message_id: int, caption: str) -> None:
+    """Rewrite the alert caption after a decision so the buttons disappear
+    and the thread shows what happened."""
+    await _tg_call(
+        "editMessageCaption",
+        json={"chat_id": chat_id, "message_id": message_id, "caption": caption},
+    )
+
+
+async def telegram_set_webhook(url: str, secret_token: str) -> bool:
+    """secret_token is delivered back by Telegram on every webhook call as
+    the `X-Telegram-Bot-Api-Secret-Token` header (Bot API 6.0+) - the
+    intended way to authenticate inbound webhook calls. The previous
+    implementation instead appended the secret as a `?secret=` URL query
+    parameter, which leaks into access logs/proxies and isn't what Telegram
+    itself verifies or expects."""
+    r = await _tg_call("setWebhook", json={
+        "url": url,
+        "secret_token": secret_token,
+        "allowed_updates": ["message", "callback_query"],
+    })
+    ok = r is not None and r.status_code == 200
+    log.info(f"Telegram webhook set: {r.status_code if r else 'no response'} {r.text[:200] if r else ''}")
+    return ok
+
+
+async def telegram_set_menu_button(webapp_url: str) -> bool:
+    r = await _tg_call("setChatMenuButton", json={
+        "menu_button": {"type": "web_app", "text": "💖 FIDEM", "web_app": {"url": webapp_url}},
+    })
+    ok = r is not None and r.status_code == 200
+    log.info(f"Telegram menu button set: {r.status_code if r else 'no response'} {r.text[:200] if r else ''}")
+    return ok
 
 
 # ---- CLICK Shop pay-link (Merchant API checkout link) ----

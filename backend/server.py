@@ -269,6 +269,14 @@ async def startup() -> None:
     # filtered by status, /stats pending count.
     await db.manual_topups.create_index([("user_id", 1), ("status", 1)], name="ix_manual_topups_user_status")
     await db.manual_topups.create_index([("status", 1), ("created_at", -1)], name="ix_manual_topups_status_time")
+    # Telegram webhook update_id dedup - Telegram retries any update that
+    # doesn't get a fast 2xx, so without this a retry (or a slow response)
+    # reprocesses the same /start or callback_query and can double-send.
+    try:
+        await db.telegram_updates.create_index("update_id", unique=True, name="ix_tg_updates_id")
+    except Exception as e:
+        log.warning(f"Warning: Failed to create unique telegram_updates index (likely pre-existing duplicates): {e}")
+        await db.telegram_updates.create_index("update_id", name="ix_tg_updates_id_nonunique")
 
     # Initialize referral_id for existing users (first 8 chars of id) - only if needed
     sample_referral = await db.users.find_one({"referral_id": {"$exists": True}}, {"referral_id": 1})

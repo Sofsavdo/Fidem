@@ -11,14 +11,16 @@ import logging
 import os
 from datetime import timedelta
 
-import httpx
-
-from core import db, iso, now_utc, parse_dt
+from core import db, iso, now_utc
+from services import (
+    TELEGRAM_BOT_TOKEN,
+    answer_callback_query,
+    edit_message_caption,
+    send_telegram_message,
+    send_telegram_photo,
+)
 
 log = logging.getLogger("fidem.admin_bot")
-
-TG_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-TG_API = f"https://api.telegram.org/bot{TG_BOT_TOKEN}"
 
 
 def _bot_own_id() -> int | None:
@@ -28,7 +30,7 @@ def _bot_own_id() -> int | None:
     rejects every send with 'Forbidden: the bot can't send messages to the
     bot', which otherwise looks identical to a misconfigured/missing admin."""
     try:
-        return int(TG_BOT_TOKEN.split(":", 1)[0])
+        return int(TELEGRAM_BOT_TOKEN.split(":", 1)[0])
     except (ValueError, IndexError):
         return None
 
@@ -62,50 +64,6 @@ async def get_admin_chat_ids() -> list[int]:
 
 async def is_admin_tg(tg_id: int) -> bool:
     return tg_id in await get_admin_chat_ids()
-
-
-async def _send_photo(chat_id: int, photo: bytes, caption: str, reply_markup: dict | None = None) -> bool:
-    if not TG_BOT_TOKEN:
-        return False
-    import json as _json
-
-    data = {"chat_id": str(chat_id), "caption": caption}
-    if reply_markup:
-        data["reply_markup"] = _json.dumps(reply_markup)
-    try:
-        async with httpx.AsyncClient(timeout=20.0) as cl:
-            r = await cl.post(f"{TG_API}/sendPhoto", data=data, files={"photo": ("receipt.jpg", photo)})
-            if r.status_code != 200:
-                log.warning(f"sendPhoto failed: {r.status_code} {r.text[:200]}")
-            return r.status_code == 200
-    except Exception as e:
-        log.warning(f"sendPhoto error: {e}")
-        return False
-
-
-async def answer_callback(callback_id: str, text: str) -> None:
-    if not TG_BOT_TOKEN:
-        return
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as cl:
-            await cl.post(f"{TG_API}/answerCallbackQuery", json={"callback_query_id": callback_id, "text": text})
-    except Exception:
-        pass
-
-
-async def edit_caption(chat_id: int, message_id: int, caption: str) -> None:
-    """Rewrite the alert caption after a decision so the buttons disappear
-    and the thread shows what happened."""
-    if not TG_BOT_TOKEN:
-        return
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as cl:
-            await cl.post(
-                f"{TG_API}/editMessageCaption",
-                json={"chat_id": chat_id, "message_id": message_id, "caption": caption},
-            )
-    except Exception:
-        pass
 
 
 async def notify_admins_manual_topup(topup: dict) -> None:
@@ -145,11 +103,9 @@ async def notify_admins_manual_topup(topup: dict) -> None:
     except Exception as e:
         log.warning(f"topup receipt fetch failed: {e}")
 
-    from services import send_telegram_message
-
     for chat_id in admins:
         if photo:
-            ok = await _send_photo(chat_id, photo, caption, reply_markup=keyboard)
+            ok = await send_telegram_photo(chat_id, photo, caption, reply_markup=keyboard)
             if ok:
                 continue
         # No photo (or sendPhoto failed): still deliver the alert as text
@@ -217,7 +173,7 @@ async def handle_admin_callback(cb: dict) -> None:
     if not data.startswith("mtu:"):
         return
     if not await is_admin_tg(from_id):
-        await answer_callback(cb_id, "Ruxsat yo'q")
+        await answer_callback_query(cb_id, "Ruxsat yo'q")
         return
 
     _, action, tid = data.split(":", 2)
@@ -231,12 +187,12 @@ async def handle_admin_callback(cb: dict) -> None:
         decided_by=f"tg:{from_id}",
     )
     if res is None:
-        await answer_callback(cb_id, "Allaqachon ko'rib chiqilgan")
+        await answer_callback_query(cb_id, "Allaqachon ko'rib chiqilgan")
         if chat_id and message_id:
-            await edit_caption(chat_id, message_id, (msg.get("caption") or "") + "\n\n⚠️ Allaqachon ko'rib chiqilgan")
+            await edit_message_caption(chat_id, message_id, (msg.get("caption") or "") + "\n\n⚠️ Allaqachon ko'rib chiqilgan")
         return
 
     verdict = "✅ TASDIQLANDI — balans tushdi" if approve else "❌ RAD ETILDI"
-    await answer_callback(cb_id, verdict)
+    await answer_callback_query(cb_id, verdict)
     if chat_id and message_id:
-        await edit_caption(chat_id, message_id, (msg.get("caption") or "") + f"\n\n{verdict}")
+        await edit_message_caption(chat_id, message_id, (msg.get("caption") or "") + f"\n\n{verdict}")
