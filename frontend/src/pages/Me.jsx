@@ -156,35 +156,40 @@ export default function Me() {
           data-testid="profile-teaser-banner"
           className="block rounded-3xl bg-gradient-to-r from-primary/15 via-primary/5 to-card border border-primary/30 p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform"
         >
-          <div className="flex items-center gap-3">
-            {/* Masked avatar stack — real (locked) people, not just a line of
-                text nobody reads. Photos are hidden for free users, so each
-                circle shows the masked initial on a warm gradient. */}
-            <div className="flex -space-x-3 shrink-0">
-              {(interestedSummary.items || []).slice(0, 3).map((p, i) => (
-                <div
-                  key={p.id || i}
-                  className="w-11 h-11 rounded-full ring-2 ring-card grid place-items-center font-heading font-semibold text-white text-sm bg-gradient-to-br from-primary to-rose-400 overflow-hidden"
-                  style={{ zIndex: 3 - i }}
-                >
-                  {p.photo_url ? (
-                    <img src={photoSrc(p.photo_url)} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    (p.name || "?")[0]
-                  )}
-                </div>
-              ))}
-              {interestedSummary.total > 3 && (
-                <div className="w-11 h-11 rounded-full ring-2 ring-card grid place-items-center bg-ink text-white text-xs font-bold" style={{ zIndex: 0 }}>
-                  +{interestedSummary.total - 3}
-                </div>
-              )}
+          {/* Stacked layout: avatars+text on top, CTA full-width below — a
+              single horizontal row here squeezed the avatar stack, title,
+              subtitle and button all into too little space. */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              {/* Masked avatar stack — real (locked) people, not just a line of
+                  text nobody reads. Photos are hidden for free users, so each
+                  circle shows the masked initial on a warm gradient. */}
+              <div className="flex -space-x-3 shrink-0">
+                {(interestedSummary.items || []).slice(0, 3).map((p, i) => (
+                  <div
+                    key={p.id || i}
+                    className="w-11 h-11 rounded-full ring-2 ring-card grid place-items-center font-heading font-semibold text-white text-sm bg-gradient-to-br from-primary to-rose-400 overflow-hidden"
+                    style={{ zIndex: 3 - i }}
+                  >
+                    {p.photo_url ? (
+                      <img src={photoSrc(p.photo_url)} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      (p.name || "?")[0]
+                    )}
+                  </div>
+                ))}
+                {interestedSummary.total > 3 && (
+                  <div className="w-11 h-11 rounded-full ring-2 ring-card grid place-items-center bg-ink text-white text-xs font-bold" style={{ zIndex: 0 }}>
+                    +{interestedSummary.total - 3}
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold leading-snug">💘 {t("profile_teaser_title")}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t("profile_teaser_subtitle").replace("{n}", interestedSummary.total)}</p>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold leading-snug">💘 {t("profile_teaser_title")}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{t("profile_teaser_subtitle").replace("{n}", interestedSummary.total)}</p>
-            </div>
-            <span className="shrink-0 rounded-full bg-primary text-white text-xs font-semibold px-3.5 py-2">{t("profile_teaser_cta")}</span>
+            <span className="block text-center rounded-full bg-primary text-white text-xs font-semibold px-3.5 py-2.5">{t("profile_teaser_cta")}</span>
           </div>
         </Link>
       )}
