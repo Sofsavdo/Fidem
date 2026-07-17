@@ -258,14 +258,14 @@ async def _admin_daily_digest() -> None:
     await db.settings.update_one(
         {"id": "admin_digest"}, {"$set": {"sent_on": today}}, upsert=True
     )
-    from admin_bot import build_stats_text, get_admin_chat_ids
+    from admin_bot import build_stats_text, get_admin_chat_ids, send_admin_alert
 
     admins = await get_admin_chat_ids()
     if not admins:
         return
     text = await build_stats_text()
     for chat_id in admins:
-        await send_telegram_message(chat_id, text)
+        await send_admin_alert(chat_id, text)
 
 
 async def _cleanup_telegram_updates() -> None:
@@ -276,6 +276,39 @@ async def _cleanup_telegram_updates() -> None:
     await db.telegram_updates.delete_many({"at": {"$lt": cutoff}})
 
 
+async def _snapshot_daily_stats() -> None:
+    """One row/day of the core growth numbers, so the AI insights endpoint
+    (routers/admin_r.py) can say '7 kun oldin X edi, hozir Y' instead of only
+    ever seeing a single point in time. Idempotent per calendar day via the
+    same sent_on-marker pattern as _admin_daily_digest."""
+    today = now_utc().date().isoformat()
+    if await db.stats_snapshots.find_one({"date": today}, {"_id": 1}):
+        return
+    now = now_utc()
+    today_iso = iso(now - timedelta(days=1))
+    week_iso = iso(now - timedelta(days=7))
+    month_iso = iso(now - timedelta(days=30))
+    total, onboarded, dau, wau, mau, premium, vip = await asyncio.gather(
+        db.users.count_documents({}),
+        db.users.count_documents({"onboarded": True}),
+        db.users.count_documents({"last_active": {"$gte": today_iso}}),
+        db.users.count_documents({"last_active": {"$gte": week_iso}}),
+        db.users.count_documents({"last_active": {"$gte": month_iso}}),
+        db.users.count_documents({"plan": "premium"}),
+        db.users.count_documents({"plan": "vip"}),
+    )
+    rev = await db.payments.aggregate([
+        {"$match": {"status": "success", "created_at": {"$gte": iso(now.replace(hour=0, minute=0, second=0, microsecond=0))}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
+    ]).to_list(1)
+    await db.stats_snapshots.insert_one({
+        "date": today, "total_users": total, "onboarded": onboarded,
+        "dau": dau, "wau": wau, "mau": mau, "premium": premium, "vip": vip,
+        "revenue_today": (rev[0]["total"] if rev else 0) or 0,
+        "created_at": iso(now),
+    })
+
+
 async def _run_pass() -> None:
     await _plan_reminders()
     await _plan_expiry()
@@ -284,6 +317,7 @@ async def _run_pass() -> None:
     await _onboarding_nudges()
     await _admin_daily_digest()
     await _cleanup_telegram_updates()
+    await _snapshot_daily_stats()
 
 
 async def lifecycle_loop() -> None:

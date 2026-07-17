@@ -117,12 +117,28 @@ function prefetchHotRoutes() {
 }
 
 function Inner() {
+  const { user } = useApp();
+
   useEffect(() => {
     const ric = window.requestIdleCallback || ((cb) => setTimeout(cb, 1500));
     const cancel = window.cancelIdleCallback || clearTimeout;
     const id = ric(prefetchHotRoutes);
     return () => cancel(id);
   }, []);
+
+  // Admin.jsx pulls in recharts (a heavy, admin-only dependency) so it's
+  // deliberately excluded from prefetchHotRoutes for every regular user -
+  // but for an admin, opening the panel (from the browser or the
+  // Fidemadminbot Mini App button) is the very first thing they do, so the
+  // chunk should already be warm by the time they tap it instead of paying
+  // that download on the critical path.
+  useEffect(() => {
+    if (!user?.is_admin) return;
+    const ric = window.requestIdleCallback || ((cb) => setTimeout(cb, 1500));
+    const cancel = window.cancelIdleCallback || clearTimeout;
+    const id = ric(() => import("@/pages/Admin"));
+    return () => cancel(id);
+  }, [user?.is_admin]);
 
   // Keep the theme in sync (and follow system/Telegram changes when set to
   // "system"). The initial class is set by the inline script in index.html.

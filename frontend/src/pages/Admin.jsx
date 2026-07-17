@@ -18,10 +18,12 @@ import {
   useAdminCeo, useAdminFunnel, useAdminEngagement, useAdminRevenue,
   useAdminConciergeAnalytics, useAdminChatModAnalytics, useAdminAuditLog,
   useAdminUserDetail, useAdminUserAction, useDeleteDemoUsers, useAdminConfigHealth,
+  useAdminAiInsights, useRefreshAiInsights,
 } from "@/hooks/queries";
 
 const menuItems = [
   { id: "ceo", icon: Gauge, label: "CEO Dashboard" },
+  { id: "ai", icon: Bot, label: "AI Tahlilchi" },
   { id: "growth", icon: Heart, label: "O'sish (Funnel)" },
   { id: "revenue", icon: DollarSign, label: "Daromad" },
   { id: "dashboard", icon: LayoutDashboard, label: "Boshqaruv" },
@@ -66,18 +68,17 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col lg:flex-row">
-      {/* Sidebar */}
-      <aside className={`lg:fixed lg:left-0 lg:top-0 lg:h-full bg-card border-r border-border transition-all duration-300 z-50 ${sidebarOpen ? "lg:w-64 w-full" : "lg:w-16 w-full"}`}>
+      {/* Desktop sidebar - below lg this used to render as a full-width
+          block ABOVE the page content (every tab required scrolling past
+          all 18 menu buttons first), and its collapse toggle did nothing on
+          mobile since both the open/closed classes resolved to the same
+          "w-full". Now genuinely desktop-only; mobile gets its own compact
+          horizontal tab bar below instead of a shrunk version of this. */}
+      <aside className={`hidden lg:flex lg:flex-col lg:fixed lg:left-0 lg:top-0 lg:h-full bg-card border-r border-border transition-all duration-300 z-50 ${sidebarOpen ? "lg:w-64" : "lg:w-16"}`}>
         <div className="p-4 border-b border-border flex items-center justify-between">
           <h1 className={`font-heading font-semibold ${sidebarOpen ? "text-xl" : "text-center text-sm"}`}>
             {sidebarOpen ? "Boshqaruv paneli" : "BP"}
           </h1>
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="lg:hidden p-2 rounded-full hover:bg-muted"
-          >
-            <ChevronRight className={`w-5 h-5 transition-transform ${sidebarOpen ? "rotate-180" : ""}`} />
-          </button>
         </div>
         <nav className="p-2 space-y-1">
           {menuItems.map((item) => (
@@ -105,18 +106,49 @@ export default function Admin() {
         </div>
       </aside>
 
+      {/* Mobile tab bar - horizontally scrollable pills, same pattern as
+          the segment filters elsewhere in this panel (e.g. USER_SEGMENTS).
+          Sticky so switching tabs never requires scrolling back up first. */}
+      <nav className="lg:hidden sticky top-0 z-40 bg-card border-b border-border">
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar px-3 py-2.5">
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              data-testid={`admin-mobile-tab-${item.id}`}
+              className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                activeTab === item.id
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              <item.icon className="w-3.5 h-3.5 shrink-0" />
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </nav>
+
       {/* Main Content */}
       <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? "lg:ml-64" : "lg:ml-16"}`}>
         <div className="p-4 lg:p-6 w-full">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <Link to="/me" className="p-2 rounded-full hover:bg-muted">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
+            <div className="flex items-center gap-3 min-w-0">
+              <Link to="/me" className="p-2 rounded-full hover:bg-muted shrink-0">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
-              <h2 className="font-heading text-xl lg:text-2xl font-semibold">{menuItems.find(m => m.id === activeTab)?.label}</h2>
+              <h2 className="font-heading text-xl lg:text-2xl font-semibold truncate">{menuItems.find(m => m.id === activeTab)?.label}</h2>
             </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>{user.name}</span>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
+              {configHealth && (
+                <span
+                  data-testid="admin-bot-status"
+                  className={`text-[11px] px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${configHealth.admin_bot_configured ? "bg-emerald-100 text-emerald-800" : "bg-muted text-muted-foreground"}`}
+                >
+                  {configHealth.admin_bot_configured ? "🛠 Admin bot: ulandi" : "🛠 Admin bot: sozlanmagan"}
+                </span>
+              )}
+              <span className="hidden sm:inline">{user.name}</span>
             </div>
           </div>
 
@@ -143,6 +175,7 @@ export default function Admin() {
           )}
 
           {activeTab === "ceo" && <AdminCeoDashboard go={setActiveTab} />}
+          {activeTab === "ai" && <AdminAiInsights />}
           {activeTab === "growth" && <AdminGrowthDashboard />}
           {activeTab === "revenue" && <AdminRevenueDashboard />}
           {activeTab === "auditlog" && <AdminAuditLog />}
@@ -268,8 +301,92 @@ function AdminCeoDashboard({ go }) {
       </div>
 
       <div className="flex gap-2 flex-wrap">
+        <button onClick={() => go("ai")} className="text-xs rounded-full border border-border px-4 py-2 hover:bg-muted">🤖 AI tahlilini ko'rish →</button>
         <button onClick={() => go("growth")} className="text-xs rounded-full border border-border px-4 py-2 hover:bg-muted">O'sish funnel'ini ko'rish →</button>
         <button onClick={() => go("revenue")} className="text-xs rounded-full border border-border px-4 py-2 hover:bg-muted">Daromad tahlili →</button>
+      </div>
+    </div>
+  );
+}
+
+const TREND_UZ = {
+  growing: { label: "O'sish kuzatilmoqda", cls: "bg-emerald-100 text-emerald-800" },
+  stable: { label: "Barqaror", cls: "bg-amber-100 text-amber-800" },
+  declining: { label: "Pasaymoqda", cls: "bg-rose-100 text-rose-800" },
+};
+
+// AI growth/activity analyst: reads the exact same numbers the CEO Dashboard
+// shows (plus 7d/30d trend + winback effectiveness) and turns them into a
+// plain-Uzbek verdict + prioritized recommendations, server-cached for 3h so
+// opening this tab doesn't burn a model call every time.
+function AdminAiInsights() {
+  const { data, isLoading } = useAdminAiInsights();
+  const refresh = useRefreshAiInsights();
+
+  if (isLoading) return <div className="text-center py-12 text-muted-foreground">Yuklanmoqda...</div>;
+
+  const trend = TREND_UZ[data?.trend] || TREND_UZ.stable;
+  const generatedAt = data?.generated_at ? new Date(data.generated_at).toLocaleString("uz-UZ") : null;
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-3xl bg-gradient-to-br from-ink to-zinc-800 text-white p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Bot className="w-5 h-5 text-primary" />
+            <p className="text-xs uppercase tracking-wider text-white/60">AI o'sish tahlilchisi</p>
+          </div>
+          <span className={`text-[11px] px-2.5 py-1 rounded-full font-semibold ${trend.cls}`}>{trend.label}</span>
+        </div>
+        <p className="mt-3 text-sm leading-relaxed">
+          {data?.ai_generated ? (data.summary || "—") : "AI tahlil hozircha mavjud emas — provider sozlanmagan yoki vaqtincha ishlamayapti."}
+        </p>
+      </div>
+
+      {data?.ai_generated && (
+        <>
+          {data.highlights?.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Diqqatga sazovor</p>
+              <div className="space-y-2">
+                {data.highlights.map((h, i) => (
+                  <div key={i} className="rounded-2xl border border-border bg-card p-3 text-sm">✨ {h}</div>
+                ))}
+              </div>
+            </div>
+          )}
+          {data.risks?.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Xavflar</p>
+              <div className="space-y-2">
+                {data.risks.map((r, i) => (
+                  <div key={i} className="rounded-2xl border border-rose-200 bg-rose-50 text-rose-900 p-3 text-sm">⚠️ {r}</div>
+                ))}
+              </div>
+            </div>
+          )}
+          {data.recommendations?.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Tavsiyalar</p>
+              <div className="space-y-2">
+                {data.recommendations.map((r, i) => (
+                  <div key={i} className="rounded-2xl border border-primary/30 bg-primary/5 p-3 text-sm">👉 {r}</div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      <div className="flex items-center justify-between gap-3 pt-1">
+        <p className="text-[11px] text-muted-foreground">{generatedAt ? `So'nggi yangilanish: ${generatedAt}` : ""}</p>
+        <button
+          onClick={() => refresh.mutate()}
+          disabled={refresh.isPending}
+          className="text-xs rounded-full bg-primary text-primary-foreground px-4 py-2 font-semibold disabled:opacity-50"
+        >
+          {refresh.isPending ? "Tahlil qilinmoqda..." : "🔄 Qayta tahlil qilish"}
+        </button>
       </div>
     </div>
   );
@@ -1106,6 +1223,9 @@ function AdminUserQuickActions({ userId }) {
         <button onClick={() => run("ban", "Bu foydalanuvchini ban qilishga ishonchingiz komilmi?")} disabled={actionMut.isPending} className="text-xs rounded-full bg-red-50 text-red-700 px-3 py-2 inline-flex items-center gap-1 disabled:opacity-50">
           <Ban className="w-3 h-3" /> Ban qilish
         </button>
+        <button onClick={() => run("fraud_block", "Firibgarlik deb belgilaymizmi? Balans 0 ga qaytariladi va hisob bloklanadi, foydalanuvchiga ogohlantirish yuboriladi.")} disabled={actionMut.isPending} className="text-xs rounded-full bg-rose-100 text-rose-800 px-3 py-2 inline-flex items-center gap-1 disabled:opacity-50 font-semibold">
+          <AlertTriangle className="w-3 h-3" /> Firibgarlik — balans 0 + blok
+        </button>
       </div>
     </div>
   );
@@ -1341,6 +1461,22 @@ function AdminManualTopups() {
     } finally { setBusy(null); }
   };
 
+  // Reversal for an approved P2P request that turns out to be fraudulent
+  // (money never actually landed - only checkable in the real bank app) -
+  // zeroes the balance it credited, blocks the account, and warns the user
+  // in one call instead of chaining 3 separate admin actions.
+  const flagFraud = async (row) => {
+    if (!window.confirm(`"${row.user?.name || row.user_id}" hisobini firibgarlik deb belgilaymizmi? Balans 0 ga qaytariladi va hisob bloklanadi.`)) return;
+    setBusy(row.id);
+    try {
+      await api.post(`/admin/users/${row.user_id}/action`, { action: "fraud_block" });
+      toast.success("Balans 0 ga qaytarildi, hisob bloklandi");
+      loadItems(status);
+    } catch {
+      toast.error("Xatolik");
+    } finally { setBusy(null); }
+  };
+
   return (
     <div className="max-w-2xl space-y-4">
       {/* Config: toggle + receiving card */}
@@ -1390,9 +1526,17 @@ function AdminManualTopups() {
         {items.map((r) => (
           <div key={r.id} className="rounded-2xl bg-card border border-border p-4 flex items-center gap-3 flex-wrap">
             <div className="flex-1 min-w-[160px]">
-              <p className="text-sm font-medium">{r.user?.name || r.user_id} · <span className="tabular-nums font-semibold">{Number(r.amount).toLocaleString()} so'm</span></p>
+              <p className="text-sm font-medium flex items-center gap-1.5">
+                {r.user?.name || r.user_id} · <span className="tabular-nums font-semibold">{Number(r.amount).toLocaleString()} so'm</span>
+                {r.decided_by === "ai" && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 font-semibold shrink-0">🤖 AI</span>}
+              </p>
               <p className="text-xs text-muted-foreground mt-0.5">{new Date(r.created_at).toLocaleString()} · balans: {Number(r.user?.balance || 0).toLocaleString()}</p>
               {r.rejection_reason && <p className="text-xs text-primary mt-0.5">{r.rejection_reason}</p>}
+              {r.ai_review?.ai_generated && (
+                <p className="text-[11px] text-violet-700 mt-1 bg-violet-50 rounded-lg px-2 py-1">
+                  🤖 {r.ai_review.verdict} ({r.ai_review.confidence}%) — {r.ai_review.reason || "—"}
+                </p>
+              )}
             </div>
             <a href={photoSrc(r.proof_url)} target="_blank" rel="noreferrer" className="text-xs text-secondary underline shrink-0">Chekni ko'rish</a>
             {r.status === "pending" && (
@@ -1402,6 +1546,12 @@ function AdminManualTopups() {
                 <button onClick={() => decide(r.id, false)} disabled={busy === r.id}
                   className="rounded-full border border-border text-xs font-semibold px-4 py-2 disabled:opacity-50">Rad etish</button>
               </div>
+            )}
+            {r.status === "approved" && (
+              <button onClick={() => flagFraud(r)} disabled={busy === r.id}
+                className="shrink-0 rounded-full border border-rose-300 text-rose-700 text-xs font-semibold px-4 py-2 disabled:opacity-50">
+                Firibgarlik — bloklash
+              </button>
             )}
           </div>
         ))}

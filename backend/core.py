@@ -16,6 +16,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from models import new_id, now_utc
 from services import (
+    ADMIN_BOT_TOKEN,  # noqa: F401 - re-exported for `from core import ADMIN_BOT_TOKEN` callers
     TELEGRAM_BOT_TOKEN,  # noqa: F401 - re-exported for `from core import TELEGRAM_BOT_TOKEN` callers
     age_from_birth,
     compute_completeness,
@@ -32,6 +33,7 @@ db = client[os.environ["DB_NAME"]]
 
 TELEGRAM_BOT_USERNAME = os.environ.get("TELEGRAM_BOT_USERNAME", "Fidem_Appbot")
 TELEGRAM_WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "fidem-tg")
+ADMIN_BOT_WEBHOOK_SECRET = os.environ.get("ADMIN_BOT_WEBHOOK_SECRET", "fidem-admin-tg")
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@fidem.uz")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 
@@ -94,6 +96,13 @@ def get_webapp_url() -> str:
         "WEBAPP_URL",
         "https://fidem-frontend-production.up.railway.app",
     ).rstrip("/")
+
+
+def get_admin_webapp_url() -> str:
+    """Same deployed frontend, just opened straight at /admin - there is no
+    separate admin build, only a separate bot pointing a Mini App button at
+    this URL."""
+    return f"{get_webapp_url()}/admin"
 
 
 def hash_pw(pw: str) -> str:

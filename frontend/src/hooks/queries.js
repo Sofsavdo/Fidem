@@ -380,6 +380,26 @@ export function useAdminConfigHealth() {
   });
 }
 
+// AI growth/activity analyst - cached server-side (3h), so the default
+// fetch is cheap; useRefreshAiInsights forces a fresh model call.
+export function useAdminAiInsights() {
+  return useQuery({
+    queryKey: ["admin", "aiInsights"],
+    queryFn: () => api.get("/admin/ai-insights").then((r) => r.data),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useRefreshAiInsights() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.get("/admin/ai-insights?force=true").then((r) => r.data),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["admin", "aiInsights"], data);
+    },
+  });
+}
+
 export function useAdminCeo() {
   return useQuery({
     queryKey: QK.adminCeo,

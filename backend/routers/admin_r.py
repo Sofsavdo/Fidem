@@ -24,19 +24,31 @@ async def admin_config_health(_: str = Depends(get_current_admin)):
     review, /stats, the daily digest - can ever reach anyone, no matter
     how correct the rest of the notification code is."""
     from admin_bot import get_admin_chat_ids
+    from core import ADMIN_BOT_TOKEN
 
     admin_ids = await get_admin_chat_ids()
     return {
         "telegram_admin_count": len(admin_ids),
         "telegram_configured": len(admin_ids) > 0,
+        # Whether ADMIN_BOT_TOKEN is set on THIS running process - the only
+        # way an admin who can't check Railway logs/env vars can confirm the
+        # variable actually took effect (typo'd key, forgot to redeploy,
+        # etc. all look identical from the outside otherwise).
+        "admin_bot_configured": bool(ADMIN_BOT_TOKEN),
     }
 
 
 @router.get("/stats")
 async def admin_stats(_: str = Depends(get_current_admin)):
+    return await _compute_admin_stats()
+
+
+async def _compute_admin_stats() -> dict:
     """Dashboard metrics. Everything runs CONCURRENTLY via asyncio.gather -
     this endpoint used to fire ~22 sequential DB roundtrips, which made the
-    whole admin panel feel frozen on every open."""
+    whole admin panel feel frozen on every open. Factored out of the /stats
+    route so the AI growth-insights endpoint below can reuse the exact same
+    numbers the admin sees on screen instead of recomputing its own."""
     today_iso = iso(datetime.now(timezone.utc) - timedelta(days=1))
     week_iso = iso(datetime.now(timezone.utc) - timedelta(days=7))
     month_iso = iso(datetime.now(timezone.utc) - timedelta(days=30))
@@ -129,6 +141,88 @@ async def admin_stats(_: str = Depends(get_current_admin)):
             "avg_messages_per_user": round(avg_messages_per_user, 1),
         },
     }
+
+
+AI_INSIGHTS_CACHE_MINUTES = 180  # a fresh AI call costs tokens + ~5-10s; the
+# underlying numbers barely move within 3 hours, so re-showing the cached
+# read on every panel open is not stale in any way that matters.
+
+
+def _fmt_snapshot(label: str, snap: dict | None) -> str:
+    if not snap:
+        return f"{label}: maʼlumot yo'q"
+    return (
+        f"{label}: jami={snap.get('total_users', 0)}, anketali={snap.get('onboarded', 0)}, "
+        f"DAU={snap.get('dau', 0)}, WAU={snap.get('wau', 0)}, MAU={snap.get('mau', 0)}, "
+        f"premium={snap.get('premium', 0)}, vip={snap.get('vip', 0)}, "
+        f"bugungi_daromad={snap.get('revenue_today', 0)}"
+    )
+
+
+async def _build_insights_data() -> str:
+    stats = await _compute_admin_stats()
+    today = now_utc().date().isoformat()
+    week_ago = iso(now_utc() - timedelta(days=7))[:10]
+    month_ago = iso(now_utc() - timedelta(days=30))[:10]
+    snap_7d, snap_30d = await asyncio.gather(
+        db.stats_snapshots.find_one({"date": {"$lte": week_ago}}, {"_id": 0}, sort=[("date", -1)]),
+        db.stats_snapshots.find_one({"date": {"$lte": month_ago}}, {"_id": 0}, sort=[("date", -1)]),
+    )
+    week_iso = iso(now_utc() - timedelta(days=7))
+    winback_sent_7d = await db.users.count_documents({"last_winback_sent_at": {"$gte": week_iso}})
+    inactive_3d_plus = await db.users.count_documents({
+        "onboarded": True, "blocked": {"$ne": True}, "last_active": {"$lt": iso(now_utc() - timedelta(days=3))},
+    })
+
+    lines = [
+        f"HOZIRGI HOLAT ({today}):",
+        f"  Jami userlar: {stats['total_users']} (erkak {stats['males']}, ayol {stats['females']})",
+        f"  Anketa to'ldirgan: {stats['onboarded']}",
+        f"  Faol: DAU={stats['dau']}, WAU={stats['wau']}, MAU={stats['mau']}",
+        f"  Pullik tarif: Premium={stats['premium']}, VIP={stats['vip']} "
+        f"(konversiya: {stats['conversion_premium']}%)",
+        f"  Daromad: bugun={stats['revenue']['today']}, hafta={stats['revenue']['week']}, "
+        f"oy={stats['revenue']['month']}, jami={stats['revenue']['total']} so'm",
+        f"  Sifat: o'rtacha anketa to'liqligi={stats['quality']['avg_completion']}%, "
+        f"yangi userlar saqlanish darajasi={stats['quality']['retention_rate']}%, "
+        f"faol userga o'rtacha xabar={stats['quality']['avg_messages_per_user']}",
+        f"  Kutilayotgan: to'lovlar={stats['pending_payments']}, "
+        f"tekshiruvlar={stats['pending_verifications']}, shikoyatlar={stats['open_reports']}",
+        "",
+        "TARIXIY TAQQOSLASH:",
+        f"  {_fmt_snapshot('7 kun oldin', snap_7d)}",
+        f"  {_fmt_snapshot('30 kun oldin', snap_30d)}",
+        "",
+        "QAYTA FAOLLASHTIRISH (winback) TIZIMI:",
+        f"  Oxirgi 7 kunda avtomatik xabar yuborilgan userlar: {winback_sent_7d}",
+        f"  Hozir 3+ kundan beri faol bo'lmagan (lekin bloklanmagan) userlar soni: {inactive_3d_plus}",
+        "",
+        "TOP HUDUDLAR: " + ", ".join(f"{r['_id']} ({r['count']})" for r in stats["top_regions"][:5]),
+    ]
+    return "\n".join(lines)
+
+
+@router.get("/ai-insights")
+async def admin_ai_insights(force: bool = False, _: str = Depends(get_current_admin)):
+    """The 'AI tahlilchi' panel: a growth/activity analysis in Uzbek, backed
+    by the exact same numbers as /admin/stats plus 7d/30d trend snapshots
+    and winback effectiveness. Cached for AI_INSIGHTS_CACHE_MINUTES so
+    opening the tab repeatedly doesn't burn a model call every time;
+    force=true (the panel's 'Yangilash' button) always regenerates."""
+    cached = await db.ai_insights_cache.find_one({"id": "latest"}, {"_id": 0})
+    if not force and cached and cached.get("generated_at"):
+        from core import parse_dt
+        age = now_utc() - parse_dt(cached["generated_at"])
+        if age < timedelta(minutes=AI_INSIGHTS_CACHE_MINUTES):
+            return cached
+
+    from ai_service import generate_growth_insights
+
+    data = await _build_insights_data()
+    insight = await generate_growth_insights(data)
+    doc = {**insight, "generated_at": iso(now_utc())}
+    await db.ai_insights_cache.update_one({"id": "latest"}, {"$set": doc}, upsert=True)
+    return doc
 
 
 @router.get("/users")
@@ -319,6 +413,18 @@ async def admin_user_action(
         await db.users.update_one({"id": target_id}, {"$set": {"balance": 0}})
     elif action == "reset_likes":
         await db.saved.delete_many({"owner_id": target_id})
+    elif action == "fraud_block":
+        # The reversal side of AI auto-approved P2P top-ups: if the money
+        # never actually landed (only checkable in the real bank app, which
+        # no AI here has access to), one tap zeroes the balance it credited,
+        # blocks the account, and tells the user why - instead of the admin
+        # having to chain reset_balance + ban + a manual message by hand.
+        await db.users.update_one({"id": target_id}, {"$set": {"balance": 0, "blocked": True}})
+        await push_notif(
+            target_id, "balance",
+            "⚠️ Hisobingiz bloklandi: to'lov firibgarligi aniqlandi (kartaga pul tushmagan yoki soxta chek). "
+            "Agar bu xato deb hisoblasangiz, admin bilan bog'laning.",
+        )
     else:
         raise HTTPException(400, f"Unknown action: {action}")
 
