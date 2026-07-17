@@ -3,10 +3,11 @@ import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, Phone, AtSign, Instagram, Save, SlidersHorizontal, ShieldCheck, Lock, Video, Trash2, Crown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Phone, AtSign, Instagram, Save, SlidersHorizontal, ShieldCheck, Lock, Video, Trash2, Crown, Monitor, Sun, Moon } from "lucide-react";
 import { useDailyStatus, QK } from "@/hooks/queries";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { photoSrc } from "@/lib/photo";
+import { getTheme, setTheme } from "@/lib/theme";
 
 // Client-side duration probe: reject anything over ~16s before uploading.
 function probeVideoDuration(file) {
@@ -31,6 +32,8 @@ export default function MeSettings() {
   const { t, user, refresh } = useApp();
   const queryClient = useQueryClient();
   const { data: daily } = useDailyStatus();
+  const [theme, setThemeState] = useState(getTheme());
+  const pickTheme = (v) => { setThemeState(v); setTheme(v); };
 
   const [phone, setPhone] = useState(user?.contact_phone || "");
   const [tg, setTg] = useState(user?.contact_telegram || "");
@@ -109,6 +112,31 @@ export default function MeSettings() {
       </header>
 
       <div className="max-w-2xl mx-auto p-4 md:p-6 space-y-5">
+        {/* Appearance — theme. Lives here (the general settings hub) rather
+            than on the "who can message me" filter sub-page, which it has
+            nothing to do with. */}
+        <div className="rounded-3xl bg-card border border-border p-4">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2.5">{t("appearance")}</p>
+          <div className="inline-flex p-1 rounded-2xl bg-muted/60 border border-border/70 w-full">
+            {[
+              { k: "system", label: t("theme_system"), Icon: Monitor },
+              { k: "light", label: t("theme_light"), Icon: Sun },
+              { k: "dark", label: t("theme_dark"), Icon: Moon },
+            ].map((o) => (
+              <button
+                key={o.k}
+                data-testid={`theme-${o.k}`}
+                onClick={() => pickTheme(o.k)}
+                className={`flex-1 py-2 px-3 text-sm font-medium rounded-xl transition-colors inline-flex items-center justify-center gap-1.5 ${
+                  theme === o.k ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
+                }`}
+              >
+                <o.Icon className="w-4 h-4" /> {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Contact info — what the chat's "share contact" button sends */}
         <div className="rounded-3xl bg-card border border-border p-5 space-y-3" data-testid="contact-info-card">
           <div>

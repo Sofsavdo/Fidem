@@ -7,11 +7,12 @@ import { openExternalLink } from "@/lib/telegram";
 import api from "@/lib/api";
 import { useAnnouncements } from "@/hooks/queries";
 import { EmptyState } from "@/components/kit";
+import { localeFor } from "@/lib/time";
 
 // Anonslar — the platform news feed: photo posts, releases, and (later)
 // match/wedding success stories.
 export default function Announcements() {
-  const { t } = useApp();
+  const { t, lang } = useApp();
   const navigate = useNavigate();
   const { data: items = [], isLoading } = useAnnouncements();
   const seenRef = useRef(new Set());
@@ -89,7 +90,7 @@ export default function Announcements() {
                 </button>
               )}
               <p className="text-[11px] text-muted-foreground mt-2.5">
-                {a.created_at ? new Date(a.created_at).toLocaleDateString() : ""}
+                {a.created_at ? new Date(a.created_at).toLocaleDateString(localeFor(lang)) : ""}
               </p>
             </div>
           </article>

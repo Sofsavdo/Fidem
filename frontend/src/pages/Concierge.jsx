@@ -8,9 +8,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { useConciergeInfo, useConciergeMine, QK } from "@/hooks/queries";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { openExternalLink } from "@/lib/telegram";
+import { localeFor } from "@/lib/time";
 
 export default function Concierge() {
-  const { t } = useApp();
+  const { t, lang } = useApp();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -67,7 +68,7 @@ export default function Concierge() {
         <div className="flex items-start justify-between">
           <div>
             <div className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-secondary text-white">
-              <Crown className="w-3 h-3" /> PREMIUM
+              <Crown className="w-3 h-3" /> {t("concierge_badge")}
             </div>
             <h2 className="text-3xl font-heading font-semibold mt-2">{info.price.toLocaleString()} {t("sum_word")}</h2>
             <p className="text-sm text-muted-foreground">{info.days} {t("day_word")} · {info.max_matches} {t("concierge_matches_word")}</p>
@@ -99,7 +100,7 @@ export default function Concierge() {
             <div key={o.id} className="rounded-3xl border border-border bg-card p-5 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm"><span className="font-medium">{o.amount.toLocaleString()} {t("sum_word")}</span> · {new Date(o.created_at).toLocaleDateString()}</p>
+                  <p className="text-sm"><span className="font-medium">{o.amount.toLocaleString()} {t("sum_word")}</span> · {new Date(o.created_at).toLocaleDateString(localeFor(lang))}</p>
                   <p className="text-xs text-muted-foreground">{statusLabel(o.status)}</p>
                 </div>
                 <span className="text-xs font-medium">{(o.matches || []).length}/{info.max_matches} {t("concierge_matches_word")}</span>
