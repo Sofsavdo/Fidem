@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { X, Gift as GiftIcon, Plus } from "lucide-react";
@@ -15,9 +15,14 @@ const TIER_ORDER = ["care", "love", "luxury"];
 
 export default function GiftModal({ targetId, targetName, onClose, onSent }) {
   const { user, t, lang, refresh } = useApp();
+  const navigate = useNavigate();
   const [catalog, setCatalog] = useState(null);
   const [sending, setSending] = useState(null);
   const [activeTier, setActiveTier] = useState("care");
+  // Hard lock, separate from the `sending` state - a slow connection reads
+  // as "did nothing happen?" and a fast repeated tap can otherwise fire the
+  // purchase again before React's disabled-button re-render lands.
+  const sendingRef = useRef(false);
 
   useEffect(() => {
     if (!targetId) return;
@@ -38,6 +43,8 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
   const labelKey = lang === "ru" ? "label_ru" : lang === "en" ? "label_en" : "label_uz";
 
   const send = async (item) => {
+    if (sendingRef.current) return;
+    sendingRef.current = true;
     setSending(item.kind);
     try {
       await api.post("/gifts/send", { to_user_id: targetId, gift_kind: item.kind });
@@ -48,6 +55,7 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
     } catch (e) {
       toast.error(t("error_generic"));
     } finally {
+      sendingRef.current = false;
       setSending(null);
     }
   };
@@ -115,15 +123,21 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
               <button
                 key={g.kind}
                 data-testid={`gift-${g.kind}`}
-                onClick={() => cannotAfford ? toast.info(t("gift_need_topup")) : send(g)}
+                onClick={() => {
+                  if (cannotAfford) {
+                    toast.info(t("gift_need_topup"));
+                    onClose();
+                    navigate("/premium?tab=balance");
+                    return;
+                  }
+                  send(g);
+                }}
                 disabled={sending !== null}
-                className={`relative rounded-2xl border p-2.5 transition flex flex-col items-center justify-center gap-0.5 aspect-square ${
-                  cannotAfford ? "border-dashed border-border bg-muted/20" : "border-border bg-card hover:-translate-y-0.5 hover:shadow-md active:scale-95"
-                }`}
+                className="relative rounded-2xl border border-border bg-card p-2.5 transition flex flex-col items-center justify-center gap-0.5 aspect-square hover:-translate-y-0.5 hover:shadow-md active:scale-95 disabled:opacity-70"
               >
-                <span className={`text-3xl leading-none ${cannotAfford ? "opacity-40 grayscale" : ""}`}>{g.emoji}</span>
-                <span className={`text-[10px] font-medium text-center leading-tight mt-0.5 line-clamp-1 w-full ${cannotAfford ? "opacity-60" : ""}`}>{g[labelKey]}</span>
-                <span className={`text-[10px] tabular-nums ${cannotAfford ? "text-primary font-semibold" : "text-muted-foreground"}`}>
+                <span className="text-3xl leading-none">{g.emoji}</span>
+                <span className="text-[10px] font-medium text-center leading-tight mt-0.5 line-clamp-1 w-full">{g[labelKey]}</span>
+                <span className="text-[10px] tabular-nums text-muted-foreground">
                   {g.price >= 1000 ? `${(g.price / 1000).toFixed(g.price >= 10000 ? 0 : 1)}K` : g.price}
                 </span>
                 {sending === g.kind && <span className="absolute inset-0 grid place-items-center bg-card/80 rounded-2xl text-foreground text-xs">{t("gift_sending")}</span>}

@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends
 
 from auth import get_current_admin
 from core import db, iso, now_utc, parse_dt
+from models import GIFT_PRICES, PLAN_GIFTS
 
 router = APIRouter(prefix="/admin", tags=["admin-analytics"])
 
@@ -88,6 +89,25 @@ async def _real_revenue(since_iso: Optional[str] = None) -> int:
         db.payments.aggregate([{"$match": match_p2p}, {"$group": {"_id": None, "t": {"$sum": "$amount"}}}]).to_list(1),
     )
     return (click_agg[0]["t"] if click_agg else 0) + (p2p_agg[0]["t"] if p2p_agg else 0)
+
+
+# ---------- Gift Shop revenue: charge_for_gift() (chat_r.py) deducts
+# balance directly and logs to db.gifts - it never creates a db.payments
+# row, so without this helper every gift purchase (decorative AND gifted
+# subscriptions) would be invisible to the spend-by-feature breakdown below.
+# Like the rest of this file, this is "balance actually spent", not "real
+# cash in" - the money was already counted as real revenue when the balance
+# was topped up (or never was, e.g. streak bonuses), so it must never be
+# added to _real_revenue().
+async def _gift_shop_spend(since_iso: Optional[str] = None) -> int:
+    match: dict = {}
+    if since_iso:
+        match["created_at"] = {"$gte": since_iso}
+    rows = await db.gifts.aggregate([
+        {"$match": match},
+        {"$group": {"_id": None, "total": {"$sum": "$price"}}},
+    ]).to_list(1)
+    return rows[0]["total"] if rows else 0
 
 
 @router.get("/ceo")
@@ -309,6 +329,14 @@ async def revenue_dashboard(_: str = Depends(get_current_admin)):
         {"$group": {"_id": "$purpose", "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
         {"$sort": {"total": -1}},
     ]).to_list(20)
+    gift_by_category = await db.gifts.aggregate([
+        {"$group": {"_id": "$category", "total": {"$sum": "$price"}, "count": {"$sum": 1}}},
+    ]).to_list(10)
+    for r in gift_by_category:
+        # Rows logged before the Gift Shop refactor have no "category" field
+        # (every gift was decorative back then) - default them to "deco".
+        spend_by_purpose.append({"_id": f"gift_shop_{r['_id'] or 'deco'}", "total": r["total"], "count": r["count"]})
+    spend_by_purpose.sort(key=lambda r: r["total"], reverse=True)
 
     # 30-day daily trend of real cash in, for a sparkline.
     trend_rows = await db.payments.aggregate([
@@ -344,6 +372,65 @@ async def revenue_dashboard(_: str = Depends(get_current_admin)):
             "premium_conversion_pct": round(paying_users / total_users * 100, 2) if total_users else 0,
         },
         "ltv_note": "LTV ishonchli hisoblash uchun uzoqroq muddat (kohorta chayqovi) kerak — hozircha ARPPU'ni proksi sifatida ishlating.",
+    }
+
+
+@router.get("/gift-shop")
+async def gift_shop_analytics(_: str = Depends(get_current_admin)):
+    """Gift Shop detail behind the /admin/revenue "gift_shop_*" spend rows:
+    top-selling decorative gifts, the gifted-subscription breakdown by plan,
+    and the real so'm value currently sitting unredeemed in gift_inventory
+    (paid for, not yet given to anyone)."""
+    p = _period_bounds()
+
+    (
+        rev_today, rev_week, rev_month, rev_total,
+        by_category, top_deco, plan_breakdown, inventory_agg,
+    ) = await asyncio.gather(
+        _gift_shop_spend(p["today"]),
+        _gift_shop_spend(p["week"]),
+        _gift_shop_spend(p["month"]),
+        _gift_shop_spend(None),
+        db.gifts.aggregate([
+            {"$group": {"_id": "$category", "total": {"$sum": "$price"}, "count": {"$sum": 1}}},
+        ]).to_list(10),
+        db.gifts.aggregate([
+            {"$match": {"category": {"$ne": "plan"}}},
+            {"$group": {"_id": "$kind", "total": {"$sum": "$price"}, "count": {"$sum": 1}}},
+            {"$sort": {"total": -1}},
+            {"$limit": 10},
+        ]).to_list(10),
+        db.gifts.aggregate([
+            {"$match": {"category": "plan"}},
+            {"$group": {"_id": "$kind", "total": {"$sum": "$price"}, "count": {"$sum": 1}}},
+            {"$sort": {"total": -1}},
+        ]).to_list(10),
+        db.gift_inventory.aggregate([
+            {"$match": {"status": "unused"}},
+            {"$group": {"_id": None, "total": {"$sum": "$price"}, "count": {"$sum": 1}}},
+        ]).to_list(1),
+    )
+
+    for r in top_deco:
+        meta = GIFT_PRICES.get(r["_id"], {})
+        r["label"] = meta.get("label_uz", r["_id"])
+        r["emoji"] = meta.get("emoji", "🎁")
+    for r in plan_breakdown:
+        meta = PLAN_GIFTS.get(r["_id"], {})
+        r["label"] = meta.get("label_uz", r["_id"])
+        r["emoji"] = meta.get("emoji", "🎁")
+
+    deco_total = sum(r["total"] for r in by_category if (r["_id"] or "deco") != "plan")
+    plan_total = sum(r["total"] for r in by_category if r["_id"] == "plan")
+    inv = inventory_agg[0] if inventory_agg else {"total": 0, "count": 0}
+
+    return {
+        "revenue": {"today": rev_today, "week": rev_week, "month": rev_month, "total": rev_total},
+        "deco_total": deco_total,
+        "plan_total": plan_total,
+        "top_deco_gifts": top_deco,
+        "plan_gift_breakdown": plan_breakdown,
+        "inventory_pending": {"count": inv.get("count", 0), "value": inv.get("total", 0)},
     }
 
 

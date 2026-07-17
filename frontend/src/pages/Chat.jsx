@@ -386,8 +386,22 @@ export default function Chat() {
                 mine
                   ? "bg-primary text-white rounded-br-sm"
                   : "bg-card border border-border rounded-bl-sm"
-              } ${m.kind === "gift" ? "bg-gold-light text-yellow-900 border-gold/40" : ""}`}>
-                {m.kind === "voice" && m.meta?.voice_url ? (
+              } ${m.kind === "gift" ? "!bg-gold-light !text-yellow-900 !border !border-gold/40 !px-2.5 !py-2" : ""}`}>
+                {m.kind === "gift" && m.meta ? (
+                  // A bare emoji + text string doesn't read as "a gift was
+                  // sent" once the live celebration animation has played out
+                  // - this is what the message looks like forever after,
+                  // in both parties' chat history.
+                  <div className="flex items-center gap-2.5 min-w-[150px]" data-testid={`gift-msg-${m.id}`}>
+                    <span className="w-10 h-10 rounded-2xl grid place-items-center bg-gradient-to-br from-gold via-amber-400 to-gold-dark shadow shrink-0">
+                      <span className="text-xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]">{m.meta.emoji}</span>
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[9px] uppercase tracking-wider font-bold opacity-70">🎁 Sovg'a</p>
+                      <p className="text-sm font-semibold leading-tight truncate">{m.meta.label}</p>
+                    </div>
+                  </div>
+                ) : m.kind === "voice" && m.meta?.voice_url ? (
                   <div className="flex items-center gap-2 min-w-[200px]" data-testid={`voice-msg-${m.id}`}>
                     <span className="text-[9px] uppercase tracking-wider opacity-70">🎙 · {m.meta.voice_duration || 0}s</span>
                     <audio controls preload="none" src={`/api/chat/voice/${m.id}?auth=${localStorage.getItem("fidem_token") || ""}`} className="h-8 max-w-full" />

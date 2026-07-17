@@ -715,6 +715,15 @@ async def deliver_gift(sender: dict, uid: str, to_user_id: str, kind: str, meta:
     await db.users.update_one({"id": to_user_id}, {"$inc": {"gifts_received_total": price}})
     if category == "plan":
         await _apply_plan_gift(to_user_id, meta["plan"], meta["months"])
+        # A gifted subscription is real subscription-tier value, exactly like
+        # buying one directly (process_completed_payment credits the buyer
+        # there too) - attributed to the SENDER, who actually paid, not the
+        # recipient. Without this, gifting someone VIP would never count
+        # toward "paying_users"/ARPPU/conversion anywhere in the admin panel.
+        await db.users.update_one(
+            {"id": uid},
+            {"$inc": {"lifetime_contribution": price, "lifetime_contribution_breakdown.subscription_payments": price}},
+        )
     gift = {
         "id": new_id(),
         "from_user_id": uid,

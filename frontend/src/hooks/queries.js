@@ -489,6 +489,14 @@ export function useAdminRevenue() {
   });
 }
 
+export function useAdminGiftShop() {
+  return useQuery({
+    queryKey: ["admin", "giftShop"],
+    queryFn: () => api.get("/admin/gift-shop").then((r) => r.data),
+    staleTime: 60_000,
+  });
+}
+
 export function useAdminConciergeAnalytics() {
   return useQuery({
     queryKey: QK.adminConciergeAnalytics,

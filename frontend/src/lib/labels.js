@@ -18,6 +18,8 @@ export const PURPOSE_UZ = {
   chat_unlock: "Suhbatni ochish",
   balance_topup: "Balans to'ldirish",
   gift: "Sovg'a",
+  gift_shop_deco: "Sovg'alar do'koni (dekorativ)",
+  gift_shop_plan: "Obuna sovg'alari",
   concierge: "Concierge xizmati",
   rank_boost: "Saxiylar reytingi hissasi",
   boost: "Profil boost (24 soat)",

@@ -25,7 +25,11 @@ ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-8")
 # copy-paste failure mode as ADMIN_BOT_TOKEN (services.py) - a key with
 # stray whitespace still looks "configured" but every call to it 400s.
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+# "-latest" aliases auto-follow Google's current stable release for that
+# tier, so this never goes stale the way a pinned version does - gemini-2.0-
+# flash (the old default here) was shut down by Google on 2026-06-01, and
+# every call started 404ing with no code change on our side at all.
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest").strip()
 
 _client = None
 
