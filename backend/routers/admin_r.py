@@ -25,16 +25,24 @@ async def admin_config_health(_: str = Depends(get_current_admin)):
     how correct the rest of the notification code is."""
     from admin_bot import get_admin_chat_ids
     from core import ADMIN_BOT_TOKEN
+    from services import get_bot_info
 
     admin_ids = await get_admin_chat_ids()
+
+    # A non-empty ADMIN_BOT_TOKEN proves nothing by itself - a typo'd or
+    # truncated token (e.g. a trailing space from copy-pasting into Railway)
+    # would still show as "configured" while every real send to it silently
+    # fails. getMe is a live round-trip to Telegram that actually proves the
+    # token works, so the panel can tell an admin (who has no way to check
+    # server logs) the real reason P2P alerts aren't arriving there.
+    admin_bot_info = await get_bot_info(ADMIN_BOT_TOKEN) if ADMIN_BOT_TOKEN else None
+
     return {
         "telegram_admin_count": len(admin_ids),
         "telegram_configured": len(admin_ids) > 0,
-        # Whether ADMIN_BOT_TOKEN is set on THIS running process - the only
-        # way an admin who can't check Railway logs/env vars can confirm the
-        # variable actually took effect (typo'd key, forgot to redeploy,
-        # etc. all look identical from the outside otherwise).
         "admin_bot_configured": bool(ADMIN_BOT_TOKEN),
+        "admin_bot_token_valid": admin_bot_info is not None,
+        "admin_bot_username": (admin_bot_info or {}).get("username"),
     }
 
 

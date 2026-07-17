@@ -21,7 +21,7 @@ import httpx
 
 log = logging.getLogger(__name__)
 
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 _TG_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
 # Second, separate bot (Fidemadminbot) used only to open the admin panel as
@@ -29,7 +29,11 @@ _TG_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 # token/webhook/secret from the user-facing bot above - the admin bot must
 # never be reachable by a regular user, and a shared token would mean any
 # webhook payload for one bot could be replayed against the other.
-ADMIN_BOT_TOKEN = os.environ.get("ADMIN_BOT_TOKEN", "")
+# .strip(): a copy-pasted token picking up a trailing newline/space (a
+# common paste mistake when setting a Railway variable) would otherwise
+# silently make every call fail while still LOOKING configured (a non-empty
+# string) to any check that only tests truthiness.
+ADMIN_BOT_TOKEN = os.environ.get("ADMIN_BOT_TOKEN", "").strip()
 
 CLICK_MERCHANT_ID = os.environ.get("CLICK_MERCHANT_ID", "")
 CLICK_SERVICE_ID = os.environ.get("CLICK_SERVICE_ID", "")
@@ -219,6 +223,24 @@ async def admin_bot_set_menu_button(webapp_url: str) -> bool:
     ok = r is not None and r.status_code == 200
     log.info(f"Admin bot menu button set: {r.status_code if r else 'no response'} {r.text[:200] if r else ''}")
     return ok
+
+
+async def get_bot_info(token: str) -> Optional[dict]:
+    """Live validity check via Telegram's getMe - a non-empty token string
+    proves nothing on its own (a typo'd or truncated token still passes any
+    check that only tests truthiness, then fails silently on every real
+    call). Returns the bot's own profile (id, username, ...) on success,
+    None if the token is invalid or Telegram is unreachable."""
+    if not token:
+        return None
+    r = await _tg_call_as(token, "getMe")
+    if r is None or r.status_code != 200:
+        return None
+    try:
+        data = r.json()
+    except Exception:
+        return None
+    return data.get("result") if data.get("ok") else None
 
 
 # ---- CLICK Shop pay-link (Merchant API checkout link) ----

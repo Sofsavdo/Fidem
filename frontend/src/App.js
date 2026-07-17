@@ -75,6 +75,26 @@ function Gate({ children }) {
   return children;
 }
 
+// /admin gets its own gate, deliberately NOT the shared Gate above: a
+// device that previously opened the regular Fidem_Appbot can have a stale,
+// non-admin, non-onboarded session sitting in localStorage (both bots share
+// this app's storage - see AppContext's admin-bot-retry effect), and the
+// shared Gate would bounce that straight into the "create your dating
+// profile" onboarding wizard. The Fidemadminbot Mini App must only ever
+// show the admin panel or nothing - never any part of the dating app.
+function AdminGate({ children }) {
+  const { user, loading } = useApp();
+
+  if (loading) return <PageSpinner />;
+  if (!user) {
+    if (isTelegramWebApp()) return <TelegramLoading />;
+    return <Navigate to="/auth" replace />;
+  }
+  // Admin.jsx itself renders "Faqat admin uchun" when user.is_admin is
+  // false - intentionally no redirect here for that case either.
+  return children;
+}
+
 function RootRoute() {
   const { user, loading } = useApp();
 
@@ -185,8 +205,8 @@ function Inner() {
           <Route path="/verification" element={<Verification />} />
           <Route path="/referral" element={<Referral />} />
           <Route path="/rankings" element={<Rankings />} />
-          <Route path="/admin" element={<Admin />} />
         </Route>
+        <Route path="/admin" element={<AdminGate><Layout><Admin /></Layout></AdminGate>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
