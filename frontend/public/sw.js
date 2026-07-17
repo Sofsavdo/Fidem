@@ -1,5 +1,23 @@
 // FIDEM Service Worker — minimal offline-first cache
-const CACHE_NAME = 'fidem-v1';
+//
+// v2: static assets are now stale-while-revalidate, not pure cache-first.
+// Pure cache-first never re-checks the network once a URL is cached, which
+// is fine for content-hashed JS/CSS chunks (a new deploy gets new hashed
+// filenames, so old cache entries just go unused) - but Telegram's Mini
+// App WebView often keeps a page's JS context alive across re-opens
+// instead of doing a fresh top-level navigation, and can serve its OWN
+// cached copy of index.html without ever re-hitting the network. When
+// that happens, the page never learns new hashed filenames exist, and a
+// long-lived session (exactly what a Telegram Mini App is, compared to a
+// browser tab someone just opened) can keep running whatever JS bundle
+// was current the day they first opened it - shipped features/fixes
+// never reach that session until something forces a real reload.
+// Stale-while-revalidate still answers instantly from cache, but always
+// fires a background fetch to refresh the cache with whatever the
+// network currently has, so the NEXT load (even without a full reload)
+// picks up new files, and the update-detection wired up in index.js can
+// prompt/force a reload once a new version is actually available.
+const CACHE_NAME = 'fidem-v2';
 const PRECACHE_URLS = [
   '/',
   '/manifest.json',
@@ -38,15 +56,29 @@ self.addEventListener('fetch', (event) => {
     );
     return;
   }
-  // Cache-first for static assets
+  // Stale-while-revalidate for static assets: answer from cache instantly
+  // if present, but always also fetch in the background and update the
+  // cache - so a session that never fully reloads still converges on the
+  // latest build within one round trip instead of staying stale forever.
+  // event.waitUntil keeps the worker alive long enough for the background
+  // fetch/cache.put to actually finish once respondWith has already
+  // resolved with the cached copy - without it the browser is free to
+  // suspend the worker mid-fetch and the revalidation silently never lands.
   event.respondWith(
-    caches.match(request).then((cached) => cached || fetch(request).then((res) => {
-      if (res && res.status === 200 && res.type === 'basic') {
-        const copy = res.clone();
-        caches.open(CACHE_NAME).then((c) => c.put(request, copy));
+    caches.open(CACHE_NAME).then(async (cache) => {
+      const cached = await cache.match(request);
+      const network = fetch(request).then((res) => {
+        if (res && res.status === 200 && res.type === 'basic') {
+          cache.put(request, res.clone());
+        }
+        return res;
+      }).catch(() => null);
+      if (cached) {
+        event.waitUntil(network);
+        return cached;
       }
-      return res;
-    }).catch(() => cached))
+      return (await network) || cached;
+    })
   );
 });
 
