@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
-import { Link } from "react-router-dom";
-import { ArrowLeft, ShieldCheck, Wallet, Users as UsersIcon, DollarSign, TrendingUp, BarChart3, LayoutDashboard, Search, MessageSquare, Settings, ChevronRight, MapPin, Activity, AlertTriangle, Send, Megaphone, Trash2, Bot, Eye, Pencil, Link2, Heart, Crown, Gauge, ScrollText, Ban, VolumeX, EyeOff } from "lucide-react";
+import { ShieldCheck, Wallet, Users as UsersIcon, DollarSign, TrendingUp, BarChart3, LayoutDashboard, Search, MessageSquare, Settings, ChevronRight, MapPin, Activity, AlertTriangle, Send, Megaphone, Trash2, Bot, Eye, Pencil, Link2, Heart, Crown, Gauge, ScrollText, Ban, VolumeX, EyeOff, Menu, X } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
 import api from "@/lib/api";
 import { PURPOSE_UZ, REF_TYPE_UZ, VERIF_KIND_UZ } from "@/lib/labels";
@@ -58,6 +57,7 @@ export default function Admin() {
   const { user, t } = useApp();
   const [activeTab, setActiveTab] = useState("ceo");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { data: stats } = useAdminStats();
   const { data: configHealth } = useAdminConfigHealth();
 
@@ -106,37 +106,57 @@ export default function Admin() {
         </div>
       </aside>
 
-      {/* Mobile tab bar - horizontally scrollable pills, same pattern as
-          the segment filters elsewhere in this panel (e.g. USER_SEGMENTS).
-          Sticky so switching tabs never requires scrolling back up first. */}
-      <nav className="lg:hidden sticky top-0 z-40 bg-card border-b border-border">
-        <div className="flex gap-1.5 overflow-x-auto no-scrollbar px-3 py-2.5">
-          {menuItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              data-testid={`admin-mobile-tab-${item.id}`}
-              className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                activeTab === item.id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              <item.icon className="w-3.5 h-3.5 shrink-0" />
-              {item.label}
-            </button>
-          ))}
+      {/* Mobile: a hamburger opens the full menu as a slide-out drawer,
+          instead of a left-to-right scrollable pill strip - with 19
+          sections, a horizontal scroll hid most of them off-screen and
+          looked cluttered; a drawer shows the whole list at once, exactly
+          like the desktop sidebar. This is also the ONLY navigation surface
+          inside the admin Mini App - there is deliberately no link back
+          into the regular Fidem app (see the removed "/me" back-arrow
+          below), so opening the admin bot can never land on the dating app. */}
+      {mobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex" role="dialog" aria-modal="true">
+          <div className="w-72 max-w-[80vw] h-full bg-card overflow-y-auto shadow-xl">
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <h1 className="font-heading text-lg font-semibold">Boshqaruv paneli</h1>
+              <button onClick={() => setMobileMenuOpen(false)} className="p-2 rounded-full hover:bg-muted" data-testid="admin-mobile-menu-close">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <nav className="p-2 space-y-1">
+              {menuItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
+                  data-testid={`admin-mobile-tab-${item.id}`}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
+                    activeTab === item.id
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <item.icon className="w-5 h-5 flex-shrink-0" />
+                  <span className="text-sm font-medium">{item.label}</span>
+                </button>
+              ))}
+            </nav>
+          </div>
+          <div className="flex-1 bg-black/40" onClick={() => setMobileMenuOpen(false)} />
         </div>
-      </nav>
+      )}
 
       {/* Main Content */}
       <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? "lg:ml-64" : "lg:ml-16"}`}>
         <div className="p-4 lg:p-6 w-full">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
             <div className="flex items-center gap-3 min-w-0">
-              <Link to="/me" className="p-2 rounded-full hover:bg-muted shrink-0">
-                <ArrowLeft className="w-5 h-5" />
-              </Link>
+              <button
+                onClick={() => setMobileMenuOpen(true)}
+                className="lg:hidden p-2 rounded-full hover:bg-muted shrink-0"
+                data-testid="admin-mobile-menu-open"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
               <h2 className="font-heading text-xl lg:text-2xl font-semibold truncate">{menuItems.find(m => m.id === activeTab)?.label}</h2>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
