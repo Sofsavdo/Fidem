@@ -8,22 +8,18 @@ import { PageHead, SectionLabel, Segmented, EmptyState, CTA } from "@/components
 import {
   useGiftCatalog, usePlanGiftCatalog, useGiftInventory, useGiftRecipients, usePurchaseGift, useRedeemGift,
 } from "@/hooks/queries";
+import { giftGradient, GIFT_PLAN_ICONS } from "@/lib/giftVisuals";
 
 // Full-bleed gradient tiles, not a small icon in a white box - a static
 // emoji reads as "premium" only when it's the hero of a rich card, not a
-// tiny picture bolted onto plain white.
+// tiny picture bolted onto plain white. Gradients themselves live in
+// giftVisuals.js, shared with the chat bubble a delivered gift renders as.
 const TIER_META = {
-  care:   { label_uz: "E'tibor", label_ru: "Забота", label_en: "Care", grad: "from-violet-500 to-indigo-600" },
-  love:   { label_uz: "Sevgi",   label_ru: "Любовь", label_en: "Love", grad: "from-primary to-fuchsia-600" },
-  luxury: { label_uz: "Hashamat",label_ru: "Люкс",   label_en: "Luxury", grad: "from-gold via-amber-500 to-gold-dark" },
+  care:   { label_uz: "E'tibor", label_ru: "Забота", label_en: "Care" },
+  love:   { label_uz: "Sevgi",   label_ru: "Любовь", label_en: "Love" },
+  luxury: { label_uz: "Hashamat",label_ru: "Люкс",   label_en: "Luxury" },
 };
 const TIER_ORDER = ["care", "love", "luxury"];
-
-const PLAN_META = {
-  standard: { grad: "from-sky-500 to-blue-700", icon: "⭐" },
-  premium:  { grad: "from-fuchsia-500 to-primary", icon: "💎" },
-  vip:      { grad: "from-gold via-amber-500 to-gold-dark", icon: "👑" },
-};
 
 function labelFor(lang, item) {
   return lang === "ru" ? item.label_ru : lang === "en" ? item.label_en : item.label_uz;
@@ -140,12 +136,8 @@ function RecipientPicker({ onPick, onClose, disabled }) {
   );
 }
 
-function itemGradient(item) {
-  if (item.category === "plan") return PLAN_META[item.plan]?.grad || PLAN_META.standard.grad;
-  return TIER_META[item.tier]?.grad || TIER_META.care.grad;
-}
 function itemEmoji(item) {
-  if (item.category === "plan") return PLAN_META[item.plan]?.icon || "🎁";
+  if (item.category === "plan") return GIFT_PLAN_ICONS[item.plan] || "🎁";
   return item.emoji;
 }
 
@@ -208,7 +200,7 @@ function PurchaseFlow({ item, lang, onClose, onDone }) {
       <div className="relative w-full sm:max-w-sm bg-card rounded-t-3xl sm:rounded-3xl shadow-2xl p-5">
         <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-full hover:bg-muted"><X className="w-4 h-4" /></button>
         <div className="text-center mb-5">
-          <div className={`w-20 h-20 mx-auto rounded-3xl grid place-items-center bg-gradient-to-br ${itemGradient(item)} mb-3 shadow-lg`}>
+          <div className={`w-20 h-20 mx-auto rounded-3xl grid place-items-center bg-gradient-to-br ${giftGradient(item)} mb-3 shadow-lg`}>
             <span className="text-4xl drop-shadow-[0_4px_10px_rgba(0,0,0,0.35)]">{itemEmoji(item)}</span>
           </div>
           <p className="font-heading text-lg font-semibold">{labelFor(lang, item)}</p>
@@ -281,7 +273,7 @@ function InventoryTab({ lang }) {
     <div className="space-y-2">
       {items.map((it) => (
         <div key={it.id} className="rounded-2xl border border-border bg-card p-3 flex items-center gap-3" data-testid={`gift-inv-${it.id}`}>
-          <div className={`w-12 h-12 rounded-2xl grid place-items-center bg-gradient-to-br ${(TIER_META[it.tier] || TIER_META.care).grad} shrink-0 shadow`}>
+          <div className={`w-12 h-12 rounded-2xl grid place-items-center bg-gradient-to-br ${giftGradient(it)} shrink-0 shadow`}>
             <span className="text-2xl drop-shadow">{it.emoji}</span>
           </div>
           <div className="min-w-0 flex-1">
@@ -366,7 +358,7 @@ export default function GiftShop() {
                       emoji={itemEmoji(it)}
                       title={labelFor(lang, it)}
                       price={it.price}
-                      gradient={itemGradient(it)}
+                      gradient={giftGradient(it)}
                       onClick={() => onPickGift(it)}
                       testid={`giftshop-card-${it.kind}`}
                     />
@@ -387,7 +379,7 @@ export default function GiftShop() {
                     emoji={itemEmoji(it)}
                     title={labelFor(lang, it)}
                     price={it.price}
-                    gradient={itemGradient(it)}
+                    gradient={giftGradient(it)}
                     onClick={() => onPickGift(it)}
                     testid={`giftshop-plan-card-${it.kind}`}
                   />

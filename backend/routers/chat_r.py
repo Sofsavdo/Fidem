@@ -742,7 +742,12 @@ async def deliver_gift(sender: dict, uid: str, to_user_id: str, kind: str, meta:
         "to_user_id": to_user_id,
         "text": f"{meta['emoji']} {meta['label_uz']}",
         "kind": "gift",
-        "meta": {"gift": kind, "price": price, "emoji": meta["emoji"], "label": meta["label_uz"], "category": category},
+        "meta": {
+            "gift": kind, "price": price, "emoji": meta["emoji"], "label": meta["label_uz"], "category": category,
+            # tier (deco) / plan (subscription) - lets the chat bubble render
+            # the exact same gradient the Gift Shop tile showed for this item.
+            "tier": meta.get("tier"), "plan": meta.get("plan"),
+        },
         "created_at": iso(now_utc()),
         "read": False,
     }
