@@ -57,6 +57,7 @@ from routers.location_r import router as location_router  # noqa: E402
 from routers.settings_r import router as settings_router  # noqa: E402
 from routers.picks_r import router as picks_router  # noqa: E402
 from routers.announcements_r import router as announcements_router  # noqa: E402
+from routers.gift_shop_r import router as gift_shop_router  # noqa: E402
 from lifecycle import lifecycle_loop  # noqa: E402
 from services import compute_completeness  # noqa: E402
 from storage import init_storage  # noqa: E402
@@ -86,6 +87,7 @@ api.include_router(location_router)
 api.include_router(settings_router)
 api.include_router(picks_router)
 api.include_router(announcements_router)
+api.include_router(gift_shop_router)
 app.include_router(api)
 
 
@@ -222,6 +224,9 @@ async def startup() -> None:
     # from_user_id for period filters (day/week/month).
     await db.gifts.create_index([("created_at", -1)], name="ix_gifts_time")
     await db.gifts.create_index([("from_user_id", 1)], name="ix_gifts_from_user")
+    # Gift shop inventory - "unused" list on every open, redeem does an
+    # atomic (id, owner_id, status=unused) claim.
+    await db.gift_inventory.create_index([("owner_id", 1), ("status", 1)], name="ix_gift_inv_owner_status")
     # Daily picks: unique per user per day. Without a unique index, two
     # concurrent /daily-picks requests on a cache-miss can both pass the
     # find_one-then-upsert race and insert two docs for the same day. A

@@ -646,17 +646,25 @@ async def gifts_catalog(uid: str = Depends(get_current_user_id)):
     }
 
 
-@router.post("/gifts/send")
-async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id)):
-    # Map legacy gift kinds
-    kind = LEGACY_GIFT_MAP.get(req.gift_kind, req.gift_kind)
+def resolve_gift_kind(gift_kind: str) -> tuple[str, dict]:
+    """Maps legacy kinds and validates against the real catalog. Raises 400
+    on anything invalid - shared by every gift-purchasing entry point."""
+    kind = LEGACY_GIFT_MAP.get(gift_kind, gift_kind)
     meta = GIFT_PRICES.get(kind)
     if not meta:
         raise HTTPException(400, "Invalid gift")
+    return kind, meta
+
+
+async def charge_for_gift(uid: str, sender: dict, kind: str, meta: dict) -> bool:
+    """Deducts the cost of ONE gift from `uid` - balance for paid tiers, the
+    weekly quota counter for the free tier. Raises 402 if they can't afford
+    it. Returns whether it was a free-quota gift (vs. a paid one), which
+    callers need for bookkeeping. Split out from the old send_gift() so the
+    gift-shop's "buy now, give later" flow can charge once at purchase time
+    and deliver separately (possibly days later) without re-charging."""
     price = meta["price"]
-    sender = await get_user(uid)
     is_free_gift = meta.get("tier") == "free"
-    # Validate free-quota for free gifts
     if is_free_gift:
         plan = sender.get("plan", "free")
         week_id = now_utc().strftime("%G-W%V")
@@ -667,10 +675,6 @@ async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id
         quota = FREE_GIFTS_BY_PLAN.get(plan, 1)
         if week_used >= quota:
             raise HTTPException(402, f"Bu hafta uchun bepul sovg'a kvotangiz tugadi ({quota} ta). Pulli gift yuboring yoki kelasi haftani kuting.")
-    await get_user(req.to_user_id)  # validates exists
-    # Apply balance/quota change
-    if is_free_gift:
-        week_id = now_utc().strftime("%G-W%V")
         await db.users.update_one(
             {"id": uid},
             {"$inc": {f"free_gifts_used.{week_id}": 1, "gifts_sent_count": 1}},
@@ -682,26 +686,38 @@ async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id
         )
         if res.modified_count == 0:
             raise HTTPException(402, "Balansda mablag' yetarli emas")
+    return is_free_gift
+
+
+async def deliver_gift(sender: dict, uid: str, to_user_id: str, kind: str, meta: dict, is_free_gift: bool) -> dict:
+    """Records an already-paid-for gift as delivered to its recipient: the
+    db.gifts ledger row (this is what the leaderboard sums), a chat message
+    (gifting a total stranger from the gift shop just starts that chat, the
+    same way an icebreaker would), a live WS push if they're online, and a
+    notification. Never touches balance/quota - see charge_for_gift for
+    that half."""
+    price = meta["price"]
+    if not is_free_gift:
         await db.users.update_one(
-            {"id": req.to_user_id},
+            {"id": to_user_id},
             {"$inc": {"gifts_received_total": price}},
         )
     gift = {
         "id": new_id(),
         "from_user_id": uid,
-        "to_user_id": req.to_user_id,
+        "to_user_id": to_user_id,
         "kind": kind,
         "price": price,
         "is_free": is_free_gift,
         "created_at": iso(now_utc()),
     }
     await db.gifts.insert_one(gift)
-    cid = chat_id_for(uid, req.to_user_id)
+    cid = chat_id_for(uid, to_user_id)
     gift_msg = {
         "id": new_id(),
         "chat_id": cid,
         "from_user_id": uid,
-        "to_user_id": req.to_user_id,
+        "to_user_id": to_user_id,
         "text": f"{meta['emoji']} {meta['label_uz']}",
         "kind": "gift",
         "meta": {"gift": kind, "price": price, "emoji": meta["emoji"], "label": meta["label_uz"], "is_free": is_free_gift},
@@ -710,14 +726,24 @@ async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id
     }
     await db.messages.insert_one(gift_msg)
     gift_msg.pop("_id", None)
-    await manager.broadcast_chat([uid, req.to_user_id], {"type": "message", "data": gift_msg})
+    await manager.broadcast_chat([uid, to_user_id], {"type": "message", "data": gift_msg})
     await push_notif(
-        req.to_user_id, "gift",
+        to_user_id, "gift",
         f"{meta['emoji']} {sender.get('name', '')} sizga {meta['label_uz']} yubordi!",
         link=f"/chat/{uid}",
     )
-    new_balance = sender.get("balance", 0) if is_free_gift else (sender.get("balance", 0) - price)
-    return {"ok": True, "balance": new_balance, "gift": gift_msg["meta"]}
+    return gift_msg["meta"]
+
+
+@router.post("/gifts/send")
+async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id)):
+    kind, meta = resolve_gift_kind(req.gift_kind)
+    sender = await get_user(uid)
+    await get_user(req.to_user_id)  # validates exists
+    is_free_gift = await charge_for_gift(uid, sender, kind, meta)
+    gift_meta = await deliver_gift(sender, uid, req.to_user_id, kind, meta, is_free_gift)
+    new_balance = sender.get("balance", 0) if is_free_gift else (sender.get("balance", 0) - meta["price"])
+    return {"ok": True, "balance": new_balance, "gift": gift_meta}
 
 
 # ---------- Leaderboard ----------

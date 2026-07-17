@@ -244,6 +244,17 @@ class SendGiftRequest(BaseModel):
     gift_kind: str
 
 
+class GiftPurchaseRequest(BaseModel):
+    gift_kind: str
+    # Omitted/None: buy it into your own inventory to give away later.
+    # Set: buy and deliver immediately to that recipient (no inventory hold).
+    to_user_id: Optional[str] = None
+
+
+class GiftRedeemRequest(BaseModel):
+    to_user_id: str
+
+
 GIFT_PRICES = {
     # 2 ta haftalik bepul gift (price=0)
     "rose_free":   {"price": 0,       "emoji": "🌹", "label_uz": "Atirgul (bepul)",  "label_ru": "Роза (бесплатно)",   "label_en": "Rose (free)",      "tier": "free", "free_per_week": 1},

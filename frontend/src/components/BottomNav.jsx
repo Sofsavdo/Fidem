@@ -1,6 +1,6 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
-import { Users, MessageCircle, Heart, User, Megaphone } from "lucide-react";
+import { Users, MessageCircle, Heart, User, Megaphone, Gift } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { useAnnouncements } from "@/hooks/queries";
 import { selection } from "@/lib/haptics";
@@ -12,6 +12,7 @@ const tabs = [
   { to: "/messages", icon: MessageCircle, key: "messages", testid: "nav-messages" },
   { to: "/announcements", icon: Megaphone, key: "anons", testid: "nav-anons" },
   { to: "/saved", icon: Heart, key: "liked", testid: "nav-saved" },
+  { to: "/gifts", icon: Gift, key: "gift", testid: "nav-gift" },
   { to: "/me", icon: User, key: "me", testid: "nav-me" },
 ];
 
@@ -30,7 +31,7 @@ export default function BottomNav() {
       className="shrink-0 glass border-t border-border/60 pb-[env(safe-area-inset-bottom)]"
       style={{ zIndex: 10000 }}
     >
-      <div className="max-w-md mx-auto grid grid-cols-5 px-1.5 pt-1.5">
+      <div className="max-w-md mx-auto grid grid-cols-6 px-1 pt-1.5">
         {tabs.map((tab) => (
           <NavLink
             key={tab.key}

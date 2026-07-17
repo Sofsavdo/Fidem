@@ -176,6 +176,54 @@ export function useActivateBoost() {
   });
 }
 
+// ---------- Gift shop (standalone catalog, distinct from the in-chat
+// GiftModal - same backend catalog/pricing, different purchase flow: buy
+// for yourself now, give it away later, or pick a recipient up front). ----
+export function useGiftCatalog() {
+  return useQuery({
+    queryKey: ["gifts", "catalog"],
+    queryFn: () => api.get("/gifts/catalog").then((r) => r.data),
+    staleTime: 60_000,
+  });
+}
+
+export function useGiftInventory() {
+  return useQuery({
+    queryKey: ["gifts", "inventory"],
+    queryFn: () => api.get("/gifts/inventory").then((r) => r.data?.items || []),
+  });
+}
+
+export function useGiftRecipients(q) {
+  return useQuery({
+    queryKey: ["gifts", "recipients", q],
+    queryFn: () => api.get("/gifts/recipients", { params: q ? { q } : {} }).then((r) => r.data || []),
+  });
+}
+
+export function usePurchaseGift() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ giftKind, toUserId }) =>
+      api.post("/gifts/purchase", { gift_kind: giftKind, to_user_id: toUserId || null }).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["gifts", "catalog"] });
+      queryClient.invalidateQueries({ queryKey: ["gifts", "inventory"] });
+    },
+  });
+}
+
+export function useRedeemGift() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemId, toUserId }) =>
+      api.post(`/gifts/inventory/${itemId}/redeem`, { to_user_id: toUserId }).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["gifts", "inventory"] });
+    },
+  });
+}
+
 // Real gift-value leaderboard (chat_r.py aggregates db.gifts by sender) -
 // the "ranking_score" based /rankings/* endpoints were removed because that
 // field was never written anywhere, so they always returned empty results.
