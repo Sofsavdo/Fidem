@@ -239,7 +239,10 @@ export function AppProvider({ children }) {
   useEffect(() => {
     if (wsEvent?.type !== "notification") return;
     const kind = wsEvent.data?.kind;
-    if (["balance", "premium", "boost", "withdraw", "referral"].includes(kind)) {
+    // "gift" is included because a gifted subscription plan (Gift Shop)
+    // changes the recipient's plan/boost server-side just like a direct
+    // purchase would.
+    if (["balance", "premium", "boost", "withdraw", "referral", "gift"].includes(kind)) {
       loadMe();
     }
   }, [wsEvent, loadMe]);

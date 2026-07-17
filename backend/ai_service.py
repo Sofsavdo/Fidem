@@ -21,8 +21,10 @@ ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-8")
 
 # Primary vision provider: Gemini (Google AI Studio). All verification and
 # photo checks go through it when GEMINI_API_KEY is set; the Anthropic path
-# stays as an automatic fallback.
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+# stays as an automatic fallback. .strip(): the same trailing-space-from-
+# copy-paste failure mode as ADMIN_BOT_TOKEN (services.py) - a key with
+# stray whitespace still looks "configured" but every call to it 400s.
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
 
 _client = None
@@ -34,6 +36,28 @@ def _get_client():
         import anthropic
         _client = anthropic.AsyncAnthropic()
     return _client
+
+
+def _classify_ai_error(e: Exception) -> str:
+    """A raw exception ('400 Bad Request', a bare timeout, ...) means nothing
+    to an admin who can't read server logs - an invalid key and an exhausted
+    quota need completely different fixes, but look identical as a generic
+    'AI unavailable' message. Used to attach a short, actionable reason to
+    the few AI results that already surface diagnostics to the panel."""
+    if isinstance(e, httpx.HTTPStatusError):
+        status = e.response.status_code
+        if status in (400, 401, 403):
+            return f"API kalit noto'g'ri yoki ruxsat yo'q (HTTP {status})"
+        if status == 404:
+            return f"Model topilmadi - GEMINI_MODEL nomini tekshiring (HTTP {status})"
+        if status == 429:
+            return "So'rov limiti tugadi (quota/rate limit) - birozdan keyin urinib ko'ring"
+        return f"AI xizmati xato qaytardi (HTTP {status})"
+    if isinstance(e, httpx.TimeoutException):
+        return "AI xizmatiga ulanish vaqti tugadi (timeout)"
+    if isinstance(e, httpx.ConnectError):
+        return "AI xizmatiga ulanib bo'lmadi (tarmoq xatosi)"
+    return "Kutilmagan xatolik"
 
 
 async def _gemini_json(prompt: str, images: list[tuple[str, str]], schema: dict) -> dict:
@@ -416,9 +440,10 @@ async def generate_growth_insights(data: str) -> dict:
     """Turns a plain-text metrics dump (built by routers/admin_r.py from
     admin_stats + stats_snapshots + winback activity) into a structured
     Uzbek-language growth analysis for the admin panel. Never raises - a
-    failure returns ai_generated=False so the panel can show a plain
-    'unavailable, try again' state instead of crashing."""
+    failure returns ai_generated=False (with a short "error" reason the
+    panel can display) instead of crashing."""
     prompt = _insights_prompt(data)
+    last_error = ""
 
     if GEMINI_API_KEY:
         try:
@@ -433,7 +458,8 @@ async def generate_growth_insights(data: str) -> dict:
                 "ai_generated": True,
             }
         except Exception as e:
-            log.warning("growth_insights: gemini call failed, trying fallback: %s", e)
+            last_error = _classify_ai_error(e)
+            log.warning("growth_insights: gemini call failed (%s), trying fallback: %s", last_error, e)
 
     try:
         client = _get_client()
@@ -466,10 +492,12 @@ async def generate_growth_insights(data: str) -> dict:
             "ai_generated": True,
         }
     except Exception as e:
-        log.warning("growth_insights: no provider available: %s", e)
+        if not last_error:
+            last_error = _classify_ai_error(e)
+        log.warning("growth_insights: no provider available (%s): %s", last_error, e)
         return {
             "trend": "stable", "summary": "", "highlights": [], "risks": [],
-            "recommendations": [], "ai_generated": False,
+            "recommendations": [], "ai_generated": False, "error": last_error,
         }
 
 

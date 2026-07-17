@@ -370,8 +370,11 @@ function AdminAiInsights() {
           <span className={`text-[11px] px-2.5 py-1 rounded-full font-semibold ${trend.cls}`}>{trend.label}</span>
         </div>
         <p className="mt-3 text-sm leading-relaxed">
-          {data?.ai_generated ? (data.summary || "—") : "AI tahlil hozircha mavjud emas — provider sozlanmagan yoki vaqtincha ishlamayapti."}
+          {data?.ai_generated ? (data.summary || "—") : "AI tahlil hozircha mavjud emas."}
         </p>
+        {!data?.ai_generated && data?.error && (
+          <p className="mt-2 text-xs text-rose-300">Sabab: {data.error}</p>
+        )}
       </div>
 
       {data?.ai_generated && (

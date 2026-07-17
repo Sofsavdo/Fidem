@@ -244,11 +244,20 @@ class SendGiftRequest(BaseModel):
     gift_kind: str
 
 
+class GiftPurchaseRequest(BaseModel):
+    gift_kind: str
+    # Omitted/None: buy it into your own inventory to give away later.
+    # Set: buy and deliver immediately to that recipient (no inventory hold).
+    to_user_id: Optional[str] = None
+
+
+class GiftRedeemRequest(BaseModel):
+    to_user_id: str
+
+
 GIFT_PRICES = {
-    # 2 ta haftalik bepul gift (price=0)
-    "rose_free":   {"price": 0,       "emoji": "🌹", "label_uz": "Atirgul (bepul)",  "label_ru": "Роза (бесплатно)",   "label_en": "Rose (free)",      "tier": "free", "free_per_week": 1},
-    "heart_free":  {"price": 0,       "emoji": "💗", "label_uz": "Yurakcha (bepul)", "label_ru": "Сердечко (бесплатно)","label_en": "Heart (free)",     "tier": "free", "free_per_week": 1},
-    # 10 ta pulli gift (2000 so'm dan 499000 so'm gacha)
+    # 10 ta pulli sovg'a (2000 so'm dan 499000 so'm gacha) - hech biri bepul
+    # emas: har bir sovg'a haqiqiy pul qiymatiga ega bo'lishi kerak.
     "heart":       {"price": 2000,    "emoji": "❤️", "label_uz": "Yurak",            "label_ru": "Сердце",             "label_en": "Heart",            "tier": "care"},
     "chocolate":   {"price": 5000,    "emoji": "🍫", "label_uz": "Shokolad",         "label_ru": "Шоколад",            "label_en": "Chocolate",        "tier": "care"},
     "coffee":      {"price": 10000,   "emoji": "☕", "label_uz": "Qahva",            "label_ru": "Кофе",               "label_en": "Coffee",           "tier": "care"},
@@ -261,13 +270,24 @@ GIFT_PRICES = {
     "rocket":      {"price": 499000,  "emoji": "🚀", "label_uz": "Raketa",           "label_ru": "Ракета",             "label_en": "Rocket",           "tier": "luxury"},
 }
 
-# Weekly free gift quota per plan (rose_free, heart_free uchun)
-FREE_GIFTS_BY_PLAN = {"free": 1, "premium": 2, "vip": 3}
+# Obuna tariflarini/oylik to'plamlarni sovg'a qilish - alohida katalog
+# (gift_shop_r.py'dagi /gifts/plan-catalog), har doim darhol bir kishiga
+# yetkaziladi (inventarga saqlab bo'lmaydi - o'zi uchun sotib olish oddiy
+# /payments/create orqali bo'ladi, bu yerda faqat "sovg'a qilish" bor).
+PLAN_GIFTS = {
+    "gift_standard_1m": {"price": 34900,  "plan": "standard", "months": 1, "emoji": "⭐", "label_uz": "Standard — 1 oy", "label_ru": "Стандарт — 1 месяц",  "label_en": "Standard — 1 month"},
+    "gift_standard_3m": {"price": 89000,  "plan": "standard", "months": 3, "emoji": "⭐", "label_uz": "Standard — 3 oy", "label_ru": "Стандарт — 3 месяца", "label_en": "Standard — 3 months"},
+    "gift_premium_1m":  {"price": 79000,  "plan": "premium",  "months": 1, "emoji": "💎", "label_uz": "Premium — 1 oy",  "label_ru": "Премиум — 1 месяц",   "label_en": "Premium — 1 month"},
+    "gift_premium_3m":  {"price": 199000, "plan": "premium",  "months": 3, "emoji": "💎", "label_uz": "Premium — 3 oy",  "label_ru": "Премиум — 3 месяца",  "label_en": "Premium — 3 months"},
+    "gift_vip_1m":       {"price": 199000, "plan": "vip",      "months": 1, "emoji": "👑", "label_uz": "VIP — 1 oy",      "label_ru": "VIP — 1 месяц",       "label_en": "VIP — 1 month"},
+    "gift_vip_3m":       {"price": 499000, "plan": "vip",      "months": 3, "emoji": "👑", "label_uz": "VIP — 3 oy",      "label_ru": "VIP — 3 месяца",      "label_en": "VIP — 3 months"},
+}
+
 # Backwards compatibility helper
 GIFT_EMOJI = {k: v["emoji"] for k, v in GIFT_PRICES.items()}
 GIFT_LABEL_UZ = {k: v["label_uz"] for k, v in GIFT_PRICES.items()}
 # Backwards compat: legacy gift kinds (rose/box/diamond/crown) map to new equivalents
-LEGACY_GIFT_MAP = {"rose": "rose_free", "box": "bouquet", "diamond": "diamond", "crown": "crown"}
+LEGACY_GIFT_MAP = {"rose": "heart", "box": "bouquet", "diamond": "diamond", "crown": "crown"}
 
 
 # ---------- Notifications ----------

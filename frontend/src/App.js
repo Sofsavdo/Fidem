@@ -37,6 +37,7 @@ const Privacy = lazy(() => import("@/pages/Privacy"));
 const MeSettings = lazy(() => import("@/pages/MeSettings"));
 const PrivacyCenter = lazy(() => import("@/pages/PrivacyCenter"));
 const Announcements = lazy(() => import("@/pages/Announcements"));
+const GiftShop = lazy(() => import("@/pages/GiftShop"));
 
 function isTelegramWebApp() {
   return Boolean(window.Telegram?.WebApp?.initData);
@@ -134,6 +135,7 @@ function prefetchHotRoutes() {
   import("@/pages/Me");
   import("@/pages/Withdrawals");
   import("@/pages/Premium");
+  import("@/pages/GiftShop");
 }
 
 function Inner() {
@@ -193,6 +195,7 @@ function Inner() {
           <Route path="/me/settings" element={<MeSettings />} />
           <Route path="/privacy-center" element={<PrivacyCenter />} />
           <Route path="/announcements" element={<Announcements />} />
+          <Route path="/gifts" element={<GiftShop />} />
           <Route path="/premium" element={<Premium />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/notifications" element={<Notifications />} />

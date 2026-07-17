@@ -330,9 +330,10 @@ def test_admin_verifications_list(session, admin_token):
 
 # ---------- Gift flow (after balance topup) ----------
 def test_gift_send(session, user_creds, admin_token, candidate_list):
-    # ensure balance
+    # ensure balance - "rose" now resolves to the paid "heart" gift (2000
+    # so'm), since decorative gifts have no free tier anymore
     session.patch(f"{API}/admin/users/{user_creds['user_id']}",
-                  json={"add_balance": 1000}, headers=_auth_header(admin_token))
+                  json={"add_balance": 5000}, headers=_auth_header(admin_token))
     target = candidate_list[0]
     r = session.post(f"{API}/gifts/send",
                      json={"to_user_id": target["id"], "gift_kind": "rose"},
