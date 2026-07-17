@@ -29,11 +29,9 @@ from core import (
     user_public,
 )
 from models import (
-    FREE_GIFTS_BY_PLAN,
-    GIFT_EMOJI,
-    GIFT_LABEL_UZ,
     GIFT_PRICES,
     LEGACY_GIFT_MAP,
+    PLAN_GIFTS,
     ReportRequest,
     SaveRequest,
     SendGiftRequest,
@@ -617,13 +615,9 @@ async def get_voice_file(
 # ---------- Gifts ----------
 @router.get("/gifts/catalog")
 async def gifts_catalog(uid: str = Depends(get_current_user_id)):
-    """Return full gift catalog with current free-quota status."""
+    """Decorative gift catalog - see /gifts/plan-catalog for giftable
+    subscriptions. No free tier: every gift here costs real balance."""
     me = await get_user(uid)
-    plan = me.get("plan", "free")
-    week_id = now_utc().strftime("%G-W%V")
-    used = me.get("free_gifts_used", {}) or {}
-    week_used = used.get(week_id, 0) if isinstance(used, dict) else 0
-    quota_per_week = FREE_GIFTS_BY_PLAN.get(plan, 1)
     items = []
     for kind, meta in GIFT_PRICES.items():
         items.append({
@@ -634,81 +628,100 @@ async def gifts_catalog(uid: str = Depends(get_current_user_id)):
             "label_en": meta["label_en"],
             "price": meta["price"],
             "tier": meta["tier"],
-            "free": meta.get("tier") == "free",
+            "category": "deco",
         })
-    return {
-        "items": items,
-        "free_quota_per_week": quota_per_week,
-        "free_used_this_week": week_used,
-        "free_remaining": max(0, quota_per_week - week_used),
-        "balance": me.get("balance", 0),
-        "plan": plan,
-    }
+    return {"items": items, "balance": me.get("balance", 0), "plan": me.get("plan", "free")}
+
+
+@router.get("/gifts/plan-catalog")
+async def gifts_plan_catalog(uid: str = Depends(get_current_user_id)):
+    """Subscription plans/bundles offered as gifts. Always delivered
+    immediately to a chosen recipient - gifting a plan to yourself is just
+    buying it via /payments/create, so no inventory hold exists here."""
+    me = await get_user(uid)
+    items = []
+    for kind, meta in PLAN_GIFTS.items():
+        items.append({
+            "kind": kind,
+            "plan": meta["plan"],
+            "months": meta["months"],
+            "emoji": meta["emoji"],
+            "label_uz": meta["label_uz"],
+            "label_ru": meta["label_ru"],
+            "label_en": meta["label_en"],
+            "price": meta["price"],
+            "category": "plan",
+        })
+    return {"items": items, "balance": me.get("balance", 0)}
 
 
 def resolve_gift_kind(gift_kind: str) -> tuple[str, dict]:
-    """Maps legacy kinds and validates against the real catalog. Raises 400
-    on anything invalid - shared by every gift-purchasing entry point."""
+    """Maps legacy kinds and validates against the decorative or plan-gift
+    catalog. Raises 400 on anything invalid - shared by every gift-
+    purchasing entry point. The returned meta always carries a "category"
+    key ("deco"/"plan") so callers know whether to apply a subscription."""
     kind = LEGACY_GIFT_MAP.get(gift_kind, gift_kind)
-    meta = GIFT_PRICES.get(kind)
-    if not meta:
-        raise HTTPException(400, "Invalid gift")
-    return kind, meta
+    if kind in GIFT_PRICES:
+        return kind, {**GIFT_PRICES[kind], "category": "deco"}
+    if kind in PLAN_GIFTS:
+        return kind, {**PLAN_GIFTS[kind], "category": "plan"}
+    raise HTTPException(400, "Invalid gift")
 
 
-async def charge_for_gift(uid: str, sender: dict, kind: str, meta: dict) -> bool:
-    """Deducts the cost of ONE gift from `uid` - balance for paid tiers, the
-    weekly quota counter for the free tier. Raises 402 if they can't afford
-    it. Returns whether it was a free-quota gift (vs. a paid one), which
-    callers need for bookkeeping. Split out from the old send_gift() so the
-    gift-shop's "buy now, give later" flow can charge once at purchase time
-    and deliver separately (possibly days later) without re-charging."""
+async def charge_for_gift(uid: str, kind: str, meta: dict) -> None:
+    """Deducts the cost of ONE gift from `uid`'s balance. Raises 402 if they
+    can't afford it. Split out from the old send_gift() so the gift-shop's
+    "buy now, give later" flow can charge once at purchase time and deliver
+    separately (possibly days later) without re-charging."""
     price = meta["price"]
-    is_free_gift = meta.get("tier") == "free"
-    if is_free_gift:
-        plan = sender.get("plan", "free")
-        week_id = now_utc().strftime("%G-W%V")
-        used_map = sender.get("free_gifts_used", {}) or {}
-        if not isinstance(used_map, dict):
-            used_map = {}
-        week_used = used_map.get(week_id, 0)
-        quota = FREE_GIFTS_BY_PLAN.get(plan, 1)
-        if week_used >= quota:
-            raise HTTPException(402, f"Bu hafta uchun bepul sovg'a kvotangiz tugadi ({quota} ta). Pulli gift yuboring yoki kelasi haftani kuting.")
-        await db.users.update_one(
-            {"id": uid},
-            {"$inc": {f"free_gifts_used.{week_id}": 1, "gifts_sent_count": 1}},
-        )
+    res = await db.users.update_one(
+        {"id": uid, "balance": {"$gte": price}},
+        {"$inc": {"balance": -price, "gifts_sent_total": price, "gifts_sent_count": 1}},
+    )
+    if res.modified_count == 0:
+        raise HTTPException(402, "Balansda mablag' yetarli emas")
+
+
+PLAN_RANK = {"standard": 0, "premium": 1, "vip": 2}
+
+
+async def _apply_plan_gift(to_user_id: str, plan: str, months: int) -> None:
+    """Upgrades the recipient to `plan` for `months`*30 days. Never
+    downgrades a plan they already have at that tier or better - it only
+    stacks the extra time on top of their current expiry in that case."""
+    recipient = await db.users.find_one({"id": to_user_id}, {"_id": 0, "plan": 1, "plan_until": 1})
+    current_plan = (recipient or {}).get("plan") or "free"
+    candidate_until = now_utc() + timedelta(days=months * 30)
+    if current_plan in PLAN_RANK and PLAN_RANK[current_plan] >= PLAN_RANK.get(plan, -1):
+        current_until = parse_dt(recipient["plan_until"]) if recipient.get("plan_until") else now_utc()
+        final_plan = current_plan
+        final_until = max(current_until, candidate_until) if current_until > now_utc() else candidate_until
     else:
-        res = await db.users.update_one(
-            {"id": uid, "balance": {"$gte": price}},
-            {"$inc": {"balance": -price, "gifts_sent_total": price, "gifts_sent_count": 1}},
-        )
-        if res.modified_count == 0:
-            raise HTTPException(402, "Balansda mablag' yetarli emas")
-    return is_free_gift
+        final_plan = plan
+        final_until = candidate_until
+    await db.users.update_one({"id": to_user_id}, {"$set": {"plan": final_plan, "plan_until": iso(final_until)}})
+    if final_plan in ("premium", "vip"):
+        await db.users.update_one({"id": to_user_id}, {"$set": {"boost_until": iso(now_utc() + timedelta(days=30))}})
 
 
-async def deliver_gift(sender: dict, uid: str, to_user_id: str, kind: str, meta: dict, is_free_gift: bool) -> dict:
+async def deliver_gift(sender: dict, uid: str, to_user_id: str, kind: str, meta: dict, category: str) -> dict:
     """Records an already-paid-for gift as delivered to its recipient: the
     db.gifts ledger row (this is what the leaderboard sums), a chat message
     (gifting a total stranger from the gift shop just starts that chat, the
     same way an icebreaker would), a live WS push if they're online, and a
-    notification. Never touches balance/quota - see charge_for_gift for
-    that half."""
+    notification. For a plan-category gift, also applies the subscription.
+    Never touches balance - see charge_for_gift for that half."""
     price = meta["price"]
-    if not is_free_gift:
-        await db.users.update_one(
-            {"id": to_user_id},
-            {"$inc": {"gifts_received_total": price}},
-        )
+    await db.users.update_one({"id": to_user_id}, {"$inc": {"gifts_received_total": price}})
+    if category == "plan":
+        await _apply_plan_gift(to_user_id, meta["plan"], meta["months"])
     gift = {
         "id": new_id(),
         "from_user_id": uid,
         "to_user_id": to_user_id,
         "kind": kind,
         "price": price,
-        "is_free": is_free_gift,
+        "category": category,
         "created_at": iso(now_utc()),
     }
     await db.gifts.insert_one(gift)
@@ -720,16 +733,17 @@ async def deliver_gift(sender: dict, uid: str, to_user_id: str, kind: str, meta:
         "to_user_id": to_user_id,
         "text": f"{meta['emoji']} {meta['label_uz']}",
         "kind": "gift",
-        "meta": {"gift": kind, "price": price, "emoji": meta["emoji"], "label": meta["label_uz"], "is_free": is_free_gift},
+        "meta": {"gift": kind, "price": price, "emoji": meta["emoji"], "label": meta["label_uz"], "category": category},
         "created_at": iso(now_utc()),
         "read": False,
     }
     await db.messages.insert_one(gift_msg)
     gift_msg.pop("_id", None)
     await manager.broadcast_chat([uid, to_user_id], {"type": "message", "data": gift_msg})
+    verb = "sovg'a qildi" if category == "plan" else "yubordi"
     await push_notif(
         to_user_id, "gift",
-        f"{meta['emoji']} {sender.get('name', '')} sizga {meta['label_uz']} yubordi!",
+        f"{meta['emoji']} {sender.get('name', '')} sizga {meta['label_uz']} {verb}!",
         link=f"/chat/{uid}",
     )
     return gift_msg["meta"]
@@ -740,9 +754,9 @@ async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id
     kind, meta = resolve_gift_kind(req.gift_kind)
     sender = await get_user(uid)
     await get_user(req.to_user_id)  # validates exists
-    is_free_gift = await charge_for_gift(uid, sender, kind, meta)
-    gift_meta = await deliver_gift(sender, uid, req.to_user_id, kind, meta, is_free_gift)
-    new_balance = sender.get("balance", 0) if is_free_gift else (sender.get("balance", 0) - meta["price"])
+    await charge_for_gift(uid, kind, meta)
+    gift_meta = await deliver_gift(sender, uid, req.to_user_id, kind, meta, meta["category"])
+    new_balance = sender.get("balance", 0) - meta["price"]
     return {"ok": True, "balance": new_balance, "gift": gift_meta}
 
 

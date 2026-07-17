@@ -1,49 +1,68 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Sparkles, Search, User, Plus, ArrowRight, X, PackageOpen } from "lucide-react";
+import { Search, User, Plus, ArrowRight, X, PackageOpen } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { photoSrc } from "@/lib/photo";
-import { PageHead, SectionLabel, Segmented, Price, EmptyState, CTA } from "@/components/kit";
+import { PageHead, SectionLabel, Segmented, EmptyState, CTA } from "@/components/kit";
 import {
-  useGiftCatalog, useGiftInventory, useGiftRecipients, usePurchaseGift, useRedeemGift,
+  useGiftCatalog, usePlanGiftCatalog, useGiftInventory, useGiftRecipients, usePurchaseGift, useRedeemGift,
 } from "@/hooks/queries";
 
+// Full-bleed gradient tiles, not a small icon in a white box - a static
+// emoji reads as "premium" only when it's the hero of a rich card, not a
+// tiny picture bolted onto plain white.
 const TIER_META = {
-  free:   { label_uz: "Bepul", label_ru: "Бесплатно", label_en: "Free", ring: "from-emerald-400/30 to-emerald-400/5", chip: "bg-emerald-100 text-emerald-800" },
-  care:   { label_uz: "E'tibor", label_ru: "Забота", label_en: "Care", ring: "from-secondary/35 to-secondary/5", chip: "bg-secondary/10 text-secondary" },
-  love:   { label_uz: "Sevgi", label_ru: "Любовь", label_en: "Love", ring: "from-primary/35 to-primary/5", chip: "bg-primary/10 text-primary" },
-  luxury: { label_uz: "Hashamat", label_ru: "Люкс", label_en: "Luxury", ring: "from-gold to-gold-light/40", chip: "bg-gold-light/60 text-gold-dark" },
+  care:   { label_uz: "E'tibor", label_ru: "Забота", label_en: "Care", grad: "from-violet-500 to-indigo-600" },
+  love:   { label_uz: "Sevgi",   label_ru: "Любовь", label_en: "Love", grad: "from-primary to-fuchsia-600" },
+  luxury: { label_uz: "Hashamat",label_ru: "Люкс",   label_en: "Luxury", grad: "from-gold via-amber-500 to-gold-dark" },
 };
-const TIER_ORDER = ["free", "care", "love", "luxury"];
+const TIER_ORDER = ["care", "love", "luxury"];
+
+const PLAN_META = {
+  standard: { grad: "from-sky-500 to-blue-700", icon: "⭐" },
+  premium:  { grad: "from-fuchsia-500 to-primary", icon: "💎" },
+  vip:      { grad: "from-gold via-amber-500 to-gold-dark", icon: "👑" },
+};
 
 function labelFor(lang, item) {
   return lang === "ru" ? item.label_ru : lang === "en" ? item.label_en : item.label_uz;
 }
 
-// Premium card: a large tier-gradient badge behind the emoji instead of a
-// bare icon in a row, name + price given real typographic weight - the
-// "raketa emas" complaint was about presentation, not the emoji itself.
-function GiftCard({ item, lang, disabled, onPick }) {
-  const tier = TIER_META[item.tier] || TIER_META.care;
+function tierLabel(lang, tk) {
+  const tm = TIER_META[tk];
+  return lang === "ru" ? tm.label_ru : lang === "en" ? tm.label_en : tm.label_uz;
+}
+
+// The one card component every gift (decorative or subscription) renders
+// through - a full gradient tile with a glowing hero emoji, a frosted chip
+// and bold price, instead of a small icon-in-a-circle sitting on white.
+function GiftTile({ emoji, title, price, gradient, chip, disabled, onClick, testid }) {
   return (
     <button
-      onClick={() => onPick(item)}
+      onClick={onClick}
       disabled={disabled}
-      data-testid={`giftshop-card-${item.kind}`}
-      className={`group rounded-3xl border border-border bg-card p-4 flex flex-col items-center gap-2 transition ${
-        disabled ? "opacity-40" : "hover:-translate-y-1 hover:shadow-lg active:scale-95"
+      data-testid={testid}
+      className={`group relative overflow-hidden rounded-3xl h-[150px] p-3 flex flex-col text-white shadow-lg bg-gradient-to-br ${gradient} transition ${
+        disabled ? "opacity-40 grayscale" : "hover:-translate-y-1 hover:shadow-2xl active:scale-95"
       }`}
     >
-      <div className={`w-16 h-16 rounded-full grid place-items-center bg-gradient-to-br ${tier.ring} shadow-inner`}>
-        <span className="text-3xl leading-none drop-shadow-sm">{item.emoji}</span>
-      </div>
-      <p className="text-sm font-semibold text-center leading-tight">{labelFor(lang, item)}</p>
-      {item.price > 0 ? (
-        <Price amount={item.price} size="sm" />
-      ) : (
-        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${tier.chip}`}>{tier.label_uz}</span>
+      <span className="absolute inset-0 bg-gradient-to-br from-white/25 via-transparent to-black/10 pointer-events-none" />
+      {chip && (
+        <span className="relative self-start text-[9px] font-bold uppercase tracking-wider bg-black/25 backdrop-blur-sm px-2 py-0.5 rounded-full">
+          {chip}
+        </span>
       )}
+      <span className="relative flex-1 grid place-items-center">
+        <span className="absolute w-14 h-14 rounded-full bg-white/25 blur-xl" />
+        <span className="relative text-4xl drop-shadow-[0_4px_10px_rgba(0,0,0,0.35)]">{emoji}</span>
+      </span>
+      <span className="relative text-center">
+        <p className="text-xs font-semibold leading-tight line-clamp-2">{title}</p>
+        <p className="text-sm font-bold tabular-nums mt-0.5">
+          {price.toLocaleString()} <span className="text-[10px] font-medium opacity-80">so'm</span>
+        </p>
+      </span>
     </button>
   );
 }
@@ -112,17 +131,30 @@ function RecipientPicker({ onPick, onClose }) {
   );
 }
 
+function itemGradient(item) {
+  if (item.category === "plan") return PLAN_META[item.plan]?.grad || PLAN_META.standard.grad;
+  return TIER_META[item.tier]?.grad || TIER_META.care.grad;
+}
+function itemEmoji(item) {
+  if (item.category === "plan") return PLAN_META[item.plan]?.icon || "🎁";
+  return item.emoji;
+}
+
 // The purchase flow for a freshly-picked catalog item: ask who it's for,
 // then either confirm-into-inventory or hand off to the recipient picker.
+// A subscription gift (category "plan") always goes straight to the
+// recipient picker - gifting a plan to yourself is just buying it.
 function PurchaseFlow({ item, lang, onClose, onDone }) {
-  const { t } = useApp();
-  const [step, setStep] = useState("who"); // "who" | "pick"
+  const { t, refresh } = useApp();
+  const isPlan = item.category === "plan";
+  const [step, setStep] = useState(isPlan ? "pick" : "who");
   const purchase = usePurchaseGift();
 
   const buyForSelf = () => {
     purchase.mutate({ giftKind: item.kind }, {
       onSuccess: () => {
         toast.success(t("gift_bought_for_self").replace("{emoji}", item.emoji).replace("{label}", labelFor(lang, item)));
+        refresh();
         onDone();
       },
       onError: (e) => toast.error(e?.response?.status === 402 ? t("gift_need_topup") : t("error_generic")),
@@ -133,6 +165,7 @@ function PurchaseFlow({ item, lang, onClose, onDone }) {
     purchase.mutate({ giftKind: item.kind, toUserId: recipient.id }, {
       onSuccess: () => {
         toast.success(t("gift_sent_to_named").replace("{emoji}", item.emoji).replace("{name}", recipient.name));
+        refresh();
         onDone();
       },
       onError: (e) => toast.error(e?.response?.status === 402 ? t("gift_need_topup") : t("error_generic")),
@@ -140,7 +173,7 @@ function PurchaseFlow({ item, lang, onClose, onDone }) {
   };
 
   if (step === "pick") {
-    return <RecipientPicker onPick={buyForRecipient} onClose={() => setStep("who")} />;
+    return <RecipientPicker onPick={buyForRecipient} onClose={isPlan ? onClose : () => setStep("who")} />;
   }
 
   return (
@@ -149,11 +182,11 @@ function PurchaseFlow({ item, lang, onClose, onDone }) {
       <div className="relative w-full sm:max-w-sm bg-card rounded-t-3xl sm:rounded-3xl shadow-2xl p-5">
         <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-full hover:bg-muted"><X className="w-4 h-4" /></button>
         <div className="text-center mb-5">
-          <div className={`w-20 h-20 mx-auto rounded-full grid place-items-center bg-gradient-to-br ${(TIER_META[item.tier] || TIER_META.care).ring} mb-3`}>
-            <span className="text-4xl">{item.emoji}</span>
+          <div className={`w-20 h-20 mx-auto rounded-3xl grid place-items-center bg-gradient-to-br ${itemGradient(item)} mb-3 shadow-lg`}>
+            <span className="text-4xl drop-shadow-[0_4px_10px_rgba(0,0,0,0.35)]">{itemEmoji(item)}</span>
           </div>
           <p className="font-heading text-lg font-semibold">{labelFor(lang, item)}</p>
-          {item.price > 0 && <Price amount={item.price} className="mt-1" />}
+          <p className="text-sm font-bold tabular-nums mt-1">{item.price.toLocaleString()} <span className="text-xs font-medium text-muted-foreground">so'm</span></p>
         </div>
         <p className="text-sm font-medium text-center mb-3">{t("gift_who_for_question")}</p>
         <div className="space-y-2">
@@ -183,7 +216,7 @@ function PurchaseFlow({ item, lang, onClose, onDone }) {
 }
 
 function InventoryTab({ lang }) {
-  const { t } = useApp();
+  const { t, refresh } = useApp();
   const { data: items = [], isLoading } = useGiftInventory();
   const [redeeming, setRedeeming] = useState(null);
   const redeem = useRedeemGift();
@@ -192,6 +225,7 @@ function InventoryTab({ lang }) {
     redeem.mutate({ itemId: redeeming.id, toUserId: recipient.id }, {
       onSuccess: () => {
         toast.success(t("gift_sent_to_named").replace("{emoji}", redeeming.emoji).replace("{name}", recipient.name));
+        refresh();
         setRedeeming(null);
       },
       onError: () => { toast.error(t("error_generic")); setRedeeming(null); },
@@ -213,12 +247,12 @@ function InventoryTab({ lang }) {
     <div className="space-y-2">
       {items.map((it) => (
         <div key={it.id} className="rounded-2xl border border-border bg-card p-3 flex items-center gap-3" data-testid={`gift-inv-${it.id}`}>
-          <div className={`w-12 h-12 rounded-full grid place-items-center bg-gradient-to-br ${(TIER_META[it.price === 0 ? "free" : "care"]).ring} shrink-0`}>
-            <span className="text-2xl">{it.emoji}</span>
+          <div className={`w-12 h-12 rounded-2xl grid place-items-center bg-gradient-to-br ${(TIER_META[it.tier] || TIER_META.care).grad} shrink-0 shadow`}>
+            <span className="text-2xl drop-shadow">{it.emoji}</span>
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold truncate">{labelFor(lang, it)}</p>
-            <p className="text-xs text-muted-foreground">{it.price > 0 ? `${it.price.toLocaleString()} so'm` : t("gift_free_word")}</p>
+            <p className="text-xs text-muted-foreground">{it.price.toLocaleString()} so'm</p>
           </div>
           <CTA onClick={() => setRedeeming(it)} className="!w-auto px-4 !py-2 text-sm shrink-0" data-testid={`gift-use-${it.id}`}>
             {t("gift_use_button")}
@@ -234,10 +268,11 @@ export default function GiftShop() {
   const { user, t, lang } = useApp();
   const [tab, setTab] = useState("shop");
   const { data: catalog, isLoading } = useGiftCatalog();
+  const { data: planCatalog, isLoading: planLoading } = usePlanGiftCatalog();
   const [picked, setPicked] = useState(null);
 
   const groups = React.useMemo(() => {
-    const g = { free: [], care: [], love: [], luxury: [] };
+    const g = { care: [], love: [], luxury: [] };
     (catalog?.items || []).forEach((it) => { if (g[it.tier]) g[it.tier].push(it); });
     return g;
   }, [catalog]);
@@ -268,23 +303,48 @@ export default function GiftShop() {
       />
 
       {tab === "shop" && (
-        <div className="space-y-5">
-          {isLoading && <p className="text-center text-sm text-muted-foreground py-10">{t("loading")}</p>}
+        <div className="space-y-6">
+          {(isLoading || planLoading) && <p className="text-center text-sm text-muted-foreground py-10">{t("loading")}</p>}
+
+          {!planLoading && planCatalog?.items?.length > 0 && (
+            <div>
+              <SectionLabel>{t("gift_plan_section_title")}</SectionLabel>
+              <p className="text-xs text-muted-foreground -mt-1 mb-2">{t("gift_plan_section_hint")}</p>
+              <div className="grid grid-cols-2 gap-2.5">
+                {planCatalog.items.map((it) => (
+                  <GiftTile
+                    key={it.kind}
+                    emoji={itemEmoji(it)}
+                    title={labelFor(lang, it)}
+                    price={it.price}
+                    gradient={itemGradient(it)}
+                    disabled={it.price > balance}
+                    onClick={() => setPicked(it)}
+                    testid={`giftshop-plan-card-${it.kind}`}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           {!isLoading && TIER_ORDER.map((tk) => {
             const list = groups[tk];
             if (!list || list.length === 0) return null;
-            const tm = TIER_META[tk];
             return (
               <div key={tk}>
-                <div className="flex items-center gap-2 mb-2">
-                  <SectionLabel>{tm[lang === "ru" ? "label_ru" : lang === "en" ? "label_en" : "label_uz"]}</SectionLabel>
-                  {tk === "free" && catalog && (
-                    <span className="text-[10px] text-secondary inline-flex items-center gap-1"><Sparkles className="w-3 h-3" /> {catalog.free_remaining}/{catalog.free_quota_per_week} {t("gift_free_word")}</span>
-                  )}
-                </div>
-                <div className="grid grid-cols-3 gap-2.5">
+                <SectionLabel>{tierLabel(lang, tk)}</SectionLabel>
+                <div className="grid grid-cols-3 gap-2.5 mt-2">
                   {list.map((it) => (
-                    <GiftCard key={it.kind} item={it} lang={lang} disabled={it.price > balance && it.tier !== "free"} onPick={setPicked} />
+                    <GiftTile
+                      key={it.kind}
+                      emoji={itemEmoji(it)}
+                      title={labelFor(lang, it)}
+                      price={it.price}
+                      gradient={itemGradient(it)}
+                      disabled={it.price > balance}
+                      onClick={() => setPicked(it)}
+                      testid={`giftshop-card-${it.kind}`}
+                    />
                   ))}
                 </div>
               </div>

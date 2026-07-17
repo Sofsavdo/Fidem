@@ -95,6 +95,7 @@ async def gift_inventory(uid: str = Depends(get_current_user_id)):
             "label_ru": meta.get("label_ru", r["kind"]),
             "label_en": meta.get("label_en", r["kind"]),
             "price": r["price"],
+            "tier": meta.get("tier", "care"),
             "created_at": r["created_at"],
         })
     return {"items": out}
@@ -111,24 +112,28 @@ async def gift_purchase(req: GiftPurchaseRequest, uid: str = Depends(get_current
         await get_user(req.to_user_id)  # validates exists
         if await _blocked_pair(uid, req.to_user_id):
             raise HTTPException(403, "Bu foydalanuvchiga sovg'a yubora olmaysiz")
-        is_free_gift = await charge_for_gift(uid, sender, kind, meta)
-        gift_meta = await deliver_gift(sender, uid, req.to_user_id, kind, meta, is_free_gift)
-        new_balance = sender.get("balance", 0) if is_free_gift else (sender.get("balance", 0) - meta["price"])
+        await charge_for_gift(uid, kind, meta)
+        gift_meta = await deliver_gift(sender, uid, req.to_user_id, kind, meta, meta["category"])
+        new_balance = sender.get("balance", 0) - meta["price"]
         return {"ok": True, "balance": new_balance, "delivered": True, "gift": gift_meta}
 
+    if meta["category"] == "plan":
+        # A gifted subscription is never held - "buy it for myself" is just
+        # the regular /payments/create flow on the Premium page.
+        raise HTTPException(400, "Obuna sovg'asi hoziroq kimgadir yuborilishi kerak")
+
     # No recipient chosen yet: charge now, hold in inventory for later.
-    is_free_gift = await charge_for_gift(uid, sender, kind, meta)
+    await charge_for_gift(uid, kind, meta)
     item = {
         "id": new_id(),
         "owner_id": uid,
         "kind": kind,
         "price": meta["price"],
-        "is_free": is_free_gift,
         "status": "unused",
         "created_at": iso(now_utc()),
     }
     await db.gift_inventory.insert_one(item)
-    new_balance = sender.get("balance", 0) if is_free_gift else (sender.get("balance", 0) - meta["price"])
+    new_balance = sender.get("balance", 0) - meta["price"]
     return {"ok": True, "balance": new_balance, "delivered": False, "inventory_id": item["id"]}
 
 
@@ -152,5 +157,5 @@ async def gift_redeem(item_id: str, req: GiftRedeemRequest, uid: str = Depends(g
         raise HTTPException(404, "Bu sovg'a topilmadi yoki allaqachon ishlatilgan")
 
     kind, meta = resolve_gift_kind(claim["kind"])
-    gift_meta = await deliver_gift(sender, uid, req.to_user_id, kind, meta, bool(claim.get("is_free")))
+    gift_meta = await deliver_gift(sender, uid, req.to_user_id, kind, meta, meta["category"])
     return {"ok": True, "gift": gift_meta}

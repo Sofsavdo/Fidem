@@ -187,6 +187,14 @@ export function useGiftCatalog() {
   });
 }
 
+export function usePlanGiftCatalog() {
+  return useQuery({
+    queryKey: ["gifts", "plan-catalog"],
+    queryFn: () => api.get("/gifts/plan-catalog").then((r) => r.data),
+    staleTime: 60_000,
+  });
+}
+
 export function useGiftInventory() {
   return useQuery({
     queryKey: ["gifts", "inventory"],

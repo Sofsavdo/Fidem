@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { toast } from "sonner";
-import { X, Gift as GiftIcon, Sparkles, Plus } from "lucide-react";
+import { X, Gift as GiftIcon, Plus } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 
 const TIER_META = {
@@ -40,9 +40,8 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
   const send = async (item) => {
     setSending(item.kind);
     try {
-      const r = await api.post("/gifts/send", { to_user_id: targetId, gift_kind: item.kind });
-      const isFree = r.data?.gift?.is_free;
-      toast.success(isFree ? t("gift_sent_free").replace("{emoji}", item.emoji).replace("{label}", item[labelKey]) : t("gift_sent_paid").replace("{emoji}", item.emoji));
+      await api.post("/gifts/send", { to_user_id: targetId, gift_kind: item.kind });
+      toast.success(t("gift_sent_paid").replace("{emoji}", item.emoji));
       onSent?.({ ...item, label: item[labelKey] });
       onClose();
       refresh(); // balance sync happens in the background — don't make the user wait a 2nd round-trip to see the modal close
@@ -53,7 +52,6 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
     }
   };
 
-  const freeRemaining = catalog?.free_remaining ?? 0;
   const balance = user?.balance || 0;
 
   return (
@@ -85,9 +83,6 @@ export default function GiftModal({ targetId, targetName, onClose, onSent }) {
             <Plus className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate"><b>{balance.toLocaleString()}</b> {t("sum")}</span>
           </Link>
-          <span className="inline-flex items-center gap-1 text-secondary shrink-0">
-            <Sparkles className="w-3 h-3" /> {freeRemaining}/{catalog?.free_quota_per_week || 1} {t("gift_free_word")}
-          </span>
         </div>
 
         {/* Tier tabs */}
