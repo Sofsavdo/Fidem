@@ -286,8 +286,8 @@ export default function ProfileDetail() {
 
         {/* Key stats — 2 columns on mobile, 3 on larger */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2" data-testid="profile-stats">
-          <Stat label={t("height")} value={`${c.height_cm} sm`} />
-          <Stat label={t("weight")} value={`${c.weight_kg} kg`} />
+          <Stat label={t("height")} value={c.height_cm ? `${c.height_cm} sm` : "—"} />
+          <Stat label={t("weight")} value={c.weight_kg ? `${c.weight_kg} kg` : "—"} />
           <Stat label={t("marital_status")} value={t(c.marital_status)} />
           <Stat label={t("has_children")} value={c.has_children ? `${t("yes")}${c.children_count ? ` · ${c.children_count}` : ""}` : t("no")} />
           <Stat label={t("education")} value={c.education || "—"} />

@@ -6,9 +6,10 @@ import { toast } from "sonner";
 import { Wallet, ArrowDownToLine, Clock, CheckCircle2, XCircle, Info, ChevronLeft } from "lucide-react";
 import { useWithdrawalsStatus, useWithdrawalsHistory, QK } from "@/hooks/queries";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { localeFor } from "@/lib/time";
 
 export default function Withdrawals() {
-  const { t } = useApp();
+  const { t, lang } = useApp();
   const queryClient = useQueryClient();
   const [amount, setAmount] = useState("");
   const [card, setCard] = useState("");
@@ -93,9 +94,12 @@ export default function Withdrawals() {
         </div>
       </div>
 
+      {/* A hover-only tooltip never shows on a touchscreen - the clarification
+          (balance/gifts aren't withdrawable) needs to be plain visible text,
+          and it should say something the page subtitle above hasn't already. */}
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Info className="w-4 h-4 cursor-help" title={t("withdraw_only_referral")} />
-        <span>{t("withdraw_explainer")}</span>
+        <Info className="w-4 h-4 shrink-0" />
+        <span>{t("withdraw_only_referral")}</span>
       </div>
 
       {/* Eligibility */}
@@ -191,7 +195,7 @@ export default function Withdrawals() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium">{(w.amount || 0).toLocaleString()} {t("sum_word")}</p>
-                    <p className="text-[11px] text-muted-foreground">{w.created_at ? new Date(w.created_at).toLocaleString() : "—"}</p>
+                    <p className="text-[11px] text-muted-foreground">{w.created_at ? new Date(w.created_at).toLocaleString(localeFor(lang)) : "—"}</p>
                     <p className="text-[11px] text-muted-foreground font-mono">**** **** **** {(w.card_number || "").slice(-4)}</p>
                   </div>
                   {statusBadge(w.status)}

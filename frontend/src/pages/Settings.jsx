@@ -2,11 +2,10 @@ import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ShieldCheck, Monitor, Sun, Moon } from "lucide-react";
+import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import CountrySelect from "@/components/CountrySelect";
 import RegionSelect from "@/components/RegionSelect";
-import { getTheme, setTheme } from "@/lib/theme";
 
 export default function Settings() {
   const { t, user, refresh, lang } = useApp();
@@ -16,8 +15,6 @@ export default function Settings() {
     require_verified: false, require_financial: false,
   });
   const [saving, setSaving] = useState(false);
-  const [theme, setThemeState] = useState(getTheme());
-  const pickTheme = (v) => { setThemeState(v); setTheme(v); };
 
   useEffect(() => {
     if (user?.message_filters) {
@@ -56,29 +53,6 @@ export default function Settings() {
         </Link>
         <h1 className="font-heading text-2xl font-semibold tracking-tight">{t("who_can_message_me")}</h1>
       </div>
-      {/* Appearance — theme */}
-      <div className="rounded-3xl bg-card border border-border p-4">
-        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2.5">{t("appearance")}</p>
-        <div className="inline-flex p-1 rounded-2xl bg-muted/60 border border-border/70 w-full">
-          {[
-            { k: "system", label: t("theme_system"), Icon: Monitor },
-            { k: "light", label: t("theme_light"), Icon: Sun },
-            { k: "dark", label: t("theme_dark"), Icon: Moon },
-          ].map((o) => (
-            <button
-              key={o.k}
-              data-testid={`theme-${o.k}`}
-              onClick={() => pickTheme(o.k)}
-              className={`flex-1 py-2 px-3 text-sm font-medium rounded-xl transition-colors inline-flex items-center justify-center gap-1.5 ${
-                theme === o.k ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
-              }`}
-            >
-              <o.Icon className="w-4 h-4" /> {o.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <p className="text-sm text-muted-foreground">
         <ShieldCheck className="inline w-4 h-4 mr-1 text-secondary" />
         {t("filter_hint")}

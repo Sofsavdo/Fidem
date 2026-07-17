@@ -7,6 +7,7 @@ import { useNotifications } from "@/hooks/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { QK } from "@/hooks/queries";
 import { Skeleton, EmptyState } from "@/components/kit";
+import { localeFor } from "@/lib/time";
 
 const ICONS = {
   view: Eye, saved: Heart, gift: Gift, message: MessageCircle, photo_request: ShieldCheck,
@@ -15,7 +16,7 @@ const ICONS = {
 };
 
 export default function Notifications() {
-  const { t } = useApp();
+  const { t, lang } = useApp();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: items = [], isLoading } = useNotifications();
@@ -91,7 +92,7 @@ export default function Notifications() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm">{n.text}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{n.created_at ? new Date(n.created_at).toLocaleString() : "—"}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{n.created_at ? new Date(n.created_at).toLocaleString(localeFor(lang)) : "—"}</p>
               </div>
               {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2" />}
             </div>

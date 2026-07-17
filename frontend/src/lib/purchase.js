@@ -8,6 +8,12 @@ import { openExternalLink } from "@/lib/telegram";
 
 export const PLAN_PRICES = { standard: 34900, premium: 79000, vip: 199000 };
 
+// Tier order used to tell whether a plan is already covered by the user's
+// current one — VIP is a superset of Premium which is a superset of
+// Standard, so a VIP user must never be offered a "buy" button for Premium
+// as if they still needed it.
+export const PLAN_RANK = { free: 0, standard: 1, premium: 2, vip: 3 };
+
 let inFlight = false;
 
 /**

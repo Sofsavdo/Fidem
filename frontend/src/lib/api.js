@@ -44,7 +44,6 @@ const perfLog = process.env.NODE_ENV === 'development' ? {
 } : null;
 
 const cacheableUrls = [
-  '/icebreakers',
   '/gifts/catalog',
   '/me/progress',
   '/daily/status',

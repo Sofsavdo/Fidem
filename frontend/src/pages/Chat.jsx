@@ -5,7 +5,7 @@ import { useApp } from "@/contexts/AppContext";
 import GiftModal from "@/components/GiftModal";
 import GiftCelebration, { tierFromPrice } from "@/components/GiftCelebration";
 import ChatVoiceRecorder from "@/components/ChatVoiceRecorder";
-import { ArrowLeft, Send, Gift, MoreVertical, Ban, Flag, Wand2, Play, Check, CheckCheck, Contact, AlertTriangle, X } from "lucide-react";
+import { ArrowLeft, Send, Gift, MoreVertical, Ban, Flag, Play, Check, CheckCheck, Contact, AlertTriangle, X } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
 import { formatLastActive } from "@/lib/time";
 import { tapLight } from "@/lib/haptics";
@@ -42,21 +42,14 @@ export default function Chat() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
-  const [icebreakers, setIcebreakers] = useState([]);
-  const [aiLoading, setAiLoading] = useState(false);
   const [messagesLoaded, setMessagesLoaded] = useState(false);
   const [celebration, setCelebration] = useState(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const endRef = useRef(null);
   const topRef = useRef(null);
-  const aiAutoRef = useRef(false);
 
   const chatId = user && otherId ? [user.id, otherId].sort().join("_") : null;
-  const { wsEvent, lang } = useApp();
-
-  useEffect(() => {
-    api.get(`/icebreakers?lang=${lang || "uz"}`).then((r) => setIcebreakers(r.data || [])).catch(() => {});
-  }, [lang]);
+  const { wsEvent } = useApp();
 
   // Fire the three requests independently and paint each as it arrives, so the
   // header and messages show the moment they're ready rather than blocking on
@@ -204,17 +197,6 @@ export default function Chat() {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  // Empty chat: fetch AI-personalized first-message suggestions automatically
-  // (once per chat open) so the user doesn't have to know a button exists.
-  useEffect(() => {
-    if (aiAutoRef.current) return;
-    if (!messagesLoaded || messages.length > 0) return;
-    if (!access || access.requires_unlock) return;
-    aiAutoRef.current = true;
-    genAiIcebreakers();
-    // eslint-disable-next-line
-  }, [messagesLoaded, messages.length, access]);
-
   // Off-platform contact detection (mirrors backend detect_contact_info).
   // Free plan: sharing contacts is a paid perk — blocked with an upsell.
   // Paid plans: allowed, but a compact confirm bar appears first so nobody
@@ -307,17 +289,6 @@ export default function Chat() {
   const sendGift = (kind) => {
     setGiftOpen(true);
     // legacy quick-send kept for backward compat — not used now
-  };
-
-  const genAiIcebreakers = async () => {
-    setAiLoading(true);
-    try {
-      const r = await api.get(`/ai/icebreakers/${otherId}?lang=${lang || "uz"}`);
-      setIcebreakers(r.data.questions || []);
-      toast.success("🤖 AI ✅");
-    } catch (e) {
-      toast.error(t("error"));
-    } finally { setAiLoading(false); }
   };
 
   const blockUser = async () => {
@@ -450,38 +421,6 @@ export default function Chat() {
         })}
         <div ref={endRef} />
       </div>
-
-      {/* Empty chat: AI writes the first message for you — suggestions load
-          automatically (see the auto-effect above), tap one to put it in the
-          composer, edit if you like, send. The old canned template texts are
-          gone on purpose. */}
-      {messagesLoaded && messages.length === 0 && !access?.requires_unlock && (
-        <div className="px-4 pb-2 space-y-1.5" data-testid="ai-first-message">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] uppercase tracking-wider text-secondary font-semibold inline-flex items-center gap-1">
-              <Wand2 className="w-3 h-3" /> {t("ai_first_message_title")}
-            </p>
-            <button data-testid="ai-icebreaker-btn" onClick={genAiIcebreakers} disabled={aiLoading} className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-secondary disabled:opacity-50">
-              ↻ {t("ai_generate_short")}
-            </button>
-          </div>
-          {aiLoading && icebreakers.length === 0 && (
-            <div className="rounded-2xl bg-secondary/5 border border-dashed border-secondary/30 px-3 py-2.5 text-xs text-secondary animate-pulse">
-              {t("ai_preparing")}
-            </div>
-          )}
-          {icebreakers.slice(0, 3).map((q, i) => (
-            <button
-              key={i}
-              data-testid={`icebreaker-${i}`}
-              onClick={() => setText(q)}
-              className="w-full text-left rounded-2xl border border-secondary/25 bg-secondary/5 hover:bg-secondary/10 px-3 py-2.5 text-sm"
-            >
-              {q}
-            </button>
-          ))}
-        </div>
-      )}
 
       <div className="fixed bottom-0 inset-x-0 glass border-t border-border/60 max-w-2xl xl:max-w-3xl mx-auto md:left-64 lg:left-72 md:right-0" style={{ paddingBottom: "env(safe-area-inset-bottom)", zIndex: 10000 }}>
         <div className="p-3 space-y-2">

@@ -1,4 +1,4 @@
-"""Growth & monetization features: boost, daily check-in, quiz, icebreakers, invites."""
+"""Growth & monetization features: boost, daily check-in, quiz, invites."""
 from __future__ import annotations
 
 from datetime import timedelta
@@ -133,51 +133,6 @@ async def boost_activate(request: Request, use_balance: bool = Body(True, embed=
         raise HTTPException(402, f"Need {BOOST_PRICE:,} so'm balance")
     await push_notif(uid, "boost", "Profile Boost faollashtirildi — 24 soat 5x ko'proq ko'rinish 🚀")
     return {"active": True, "until": iso(until), "balance_after": me.get("balance", 0) - BOOST_PRICE}
-
-
-# ---------- Icebreaker prompts ----------
-ICEBREAKERS_UZ = [
-    "Sizning eng yoqimli xotirangiz qaysi?",
-    "Hayotda 3 ta eng muhim narsa nima?",
-    "Idealdagi dam olish kuni qanday o'tadi?",
-    "Qaysi kitob/film sizga juda ta'sir qildi?",
-    "Bo'sh vaqtingizda nima qilishni yoqtirasiz?",
-    "Eng katta orzuingiz nima?",
-    "Oilada nima eng muhim deb o'ylaysiz?",
-    "Hayotda eng katta yutuq qaysi?",
-    "Qayerda yashashni xohlaysiz?",
-    "Eng yaxshi maslahatchingiz kim?",
-]
-ICEBREAKERS_RU = [
-    "Какое ваше любимое воспоминание?",
-    "Три самые важные вещи в жизни?",
-    "Как выглядит идеальный выходной?",
-    "Какая книга/фильм на вас сильнее всего повлияли?",
-    "Чем любите заниматься в свободное время?",
-    "Какая ваша самая большая мечта?",
-    "Что самое важное в семье?",
-    "Самое большое достижение в жизни?",
-    "Где бы хотели жить?",
-    "Кто ваш лучший советчик?",
-]
-ICEBREAKERS_EN = [
-    "What's your favorite memory?",
-    "Three most important things in life?",
-    "What does your ideal day off look like?",
-    "Which book/film impacted you the most?",
-    "What do you like to do in free time?",
-    "What's your biggest dream?",
-    "What matters most in family?",
-    "Your biggest achievement so far?",
-    "Where would you want to live?",
-    "Who's your best advisor?",
-]
-
-
-@router.get("/icebreakers")
-async def icebreakers(lang: str = "uz"):
-    pool = {"ru": ICEBREAKERS_RU, "en": ICEBREAKERS_EN}.get(lang, ICEBREAKERS_UZ)
-    return pool
 
 
 # ---------- Referral Username System (Phase 1.4) ----------

@@ -79,7 +79,7 @@ export default function Family() {
           <Crown className="w-5 h-5 text-amber-600 shrink-0" />
           <div className="text-sm">
             <p className="font-medium text-amber-900">VIP</p>
-            <p className="text-amber-800 mt-1">{t("family_desc")} <Link to="/premium" className="underline font-medium">{t("upgrade_plan")}</Link></p>
+            <p className="text-amber-800 mt-1">{t("family_vip_only")} <Link to="/premium" className="underline font-medium">{t("upgrade_plan")}</Link></p>
           </div>
         </div>
       )}
@@ -87,7 +87,6 @@ export default function Family() {
       {/* Set family contact */}
       <div className="rounded-3xl border border-border bg-card p-5 space-y-3">
         <h2 className="font-semibold flex items-center gap-2"><Phone className="w-4 h-4" /> {t("your_phone_label")}</h2>
-        <p className="text-xs text-muted-foreground">{t("family_desc")}</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <input data-testid="fam-phone" placeholder="+998 90 123 45 67" className="px-4 py-2.5 rounded-xl border border-input bg-background text-sm" value={phone} onChange={(e) => setPhone(e.target.value)} />
           <input data-testid="fam-name" placeholder={t("name")} className="px-4 py-2.5 rounded-xl border border-input bg-background text-sm" value={name} onChange={(e) => setName(e.target.value)} />
