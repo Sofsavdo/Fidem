@@ -66,9 +66,19 @@ async def is_admin_tg(tg_id: int) -> bool:
     return tg_id in await get_admin_chat_ids()
 
 
+# Below this AI confidence, a P2P request always stays in the human queue.
+# The model's own instructions already tell it to prefer "unsure" over a
+# shaky "approve", so a high bar here is a second layer, not the only one.
+AI_P2P_AUTO_APPROVE_CONFIDENCE = 75
+
+
 async def notify_admins_manual_topup(topup: dict) -> None:
-    """Fire a real-time review card (receipt photo + approve/reject buttons)
-    to every admin the moment a P2P top-up request lands."""
+    """AI reviews the receipt first; a confident approval credits the
+    balance immediately (decided_by="ai") and admins get an info-only
+    recap. Anything else - low confidence, reject, unsure, or the AI call
+    failing outright - falls through to the original real-time review
+    card (receipt photo + approve/reject buttons), now with the AI's own
+    read of the receipt shown alongside so a human isn't starting cold."""
     admins = await get_admin_chat_ids()
     if not admins:
         log.warning("manual topup alert: no admin telegram ids configured")
@@ -78,20 +88,57 @@ async def notify_admins_manual_topup(topup: dict) -> None:
         {"id": topup["user_id"]},
         {"_id": 0, "name": 1, "telegram_id": 1, "balance": 1, "region": 1},
     ) or {}
+
+    ai_review: dict | None = None
+    try:
+        from ai_service import analyze_p2p_receipt
+
+        ai_review = await analyze_p2p_receipt(topup.get("proof_url", ""), topup["amount"])
+    except Exception as e:
+        log.warning(f"P2P AI review failed: {e}")
+
+    await db.manual_topups.update_one({"id": topup["id"]}, {"$set": {"ai_review": ai_review}})
+
+    auto_approved = False
+    if (
+        ai_review
+        and ai_review.get("ai_generated")
+        and ai_review.get("verdict") == "approve"
+        and ai_review.get("confidence", 0) >= AI_P2P_AUTO_APPROVE_CONFIDENCE
+    ):
+        from routers.payments_r import decide_manual_topup
+
+        decided = await decide_manual_topup(topup["id"], True, reason="", decided_by="ai")
+        auto_approved = decided is not None
+
+    ai_line = ""
+    if ai_review and ai_review.get("ai_generated"):
+        icon = {"approve": "✅", "reject": "❌", "unsure": "❓"}.get(ai_review["verdict"], "❓")
+        ai_line = (
+            f"\n\n🤖 AI xulosasi: {icon} {ai_review['verdict']} ({ai_review['confidence']}%)"
+            f"\n{ai_review.get('reason') or '—'}"
+        )
+
     caption = (
         "💳 YANGI P2P TO'LOV SO'ROVI\n\n"
         f"👤 {u.get('name') or topup['user_id']} ({u.get('region') or '—'})\n"
         f"💰 Summa: {topup['amount']:,} so'm\n"
         f"💼 Joriy balansi: {(u.get('balance') or 0):,} so'm\n"
-        f"🆔 So'rov: {topup['id']}\n\n"
-        "⚠️ Tasdiqlashdan oldin pul kartaga KELGANINI bank ilovangizda tekshiring."
+        f"🆔 So'rov: {topup['id']}"
+        f"{ai_line}"
     )
-    keyboard = {
-        "inline_keyboard": [[
-            {"text": "✅ Tasdiqlash", "callback_data": f"mtu:a:{topup['id']}"},
-            {"text": "❌ Rad etish", "callback_data": f"mtu:r:{topup['id']}"},
-        ]]
-    }
+
+    if auto_approved:
+        caption += "\n\n✅ AI TOMONIDAN AVTOMATIK TASDIQLANDI — balans tushdi.\n⚠️ Agar pul kartaga kelmagan bo'lsa, foydalanuvchi tafsilotlaridan \"Firibgarlik\" tugmasi orqali balansni 0 ga qaytarib, bloklang."
+        keyboard = None
+    else:
+        caption += "\n\n⚠️ Tasdiqlashdan oldin pul kartaga KELGANINI bank ilovangizda tekshiring."
+        keyboard = {
+            "inline_keyboard": [[
+                {"text": "✅ Tasdiqlash", "callback_data": f"mtu:a:{topup['id']}"},
+                {"text": "❌ Rad etish", "callback_data": f"mtu:r:{topup['id']}"},
+            ]]
+        }
 
     photo: bytes | None = None
     try:

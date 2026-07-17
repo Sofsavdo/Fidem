@@ -1,6 +1,8 @@
 """AI services. Compatibility reports and moderation are lightweight
-template/regex fallbacks (no model call). Face verification is a real
-Claude vision call - see verify_face_photo below.
+template/regex fallbacks (no model call). Face verification, verification-
+document review, and P2P receipt review are real vision calls (Gemini
+primary, Claude fallback) - see verify_face_photo, analyze_verification,
+and analyze_p2p_receipt below.
 """
 from __future__ import annotations
 
@@ -270,6 +272,109 @@ async def verify_face_photo(image_url: str = "", image_base64: str = "") -> dict
             "reason": "Tekshiruv xizmati vaqtincha ishlamayapti. Birozdan so'ng qayta urinib ko'ring.",
             "ai_generated": False,
         }
+
+
+# ---------- 6) P2P top-up receipt review ----------
+_P2P_SCHEMA_GEMINI = {
+    "type": "OBJECT",
+    "properties": {
+        "verdict": {"type": "STRING", "enum": ["approve", "reject", "unsure"]},
+        "confidence": {"type": "NUMBER"},
+        "amount_visible": {"type": "NUMBER"},
+        "reason_uz": {"type": "STRING"},
+    },
+    "required": ["verdict", "confidence", "amount_visible", "reason_uz"],
+}
+
+
+async def analyze_p2p_receipt(image_url: str, claimed_amount: int) -> dict:
+    """AI review of a P2P (card-transfer) top-up receipt screenshot.
+
+    This can only judge whether the IMAGE plausibly shows a genuine bank/
+    payment-app transfer confirmation matching the claimed amount - it has
+    no way to confirm the money actually landed in the real bank account
+    (no banking API access), so it deliberately stays conservative: unsure
+    or any sign of tampering/mismatch/reuse must fall through to a human,
+    never verdict=approve. Never raises - a failure returns verdict=unsure
+    so the request simply stays in the admin queue exactly as before this
+    feature existed.
+    """
+    try:
+        media_type, data_b64 = await _load_image_b64(image_url, "")
+    except Exception as e:
+        log.warning("p2p_receipt: could not load image: %s", e)
+        return {"verdict": "unsure", "confidence": 0, "reason": "Rasmni ochib bo'lmadi", "ai_generated": False}
+
+    prompt = (
+        "This is a payment receipt screenshot submitted by a user claiming they "
+        f"transferred {claimed_amount} UZS (Uzbek so'm) by bank card to top up their "
+        "balance on a dating platform. Carefully assess whether this looks like a "
+        "genuine, unedited screenshot from a real Uzbek bank or payment app (Click, "
+        "Payme, Uzcard, Humo, or a bank's own app) showing a SUCCESSFUL completed "
+        "transfer - not a pending/failed one, not a balance-check screen, not an "
+        "unrelated photo, not an obviously reused/duplicate-looking or edited image. "
+        "Read whatever amount is visible in the screenshot into amount_visible (0 if "
+        "you cannot read one). Only use verdict=\"approve\" if you are genuinely "
+        "confident this is a real successful transfer AND the visible amount is "
+        "reasonably close to the claimed amount. Use verdict=\"reject\" only if "
+        "something is clearly wrong (unrelated image, failed/pending transfer, amount "
+        "far off). Use verdict=\"unsure\" for anything ambiguous, low quality, or that "
+        "you're not confident about - this is the safe default, since a human reviews "
+        "every unsure/reject case anyway. Respond with the required JSON only; "
+        "reason_uz should be a short explanation in Uzbek."
+    )
+
+    if GEMINI_API_KEY:
+        try:
+            parsed = await _gemini_json(prompt, [(media_type, data_b64)], _P2P_SCHEMA_GEMINI)
+            verdict = parsed.get("verdict") if parsed.get("verdict") in ("approve", "reject", "unsure") else "unsure"
+            return {
+                "verdict": verdict,
+                "confidence": int(parsed.get("confidence") or 0),
+                "amount_visible": parsed.get("amount_visible") or 0,
+                "reason": parsed.get("reason_uz") or "",
+                "ai_generated": True,
+            }
+        except Exception as e:
+            log.warning("p2p_receipt: gemini call failed, trying fallback: %s", e)
+
+    try:
+        client = _get_client()
+        response = await client.messages.create(
+            model=ANTHROPIC_MODEL,
+            max_tokens=300,
+            output_config={"format": {"type": "json_schema", "schema": {
+                "type": "object",
+                "properties": {
+                    "verdict": {"type": "string", "enum": ["approve", "reject", "unsure"]},
+                    "confidence": {"type": "number"},
+                    "amount_visible": {"type": "number"},
+                    "reason_uz": {"type": "string"},
+                },
+                "required": ["verdict", "confidence", "amount_visible", "reason_uz"],
+                "additionalProperties": False,
+            }}},
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": data_b64}},
+                    {"type": "text", "text": prompt},
+                ],
+            }],
+        )
+        text = next((b.text for b in response.content if b.type == "text"), "")
+        parsed = json.loads(text) if text else {}
+        verdict = parsed.get("verdict") if parsed.get("verdict") in ("approve", "reject", "unsure") else "unsure"
+        return {
+            "verdict": verdict,
+            "confidence": int(parsed.get("confidence") or 0),
+            "amount_visible": parsed.get("amount_visible") or 0,
+            "reason": parsed.get("reason_uz") or "",
+            "ai_generated": True,
+        }
+    except Exception as e:
+        log.warning("p2p_receipt: no provider available: %s", e)
+        return {"verdict": "unsure", "confidence": 0, "amount_visible": 0, "reason": "", "ai_generated": False}
 
 
 async def _load_image_b64(image_url: str, image_base64: str) -> tuple[str, str]:

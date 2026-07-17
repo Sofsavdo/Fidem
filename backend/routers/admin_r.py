@@ -319,6 +319,18 @@ async def admin_user_action(
         await db.users.update_one({"id": target_id}, {"$set": {"balance": 0}})
     elif action == "reset_likes":
         await db.saved.delete_many({"owner_id": target_id})
+    elif action == "fraud_block":
+        # The reversal side of AI auto-approved P2P top-ups: if the money
+        # never actually landed (only checkable in the real bank app, which
+        # no AI here has access to), one tap zeroes the balance it credited,
+        # blocks the account, and tells the user why - instead of the admin
+        # having to chain reset_balance + ban + a manual message by hand.
+        await db.users.update_one({"id": target_id}, {"$set": {"balance": 0, "blocked": True}})
+        await push_notif(
+            target_id, "balance",
+            "⚠️ Hisobingiz bloklandi: to'lov firibgarligi aniqlandi (kartaga pul tushmagan yoki soxta chek). "
+            "Agar bu xato deb hisoblasangiz, admin bilan bog'laning.",
+        )
     else:
         raise HTTPException(400, f"Unknown action: {action}")
 

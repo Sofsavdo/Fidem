@@ -1106,6 +1106,9 @@ function AdminUserQuickActions({ userId }) {
         <button onClick={() => run("ban", "Bu foydalanuvchini ban qilishga ishonchingiz komilmi?")} disabled={actionMut.isPending} className="text-xs rounded-full bg-red-50 text-red-700 px-3 py-2 inline-flex items-center gap-1 disabled:opacity-50">
           <Ban className="w-3 h-3" /> Ban qilish
         </button>
+        <button onClick={() => run("fraud_block", "Firibgarlik deb belgilaymizmi? Balans 0 ga qaytariladi va hisob bloklanadi, foydalanuvchiga ogohlantirish yuboriladi.")} disabled={actionMut.isPending} className="text-xs rounded-full bg-rose-100 text-rose-800 px-3 py-2 inline-flex items-center gap-1 disabled:opacity-50 font-semibold">
+          <AlertTriangle className="w-3 h-3" /> Firibgarlik — balans 0 + blok
+        </button>
       </div>
     </div>
   );
@@ -1341,6 +1344,22 @@ function AdminManualTopups() {
     } finally { setBusy(null); }
   };
 
+  // Reversal for an approved P2P request that turns out to be fraudulent
+  // (money never actually landed - only checkable in the real bank app) -
+  // zeroes the balance it credited, blocks the account, and warns the user
+  // in one call instead of chaining 3 separate admin actions.
+  const flagFraud = async (row) => {
+    if (!window.confirm(`"${row.user?.name || row.user_id}" hisobini firibgarlik deb belgilaymizmi? Balans 0 ga qaytariladi va hisob bloklanadi.`)) return;
+    setBusy(row.id);
+    try {
+      await api.post(`/admin/users/${row.user_id}/action`, { action: "fraud_block" });
+      toast.success("Balans 0 ga qaytarildi, hisob bloklandi");
+      loadItems(status);
+    } catch {
+      toast.error("Xatolik");
+    } finally { setBusy(null); }
+  };
+
   return (
     <div className="max-w-2xl space-y-4">
       {/* Config: toggle + receiving card */}
@@ -1390,9 +1409,17 @@ function AdminManualTopups() {
         {items.map((r) => (
           <div key={r.id} className="rounded-2xl bg-card border border-border p-4 flex items-center gap-3 flex-wrap">
             <div className="flex-1 min-w-[160px]">
-              <p className="text-sm font-medium">{r.user?.name || r.user_id} · <span className="tabular-nums font-semibold">{Number(r.amount).toLocaleString()} so'm</span></p>
+              <p className="text-sm font-medium flex items-center gap-1.5">
+                {r.user?.name || r.user_id} · <span className="tabular-nums font-semibold">{Number(r.amount).toLocaleString()} so'm</span>
+                {r.decided_by === "ai" && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 font-semibold shrink-0">🤖 AI</span>}
+              </p>
               <p className="text-xs text-muted-foreground mt-0.5">{new Date(r.created_at).toLocaleString()} · balans: {Number(r.user?.balance || 0).toLocaleString()}</p>
               {r.rejection_reason && <p className="text-xs text-primary mt-0.5">{r.rejection_reason}</p>}
+              {r.ai_review?.ai_generated && (
+                <p className="text-[11px] text-violet-700 mt-1 bg-violet-50 rounded-lg px-2 py-1">
+                  🤖 {r.ai_review.verdict} ({r.ai_review.confidence}%) — {r.ai_review.reason || "—"}
+                </p>
+              )}
             </div>
             <a href={photoSrc(r.proof_url)} target="_blank" rel="noreferrer" className="text-xs text-secondary underline shrink-0">Chekni ko'rish</a>
             {r.status === "pending" && (
@@ -1402,6 +1429,12 @@ function AdminManualTopups() {
                 <button onClick={() => decide(r.id, false)} disabled={busy === r.id}
                   className="rounded-full border border-border text-xs font-semibold px-4 py-2 disabled:opacity-50">Rad etish</button>
               </div>
+            )}
+            {r.status === "approved" && (
+              <button onClick={() => flagFraud(r)} disabled={busy === r.id}
+                className="shrink-0 rounded-full border border-rose-300 text-rose-700 text-xs font-semibold px-4 py-2 disabled:opacity-50">
+                Firibgarlik — bloklash
+              </button>
             )}
           </div>
         ))}
