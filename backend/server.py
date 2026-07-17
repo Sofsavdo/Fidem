@@ -44,6 +44,7 @@ from routers.chat_r import router as chat_router  # noqa: E402
 from routers.growth_r import router as growth_router  # noqa: E402
 from routers.payments_r import router as payments_router  # noqa: E402
 from routers.telegram_r import router as telegram_router, setup_telegram_webhook  # noqa: E402
+from routers.admin_telegram_r import router as admin_telegram_router, setup_admin_telegram_webhook  # noqa: E402
 from routers.personality_r import router as personality_router  # noqa: E402
 from routers.prompts_r import router as prompts_router  # noqa: E402
 from routers.stories_r import router as stories_router  # noqa: E402
@@ -72,6 +73,7 @@ api.include_router(payments_router)
 api.include_router(admin_router)
 api.include_router(analytics_router)
 api.include_router(telegram_router)
+api.include_router(admin_telegram_router)
 api.include_router(personality_router)
 api.include_router(prompts_router)
 api.include_router(stories_router)
@@ -101,6 +103,7 @@ async def startup() -> None:
 
     # Set Telegram webhook in background (non-fatal)
     asyncio.create_task(setup_telegram_webhook())
+    asyncio.create_task(setup_admin_telegram_webhook())
 
     # Re-engagement notifications for inactive users - runs on its own
     # interval for the life of the process, no external cron needed.

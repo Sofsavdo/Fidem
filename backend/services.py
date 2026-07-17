@@ -24,6 +24,13 @@ log = logging.getLogger(__name__)
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 _TG_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
+# Second, separate bot (Fidemadminbot) used only to open the admin panel as
+# a Telegram Mini App and to receive its /start. Deliberately a distinct
+# token/webhook/secret from the user-facing bot above - the admin bot must
+# never be reachable by a regular user, and a shared token would mean any
+# webhook payload for one bot could be replayed against the other.
+ADMIN_BOT_TOKEN = os.environ.get("ADMIN_BOT_TOKEN", "")
+
 CLICK_MERCHANT_ID = os.environ.get("CLICK_MERCHANT_ID", "")
 CLICK_SERVICE_ID = os.environ.get("CLICK_SERVICE_ID", "")
 CLICK_SECRET_KEY = os.environ.get("CLICK_SECRET_KEY", "")
@@ -44,17 +51,15 @@ def _client() -> httpx.AsyncClient:
     return _http_client
 
 
-async def _tg_call(method: str, **kwargs) -> Optional[httpx.Response]:
-    """POST to a Telegram Bot API method through the shared client, with a
-    single capped-wait retry on HTTP 429 (Telegram's own rate-limit
-    response, which carries the required backoff in
-    `parameters.retry_after`). Previously nothing in this codebase ever
-    looked at that field, so any burst that tripped Telegram's limiter
-    (bulk nudges, admin digests) just silently dropped the message."""
-    if not TELEGRAM_BOT_TOKEN:
-        log.warning("TELEGRAM_BOT_TOKEN not set; skipping Telegram API call")
+async def _tg_call_as(token: str, method: str, **kwargs) -> Optional[httpx.Response]:
+    """POST to a Telegram Bot API method for a given bot token, through the
+    shared client, with a single capped-wait retry on HTTP 429 (Telegram's
+    own rate-limit response, which carries the required backoff in
+    `parameters.retry_after`)."""
+    if not token:
+        log.warning(f"bot token not set; skipping Telegram API call ({method})")
         return None
-    url = f"{_TG_API}/{method}"
+    url = f"https://api.telegram.org/bot{token}/{method}"
     try:
         r = await _client().post(url, **kwargs)
         if r.status_code == 429:
@@ -70,6 +75,10 @@ async def _tg_call(method: str, **kwargs) -> Optional[httpx.Response]:
     except Exception as e:
         log.error(f"Telegram {method} failed: {e}")
         return None
+
+
+async def _tg_call(method: str, **kwargs) -> Optional[httpx.Response]:
+    return await _tg_call_as(TELEGRAM_BOT_TOKEN, method, **kwargs)
 
 
 async def send_telegram_message(chat_id: int, text: str, reply_markup: Optional[dict] = None) -> bool:
@@ -148,6 +157,39 @@ async def telegram_set_menu_button(webapp_url: str) -> bool:
     })
     ok = r is not None and r.status_code == 200
     log.info(f"Telegram menu button set: {r.status_code if r else 'no response'} {r.text[:200] if r else ''}")
+    return ok
+
+
+# ---- Admin bot (Fidemadminbot) - same wire format, separate token/chat ----
+async def send_admin_bot_message(chat_id: int, text: str, reply_markup: Optional[dict] = None) -> bool:
+    payload = {"chat_id": chat_id, "text": text}
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
+    r = await _tg_call_as(ADMIN_BOT_TOKEN, "sendMessage", json=payload)
+    if r is None:
+        return False
+    if r.status_code != 200:
+        log.warning(f"Admin bot sendMessage failed: {r.status_code} {r.text[:300]}")
+    return r.status_code == 200
+
+
+async def admin_bot_set_webhook(url: str, secret_token: str) -> bool:
+    r = await _tg_call_as(ADMIN_BOT_TOKEN, "setWebhook", json={
+        "url": url,
+        "secret_token": secret_token,
+        "allowed_updates": ["message"],
+    })
+    ok = r is not None and r.status_code == 200
+    log.info(f"Admin bot webhook set: {r.status_code if r else 'no response'} {r.text[:200] if r else ''}")
+    return ok
+
+
+async def admin_bot_set_menu_button(webapp_url: str) -> bool:
+    r = await _tg_call_as(ADMIN_BOT_TOKEN, "setChatMenuButton", json={
+        "menu_button": {"type": "web_app", "text": "🛠 Admin panel", "web_app": {"url": webapp_url}},
+    })
+    ok = r is not None and r.status_code == 200
+    log.info(f"Admin bot menu button set: {r.status_code if r else 'no response'} {r.text[:200] if r else ''}")
     return ok
 
 

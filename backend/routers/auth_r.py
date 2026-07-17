@@ -17,6 +17,7 @@ from auth import (
 )
 from core import (
     _client_ip,
+    ADMIN_BOT_TOKEN,
     ADMIN_EMAIL,
     TELEGRAM_BOT_TOKEN,
     check_pw,
@@ -350,6 +351,50 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request):
             await db.pending_refs.delete_one({"telegram_id": tg_id})
 
     return AuthResponse(token=create_token(uid), user_id=uid, onboarded=False, user=_build_me_payload(doc))
+
+
+@router.post("/auth/admin/telegram", response_model=AuthResponse)
+async def auth_admin_telegram(req: TelegramAuthRequest):
+    """Login for the Fidemadminbot Mini App only - verified against
+    ADMIN_BOT_TOKEN (a different bot/secret than the user-facing app), and
+    gated on the same admin allowlist the Telegram alert bot uses
+    (ADMIN_TELEGRAM_IDS, or an is_admin user with a matching telegram_id).
+    Nothing else can reach this: a regular user's initData is signed by the
+    OTHER bot's token and fails validation here outright."""
+    if not ADMIN_BOT_TOKEN:
+        raise HTTPException(500, "Admin bot token not configured")
+    tg_user = validate_telegram_init_data(req.init_data, ADMIN_BOT_TOKEN)
+    tg_id = str(tg_user.get("id") or "")
+    if not tg_id:
+        raise HTTPException(400, "No telegram user id")
+
+    from admin_bot import is_admin_tg
+
+    if not await is_admin_tg(int(tg_id)):
+        raise HTTPException(403, "Bu Telegram hisobi admin sifatida sozlanmagan")
+
+    existing = await db.users.find_one({"telegram_id": tg_id, "is_admin": True})
+    if not existing:
+        # First bot login for this Telegram id: link it to the canonical
+        # admin account (seeded from ADMIN_EMAIL/ADMIN_PASSWORD at startup)
+        # so the browser login and the bot login share one identity/audit
+        # trail instead of the frontend having to render a bare, profile-
+        # less session. Safe to do without extra confirmation: is_admin_tg()
+        # above already proved this id is in ADMIN_TELEGRAM_IDS, which only
+        # the deployer controls.
+        canonical = await db.users.find_one({"email": ADMIN_EMAIL.lower(), "is_admin": True})
+        if canonical:
+            await db.users.update_one({"id": canonical["id"]}, {"$set": {"telegram_id": tg_id}})
+            existing = await db.users.find_one({"id": canonical["id"]})
+
+    admin_sub = existing["id"] if existing else f"tg:{tg_id}"
+    return AuthResponse(
+        token=create_token(admin_sub, is_admin=True),
+        user_id=admin_sub,
+        is_admin=True,
+        onboarded=True,
+        user=_build_me_payload(existing) if existing else None,
+    )
 
 
 @router.get("/auth/me")

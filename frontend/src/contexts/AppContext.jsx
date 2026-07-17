@@ -97,8 +97,15 @@ export function AppProvider({ children }) {
         return false;
       }
 
+      // Fidemadminbot opens its Mini App button straight at /admin, and
+      // only ever for a Telegram id already on the admin allowlist - the
+      // regular /auth/telegram endpoint validates initData against the
+      // OTHER bot's token, so it would reject this session outright.
+      const isAdminEntry = window.location.pathname.startsWith("/admin");
+      const authPath = isAdminEntry ? "/auth/admin/telegram" : "/auth/telegram";
+
       try {
-        const r = await api.post("/auth/telegram", {
+        const r = await api.post(authPath, {
           init_data: initData,
         });
 
@@ -107,7 +114,9 @@ export function AppProvider({ children }) {
         localStorage.setItem("fidem_token", r.data.token);
         await loadMe(r.data.user);
 
-        if (r.data.onboarded) {
+        if (isAdminEntry) {
+          window.history.replaceState(null, "", "/admin");
+        } else if (r.data.onboarded) {
           window.history.replaceState(null, "", "/");
         } else {
           window.history.replaceState(null, "", "/onboarding");
