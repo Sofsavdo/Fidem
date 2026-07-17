@@ -130,6 +130,7 @@ async def startup() -> None:
     await db.users.create_index("telegram_id", sparse=True)
     await db.users.create_index("onboarded")
     await db.users.create_index("plan")
+    await db.users.create_index("is_demo", sparse=True)
     await db.users.create_index("region")
     await db.users.create_index("gender")
     await db.users.create_index("last_active")
@@ -327,6 +328,7 @@ async def startup() -> None:
     onboarded = await db.users.count_documents({"onboarded": True, "is_admin": {"$ne": True}})
     if onboarded < 12:
         await seed_demo_users()
+    await backfill_demo_flag()
     # Seed success stories if none exist (independent of users)
     stories_count = await db.success_stories.count_documents({})
     if stories_count == 0:
@@ -392,10 +394,33 @@ async def seed_demo_users() -> None:
             "verified_financial": False, "plan": "free", "balance": 0,
             "language": "uz",
             "created_at": iso(now_utc()), "last_active": iso(now_utc()),
+            # Marks this as a seed/demo profile (marketplace-liquidity filler,
+            # not a real signup) so the admin panel can filter and bulk-remove
+            # them once real users make them unnecessary.
+            "is_demo": True,
         }
         doc["completeness"] = compute_completeness(doc)
         await db.users.insert_one(doc)
     log.info("Seeded demo users")
+
+
+async def backfill_demo_flag() -> None:
+    """Demo users created before is_demo existed have no telegram_id and no
+    email - the two account-creation paths (/auth/telegram, /auth/register)
+    always set one or the other for a real signup, so any user missing BOTH
+    (and not the admin account) can only be a seeded demo profile. Runs on
+    every boot; a no-op once everything's already tagged."""
+    res = await db.users.update_many(
+        {
+            "telegram_id": {"$in": [None, ""]},
+            "email": {"$in": [None, ""]},
+            "is_admin": {"$ne": True},
+            "is_demo": {"$ne": True},
+        },
+        {"$set": {"is_demo": True}},
+    )
+    if res.modified_count:
+        log.info(f"Backfilled is_demo on {res.modified_count} legacy seed users")
 
 
 async def seed_success_stories() -> None:

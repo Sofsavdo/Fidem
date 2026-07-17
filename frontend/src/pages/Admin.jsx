@@ -17,7 +17,7 @@ import {
   useAdminFraud, useAdminMarkSafe, useAdminBroadcast,
   useAdminCeo, useAdminFunnel, useAdminEngagement, useAdminRevenue,
   useAdminConciergeAnalytics, useAdminChatModAnalytics, useAdminAuditLog,
-  useAdminUserDetail, useAdminUserAction,
+  useAdminUserDetail, useAdminUserAction, useDeleteDemoUsers,
 } from "@/hooks/queries";
 
 const menuItems = [
@@ -725,6 +725,7 @@ const USER_SEGMENTS = [
   { k: "active", label: "🟢 Faol (7 kun)", params: { active_within_days: 7, sort: "active" } },
   { k: "regular", label: "🔁 Doimiy (bugun faol)", params: { active_within_days: 1, sort: "active" } },
   { k: "paid", label: "💎 To'lovchilar", params: { plan: "paid" } },
+  { k: "demo", label: "🧪 Demo profillar", params: { is_demo: true } },
 ];
 
 function AdminUsers() {
@@ -754,12 +755,29 @@ function AdminUsers() {
   const { data: regions = [] } = useAdminRegions();
   const list = data?.users || [];
   const total = data?.total || 0;
+  const demoTotal = data?.demo_total || 0;
   const updateUser = useUpdateAdminUser();
+  const deleteDemo = useDeleteDemoUsers();
 
   const patch = (id, p) => {
     updateUser.mutate({ id, patch: p }, {
       onSuccess: () => toast.success("Yangilandi ✓"),
       onError: () => toast.error("Foydalanuvchilarni yuklashda xatolik"),
+    });
+  };
+
+  const removeAllDemo = () => {
+    if (!window.confirm(`Barcha ${demoTotal} ta demo profilni o'chirmoqchimisiz? Bu amalni ortga qaytarib bo'lmaydi.`)) return;
+    deleteDemo.mutate(undefined, {
+      onSuccess: (r) => { toast.success(`${r.data.deleted} ta demo profil o'chirildi`); setSegment("all"); setPage(1); },
+      onError: () => toast.error("O'chirishda xatolik"),
+    });
+  };
+  const removeOneDemo = (id, name) => {
+    if (!window.confirm(`"${name}" demo profilini o'chirmoqchimisiz?`)) return;
+    deleteDemo.mutate([id], {
+      onSuccess: () => { toast.success("Demo profil o'chirildi"); setSelectedUser(null); },
+      onError: () => toast.error("O'chirishda xatolik"),
     });
   };
 
@@ -776,10 +794,20 @@ function AdminUsers() {
               onClick={() => { setSegment(s.k); setPage(1); }}
               className={`whitespace-nowrap text-xs rounded-full px-3 py-1.5 border ${segment === s.k ? "bg-foreground text-background border-foreground" : "bg-card border-border"}`}
             >
-              {s.label}
+              {s.label}{s.k === "demo" && demoTotal > 0 ? ` (${demoTotal})` : ""}
             </button>
           ))}
         </div>
+        {segment === "demo" && demoTotal > 0 && (
+          <button
+            data-testid="admin-delete-all-demo"
+            onClick={removeAllDemo}
+            disabled={deleteDemo.isPending}
+            className="w-full flex items-center justify-center gap-1.5 rounded-2xl bg-rose-50 text-rose-700 border border-rose-200 px-4 py-2.5 text-sm font-medium disabled:opacity-50"
+          >
+            <Trash2 className="w-4 h-4" /> {deleteDemo.isPending ? "O'chirilmoqda..." : `Barcha ${demoTotal} ta demo profilni o'chirish`}
+          </button>
+        )}
         <div className="flex flex-wrap gap-2">
           <select value={filters.gender} onChange={(e) => setFilters(f => ({ ...f, gender: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm min-w-[120px]">
             <option value="">Jins: Hammasi</option>
@@ -828,6 +856,7 @@ function AdminUsers() {
                 <p className="text-sm font-medium truncate flex items-center gap-1.5">
                   {u.online && <span className="w-1.5 h-1.5 rounded-full bg-secondary shrink-0" />}
                   {u.name} · {u.plan} {u.blocked ? "🚫" : ""}
+                  {u.is_demo && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold shrink-0">DEMO</span>}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">{u.region} · age {u.age} · {u.gender} · {u.marital_status || "Noma'lum"}</p>
                 <p className="text-[10px] text-muted-foreground">{u.email} · {u.phone || "Telefon yo'q"}</p>
@@ -851,9 +880,23 @@ function AdminUsers() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedUser(null)}>
           <div className="bg-card rounded-3xl border border-border max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
-              <h3 className="font-heading text-xl font-semibold">Foydalanuvchi tafsilotlari</h3>
+              <h3 className="font-heading text-xl font-semibold flex items-center gap-2">
+                Foydalanuvchi tafsilotlari
+                {selectedUser.is_demo && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold">DEMO</span>}
+              </h3>
               <button onClick={() => setSelectedUser(null)} className="p-2 rounded-full hover:bg-muted">✕</button>
             </div>
+
+            {selectedUser.is_demo && (
+              <button
+                data-testid="admin-delete-one-demo"
+                onClick={() => removeOneDemo(selectedUser.id, selectedUser.name)}
+                disabled={deleteDemo.isPending}
+                className="mb-4 w-full flex items-center justify-center gap-1.5 rounded-2xl bg-rose-50 text-rose-700 border border-rose-200 px-4 py-2.5 text-sm font-medium disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" /> Bu demo profilni o'chirish
+              </button>
+            )}
 
             <div className="space-y-4">
               {/* Profile */}

@@ -172,13 +172,44 @@ root.render(
 );
 
 if ("serviceWorker" in navigator) {
+  // controllerchange also fires the very first time a worker ever claims
+  // this page (nothing "updated" yet, there was just no controller
+  // before) - capture whether a controller already existed BEFORE that
+  // first registration so a brand-new visitor doesn't get an unwanted
+  // reload of the page they just loaded.
+  const hadControllerOnLoad = !!navigator.serviceWorker.controller;
+
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
       .then((registration) => {
         console.log('Service Worker registered: ', registration);
+
+        // A Telegram Mini App WebView often keeps this page's JS context
+        // alive across re-opens instead of doing a fresh navigation, so it
+        // can go a long time without ever picking up a new deploy on its
+        // own. Ask the already-registered worker to check for an update
+        // whenever the app comes back to the foreground - a real browser
+        // tab does this on its own on navigation, but a long-lived Mini
+        // App session may never navigate again.
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') {
+            registration.update().catch(() => {});
+          }
+        });
       })
       .catch((registrationError) => {
         console.log('Service Worker registration failed: ', registrationError);
       });
+  });
+
+  // Once a newly-installed worker actually takes control (a real update
+  // was found and activated), the page it controls is still running the
+  // OLD bundle in memory - a one-time reload is what actually gets the
+  // session onto the new code. Guarded so a rapid double-fire can't loop.
+  let reloadedForUpdate = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadControllerOnLoad || reloadedForUpdate) return;
+    reloadedForUpdate = true;
+    window.location.reload();
   });
 }
