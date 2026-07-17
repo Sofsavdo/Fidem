@@ -18,10 +18,12 @@ import {
   useAdminCeo, useAdminFunnel, useAdminEngagement, useAdminRevenue,
   useAdminConciergeAnalytics, useAdminChatModAnalytics, useAdminAuditLog,
   useAdminUserDetail, useAdminUserAction, useDeleteDemoUsers, useAdminConfigHealth,
+  useAdminAiInsights, useRefreshAiInsights,
 } from "@/hooks/queries";
 
 const menuItems = [
   { id: "ceo", icon: Gauge, label: "CEO Dashboard" },
+  { id: "ai", icon: Bot, label: "AI Tahlilchi" },
   { id: "growth", icon: Heart, label: "O'sish (Funnel)" },
   { id: "revenue", icon: DollarSign, label: "Daromad" },
   { id: "dashboard", icon: LayoutDashboard, label: "Boshqaruv" },
@@ -143,6 +145,7 @@ export default function Admin() {
           )}
 
           {activeTab === "ceo" && <AdminCeoDashboard go={setActiveTab} />}
+          {activeTab === "ai" && <AdminAiInsights />}
           {activeTab === "growth" && <AdminGrowthDashboard />}
           {activeTab === "revenue" && <AdminRevenueDashboard />}
           {activeTab === "auditlog" && <AdminAuditLog />}
@@ -268,8 +271,92 @@ function AdminCeoDashboard({ go }) {
       </div>
 
       <div className="flex gap-2 flex-wrap">
+        <button onClick={() => go("ai")} className="text-xs rounded-full border border-border px-4 py-2 hover:bg-muted">🤖 AI tahlilini ko'rish →</button>
         <button onClick={() => go("growth")} className="text-xs rounded-full border border-border px-4 py-2 hover:bg-muted">O'sish funnel'ini ko'rish →</button>
         <button onClick={() => go("revenue")} className="text-xs rounded-full border border-border px-4 py-2 hover:bg-muted">Daromad tahlili →</button>
+      </div>
+    </div>
+  );
+}
+
+const TREND_UZ = {
+  growing: { label: "O'sish kuzatilmoqda", cls: "bg-emerald-100 text-emerald-800" },
+  stable: { label: "Barqaror", cls: "bg-amber-100 text-amber-800" },
+  declining: { label: "Pasaymoqda", cls: "bg-rose-100 text-rose-800" },
+};
+
+// AI growth/activity analyst: reads the exact same numbers the CEO Dashboard
+// shows (plus 7d/30d trend + winback effectiveness) and turns them into a
+// plain-Uzbek verdict + prioritized recommendations, server-cached for 3h so
+// opening this tab doesn't burn a model call every time.
+function AdminAiInsights() {
+  const { data, isLoading } = useAdminAiInsights();
+  const refresh = useRefreshAiInsights();
+
+  if (isLoading) return <div className="text-center py-12 text-muted-foreground">Yuklanmoqda...</div>;
+
+  const trend = TREND_UZ[data?.trend] || TREND_UZ.stable;
+  const generatedAt = data?.generated_at ? new Date(data.generated_at).toLocaleString("uz-UZ") : null;
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-3xl bg-gradient-to-br from-ink to-zinc-800 text-white p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Bot className="w-5 h-5 text-primary" />
+            <p className="text-xs uppercase tracking-wider text-white/60">AI o'sish tahlilchisi</p>
+          </div>
+          <span className={`text-[11px] px-2.5 py-1 rounded-full font-semibold ${trend.cls}`}>{trend.label}</span>
+        </div>
+        <p className="mt-3 text-sm leading-relaxed">
+          {data?.ai_generated ? (data.summary || "—") : "AI tahlil hozircha mavjud emas — provider sozlanmagan yoki vaqtincha ishlamayapti."}
+        </p>
+      </div>
+
+      {data?.ai_generated && (
+        <>
+          {data.highlights?.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Diqqatga sazovor</p>
+              <div className="space-y-2">
+                {data.highlights.map((h, i) => (
+                  <div key={i} className="rounded-2xl border border-border bg-card p-3 text-sm">✨ {h}</div>
+                ))}
+              </div>
+            </div>
+          )}
+          {data.risks?.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Xavflar</p>
+              <div className="space-y-2">
+                {data.risks.map((r, i) => (
+                  <div key={i} className="rounded-2xl border border-rose-200 bg-rose-50 text-rose-900 p-3 text-sm">⚠️ {r}</div>
+                ))}
+              </div>
+            </div>
+          )}
+          {data.recommendations?.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Tavsiyalar</p>
+              <div className="space-y-2">
+                {data.recommendations.map((r, i) => (
+                  <div key={i} className="rounded-2xl border border-primary/30 bg-primary/5 p-3 text-sm">👉 {r}</div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      <div className="flex items-center justify-between gap-3 pt-1">
+        <p className="text-[11px] text-muted-foreground">{generatedAt ? `So'nggi yangilanish: ${generatedAt}` : ""}</p>
+        <button
+          onClick={() => refresh.mutate()}
+          disabled={refresh.isPending}
+          className="text-xs rounded-full bg-primary text-primary-foreground px-4 py-2 font-semibold disabled:opacity-50"
+        >
+          {refresh.isPending ? "Tahlil qilinmoqda..." : "🔄 Qayta tahlil qilish"}
+        </button>
       </div>
     </div>
   );

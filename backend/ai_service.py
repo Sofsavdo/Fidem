@@ -2,7 +2,8 @@
 template/regex fallbacks (no model call). Face verification, verification-
 document review, and P2P receipt review are real vision calls (Gemini
 primary, Claude fallback) - see verify_face_photo, analyze_verification,
-and analyze_p2p_receipt below.
+and analyze_p2p_receipt below. generate_growth_insights is a text-only
+call producing the admin panel's AI growth-analyst summary.
 """
 from __future__ import annotations
 
@@ -375,6 +376,101 @@ async def analyze_p2p_receipt(image_url: str, claimed_amount: int) -> dict:
     except Exception as e:
         log.warning("p2p_receipt: no provider available: %s", e)
         return {"verdict": "unsure", "confidence": 0, "amount_visible": 0, "reason": "", "ai_generated": False}
+
+
+# ---------- 7) Admin growth/activity analyst ----------
+_INSIGHTS_SCHEMA_GEMINI = {
+    "type": "OBJECT",
+    "properties": {
+        "trend": {"type": "STRING", "enum": ["growing", "stable", "declining"]},
+        "summary_uz": {"type": "STRING"},
+        "highlights_uz": {"type": "ARRAY", "items": {"type": "STRING"}},
+        "risks_uz": {"type": "ARRAY", "items": {"type": "STRING"}},
+        "recommendations_uz": {"type": "ARRAY", "items": {"type": "STRING"}},
+    },
+    "required": ["trend", "summary_uz", "highlights_uz", "risks_uz", "recommendations_uz"],
+}
+
+
+def _insights_prompt(data: str) -> str:
+    return (
+        "You are a growth analyst for FIDEM, a Telegram Mini App dating platform in "
+        "Uzbekistan. Below is a snapshot of the platform's current metrics plus "
+        "historical comparison points (7 and 30 days ago) and the automated "
+        "re-engagement (winback) system's recent activity. Analyze it like an "
+        "experienced startup growth advisor would: is the platform actually growing, "
+        "stable, or declining; what specific numbers stand out (good or bad); what "
+        "concrete risks do you see (e.g. falling activity, low conversion, a stalled "
+        "metric); and what should the owner actually DO next, ranked by impact - be "
+        "specific and concrete (e.g. 'DAU/MAU ratio is only 12%, look at push "
+        "notification timing' rather than generic advice like 'increase engagement'). "
+        "Write everything in Uzbek, in a direct, plain-spoken tone (this is a solo "
+        "founder checking in on their own product, not a boardroom report). Keep each "
+        "list to at most 5 items.\n\n"
+        f"DATA:\n{data}\n\n"
+        "Respond with the required JSON only."
+    )
+
+
+async def generate_growth_insights(data: str) -> dict:
+    """Turns a plain-text metrics dump (built by routers/admin_r.py from
+    admin_stats + stats_snapshots + winback activity) into a structured
+    Uzbek-language growth analysis for the admin panel. Never raises - a
+    failure returns ai_generated=False so the panel can show a plain
+    'unavailable, try again' state instead of crashing."""
+    prompt = _insights_prompt(data)
+
+    if GEMINI_API_KEY:
+        try:
+            parsed = await _gemini_json(prompt, [], _INSIGHTS_SCHEMA_GEMINI)
+            trend = parsed.get("trend") if parsed.get("trend") in ("growing", "stable", "declining") else "stable"
+            return {
+                "trend": trend,
+                "summary": parsed.get("summary_uz") or "",
+                "highlights": list(parsed.get("highlights_uz") or [])[:5],
+                "risks": list(parsed.get("risks_uz") or [])[:5],
+                "recommendations": list(parsed.get("recommendations_uz") or [])[:5],
+                "ai_generated": True,
+            }
+        except Exception as e:
+            log.warning("growth_insights: gemini call failed, trying fallback: %s", e)
+
+    try:
+        client = _get_client()
+        response = await client.messages.create(
+            model=ANTHROPIC_MODEL,
+            max_tokens=1200,
+            output_config={"format": {"type": "json_schema", "schema": {
+                "type": "object",
+                "properties": {
+                    "trend": {"type": "string", "enum": ["growing", "stable", "declining"]},
+                    "summary_uz": {"type": "string"},
+                    "highlights_uz": {"type": "array", "items": {"type": "string"}},
+                    "risks_uz": {"type": "array", "items": {"type": "string"}},
+                    "recommendations_uz": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["trend", "summary_uz", "highlights_uz", "risks_uz", "recommendations_uz"],
+                "additionalProperties": False,
+            }}},
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = next((b.text for b in response.content if b.type == "text"), "")
+        parsed = json.loads(text) if text else {}
+        trend = parsed.get("trend") if parsed.get("trend") in ("growing", "stable", "declining") else "stable"
+        return {
+            "trend": trend,
+            "summary": parsed.get("summary_uz") or "",
+            "highlights": list(parsed.get("highlights_uz") or [])[:5],
+            "risks": list(parsed.get("risks_uz") or [])[:5],
+            "recommendations": list(parsed.get("recommendations_uz") or [])[:5],
+            "ai_generated": True,
+        }
+    except Exception as e:
+        log.warning("growth_insights: no provider available: %s", e)
+        return {
+            "trend": "stable", "summary": "", "highlights": [], "risks": [],
+            "recommendations": [], "ai_generated": False,
+        }
 
 
 async def _load_image_b64(image_url: str, image_base64: str) -> tuple[str, str]:

@@ -276,6 +276,12 @@ async def startup() -> None:
     except Exception as e:
         log.warning(f"Warning: Failed to create unique telegram_updates index (likely pre-existing duplicates): {e}")
         await db.telegram_updates.create_index("update_id", name="ix_tg_updates_id_nonunique")
+    # One row/day for the AI growth-insights trend comparison (lifecycle.py).
+    try:
+        await db.stats_snapshots.create_index("date", unique=True, name="ix_stats_snapshots_date")
+    except Exception as e:
+        log.warning(f"Warning: Failed to create unique stats_snapshots index (likely pre-existing duplicates): {e}")
+        await db.stats_snapshots.create_index("date", name="ix_stats_snapshots_date_nonunique")
 
     # Initialize referral_id for existing users (first 8 chars of id) - only if needed
     sample_referral = await db.users.find_one({"referral_id": {"$exists": True}}, {"referral_id": 1})
