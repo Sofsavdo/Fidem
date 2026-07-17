@@ -370,6 +370,16 @@ export function useAdminStats() {
   });
 }
 
+// Surfaces the ADMIN_TELEGRAM_IDS misconfiguration in the panel itself -
+// the only other signal for it is a server log line no admin can see.
+export function useAdminConfigHealth() {
+  return useQuery({
+    queryKey: ["admin", "configHealth"],
+    queryFn: () => api.get("/admin/config-health").then((r) => r.data),
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useAdminCeo() {
   return useQuery({
     queryKey: QK.adminCeo,

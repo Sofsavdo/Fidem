@@ -17,7 +17,7 @@ import {
   useAdminFraud, useAdminMarkSafe, useAdminBroadcast,
   useAdminCeo, useAdminFunnel, useAdminEngagement, useAdminRevenue,
   useAdminConciergeAnalytics, useAdminChatModAnalytics, useAdminAuditLog,
-  useAdminUserDetail, useAdminUserAction, useDeleteDemoUsers,
+  useAdminUserDetail, useAdminUserAction, useDeleteDemoUsers, useAdminConfigHealth,
 } from "@/hooks/queries";
 
 const menuItems = [
@@ -57,6 +57,7 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState("ceo");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { data: stats } = useAdminStats();
+  const { data: configHealth } = useAdminConfigHealth();
 
   if (!user) return null;
   if (!user.is_admin) {
@@ -118,6 +119,28 @@ export default function Admin() {
               <span>{user.name}</span>
             </div>
           </div>
+
+          {configHealth && !configHealth.telegram_configured && (
+            <div
+              data-testid="admin-telegram-not-configured"
+              className="mb-6 rounded-2xl bg-rose-50 border border-rose-300 p-4 flex gap-3 items-start"
+            >
+              <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <div className="text-sm text-rose-900">
+                <p className="font-semibold">Admin Telegram bildirishnomalari o'chiq — hech kimga xabar bormaydi</p>
+                <p className="text-rose-800 mt-1 leading-relaxed">
+                  Yangi P2P to'lov so'rovlari, /stats va kunlik hisobot Telegram orqali hech kimga yetib bormaydi,
+                  chunki <code className="bg-rose-100 px-1 rounded">ADMIN_TELEGRAM_IDS</code> muhit o'zgaruvchisida
+                  haqiqiy admin ID topilmadi. Tuzatish uchun:
+                </p>
+                <ol className="list-decimal list-inside text-rose-800 mt-1.5 space-y-0.5">
+                  <li>Telegram'da <b>@userinfobot</b>ga yozing — u sizga shaxsiy ID raqamingizni yuboradi</li>
+                  <li>Railway (yoki serveringiz) sozlamalarida <code className="bg-rose-100 px-1 rounded">ADMIN_TELEGRAM_IDS</code> o'zgaruvchisiga o'sha raqamni qo'ying — bot tokenidagi raqam emas, aynan shaxsiy ID</li>
+                  <li>Serverni qayta ishga tushiring</li>
+                </ol>
+              </div>
+            </div>
+          )}
 
           {activeTab === "ceo" && <AdminCeoDashboard go={setActiveTab} />}
           {activeTab === "growth" && <AdminGrowthDashboard />}
