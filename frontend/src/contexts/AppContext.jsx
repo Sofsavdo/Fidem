@@ -154,6 +154,39 @@ export function AppProvider({ children }) {
       cancelled = true;
     };
   }, [user, loadMe]);
+
+  // /admin can be opened from EITHER Telegram Mini App (the regular
+  // Fidem_Appbot or the dedicated Fidemadminbot) - both point at this same
+  // deployed app, so they share this browser's localStorage. Whichever bot
+  // was opened FIRST on this device wins the stored token: someone who used
+  // the regular bot before ever opening Fidemadminbot lands on /admin
+  // already "logged in" as their ordinary (non-admin) dating profile, and
+  // the main Telegram auto-auth above never re-runs because a token already
+  // exists. If that's the case, retry specifically as the admin-bot
+  // identity - it only succeeds if this Telegram id is actually on the
+  // admin allowlist (ADMIN_TELEGRAM_IDS), so a non-admin still correctly
+  // sees "Faqat admin uchun" afterwards.
+  useEffect(() => {
+    if (loading || user?.is_admin) return;
+    if (!window.location.pathname.startsWith("/admin")) return;
+    const initData = window.Telegram?.WebApp?.initData;
+    if (!initData) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await api.post("/auth/admin/telegram", { init_data: initData });
+        if (cancelled) return;
+        localStorage.setItem("fidem_token", r.data.token);
+        await loadMe(r.data.user);
+      } catch {
+        // Not an admin Telegram id, or the admin bot isn't configured yet -
+        // leave the existing (non-admin) session as-is.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [loading, user, loadMe]);
+
   const login = async (email, password) => {
     const r = await api.post("/auth/login", { email, password });
     localStorage.setItem("fidem_token", r.data.token);
