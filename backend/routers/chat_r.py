@@ -687,15 +687,27 @@ PLAN_RANK = {"standard": 0, "premium": 1, "vip": 2}
 
 async def _apply_plan_gift(to_user_id: str, plan: str, months: int) -> None:
     """Upgrades the recipient to `plan` for `months`*30 days. Never
-    downgrades a plan they already have at that tier or better - it only
-    stacks the extra time on top of their current expiry in that case."""
+    downgrades a plan they already have ACTIVE at that tier or better - it
+    only stacks the extra time on top of their current expiry in that case.
+
+    Reads plan_until directly rather than going through core.get_user() (its
+    normal expiry-normalization only runs when THAT user's own session hits
+    the API) - a raw read of `plan` alone is a trap: someone whose VIP lapsed
+    days ago still has plan="vip" sitting in the DB until they next log in,
+    so a stale plan must never be trusted without checking plan_until too -
+    otherwise a cheap gifted Standard month would silently come back as a
+    full VIP month for someone who currently has no active plan at all.
+    """
     recipient = await db.users.find_one({"id": to_user_id}, {"_id": 0, "plan": 1, "plan_until": 1})
-    current_plan = (recipient or {}).get("plan") or "free"
+    stored_until = (recipient or {}).get("plan_until")
+    is_active = bool(stored_until and parse_dt(stored_until) > now_utc())
+    current_plan = (recipient or {}).get("plan") if is_active else "free"
+    current_plan = current_plan or "free"
+
     candidate_until = now_utc() + timedelta(days=months * 30)
     if current_plan in PLAN_RANK and PLAN_RANK[current_plan] >= PLAN_RANK.get(plan, -1):
-        current_until = parse_dt(recipient["plan_until"]) if recipient.get("plan_until") else now_utc()
         final_plan = current_plan
-        final_until = max(current_until, candidate_until) if current_until > now_utc() else candidate_until
+        final_until = max(parse_dt(stored_until), candidate_until)
     else:
         final_plan = plan
         final_until = candidate_until
@@ -715,6 +727,15 @@ async def deliver_gift(sender: dict, uid: str, to_user_id: str, kind: str, meta:
     await db.users.update_one({"id": to_user_id}, {"$inc": {"gifts_received_total": price}})
     if category == "plan":
         await _apply_plan_gift(to_user_id, meta["plan"], meta["months"])
+        # A gifted subscription is real subscription-tier value, exactly like
+        # buying one directly (process_completed_payment credits the buyer
+        # there too) - attributed to the SENDER, who actually paid, not the
+        # recipient. Without this, gifting someone VIP would never count
+        # toward "paying_users"/ARPPU/conversion anywhere in the admin panel.
+        await db.users.update_one(
+            {"id": uid},
+            {"$inc": {"lifetime_contribution": price, "lifetime_contribution_breakdown.subscription_payments": price}},
+        )
     gift = {
         "id": new_id(),
         "from_user_id": uid,
@@ -733,7 +754,12 @@ async def deliver_gift(sender: dict, uid: str, to_user_id: str, kind: str, meta:
         "to_user_id": to_user_id,
         "text": f"{meta['emoji']} {meta['label_uz']}",
         "kind": "gift",
-        "meta": {"gift": kind, "price": price, "emoji": meta["emoji"], "label": meta["label_uz"], "category": category},
+        "meta": {
+            "gift": kind, "price": price, "emoji": meta["emoji"], "label": meta["label_uz"], "category": category,
+            # tier (deco) / plan (subscription) - lets the chat bubble render
+            # the exact same gradient the Gift Shop tile showed for this item.
+            "tier": meta.get("tier"), "plan": meta.get("plan"),
+        },
         "created_at": iso(now_utc()),
         "read": False,
     }
@@ -762,9 +788,15 @@ async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id
 
 # ---------- Leaderboard ----------
 @router.get("/leaderboard")
-async def leaderboard(period: str = "all", uid: str = Depends(get_current_user_id)):
+async def leaderboard(period: str = "all", by: str = "sent", uid: str = Depends(get_current_user_id)):
+    """by="sent" (default): "Saxiylar" - who gives the most. by="received":
+    "Eng sevimlilar" - who gets the most. A gift being "just a sticker" for
+    the receiver was a real complaint - this is the receiver's payoff:
+    visible, real-money-backed social proof of being wanted, at zero extra
+    cost to the platform (same db.gifts rows, grouped the other way)."""
+    group_field = "$to_user_id" if by == "received" else "$from_user_id"
     pipeline = [
-        {"$group": {"_id": "$from_user_id", "total": {"$sum": "$price"}, "count": {"$sum": 1}}},
+        {"$group": {"_id": group_field, "total": {"$sum": "$price"}, "count": {"$sum": 1}}},
         {"$sort": {"total": -1}},
         {"$limit": 50},
     ]

@@ -18,6 +18,10 @@ export default function Rankings() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [period, setPeriod] = useState("all");
+  // "sent" = who gives the most ("Saxiylar"); "received" = who gets the
+  // most ("Eng sevimlilar") - the receiver's real, visible payoff for a
+  // gift, not just a sticker sitting in their chat history.
+  const [by, setBy] = useState("sent");
   const [amount, setAmount] = useState(BOOST_PRESETS[0]);
   const [customAmount, setCustomAmount] = useState("");
   const [paying, setPaying] = useState(false);
@@ -26,7 +30,7 @@ export default function Rankings() {
   // streak bonus can be contributed straight from the balance.
   const effectiveAmount = customAmount !== "" ? Math.max(0, parseInt(customAmount, 10) || 0) : amount;
 
-  const { data: leaders = [], isLoading } = useLeaderboard(period);
+  const { data: leaders = [], isLoading } = useLeaderboard(period, by);
   const myRank = leaders.findIndex((row) => row.user?.id === user?.id);
 
   const getRankBadge = (rank) => {
@@ -128,6 +132,24 @@ export default function Rankings() {
             </button>
           </div>
         </section>
+
+        <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-muted/40">
+          {[
+            ["sent", t("rank_by_sent")],
+            ["received", t("rank_by_received")],
+          ].map(([k, l]) => (
+            <button
+              key={k}
+              data-testid={`rankings-by-${k}`}
+              onClick={() => setBy(k)}
+              className={`py-2 rounded-xl text-sm font-semibold transition ${
+                by === k ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
 
         <div className="flex gap-2 overflow-x-auto pb-2">
           {[

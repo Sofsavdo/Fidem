@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
-import { ShieldCheck, Wallet, Users as UsersIcon, DollarSign, TrendingUp, BarChart3, LayoutDashboard, Search, MessageSquare, Settings, ChevronRight, MapPin, Activity, AlertTriangle, Send, Megaphone, Trash2, Bot, Eye, Pencil, Link2, Heart, Crown, Gauge, ScrollText, Ban, VolumeX, EyeOff, Menu, X } from "lucide-react";
+import { ShieldCheck, Wallet, Users as UsersIcon, DollarSign, TrendingUp, BarChart3, LayoutDashboard, Search, MessageSquare, Settings, ChevronRight, MapPin, Activity, AlertTriangle, Send, Megaphone, Trash2, Bot, Eye, Pencil, Link2, Heart, Crown, Gauge, ScrollText, Ban, VolumeX, EyeOff, Menu, X, Gift, PackageOpen } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
 import api from "@/lib/api";
 import { PURPOSE_UZ, REF_TYPE_UZ, VERIF_KIND_UZ } from "@/lib/labels";
@@ -15,7 +15,7 @@ import {
   useAdminConciergeMatch, useAdminReferrals, useAdminReferrers, useAdminReferrerDetail, useAdminMessages, useAdminDeleteMessage,
   useAdminFraud, useAdminMarkSafe, useAdminBroadcast,
   useAdminCeo, useAdminFunnel, useAdminEngagement, useAdminRevenue,
-  useAdminConciergeAnalytics, useAdminChatModAnalytics, useAdminAuditLog,
+  useAdminConciergeAnalytics, useAdminChatModAnalytics, useAdminAuditLog, useAdminGiftShop,
   useAdminUserDetail, useAdminUserAction, useDeleteDemoUsers, useAdminConfigHealth,
   useAdminAiInsights, useRefreshAiInsights,
 } from "@/hooks/queries";
@@ -25,6 +25,7 @@ const menuItems = [
   { id: "ai", icon: Bot, label: "AI Tahlilchi" },
   { id: "growth", icon: Heart, label: "O'sish (Funnel)" },
   { id: "revenue", icon: DollarSign, label: "Daromad" },
+  { id: "giftshop", icon: Gift, label: "Sovg'alar do'koni" },
   { id: "dashboard", icon: LayoutDashboard, label: "Boshqaruv" },
   { id: "analytics", icon: BarChart3, label: "Analitika" },
   { id: "users", icon: UsersIcon, label: "Foydalanuvchilar" },
@@ -209,6 +210,7 @@ export default function Admin() {
           {activeTab === "ai" && <AdminAiInsights />}
           {activeTab === "growth" && <AdminGrowthDashboard />}
           {activeTab === "revenue" && <AdminRevenueDashboard />}
+          {activeTab === "giftshop" && <AdminGiftShopDashboard />}
           {activeTab === "auditlog" && <AdminAuditLog />}
           {activeTab === "dashboard" && stats && <AdminDashboard stats={stats} go={setActiveTab} />}
 
@@ -563,6 +565,75 @@ function AdminRevenueDashboard() {
               <span className="text-sm tabular-nums"><strong>{sumFmt(r.total)}</strong> <span className="text-muted-foreground text-xs">· {r.count} ta</span></span>
             </div>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Gift Shop detail: the "gift_shop_deco"/"gift_shop_plan" rows in the
+// Daromad tab's spend-by-feature list only give a total - this breaks it
+// down into what's actually selling, and how much value is sitting unused
+// in inventory (paid for, not yet given to anyone).
+function AdminGiftShopDashboard() {
+  const { data, isLoading } = useAdminGiftShop();
+  if (isLoading || !data) return <div className="text-center py-12 text-muted-foreground">Yuklanmoqda...</div>;
+  const { revenue, deco_total, plan_total, top_deco_gifts, plan_gift_breakdown, inventory_pending } = data;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Sovg'a do'koni — balans sarfi</p>
+        <p className="text-[11px] text-muted-foreground mb-2">Bu ham "balans sarfi" — yuqoridagi haqiqiy daromadga qo'shilmaydi, chunki bu pul balansga qo'yilganda allaqachon hisoblangan.</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <KpiTile label="Bugun" value={sumFmt(revenue.today)} accent />
+          <KpiTile label="Bu hafta" value={sumFmt(revenue.week)} />
+          <KpiTile label="Bu oy" value={sumFmt(revenue.month)} />
+          <KpiTile label="Jami" value={sumFmt(revenue.total)} />
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Kategoriya bo'yicha</p>
+        <div className="grid grid-cols-2 gap-2.5">
+          <KpiTile label="Dekorativ sovg'alar" value={sumFmt(deco_total)} />
+          <KpiTile label="Obuna sovg'alari (Standard/Premium/VIP)" value={sumFmt(plan_total)} />
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Eng ko'p sotilgan dekorativ sovg'alar</p>
+        <div className="rounded-3xl bg-card border border-border divide-y divide-border">
+          {top_deco_gifts.length === 0 && <p className="p-4 text-sm text-muted-foreground text-center">Hali sotilmagan</p>}
+          {top_deco_gifts.map((r) => (
+            <div key={r._id} className="flex items-center justify-between p-3.5">
+              <span className="text-sm font-medium flex items-center gap-2">{r.emoji} {r.label}</span>
+              <span className="text-sm tabular-nums"><strong>{sumFmt(r.total)}</strong> <span className="text-muted-foreground text-xs">· {r.count} ta</span></span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Obuna sovg'alari — tarif bo'yicha</p>
+        <div className="rounded-3xl bg-card border border-border divide-y divide-border">
+          {plan_gift_breakdown.length === 0 && <p className="p-4 text-sm text-muted-foreground text-center">Hali sotilmagan</p>}
+          {plan_gift_breakdown.map((r) => (
+            <div key={r._id} className="flex items-center justify-between p-3.5">
+              <span className="text-sm font-medium flex items-center gap-2">{r.emoji} {r.label}</span>
+              <span className="text-sm tabular-nums"><strong>{sumFmt(r.total)}</strong> <span className="text-muted-foreground text-xs">· {r.count} ta</span></span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-border bg-card p-4 flex items-center gap-3">
+        <PackageOpen className="w-5 h-5 text-muted-foreground shrink-0" />
+        <div>
+          <p className="text-sm font-medium">Inventarda kutilmoqda</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {inventory_pending.count} ta sovg'a sotib olingan, hali hech kimga berilmagan — {sumFmt(inventory_pending.value)} qiymatida
+          </p>
         </div>
       </div>
     </div>

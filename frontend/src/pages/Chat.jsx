@@ -4,6 +4,7 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import GiftModal from "@/components/GiftModal";
 import GiftCelebration, { tierFromPrice } from "@/components/GiftCelebration";
+import { giftGradient } from "@/lib/giftVisuals";
 import ChatVoiceRecorder from "@/components/ChatVoiceRecorder";
 import { ArrowLeft, Send, Gift, MoreVertical, Ban, Flag, Play, Check, CheckCheck, Contact, AlertTriangle, X } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
@@ -380,13 +381,53 @@ export default function Chat() {
         )}
         {messages.map((m) => {
           const mine = m.from_user_id === user?.id;
+          const footer = (
+            <div className={`flex items-center gap-1 mt-0.5 px-1 text-[10px] text-muted-foreground ${mine ? "flex-row-reverse" : ""}`} data-testid={`msg-meta-${m.id}`}>
+              <span>{formatMsgTime(m.created_at)}</span>
+              {mine && !m.sending && (
+                m.read
+                  ? <CheckCheck className="w-3 h-3 text-secondary" />
+                  : <Check className="w-3 h-3" />
+              )}
+            </div>
+          );
+
+          // A delivered gift renders as the SAME gradient card the Gift
+          // Shop tile showed before it was bought - a plain emoji+text
+          // bubble stopped reading as "a gift" the moment the live
+          // celebration animation finished playing.
+          if (m.kind === "gift" && m.meta) {
+            return (
+              <div key={m.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
+                <div
+                  className={`relative overflow-hidden rounded-3xl w-40 p-3 flex flex-col text-white shadow-lg bg-gradient-to-br ${giftGradient(m.meta)}`}
+                  data-testid={`gift-msg-${m.id}`}
+                >
+                  <span className="absolute inset-0 bg-gradient-to-br from-white/25 via-transparent to-black/10 pointer-events-none" />
+                  <span className="relative self-start text-[9px] font-bold uppercase tracking-wider bg-black/25 backdrop-blur-sm px-2 py-0.5 rounded-full">🎁 Sovg'a</span>
+                  <span className="relative grid place-items-center py-2.5">
+                    <span className="absolute w-12 h-12 rounded-full bg-white/25 blur-xl" />
+                    <span className="relative text-3xl drop-shadow-[0_4px_10px_rgba(0,0,0,0.35)]">{m.meta.emoji}</span>
+                  </span>
+                  <span className="relative text-center">
+                    <p className="text-xs font-semibold leading-tight line-clamp-2">{m.meta.label}</p>
+                    <p className="text-sm font-bold tabular-nums mt-0.5">
+                      {(m.meta.price || 0).toLocaleString()} <span className="text-[10px] font-medium opacity-80">so'm</span>
+                    </p>
+                  </span>
+                </div>
+                {footer}
+              </div>
+            );
+          }
+
           return (
             <div key={m.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
               <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
                 mine
                   ? "bg-primary text-white rounded-br-sm"
                   : "bg-card border border-border rounded-bl-sm"
-              } ${m.kind === "gift" ? "bg-gold-light text-yellow-900 border-gold/40" : ""}`}>
+              }`}>
                 {m.kind === "voice" && m.meta?.voice_url ? (
                   <div className="flex items-center gap-2 min-w-[200px]" data-testid={`voice-msg-${m.id}`}>
                     <span className="text-[9px] uppercase tracking-wider opacity-70">🎙 · {m.meta.voice_duration || 0}s</span>
@@ -408,14 +449,7 @@ export default function Chat() {
                   m.text
                 )}
               </div>
-              <div className={`flex items-center gap-1 mt-0.5 px-1 text-[10px] text-muted-foreground ${mine ? "flex-row-reverse" : ""}`} data-testid={`msg-meta-${m.id}`}>
-                <span>{formatMsgTime(m.created_at)}</span>
-                {mine && !m.sending && (
-                  m.read
-                    ? <CheckCheck className="w-3 h-3 text-secondary" />
-                    : <Check className="w-3 h-3" />
-                )}
-              </div>
+              {footer}
             </div>
           );
         })}
