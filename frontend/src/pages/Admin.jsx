@@ -163,9 +163,20 @@ export default function Admin() {
               {configHealth && (
                 <span
                   data-testid="admin-bot-status"
-                  className={`text-[11px] px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${configHealth.admin_bot_configured ? "bg-emerald-100 text-emerald-800" : "bg-muted text-muted-foreground"}`}
+                  title={configHealth.admin_bot_configured && !configHealth.admin_bot_token_valid ? "ADMIN_BOT_TOKEN o'rnatilgan, lekin Telegram uni qabul qilmadi - qiymatni qayta tekshiring (bo'sh joy, kesilgan token bo'lishi mumkin)" : undefined}
+                  className={`text-[11px] px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${
+                    !configHealth.admin_bot_configured
+                      ? "bg-muted text-muted-foreground"
+                      : configHealth.admin_bot_token_valid
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-rose-100 text-rose-800"
+                  }`}
                 >
-                  {configHealth.admin_bot_configured ? "🛠 Admin bot: ulandi" : "🛠 Admin bot: sozlanmagan"}
+                  {!configHealth.admin_bot_configured
+                    ? "🛠 Admin bot: sozlanmagan"
+                    : configHealth.admin_bot_token_valid
+                      ? `🛠 Admin bot: ulandi${configHealth.admin_bot_username ? ` (@${configHealth.admin_bot_username})` : ""}`
+                      : "⚠️ Admin bot: token noto'g'ri"}
                 </span>
               )}
               <span className="hidden sm:inline">{user.name}</span>
