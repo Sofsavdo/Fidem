@@ -306,27 +306,6 @@ export default function GiftShop() {
         <div className="space-y-6">
           {(isLoading || planLoading) && <p className="text-center text-sm text-muted-foreground py-10">{t("loading")}</p>}
 
-          {!planLoading && planCatalog?.items?.length > 0 && (
-            <div>
-              <SectionLabel>{t("gift_plan_section_title")}</SectionLabel>
-              <p className="text-xs text-muted-foreground -mt-1 mb-2">{t("gift_plan_section_hint")}</p>
-              <div className="grid grid-cols-2 gap-2.5">
-                {planCatalog.items.map((it) => (
-                  <GiftTile
-                    key={it.kind}
-                    emoji={itemEmoji(it)}
-                    title={labelFor(lang, it)}
-                    price={it.price}
-                    gradient={itemGradient(it)}
-                    disabled={it.price > balance}
-                    onClick={() => setPicked(it)}
-                    testid={`giftshop-plan-card-${it.kind}`}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
           {!isLoading && TIER_ORDER.map((tk) => {
             const list = groups[tk];
             if (!list || list.length === 0) return null;
@@ -350,6 +329,27 @@ export default function GiftShop() {
               </div>
             );
           })}
+
+          {!planLoading && planCatalog?.items?.length > 0 && (
+            <div>
+              <SectionLabel>{t("gift_plan_section_title")}</SectionLabel>
+              <p className="text-xs text-muted-foreground -mt-1 mb-2">{t("gift_plan_section_hint")}</p>
+              <div className="grid grid-cols-2 gap-2.5">
+                {planCatalog.items.map((it) => (
+                  <GiftTile
+                    key={it.kind}
+                    emoji={itemEmoji(it)}
+                    title={labelFor(lang, it)}
+                    price={it.price}
+                    gradient={itemGradient(it)}
+                    disabled={it.price > balance}
+                    onClick={() => setPicked(it)}
+                    testid={`giftshop-plan-card-${it.kind}`}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
