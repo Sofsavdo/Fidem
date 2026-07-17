@@ -68,18 +68,17 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col lg:flex-row">
-      {/* Sidebar */}
-      <aside className={`lg:fixed lg:left-0 lg:top-0 lg:h-full bg-card border-r border-border transition-all duration-300 z-50 ${sidebarOpen ? "lg:w-64 w-full" : "lg:w-16 w-full"}`}>
+      {/* Desktop sidebar - below lg this used to render as a full-width
+          block ABOVE the page content (every tab required scrolling past
+          all 18 menu buttons first), and its collapse toggle did nothing on
+          mobile since both the open/closed classes resolved to the same
+          "w-full". Now genuinely desktop-only; mobile gets its own compact
+          horizontal tab bar below instead of a shrunk version of this. */}
+      <aside className={`hidden lg:flex lg:flex-col lg:fixed lg:left-0 lg:top-0 lg:h-full bg-card border-r border-border transition-all duration-300 z-50 ${sidebarOpen ? "lg:w-64" : "lg:w-16"}`}>
         <div className="p-4 border-b border-border flex items-center justify-between">
           <h1 className={`font-heading font-semibold ${sidebarOpen ? "text-xl" : "text-center text-sm"}`}>
             {sidebarOpen ? "Boshqaruv paneli" : "BP"}
           </h1>
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="lg:hidden p-2 rounded-full hover:bg-muted"
-          >
-            <ChevronRight className={`w-5 h-5 transition-transform ${sidebarOpen ? "rotate-180" : ""}`} />
-          </button>
         </div>
         <nav className="p-2 space-y-1">
           {menuItems.map((item) => (
@@ -107,26 +106,49 @@ export default function Admin() {
         </div>
       </aside>
 
+      {/* Mobile tab bar - horizontally scrollable pills, same pattern as
+          the segment filters elsewhere in this panel (e.g. USER_SEGMENTS).
+          Sticky so switching tabs never requires scrolling back up first. */}
+      <nav className="lg:hidden sticky top-0 z-40 bg-card border-b border-border">
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar px-3 py-2.5">
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              data-testid={`admin-mobile-tab-${item.id}`}
+              className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                activeTab === item.id
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              <item.icon className="w-3.5 h-3.5 shrink-0" />
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </nav>
+
       {/* Main Content */}
       <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? "lg:ml-64" : "lg:ml-16"}`}>
         <div className="p-4 lg:p-6 w-full">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <Link to="/me" className="p-2 rounded-full hover:bg-muted">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
+            <div className="flex items-center gap-3 min-w-0">
+              <Link to="/me" className="p-2 rounded-full hover:bg-muted shrink-0">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
-              <h2 className="font-heading text-xl lg:text-2xl font-semibold">{menuItems.find(m => m.id === activeTab)?.label}</h2>
+              <h2 className="font-heading text-xl lg:text-2xl font-semibold truncate">{menuItems.find(m => m.id === activeTab)?.label}</h2>
             </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
               {configHealth && (
                 <span
                   data-testid="admin-bot-status"
-                  className={`text-[11px] px-2.5 py-1 rounded-full font-medium ${configHealth.admin_bot_configured ? "bg-emerald-100 text-emerald-800" : "bg-muted text-muted-foreground"}`}
+                  className={`text-[11px] px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${configHealth.admin_bot_configured ? "bg-emerald-100 text-emerald-800" : "bg-muted text-muted-foreground"}`}
                 >
                   {configHealth.admin_bot_configured ? "🛠 Admin bot: ulandi" : "🛠 Admin bot: sozlanmagan"}
                 </span>
               )}
-              <span>{user.name}</span>
+              <span className="hidden sm:inline">{user.name}</span>
             </div>
           </div>
 
