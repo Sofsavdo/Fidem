@@ -232,15 +232,18 @@ export function useRedeemGift() {
   });
 }
 
-// Real gift-value leaderboard (chat_r.py aggregates db.gifts by sender) -
-// the "ranking_score" based /rankings/* endpoints were removed because that
-// field was never written anywhere, so they always returned empty results.
-export function useLeaderboard(period = "all") {
+// Real gift-value leaderboard (chat_r.py aggregates db.gifts by sender or
+// recipient) - the "ranking_score" based /rankings/* endpoints were removed
+// because that field was never written anywhere, so they always returned
+// empty results. by="sent" ranks the givers ("Saxiylar"), by="received"
+// ranks who's most gifted ("Eng sevimlilar") - a receiver's real payoff for
+// getting a gift, not just a sticker in their chat.
+export function useLeaderboard(period = "all", by = "sent") {
   return useQuery({
-    queryKey: QK.leaderboard(period),
-    queryFn: () => api.get(`/leaderboard?period=${period}`).then((r) => r.data || []),
-    // switching day/week/month keeps the old list visible while the new one
-    // loads instead of flashing an empty/loading state
+    queryKey: [...QK.leaderboard(period), by],
+    queryFn: () => api.get(`/leaderboard?period=${period}&by=${by}`).then((r) => r.data || []),
+    // switching day/week/month/sent-received keeps the old list visible
+    // while the new one loads instead of flashing an empty/loading state
     placeholderData: keepPreviousData,
   });
 }
