@@ -15,6 +15,23 @@ from routers.payments_r import process_completed_payment
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
+@router.get("/config-health")
+async def admin_config_health(_: str = Depends(get_current_admin)):
+    """Surfaces the ADMIN_TELEGRAM_IDS misconfiguration directly in the
+    panel itself, since the only other signal for it (a server log line)
+    is invisible to an admin who has no way to check Railway's logs. If
+    this comes back with zero admins, no Telegram alert - P2P top-up
+    review, /stats, the daily digest - can ever reach anyone, no matter
+    how correct the rest of the notification code is."""
+    from admin_bot import get_admin_chat_ids
+
+    admin_ids = await get_admin_chat_ids()
+    return {
+        "telegram_admin_count": len(admin_ids),
+        "telegram_configured": len(admin_ids) > 0,
+    }
+
+
 @router.get("/stats")
 async def admin_stats(_: str = Depends(get_current_admin)):
     """Dashboard metrics. Everything runs CONCURRENTLY via asyncio.gather -
