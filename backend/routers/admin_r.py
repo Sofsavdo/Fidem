@@ -127,10 +127,13 @@ async def admin_list_users(
     plan: str = "",
     joined_within_days: int = None,
     active_within_days: int = None,
+    is_demo: bool = None,
     sort: str = "",
     _: str = Depends(get_current_admin),
 ):
     query = {}
+    if is_demo is not None:
+        query["is_demo"] = True if is_demo else {"$ne": True}
     if q:
         query["$or"] = [
             {"email": {"$regex": q, "$options": "i"}},
@@ -184,8 +187,11 @@ async def admin_list_users(
             pub["days_in_app"] = max(0, (now_utc() - created).days) if created else None
         except Exception:
             pub["days_in_app"] = None
+        pub["is_demo"] = bool(u.get("is_demo"))
         out.append(pub)
-    return {"users": out, "total": total, "page": page, "limit": limit}
+
+    demo_total = await db.users.count_documents({"is_demo": True})
+    return {"users": out, "total": total, "page": page, "limit": limit, "demo_total": demo_total}
 
 
 @router.patch("/users/{target_id}")
@@ -301,6 +307,48 @@ async def admin_user_action(
 
     await log_admin_action(admin_id, f"user_action:{action}", target_id, {"days": days} if "give_" in action else {})
     return {"ok": True}
+
+
+async def _delete_users_cascade(user_ids: list[str]) -> None:
+    """Removes the user docs plus everything a real user's interaction with
+    them would have left behind (likes, views, messages, unlocks, reports,
+    blocks, notifications) - a hard delete of just the user doc would leave
+    those referencing an id that no longer resolves to anything."""
+    if not user_ids:
+        return
+    either = {"$or": [{"owner_id": {"$in": user_ids}}, {"target_id": {"$in": user_ids}}]}
+    await asyncio.gather(
+        db.users.delete_many({"id": {"$in": user_ids}}),
+        db.saved.delete_many(either),
+        db.profile_views.delete_many({"$or": [{"viewer_id": {"$in": user_ids}}, {"target_id": {"$in": user_ids}}]}),
+        db.messages.delete_many({"$or": [{"from_user_id": {"$in": user_ids}}, {"to_user_id": {"$in": user_ids}}]}),
+        db.photo_unlocks.delete_many({"$or": [{"requester_id": {"$in": user_ids}}, {"target_id": {"$in": user_ids}}]}),
+        db.photo_peeks.delete_many({"$or": [{"viewer_id": {"$in": user_ids}}, {"target_id": {"$in": user_ids}}]}),
+        db.chat_unlocks.delete_many({"$or": [{"user_id": {"$in": user_ids}}, {"target_id": {"$in": user_ids}}]}),
+        db.reports.delete_many({"$or": [{"reporter_id": {"$in": user_ids}}, {"target_id": {"$in": user_ids}}]}),
+        db.blocks.delete_many(either),
+        db.notifications.delete_many({"user_id": {"$in": user_ids}}),
+        db.compat_unlocks.delete_many({"$or": [{"user_id": {"$in": user_ids}}, {"target_id": {"$in": user_ids}}]}),
+    )
+
+
+@router.post("/users/demo/delete")
+async def admin_delete_demo_users(
+    target_ids: Optional[list[str]] = Body(None, embed=True),
+    admin_id: str = Depends(get_current_admin),
+):
+    """Bulk-remove seeded demo profiles once real signups make them
+    unnecessary. Scoped to is_demo=True no matter what target_ids says, so
+    this endpoint can never be used (by mistake or a tampered request) to
+    delete a real account - pass target_ids to remove specific demo
+    profiles, or omit it to sweep every demo profile at once."""
+    query: dict = {"is_demo": True}
+    if target_ids:
+        query["id"] = {"$in": target_ids}
+    ids = [u["id"] for u in await db.users.find(query, {"_id": 0, "id": 1}).to_list(10000)]
+    await _delete_users_cascade(ids)
+    await log_admin_action(admin_id, "delete_demo_users", None, {"count": len(ids), "target_ids": target_ids})
+    return {"ok": True, "deleted": len(ids)}
 
 
 @router.get("/payments")

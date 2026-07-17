@@ -1,22 +1,20 @@
 // FIDEM Service Worker — minimal offline-first cache
 //
-// v2: static assets are now stale-while-revalidate, not pure cache-first.
-// Pure cache-first never re-checks the network once a URL is cached, which
-// is fine for content-hashed JS/CSS chunks (a new deploy gets new hashed
-// filenames, so old cache entries just go unused) - but Telegram's Mini
-// App WebView often keeps a page's JS context alive across re-opens
-// instead of doing a fresh top-level navigation, and can serve its OWN
-// cached copy of index.html without ever re-hitting the network. When
-// that happens, the page never learns new hashed filenames exist, and a
-// long-lived session (exactly what a Telegram Mini App is, compared to a
-// browser tab someone just opened) can keep running whatever JS bundle
-// was current the day they first opened it - shipped features/fixes
-// never reach that session until something forces a real reload.
-// Stale-while-revalidate still answers instantly from cache, but always
-// fires a background fetch to refresh the cache with whatever the
-// network currently has, so the NEXT load (even without a full reload)
-// picks up new files, and the update-detection wired up in index.js can
-// prompt/force a reload once a new version is actually available.
+// Static JS/CSS build files are content-hashed (main.<hash>.js) - a given
+// hash's content can never change, so cache-first for them is both correct
+// and the fastest possible answer; there is nothing to "revalidate" (an
+// earlier revision of this file tried stale-while-revalidate here, which
+// just added a redundant background fetch for every asset on every load
+// for no freshness benefit - real cost on slow mobile connections, so it
+// was reverted). The one file whose content DOES change between deploys
+// without its URL changing is index.html, and that already goes through
+// the network-first `navigate` branch below.
+//
+// The actual fix for a long-lived Telegram Mini App WebView running an
+// old build (it can keep the page's JS context alive across re-opens
+// without ever triggering a fresh `navigate` fetch) lives in index.js:
+// registration.update() on visibilitychange, and a reload once a new
+// worker takes control.
 const CACHE_NAME = 'fidem-v2';
 const PRECACHE_URLS = [
   '/',
@@ -56,29 +54,16 @@ self.addEventListener('fetch', (event) => {
     );
     return;
   }
-  // Stale-while-revalidate for static assets: answer from cache instantly
-  // if present, but always also fetch in the background and update the
-  // cache - so a session that never fully reloads still converges on the
-  // latest build within one round trip instead of staying stale forever.
-  // event.waitUntil keeps the worker alive long enough for the background
-  // fetch/cache.put to actually finish once respondWith has already
-  // resolved with the cached copy - without it the browser is free to
-  // suspend the worker mid-fetch and the revalidation silently never lands.
+  // Cache-first for static assets (see the note above on why these never
+  // need revalidation).
   event.respondWith(
-    caches.open(CACHE_NAME).then(async (cache) => {
-      const cached = await cache.match(request);
-      const network = fetch(request).then((res) => {
-        if (res && res.status === 200 && res.type === 'basic') {
-          cache.put(request, res.clone());
-        }
-        return res;
-      }).catch(() => null);
-      if (cached) {
-        event.waitUntil(network);
-        return cached;
+    caches.match(request).then((cached) => cached || fetch(request).then((res) => {
+      if (res && res.status === 200 && res.type === 'basic') {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then((c) => c.put(request, copy));
       }
-      return (await network) || cached;
-    })
+      return res;
+    }).catch(() => cached))
   );
 });
 

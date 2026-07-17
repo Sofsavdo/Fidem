@@ -484,6 +484,20 @@ export function useUpdateAdminUser() {
   });
 }
 
+// target_ids omitted (or null) deletes every demo profile at once; pass an
+// array to remove specific ones instead. The backend only ever touches
+// is_demo=True documents regardless of what's passed.
+export function useDeleteDemoUsers() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (target_ids) => api.post("/admin/users/demo/delete", { target_ids: target_ids || null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
+    },
+  });
+}
+
 export function useAdminPayments(params) {
   return useQuery({
     queryKey: QK.adminPayments(params),
