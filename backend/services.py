@@ -173,11 +173,39 @@ async def send_admin_bot_message(chat_id: int, text: str, reply_markup: Optional
     return r.status_code == 200
 
 
+async def send_admin_bot_photo(chat_id: int, photo: bytes, caption: str, reply_markup: Optional[dict] = None) -> bool:
+    import json as _json
+
+    data = {"chat_id": str(chat_id), "caption": caption}
+    if reply_markup:
+        data["reply_markup"] = _json.dumps(reply_markup)
+    r = await _tg_call_as(ADMIN_BOT_TOKEN, "sendPhoto", data=data, files={"photo": ("receipt.jpg", photo)})
+    if r is None:
+        return False
+    if r.status_code != 200:
+        log.warning(f"Admin bot sendPhoto failed: {r.status_code} {r.text[:200]}")
+    return r.status_code == 200
+
+
+async def answer_admin_callback_query(callback_id: str, text: str) -> None:
+    await _tg_call_as(ADMIN_BOT_TOKEN, "answerCallbackQuery", json={"callback_query_id": callback_id, "text": text})
+
+
+async def edit_admin_message_caption(chat_id: int, message_id: int, caption: str) -> None:
+    await _tg_call_as(
+        ADMIN_BOT_TOKEN,
+        "editMessageCaption",
+        json={"chat_id": chat_id, "message_id": message_id, "caption": caption},
+    )
+
+
 async def admin_bot_set_webhook(url: str, secret_token: str) -> bool:
     r = await _tg_call_as(ADMIN_BOT_TOKEN, "setWebhook", json={
         "url": url,
         "secret_token": secret_token,
-        "allowed_updates": ["message"],
+        # callback_query: the P2P approve/reject inline buttons, once alerts
+        # are unified onto this bot (see admin_bot.py's send_admin_alert*).
+        "allowed_updates": ["message", "callback_query"],
     })
     ok = r is not None and r.status_code == 200
     log.info(f"Admin bot webhook set: {r.status_code if r else 'no response'} {r.text[:200] if r else ''}")

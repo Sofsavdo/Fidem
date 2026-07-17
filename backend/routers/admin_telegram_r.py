@@ -68,12 +68,29 @@ async def _handle_start(chat_id: int, tg_user_id: str) -> None:
 
 
 async def _dispatch(body: dict) -> None:
+    # P2P approve/reject inline buttons (see admin_bot.notify_admins_manual_topup,
+    # which sends them through this bot once ADMIN_BOT_TOKEN is configured).
+    cb = body.get("callback_query")
+    if cb:
+        from admin_bot import handle_admin_callback
+
+        await handle_admin_callback(cb)
+        return
+
     msg = body.get("message")
     if not msg:
         return
     text = (msg.get("text") or "").strip()
     chat_id = msg["chat"]["id"]
     tg_user_id = str(msg["from"]["id"])
+
+    if text.startswith("/stats"):
+        from admin_bot import build_stats_text, is_admin_tg
+
+        if await is_admin_tg(int(tg_user_id)):
+            await send_admin_bot_message(chat_id, await build_stats_text())
+        return
+
     if text.startswith("/start"):
         await _handle_start(chat_id, tg_user_id)
 

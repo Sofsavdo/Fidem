@@ -258,14 +258,14 @@ async def _admin_daily_digest() -> None:
     await db.settings.update_one(
         {"id": "admin_digest"}, {"$set": {"sent_on": today}}, upsert=True
     )
-    from admin_bot import build_stats_text, get_admin_chat_ids
+    from admin_bot import build_stats_text, get_admin_chat_ids, send_admin_alert
 
     admins = await get_admin_chat_ids()
     if not admins:
         return
     text = await build_stats_text()
     for chat_id in admins:
-        await send_telegram_message(chat_id, text)
+        await send_admin_alert(chat_id, text)
 
 
 async def _cleanup_telegram_updates() -> None:

@@ -13,26 +13,64 @@ from datetime import timedelta
 
 from core import db, iso, now_utc
 from services import (
+    ADMIN_BOT_TOKEN,
     TELEGRAM_BOT_TOKEN,
+    answer_admin_callback_query,
     answer_callback_query,
+    edit_admin_message_caption,
     edit_message_caption,
+    send_admin_bot_message,
+    send_admin_bot_photo,
     send_telegram_message,
     send_telegram_photo,
 )
 
 log = logging.getLogger("fidem.admin_bot")
 
+# Admin alerts (P2P review, /stats, daily digest) prefer the dedicated admin
+# bot (Fidemadminbot) once ADMIN_BOT_TOKEN is configured; otherwise they fall
+# back to the main user-facing bot so alerts never go silent just because the
+# admin bot hasn't been set up yet - a real production incident (a P2P
+# payment sat unreviewed for 46 minutes because no Telegram alert arrived)
+# is exactly the failure mode this fallback guards against.
+_USE_ADMIN_BOT = bool(ADMIN_BOT_TOKEN)
 
-def _bot_own_id() -> int | None:
-    """The numeric prefix of the bot token IS the bot's own Telegram user id
+
+async def send_admin_alert(chat_id: int, text: str, reply_markup: dict | None = None) -> bool:
+    fn = send_admin_bot_message if _USE_ADMIN_BOT else send_telegram_message
+    return await fn(chat_id, text, reply_markup=reply_markup)
+
+
+async def send_admin_alert_photo(chat_id: int, photo: bytes, caption: str, reply_markup: dict | None = None) -> bool:
+    fn = send_admin_bot_photo if _USE_ADMIN_BOT else send_telegram_photo
+    return await fn(chat_id, photo, caption, reply_markup=reply_markup)
+
+
+async def answer_admin_alert_callback(callback_id: str, text: str) -> None:
+    fn = answer_admin_callback_query if _USE_ADMIN_BOT else answer_callback_query
+    await fn(callback_id, text)
+
+
+async def edit_admin_alert_caption(chat_id: int, message_id: int, caption: str) -> None:
+    fn = edit_admin_message_caption if _USE_ADMIN_BOT else edit_message_caption
+    await fn(chat_id, message_id, caption)
+
+
+def _own_bot_ids() -> set[int]:
+    """The numeric prefix of a bot token IS that bot's own Telegram user id
     — a common copy-paste mistake is pasting that number into
-    ADMIN_TELEGRAM_IDS instead of a real admin's personal id. Telegram then
-    rejects every send with 'Forbidden: the bot can't send messages to the
-    bot', which otherwise looks identical to a misconfigured/missing admin."""
-    try:
-        return int(TELEGRAM_BOT_TOKEN.split(":", 1)[0])
-    except (ValueError, IndexError):
-        return None
+    ADMIN_TELEGRAM_IDS instead of a real admin's personal id (now possible
+    with either bot's token, since ADMIN_TELEGRAM_IDS gates both). Telegram
+    then rejects every send with 'Forbidden: the bot can't send messages to
+    the bot', which otherwise looks identical to a misconfigured/missing
+    admin."""
+    ids: set[int] = set()
+    for token in (TELEGRAM_BOT_TOKEN, ADMIN_BOT_TOKEN):
+        try:
+            ids.add(int(token.split(":", 1)[0]))
+        except (ValueError, IndexError):
+            pass
+    return ids
 
 
 async def get_admin_chat_ids() -> list[int]:
@@ -50,14 +88,15 @@ async def get_admin_chat_ids() -> list[int]:
             ids.add(int(r["telegram_id"]))
         except (TypeError, ValueError):
             pass
-    bot_id = _bot_own_id()
-    if bot_id is not None and bot_id in ids:
-        ids.discard(bot_id)
+    bot_ids = _own_bot_ids()
+    overlap = ids & bot_ids
+    if overlap:
+        ids -= bot_ids
         log.warning(
-            f"ADMIN_TELEGRAM_IDS (or an admin user's telegram_id) contains {bot_id}, "
-            "which is the BOT's own id (the number before ':' in TELEGRAM_BOT_TOKEN), "
-            "not a real admin's Telegram user id — ignoring it. Get your real id from "
-            "@userinfobot in Telegram and use that instead."
+            f"ADMIN_TELEGRAM_IDS (or an admin user's telegram_id) contains {overlap}, "
+            "which is a BOT's own id (the number before ':' in its token), not a real "
+            "admin's Telegram user id — ignoring it. Get your real id from @userinfobot "
+            "in Telegram and use that instead."
         )
     return list(ids)
 
@@ -152,11 +191,11 @@ async def notify_admins_manual_topup(topup: dict) -> None:
 
     for chat_id in admins:
         if photo:
-            ok = await send_telegram_photo(chat_id, photo, caption, reply_markup=keyboard)
+            ok = await send_admin_alert_photo(chat_id, photo, caption, reply_markup=keyboard)
             if ok:
                 continue
         # No photo (or sendPhoto failed): still deliver the alert as text
-        await send_telegram_message(chat_id, caption, reply_markup=keyboard)
+        await send_admin_alert(chat_id, caption, reply_markup=keyboard)
 
 
 async def build_stats_text() -> str:
@@ -220,7 +259,7 @@ async def handle_admin_callback(cb: dict) -> None:
     if not data.startswith("mtu:"):
         return
     if not await is_admin_tg(from_id):
-        await answer_callback_query(cb_id, "Ruxsat yo'q")
+        await answer_admin_alert_callback(cb_id, "Ruxsat yo'q")
         return
 
     _, action, tid = data.split(":", 2)
@@ -234,12 +273,12 @@ async def handle_admin_callback(cb: dict) -> None:
         decided_by=f"tg:{from_id}",
     )
     if res is None:
-        await answer_callback_query(cb_id, "Allaqachon ko'rib chiqilgan")
+        await answer_admin_alert_callback(cb_id, "Allaqachon ko'rib chiqilgan")
         if chat_id and message_id:
-            await edit_message_caption(chat_id, message_id, (msg.get("caption") or "") + "\n\n⚠️ Allaqachon ko'rib chiqilgan")
+            await edit_admin_alert_caption(chat_id, message_id, (msg.get("caption") or "") + "\n\n⚠️ Allaqachon ko'rib chiqilgan")
         return
 
     verdict = "✅ TASDIQLANDI — balans tushdi" if approve else "❌ RAD ETILDI"
-    await answer_callback_query(cb_id, verdict)
+    await answer_admin_alert_callback(cb_id, verdict)
     if chat_id and message_id:
-        await edit_message_caption(chat_id, message_id, (msg.get("caption") or "") + f"\n\n{verdict}")
+        await edit_admin_alert_caption(chat_id, message_id, (msg.get("caption") or "") + f"\n\n{verdict}")
