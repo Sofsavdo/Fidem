@@ -24,11 +24,17 @@ async def admin_config_health(_: str = Depends(get_current_admin)):
     review, /stats, the daily digest - can ever reach anyone, no matter
     how correct the rest of the notification code is."""
     from admin_bot import get_admin_chat_ids
+    from core import ADMIN_BOT_TOKEN
 
     admin_ids = await get_admin_chat_ids()
     return {
         "telegram_admin_count": len(admin_ids),
         "telegram_configured": len(admin_ids) > 0,
+        # Whether ADMIN_BOT_TOKEN is set on THIS running process - the only
+        # way an admin who can't check Railway logs/env vars can confirm the
+        # variable actually took effect (typo'd key, forgot to redeploy,
+        # etc. all look identical from the outside otherwise).
+        "admin_bot_configured": bool(ADMIN_BOT_TOKEN),
     }
 
 

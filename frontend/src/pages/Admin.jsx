@@ -118,6 +118,14 @@ export default function Admin() {
               <h2 className="font-heading text-xl lg:text-2xl font-semibold">{menuItems.find(m => m.id === activeTab)?.label}</h2>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              {configHealth && (
+                <span
+                  data-testid="admin-bot-status"
+                  className={`text-[11px] px-2.5 py-1 rounded-full font-medium ${configHealth.admin_bot_configured ? "bg-emerald-100 text-emerald-800" : "bg-muted text-muted-foreground"}`}
+                >
+                  {configHealth.admin_bot_configured ? "🛠 Admin bot: ulandi" : "🛠 Admin bot: sozlanmagan"}
+                </span>
+              )}
               <span>{user.name}</span>
             </div>
           </div>
