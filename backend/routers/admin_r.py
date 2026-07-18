@@ -340,6 +340,9 @@ async def admin_user_detail(target_id: str, _: str = Depends(get_current_admin))
 
     from routers.analytics_r import _matched_rows
 
+    async def _referral_count(code: str | None) -> int:
+        return await db.users.count_documents({"referred_by": code}) if code else 0
+
     (
         likes_sent, likes_received, matches_as_owner_rows,
         messages_sent, messages_received, chats_agg,
@@ -357,7 +360,15 @@ async def admin_user_detail(target_id: str, _: str = Depends(get_current_admin))
         ]).to_list(1000),
         db.reports.count_documents({"target_id": target_id}),
         db.reports.count_documents({"reporter_id": target_id}),
-        db.users.count_documents({"referred_by": user.get("referral_code")}) if user.get("referral_code") else 0,
+        # BUG FIX: this read user.get("referral_code") - a field that never
+        # exists anywhere in the schema (the user's own code is stored as
+        # "referral_id"; "referral_code" is only ever an incoming request
+        # field, never persisted). The ternary therefore always evaluated to
+        # the bare int 0 instead of a coroutine, and asyncio.gather() requires
+        # every argument to be awaitable - so this endpoint 500'd for EVERY
+        # user, always. The admin panel's whole "Faollik" (activity) panel in
+        # the user detail modal never loaded for anyone.
+        _referral_count(user.get("referral_id")),
         db.payments.aggregate([
             {"$match": {"user_id": target_id, "status": {"$in": ["paid", "success"]}}},
             {"$group": {"_id": None, "total": {"$sum": "$amount"}, "n": {"$sum": 1}}},
@@ -827,7 +838,11 @@ async def admin_mark_user_safe(uid: str, _: str = Depends(get_current_admin)):
 @router.get("/regions")
 async def admin_regions(_: str = Depends(get_current_admin)):
     """Get list of all regions for filtering."""
-    regions = await db.users.distinct("region", {"region": {"$ne": "", "$ne": None}})
+    # A Python dict literal can't hold two keys named "$ne" - {"$ne": "",
+    # "$ne": None} silently collapsed to just {"$ne": None}, so empty-string
+    # regions were never actually excluded and could show up as a blank
+    # entry in the admin filter dropdown.
+    regions = await db.users.distinct("region", {"region": {"$nin": ["", None]}})
     return {"regions": sorted(regions)}
 
 
