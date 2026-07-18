@@ -25,7 +25,8 @@ export default function DailyCheckIn() {
     if (lastShown === today) return;
     api.get("/daily/status").then((r) => {
       setStatus(r.data);
-      if (!r.data.claimed_today) setOpen(true);
+      // A completed 7-day ladder retires for this user - never re-open.
+      if (!r.data.completed && !r.data.claimed_today) setOpen(true);
       localStorage.setItem("fidem_daily_shown", today);
     });
   }, [user]);

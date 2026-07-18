@@ -32,6 +32,12 @@ def _streak_reward(day: int) -> int:
 @router.get("/daily/status")
 async def daily_status(uid: str = Depends(get_current_user_id)):
     me = await get_user(uid)
+    # A completed 7-day ladder is a one-time onboarding hook, not an
+    # infinite grind - once a user has claimed all 7 days in a row, the
+    # widget retires for them permanently instead of looping forever at the
+    # day-7 reward.
+    if me.get("daily_streak_completed"):
+        return {"completed": True, "streak": me.get("daily_streak", 0)}
     last = me.get("daily_last_at")
     streak = me.get("daily_streak", 0)
     today = now_utc().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -43,6 +49,7 @@ async def daily_status(uid: str = Depends(get_current_user_id)):
     chain_alive = bool(last and last >= yesterday_iso)
     next_streak = (streak + 1) if chain_alive else 1
     return {
+        "completed": False,
         "claimed_today": claimed_today,
         "streak": streak,
         "next_streak": next_streak,
@@ -58,6 +65,8 @@ async def daily_status(uid: str = Depends(get_current_user_id)):
 @router.post("/daily/claim")
 async def daily_claim(uid: str = Depends(get_current_user_id)):
     me = await get_user(uid)
+    if me.get("daily_streak_completed"):
+        raise HTTPException(400, "Kunlik bonus 7 kunlik siklni yakunladi")
     today = now_utc().replace(hour=0, minute=0, second=0, microsecond=0)
     today_iso_str = iso(today)
     yesterday_iso = iso(today - timedelta(days=1))
@@ -71,18 +80,25 @@ async def daily_claim(uid: str = Depends(get_current_user_id)):
     else:
         streak = 1
     bonus = _streak_reward(streak)
-    await db.users.update_one(
-        {"id": uid},
-        {
-            "$set": {"daily_last_at": iso(now_utc()), "daily_streak": streak},
-            "$inc": {"balance": bonus, "xp": 20 + (50 if streak % 7 == 0 else 0)},
-        },
-    )
-    await push_notif(uid, "balance", f"🔥 {streak} kunlik streak! +{bonus:,} so'm balansingizga tushdi. Ertaga: +{_streak_reward(streak + 1):,} so'm")
+    completed = streak >= len(STREAK_REWARDS)
+    update: dict = {
+        "$set": {"daily_last_at": iso(now_utc()), "daily_streak": streak},
+        "$inc": {"balance": bonus, "xp": 20 + (50 if streak % 7 == 0 else 0)},
+    }
+    if completed:
+        # Day 7 still pays its reward - the ladder just never restarts or
+        # loops for this user again after today.
+        update["$set"]["daily_streak_completed"] = True
+    await db.users.update_one({"id": uid}, update)
+    if completed:
+        await push_notif(uid, "balance", f"🔥 7 kunlik streak yakunlandi! +{bonus:,} so'm balansingizga tushdi.")
+    else:
+        await push_notif(uid, "balance", f"🔥 {streak} kunlik streak! +{bonus:,} so'm balansingizga tushdi. Ertaga: +{_streak_reward(streak + 1):,} so'm")
     return {
         "streak": streak,
         "bonus": bonus,
-        "tomorrow_bonus": _streak_reward(streak + 1),
+        "completed": completed,
+        "tomorrow_bonus": 0 if completed else _streak_reward(streak + 1),
         "currency": "sum",
         "balance_after": int(me.get("balance", 0) or 0) + bonus,
     }

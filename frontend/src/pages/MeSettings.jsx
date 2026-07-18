@@ -241,8 +241,9 @@ export default function MeSettings() {
           )}
         </div>
 
-        {/* Daily streak — moved here from the Me front page */}
-        {daily && (
+        {/* Daily streak — moved here from the Me front page. Retires
+            permanently once a user completes the full 7-day ladder. */}
+        {daily && !daily.completed && (
           <div className="rounded-3xl bg-gradient-to-r from-gold/15 to-card border border-gold/30 p-4" data-testid="daily-strip">
             <div className="flex items-center justify-between">
               <div>
