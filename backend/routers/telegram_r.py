@@ -16,7 +16,15 @@ from core import (
     iso,
     now_utc,
 )
-from services import send_telegram_message, telegram_set_menu_button, telegram_set_webhook
+from services import (
+    send_telegram_message,
+    telegram_set_menu_button,
+    telegram_set_my_commands,
+    telegram_set_my_description,
+    telegram_set_my_name,
+    telegram_set_my_short_description,
+    telegram_set_webhook,
+)
 
 log = logging.getLogger("fidem.telegram")
 router = APIRouter(tags=["telegram"])
@@ -27,6 +35,40 @@ def get_backend_url() -> str:
         "BACKEND_URL",
         "https://fidem-production.up.railway.app",
     ).rstrip("/")
+
+
+# Bot profile shown to users who haven't opened the Mini App yet: the "/"
+# command menu, the short description (bot's profile page + link-share
+# previews), and the description (empty chat before /start is pressed).
+# Keyed by Telegram client language_code; "" is the default every other
+# language falls back to - kept as Uzbek since that's the primary market.
+BOT_COMMANDS = {
+    "": [{"command": "start", "description": "FIDEM'ni ishga tushirish"}],
+    "ru": [{"command": "start", "description": "Запустить FIDEM"}],
+    "en": [{"command": "start", "description": "Launch FIDEM"}],
+}
+BOT_SHORT_DESCRIPTION = {
+    "": "Jiddiy munosabat va oila qurish uchun ishonchli platforma. Tasdiqlangan profillar, xavfsiz muloqot.",
+    "ru": "Платформа для серьёзных отношений и создания семьи. Проверенные анкеты, безопасное общение.",
+    "en": "A trusted platform for serious relationships and family. Verified profiles, safe messaging.",
+}
+BOT_DESCRIPTION = {
+    "": (
+        "💖 FIDEM — jiddiy munosabat va oila qurish uchun platforma.\n\n"
+        "✅ Aniq moslik algoritmi\n✅ Tasdiqlangan profillar\n✅ Xavfsiz chat\n✅ Premium imkoniyatlar\n\n"
+        "👇 Boshlash uchun pastdagi Start tugmasini bosing"
+    ),
+    "ru": (
+        "💖 FIDEM — платформа для серьёзных отношений и создания семьи.\n\n"
+        "✅ Точный алгоритм подбора\n✅ Проверенные анкеты\n✅ Безопасный чат\n✅ Премиум-возможности\n\n"
+        "👇 Нажмите Start, чтобы начать"
+    ),
+    "en": (
+        "💖 FIDEM — a platform for serious relationships and family.\n\n"
+        "✅ Precise matching algorithm\n✅ Verified profiles\n✅ Safe chat\n✅ Premium features\n\n"
+        "👇 Tap Start to begin"
+    ),
+}
 
 
 async def setup_telegram_webhook() -> None:
@@ -45,8 +87,15 @@ async def setup_telegram_webhook() -> None:
     try:
         await telegram_set_webhook(webhook_url, TELEGRAM_WEBHOOK_SECRET)
         await telegram_set_menu_button(webapp_url)
+        await telegram_set_my_name("FIDEM")
+        for lang, commands in BOT_COMMANDS.items():
+            await telegram_set_my_commands(commands, lang)
+        for lang, text in BOT_SHORT_DESCRIPTION.items():
+            await telegram_set_my_short_description(text, lang)
+        for lang, text in BOT_DESCRIPTION.items():
+            await telegram_set_my_description(text, lang)
     except Exception as e:
-        log.warning(f"setWebhook/menu failed: {e}")
+        log.warning(f"setWebhook/menu/profile failed: {e}")
 
 
 async def _handle_start(chat_id: int, tg_user_id: str, text: str) -> None:

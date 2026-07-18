@@ -1,7 +1,8 @@
 """Referral earnings withdrawal. Users withdraw from referral earnings only.
 
 Gifts are NOT withdrawable. Only referral earnings can be withdrawn.
-Min payout: 100,000 UZS. 12% tax withholding. Admin approves manually via CLICK transfer.
+Min payout: 100,000 UZS (free), 50,000 UZS (premium/vip). 12% tax withholding.
+Admin approves manually via CLICK transfer.
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ from models import new_id
 router = APIRouter(tags=["withdrawals"])
 
 MIN_WITHDRAW_UZS_FREE = 100_000  # Free users: minimum 100,000
-MIN_WITHDRAW_UZS_PAID = 100_000  # Paid users: minimum 100,000
+MIN_WITHDRAW_UZS_PAID = 50_000  # Premium/vip perk: lower minimum withdrawal
 # NOTE: there is deliberately NO maximum. A previous MAX_WITHDRAW_UZS_PAID of
 # 29,900 (a stray copy of the referral tier cap) combined with the 100,000
 # minimum made withdrawal mathematically impossible for premium/vip users.
@@ -149,12 +150,17 @@ async def admin_list_withdrawals(status: str | None = None, page: int = 1, limit
     skip = (page - 1) * limit
     total = await db.withdrawals.count_documents(q)
     rows = await db.withdrawals.find(q, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
-    out = []
+    # One batched lookup instead of a query per row - this loop used to fire
+    # a sequential DB round-trip per withdrawal, up to `limit` of them, on
+    # every single page load.
+    user_ids = list({r["user_id"] for r in rows})
+    users = await db.users.find(
+        {"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "name": 1, "email": 1, "phone": 1, "telegram_username": 1}
+    ).to_list(len(user_ids)) if user_ids else []
+    users_by_id = {u["id"]: u for u in users}
     for r in rows:
-        u = await db.users.find_one({"id": r["user_id"]}, {"_id": 0, "name": 1, "email": 1, "phone": 1, "telegram_username": 1})
-        r["user"] = u or {}
-        out.append(r)
-    return {"withdrawals": out, "total": total, "page": page, "limit": limit}
+        r["user"] = users_by_id.get(r["user_id"], {})
+    return {"withdrawals": rows, "total": total, "page": page, "limit": limit}
 
 
 @router.post("/admin/withdrawals/{wid}/approve")
