@@ -225,6 +225,56 @@ async def admin_bot_set_menu_button(webapp_url: str) -> bool:
     return ok
 
 
+async def _tg_set_profile_field(token: str, method: str, field: str, value, language_code: str = "") -> bool:
+    """Shared body for the setMyName/setMyDescription/setMyShortDescription/
+    setMyCommands family - all four take one payload field plus an optional
+    language_code and are called identically for both bots."""
+    payload = {field: value}
+    if language_code:
+        payload["language_code"] = language_code
+    r = await _tg_call_as(token, method, json=payload)
+    ok = r is not None and r.status_code == 200
+    if not ok:
+        log.warning(f"Telegram {method}({language_code or 'default'}) failed: {r.status_code if r else 'no response'} {r.text[:200] if r else ''}")
+    return ok
+
+
+# ---- Bot profile (BotFather-equivalent, settable via API): name shown in
+# chat header, description shown in the empty chat before /start, short
+# description shown on the bot's profile page and in shared-link previews,
+# and the "/" command menu. Every field supports a per-language variant
+# (falls back to the languageless default for any client language Telegram
+# doesn't have an explicit override for) - unlike the profile PHOTO, which
+# Telegram only allows BotFather to set (`/setuserpic`), there is no Bot API
+# method for it.
+async def telegram_set_my_name(name: str, language_code: str = "") -> bool:
+    return await _tg_set_profile_field(TELEGRAM_BOT_TOKEN, "setMyName", "name", name, language_code)
+
+
+async def telegram_set_my_description(description: str, language_code: str = "") -> bool:
+    return await _tg_set_profile_field(TELEGRAM_BOT_TOKEN, "setMyDescription", "description", description, language_code)
+
+
+async def telegram_set_my_short_description(short_description: str, language_code: str = "") -> bool:
+    return await _tg_set_profile_field(TELEGRAM_BOT_TOKEN, "setMyShortDescription", "short_description", short_description, language_code)
+
+
+async def telegram_set_my_commands(commands: list[dict], language_code: str = "") -> bool:
+    return await _tg_set_profile_field(TELEGRAM_BOT_TOKEN, "setMyCommands", "commands", commands, language_code)
+
+
+async def admin_bot_set_my_short_description(short_description: str) -> bool:
+    return await _tg_set_profile_field(ADMIN_BOT_TOKEN, "setMyShortDescription", "short_description", short_description)
+
+
+async def admin_bot_set_my_description(description: str) -> bool:
+    return await _tg_set_profile_field(ADMIN_BOT_TOKEN, "setMyDescription", "description", description)
+
+
+async def admin_bot_set_my_commands(commands: list[dict]) -> bool:
+    return await _tg_set_profile_field(ADMIN_BOT_TOKEN, "setMyCommands", "commands", commands)
+
+
 async def get_bot_info(token: str) -> Optional[dict]:
     """Live validity check via Telegram's getMe - a non-empty token string
     proves nothing on its own (a typo'd or truncated token still passes any

@@ -13,7 +13,14 @@ from fastapi import APIRouter, HTTPException, Request
 from pymongo.errors import DuplicateKeyError
 
 from core import ADMIN_BOT_TOKEN, ADMIN_BOT_WEBHOOK_SECRET, db, get_admin_webapp_url, iso, now_utc
-from services import admin_bot_set_menu_button, admin_bot_set_webhook, send_admin_bot_message
+from services import (
+    admin_bot_set_menu_button,
+    admin_bot_set_my_commands,
+    admin_bot_set_my_description,
+    admin_bot_set_my_short_description,
+    admin_bot_set_webhook,
+    send_admin_bot_message,
+)
 
 log = logging.getLogger("fidem.admin_telegram")
 router = APIRouter(tags=["admin-telegram"])
@@ -40,8 +47,15 @@ async def setup_admin_telegram_webhook() -> None:
     try:
         await admin_bot_set_webhook(webhook_url, ADMIN_BOT_WEBHOOK_SECRET)
         await admin_bot_set_menu_button(get_admin_webapp_url())
+        await admin_bot_set_my_commands([{"command": "start", "description": "Admin panelni ochish"}])
+        await admin_bot_set_my_short_description("FIDEM admin panel — faqat administratorlar uchun boshqaruv boti.")
+        await admin_bot_set_my_description(
+            "🛠 FIDEM admin panel botiga xush kelibsiz.\n\n"
+            "Bu bot faqat administratorlar uchun. Admin panelni ochish uchun "
+            "pastdagi Start tugmasini bosing."
+        )
     except Exception as e:
-        log.warning(f"admin bot setWebhook/menu failed: {e}")
+        log.warning(f"admin bot setWebhook/menu/profile failed: {e}")
 
 
 async def _handle_start(chat_id: int, tg_user_id: str) -> None:
