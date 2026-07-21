@@ -763,17 +763,31 @@ async def mark_all_read(uid: str = Depends(get_current_user_id)):
 @router.get("/referral/mine")
 async def my_referral(uid: str = Depends(get_current_user_id)):
     me_doc = await get_user(uid)
-    code = me_doc.get("referral_code")
-    if not code:
-        code = uid[:8]
-        await db.users.update_one({"id": uid}, {"$set": {"referral_code": code}})
-
-    count = await db.users.count_documents({"referred_by": code})
+    # BUG FIX: this read "referral_code" - a field that never exists in the
+    # schema (it's only ever an incoming request field name elsewhere, never
+    # persisted). The real field is "referral_id" (set at signup), with
+    # "referral_username" as the vanity override a user can set via
+    # /referral/username/set. Reading the wrong field meant this endpoint
+    # silently ignored any custom username the user had set and rewrote a
+    # separate, unused "referral_code" field on every single call.
+    referral_id = me_doc.get("referral_id")
+    if not referral_id:
+        referral_id = uid[:8]
+        await db.users.update_one({"id": uid}, {"$set": {"referral_id": referral_id}})
+    code = me_doc.get("referral_username") or referral_id
     link = f"https://t.me/{TELEGRAM_BOT_USERNAME}?start={code}"
+
+    # A referred user's `referred_by` can hold either the inviter's raw
+    # referral_id or their vanity username depending on which attribution
+    # path recorded it (deep-link start vs. manual "who invited you" entry
+    # during onboarding) - match both so a vanity username doesn't silently
+    # undercount referrals made before it was set.
+    match_codes = list({c for c in (referral_id, me_doc.get("referral_username")) if c})
+    count = await db.users.count_documents({"referred_by": {"$in": match_codes}})
 
     # Count paid referrals (users who have made at least one successful payment)
     paid_referrals = await db.users.count_documents({
-        "referred_by": code,
+        "referred_by": {"$in": match_codes},
         "plan": {"$ne": "free"}
     })
 
@@ -792,9 +806,17 @@ async def my_referral(uid: str = Depends(get_current_user_id)):
         "invited": count,
         "paid_referrals": paid_referrals,
         "referral_earnings_pending": me_doc.get("referral_earnings_pending", 0),
-        "referral_earnings_approved": me_doc.get("referral_earnings_approved", 0),
         "referral_earnings_withdrawable": me_doc.get("referral_earnings_withdrawable", 0),
         "referral_earnings_paid_out": me_doc.get("referral_earnings_paid_out", 0),
+        # Sum of "credited" signup_free bonuses - a separate, non-withdrawable
+        # internal-balance reward for free-tier referrals (see auth_r.py's
+        # /profile/onboard), previously invisible: it was silently folded
+        # into referral_earnings_pending with no distinct label anywhere.
+        "signup_bonus_total": sum(
+            int(e.get("amount") or 0)
+            for e in me_doc.get("referral_earnings", [])
+            if e.get("type") == "signup_free" and e.get("status") == "credited"
+        ),
         "monthly_count": monthly_count,
         "monthly_tier": tier,
         "tier_cap": tier_cap,

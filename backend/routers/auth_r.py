@@ -338,15 +338,17 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request):
         if ref_owner and ref_owner.get("telegram_id") == tg_id:
             await db.pending_refs.delete_one({"telegram_id": tg_id})
         else:
-            # Attribution only - no reward here. The actual referral economy
-            # is entirely the referral_earnings pipeline (tier-capped 50% of
-            # the invitee's first subscription in payments_r.py, plus the
-            # 100 so'm "signup_free" bonus below once they complete
-            # onboarding) - the only rewards ever shown on the Referral page.
-            # An earlier, separate instant-balance click-bonus used to fire
-            # right here; it was never surfaced in any UI/i18n string and
-            # duplicated the real reward system, so it has been removed
-            # rather than kept as an invisible, undocumented perk.
+            # Attribution only - no reward here. A bare "/start CODE" text
+            # message costs the sender nothing and proves nothing (no
+            # WebApp session, no real account yet) - the actual referral
+            # economy only pays out once real signals exist: the tier-capped
+            # 50% cash cut of the invitee's first paid subscription
+            # (payments_r.py), or the 100 so'm internal-balance bonus below
+            # once they complete full onboarding (AI-verified photo + 80%+
+            # profile). An earlier, separate instant-balance click-bonus
+            # used to fire right here; it was never surfaced in any UI/i18n
+            # string and duplicated the real reward system, so it has been
+            # removed rather than kept as an invisible, undocumented perk.
             await db.users.update_one({"id": uid}, {"$set": {"referred_by": ref_code}})
             await db.pending_refs.delete_one({"telegram_id": tg_id})
 
@@ -499,14 +501,21 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
         asyncio.create_task(notify_new_profile_to_relevant_users(fresh))
 
 
-        # Referral signup reward
-        # 100 so'm to inviter's referral earnings if inviter account age >= 30 days and user has 80%+ profile
+        # Referral signup reward - a small, non-withdrawable internal-balance
+        # bonus (NOT the cash referral_earnings pipeline used for paid
+        # subscriptions) so a farm of free-tier signups can only ever cost
+        # the business in-app inventory, never real money. Credited
+        # immediately (no hold/approval step needed, unlike cash earnings)
+        # since there is no cash-out risk - but still gated on the new
+        # account not being fraud-flagged, and requires the trigger that was
+        # already the right one: full onboarding completion (AI-verified
+        # photo + 80%+ profile + terms), never a bare "/start" text message.
         referred_by = fresh.get("referred_by")
-        if referred_by and completeness >= 80:
+        if referred_by and completeness >= 80 and not fresh.get("flagged_as_bot"):
             inviter = await db.users.find_one({"referral_id": referred_by})
             if not inviter:
                 inviter = await db.users.find_one({"referral_username_lower": referred_by.lower()})
-            
+
             if inviter:
                 # Check inviter account age >= 30 days
                 inviter_age = now_utc() - parse_dt(inviter.get("created_at", now_utc()))
@@ -519,33 +528,40 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
                             "referral_earnings.type": "signup_free"
                         }
                     )
-                    
+
                     if not existing_earning:
-                        hold_until = now_utc() + timedelta(days=30)
-                        
-                        # Record referral earning with 1 month hold
+                        SIGNUP_BONUS = 100
+                        # Kept for record-keeping/analytics parity with the
+                        # cash earning types - not used to gate anything,
+                        # since this bonus is credited immediately.
                         earning_record = {
                             "id": new_id(),
                             "user_id": inviter["id"],
                             "referred_user_id": uid,
                             "type": "signup_free",
-                            "amount": 100,
-                            "status": "pending",
+                            "amount": SIGNUP_BONUS,
+                            "status": "credited",
                             "created_at": iso(now_utc()),
-                            "hold_until": iso(hold_until),
-                            "approved_at": None,
+                            "hold_until": None,
+                            "approved_at": iso(now_utc()),
                             "paid_at": None,
-                            "gross_amount": 100,
+                            "gross_amount": SIGNUP_BONUS,
                             "tax_amount": 0,
-                            "net_amount": 100,
+                            "net_amount": SIGNUP_BONUS,
                             "level": 1,
                         }
                         await db.users.update_one(
                             {"id": inviter["id"]},
                             {
                                 "$push": {"referral_earnings": earning_record},
-                                "$inc": {"referral_earnings_pending": 100}
+                                "$inc": {"balance": SIGNUP_BONUS},
                             }
+                        )
+                        await push_notif(
+                            inviter["id"],
+                            "referral",
+                            f"🎉 Do'stingiz FIDEM'ga qo'shildi! +{SIGNUP_BONUS} so'm ichki balansingizga tushdi "
+                            "(tarif yoki sovg'a uchun ishlatishingiz mumkin).",
                         )
 
     return {"ok": True, "completeness": completeness}

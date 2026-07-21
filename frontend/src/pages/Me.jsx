@@ -324,6 +324,11 @@ export default function Me() {
         <div className="flex items-center justify-between">
           <div className="min-w-0">
             <p className="font-heading text-lg flex items-center gap-2"><Share2 className="w-4 h-4 text-secondary" /> {t("invite_friends")}</p>
+            {/* Always-visible value prop - a first-time viewer with 0/0 stats
+                otherwise has no way to learn this pays real money at all,
+                since the raw invite/paid counters below mean nothing until
+                you already know what they represent. */}
+            <p className="text-xs font-medium text-secondary mt-0.5">{t("invite_friends_earn_hint")}</p>
             {referral ? (
               <>
                 <p className="text-xs text-muted-foreground mt-0.5">{referral.invited_count || 0} {t("ref_invites")} · {referral.paid_referrals || 0} {t("ref_paid_referrals")}</p>

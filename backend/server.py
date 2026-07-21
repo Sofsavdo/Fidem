@@ -59,6 +59,7 @@ from routers.picks_r import router as picks_router  # noqa: E402
 from routers.announcements_r import router as announcements_router  # noqa: E402
 from routers.gift_shop_r import router as gift_shop_router  # noqa: E402
 from lifecycle import lifecycle_loop  # noqa: E402
+from referral_earnings import referral_release_loop  # noqa: E402
 from services import compute_completeness  # noqa: E402
 from storage import init_storage  # noqa: E402
 from winback import winback_loop  # noqa: E402
@@ -113,6 +114,11 @@ async def startup() -> None:
 
     # Plan expiry reminders/downgrades, daily picks pushes, weekly digests.
     asyncio.create_task(lifecycle_loop())
+
+    # Promotes paid-subscription referral earnings from pending to
+    # withdrawable once their fraud-buffer hold expires - nothing else does
+    # this, so without it referral cash could never actually be withdrawn.
+    asyncio.create_task(referral_release_loop())
 
     # Keeps the in-memory rate-limit buckets from growing forever.
     asyncio.create_task(rate_limiter_gc_loop())
