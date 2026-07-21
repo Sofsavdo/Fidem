@@ -14,19 +14,25 @@ import { PLAN_RANK } from "@/lib/purchase";
 
 const CHAT_UNLOCK_PRICE = 4900; // mirrors backend PRICE_CHAT_UNLOCK_UZS (comparison only)
 
+// 3/12-month prices mirror backend core.PLAN_PRICES exactly - the backend
+// is the source of truth (and what actually gets charged); duplicated here
+// only so the price can be shown before the purchase call, same as the
+// existing 1-month `price` always was.
 const PLANS = [
   // The weekly free conversation belongs to the FREE tier (backend
   // FREE_WEEKLY_INITIATIONS) - paid plans have unlimited messaging, so
   // advertising "1 free chat/week" on Standard was wrong.
   { key: "free", title: "Free", price: 0, accent: "border-border",
     perks: ["profile", "candidates", "likes_matches", "chat_replies", "chat_free_weekly_perk"] },
-  { key: "standard", title: "Standard", price: 34900, badge: "✅", accent: "border-secondary/50",
+  { key: "standard", title: "Standard", price: 34900, prices: { 1: 34900, 3: 89000, 12: 299000 }, badge: "✅", accent: "border-secondary/50",
     perks: ["chat_unlimited", "more_filters", "privacy_hidden"] },
-  { key: "premium", title: "Premium", price: 79000, badge: "💎", popular: true, accent: "border-gold",
+  { key: "premium", title: "Premium", price: 79000, prices: { 1: 79000, 3: 199000, 12: 649000 }, badge: "💎", popular: true, accent: "border-gold",
     perks: ["chat_unlimited", "who_viewed", "who_saved", "boost_visibility", "privacy_incognito"] },
-  { key: "vip", title: "VIP", price: 199000, badge: "👑", dark: true, accent: "border-white/10",
+  { key: "vip", title: "VIP", price: 199000, prices: { 1: 199000, 3: 499000, 12: 1699000 }, badge: "👑", dark: true, accent: "border-white/10",
     perks: ["max_visibility", "stealth_view", "photo_peek", "priority", "family_share"] },
 ];
+
+const DURATIONS = [1, 3, 12];
 
 const PERK = {
   uz: { profile: "Profil", candidates: "Nomzodlar", likes_matches: "Yoqtirish va moslik", chat_replies: "Kelgan xabarga bepul javob",
@@ -63,6 +69,7 @@ export default function Premium() {
     }, 200);
     return () => clearTimeout(timer);
   }, [hl, tab]);
+  const [duration, setDuration] = useState(1);
   const [topupAmount, setTopupAmount] = useState(50000);
   // Free-form top-up amount — the preset chips are shortcuts, not a limit.
   // CLICK can't process < 1000 so'm, so that's the real floor (backend
@@ -117,11 +124,11 @@ export default function Premium() {
   // attempt isn't a transaction the user needs to see in their history.
   const successfulPayments = payments.filter((p) => p.status === "success" || p.status === "paid");
 
-  const runPayment = async (purpose, amount) => {
+  const runPayment = async (purpose, amount, months = 1) => {
     setCreating(true);
     tapMedium();
     try {
-      const r = await api.post("/payments/create", { purpose, amount });
+      const r = await api.post("/payments/create", { purpose, amount, months });
       if (r.data.status === "paid") {
         notify("success");
         toast.success(t("payment_success"));
@@ -161,6 +168,28 @@ export default function Premium() {
 
       {tab === "plans" && (
         <div className="space-y-3" id="premium-plans">
+          {/* Duration selector - applies to every paid plan card below.
+              3/12-month terms are priced at a discount (computed against
+              the 1-month rate), same numbers the "gift a subscription"
+              flow already offers - this just makes it a first-class
+              purchase option instead of something only discoverable via
+              gifting. */}
+          <div className="flex gap-2" data-testid="plan-duration-selector">
+            {DURATIONS.map((d) => (
+              <button
+                key={d}
+                type="button"
+                data-testid={`duration-${d}`}
+                onClick={() => { tapLight(); setDuration(d); }}
+                className={`flex-1 rounded-2xl border py-2 text-sm font-semibold transition active:scale-[0.97] ${
+                  duration === d ? "bg-primary text-white border-primary shadow-sm" : "bg-card border-border hover:border-primary/40"
+                }`}
+              >
+                {d === 1 ? t("plan_duration_1") : d === 3 ? t("plan_duration_3") : t("plan_duration_12")}
+              </button>
+            ))}
+          </div>
+
           {PLANS.map((p) => {
             const isCurrent = (user?.plan || "free") === p.key;
             // VIP already includes everything Standard/Premium do - showing
@@ -170,6 +199,10 @@ export default function Premium() {
             // tier) get a buy button; anything at or below the user's
             // current tier shows as already included instead.
             const alreadyIncluded = !isCurrent && p.key !== "free" && PLAN_RANK[p.key] <= PLAN_RANK[user?.plan || "free"];
+            const price = p.prices ? p.prices[duration] : p.price;
+            const fullPrice = p.prices ? p.prices[1] * duration : p.price;
+            const discountPct = p.prices && duration > 1 ? Math.round((1 - price / fullPrice) * 100) : 0;
+            const durationSuffix = duration === 1 ? t("plan_per_month") : duration === 3 ? t("plan_per_3months") : t("plan_per_year");
             return (
               <div
                 key={p.key}
@@ -192,9 +225,17 @@ export default function Premium() {
                     {p.price === 0 ? (
                       <span className="font-heading text-lg font-semibold">{t("plan_free_title")}</span>
                     ) : (
-                      <span className="font-heading text-lg font-semibold tabular-nums">
-                        {p.price.toLocaleString()}<span className="text-xs font-medium opacity-60"> {t("sum")}{t("plan_per_month")}</span>
-                      </span>
+                      <>
+                        {discountPct > 0 && (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <span className={`text-[10px] line-through opacity-50 tabular-nums ${p.dark ? "text-white" : ""}`}>{fullPrice.toLocaleString()}</span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-secondary/15 text-secondary">-{discountPct}%</span>
+                          </div>
+                        )}
+                        <span className="font-heading text-lg font-semibold tabular-nums">
+                          {price.toLocaleString()}<span className="text-xs font-medium opacity-60"> {t("sum")}{durationSuffix}</span>
+                        </span>
+                      </>
                     )}
                   </div>
                 </div>
@@ -210,13 +251,13 @@ export default function Premium() {
                 {p.key !== "free" && !isCurrent && !alreadyIncluded && (
                   <button
                     data-testid={`buy-${p.key}`}
-                    onClick={() => runPayment(p.key, p.price)}
+                    onClick={() => runPayment(p.key, price, duration)}
                     disabled={creating}
                     className={`mt-3.5 w-full rounded-2xl py-2.5 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-50 ${
                       p.dark ? "bg-gold text-ink" : p.popular ? "bg-gradient-to-r from-gold-dark to-gold text-ink" : "bg-primary text-white"
                     }`}
                   >
-                    {t("plan_choose_cta")} · {p.price.toLocaleString()} {t("sum")}
+                    {t("plan_choose_cta")} · {price.toLocaleString()} {t("sum")}
                   </button>
                 )}
                 {isCurrent && (

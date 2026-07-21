@@ -10,10 +10,8 @@ from starlette.responses import JSONResponse
 
 from auth import get_current_user_id
 from core import (
+    PLAN_PRICES,
     PRICE_CHAT_UNLOCK,
-    PRICE_PREMIUM,
-    PRICE_STANDARD,
-    PRICE_VIP,
     TELEGRAM_BOT_USERNAME,
     chat_id_for,
     db,
@@ -184,12 +182,8 @@ async def my_verifications(uid: str = Depends(get_current_user_id)):
 @router.post("/payments/create")
 async def create_payment(req: CreatePaymentRequest, request: Request, uid: str = Depends(get_current_user_id)):
     rate_limit_payment(request)
-    if req.purpose == "premium":
-        amount = PRICE_PREMIUM
-    elif req.purpose == "standard":
-        amount = PRICE_STANDARD
-    elif req.purpose == "vip":
-        amount = PRICE_VIP
+    if req.purpose in ("premium", "standard", "vip"):
+        amount = PLAN_PRICES[req.purpose][req.months]
     elif req.purpose == "chat_unlock":
         amount = PRICE_CHAT_UNLOCK
         if not req.target_user_id:
@@ -281,6 +275,7 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
             "user_id": uid,
             "purpose": req.purpose,
             "amount": amount,
+            "months": req.months,
             "balance_used": balance_used,
             "click_amount": 0,
             "status": "paid",
@@ -294,7 +289,7 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
             doc["order_id"] = req.order_id
         await db.payments.insert_one(doc)
         # Process the purchase immediately
-        await process_completed_payment(uid, req.purpose, amount, balance_used, req.target_user_id, req.order_id)
+        await process_completed_payment(uid, req.purpose, amount, balance_used, req.target_user_id, req.order_id, req.months)
         return {"ok": True, "payment_id": pid, "status": "paid", "balance_used": balance_used, "click_amount": 0}
 
     # While P2P mode is on (CLICK temporarily disabled by the admin), nothing
@@ -312,6 +307,7 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
         "user_id": uid,
         "amount": amount,
         "purpose": req.purpose,
+        "months": req.months,
         "target_user_id": req.target_user_id,
         "gift_kind": req.gift_kind,
         "order_id": req.order_id,
@@ -412,7 +408,8 @@ async def click_callback(request: Request):
             payment["amount"],
             payment.get("balance_used", 0),
             payment.get("target_user_id"),
-            payment.get("order_id")
+            payment.get("order_id"),
+            payment.get("months", 1),
         )
         await db.payments.update_one(
             {"id": pid},
@@ -429,14 +426,26 @@ async def click_callback(request: Request):
     return JSONResponse({"error": -3, "error_note": "Action not found"})
 
 
-async def process_completed_payment(uid: str, purpose: str, amount: int, balance_used: int, target_user_id: str = None, order_id: str = None) -> None:
+async def process_completed_payment(uid: str, purpose: str, amount: int, balance_used: int, target_user_id: str = None, order_id: str = None, months: int = 1) -> None:
     """Process a payment completed via balance (no Click needed)."""
-    expiry_iso = iso(now_utc() + timedelta(days=30))
+    duration_days = months * 30
 
     # First paid subscription referral reward
     # Only for first paid subscription, not recurring
     if purpose in ("premium", "standard", "vip"):
-        user = await db.users.find_one({"id": uid}, {"_id": 0, "plan": 1, "first_paid_at": 1, "referred_by": 1})
+        user = await db.users.find_one({"id": uid}, {"_id": 0, "plan": 1, "plan_until": 1, "first_paid_at": 1, "referred_by": 1})
+        # Renewing the same tier (or better) before it expires extends from
+        # the remaining time instead of overwriting it - buying a fresh
+        # 3-month plan with 10 days of the current one left should leave 3
+        # months + 10 days, not just 3 months.
+        from routers.chat_r import PLAN_RANK
+        stored_until = (user or {}).get("plan_until")
+        current_plan = (user or {}).get("plan")
+        is_active = bool(stored_until and parse_dt(stored_until) > now_utc())
+        if is_active and current_plan in PLAN_RANK and PLAN_RANK.get(current_plan, -1) >= PLAN_RANK.get(purpose, -1):
+            expiry_iso = iso(parse_dt(stored_until) + timedelta(days=duration_days))
+        else:
+            expiry_iso = iso(now_utc() + timedelta(days=duration_days))
         
         # Check if this is the first paid subscription
         if user and user.get("plan") == "free" and not user.get("first_paid_at"):
@@ -515,17 +524,18 @@ async def process_completed_payment(uid: str, purpose: str, amount: int, balance
                                     f"Tabriklaymiz! Sizning taklifingiz birinchi obunani faollashtirdi. {reward:,} so'm mukofot 14 kundan keyin o'tkaziladi 🎉"
                                 )
 
+    duration_label = {1: "1 oy", 3: "3 oy", 12: "1 yil"}.get(months, f"{months} oy")
     if purpose == "premium":
         await db.users.update_one({"id": uid}, {"$set": {"plan": "premium", "plan_until": expiry_iso}})
-        # Auto-activate Boost for 30 days with Premium
-        boost_until = iso(now_utc() + timedelta(days=30))
-        await db.users.update_one({"id": uid}, {"$set": {"boost_until": boost_until}})
+        # Boost stays active exactly as long as the plan does, not a flat 30
+        # days regardless of the term bought.
+        await db.users.update_one({"id": uid}, {"$set": {"boost_until": expiry_iso}})
         # Add to lifetime contribution
         await db.users.update_one(
             {"id": uid},
             {"$inc": {"lifetime_contribution": amount, "lifetime_contribution_breakdown.subscription_payments": amount}}
         )
-        await push_notif(uid, "premium", "Premium tarif faollashtirildi. Boost 30 kun aktiv 💎")
+        await push_notif(uid, "premium", f"Premium tarif faollashtirildi ({duration_label}). Boost ham shuncha muddat aktiv 💎")
     elif purpose == "standard":
         await db.users.update_one({"id": uid}, {"$set": {"plan": "standard", "plan_until": expiry_iso}})
         # Add to lifetime contribution
@@ -533,18 +543,18 @@ async def process_completed_payment(uid: str, purpose: str, amount: int, balance
             {"id": uid},
             {"$inc": {"lifetime_contribution": amount, "lifetime_contribution_breakdown.subscription_payments": amount}}
         )
-        await push_notif(uid, "premium", "Standard tarif faollashtirildi ✅")
+        await push_notif(uid, "premium", f"Standard tarif faollashtirildi ({duration_label}) ✅")
     elif purpose == "vip":
         await db.users.update_one({"id": uid}, {"$set": {"plan": "vip", "plan_until": expiry_iso}})
-        # Auto-activate Boost for 30 days with VIP
-        boost_until = iso(now_utc() + timedelta(days=30))
-        await db.users.update_one({"id": uid}, {"$set": {"boost_until": boost_until}})
+        # Boost stays active exactly as long as the plan does, not a flat 30
+        # days regardless of the term bought.
+        await db.users.update_one({"id": uid}, {"$set": {"boost_until": expiry_iso}})
         # Add to lifetime contribution
         await db.users.update_one(
             {"id": uid},
             {"$inc": {"lifetime_contribution": amount, "lifetime_contribution_breakdown.subscription_payments": amount}}
         )
-        await push_notif(uid, "premium", "VIP tarif faollashtirildi. Boost 30 kun aktiv 👑")
+        await push_notif(uid, "premium", f"VIP tarif faollashtirildi ({duration_label}). Boost ham shuncha muddat aktiv 👑")
     elif purpose == "chat_unlock":
         target_id = target_user_id
         if target_id:
