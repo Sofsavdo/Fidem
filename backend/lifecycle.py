@@ -248,6 +248,42 @@ async def _onboarding_nudges() -> None:
         await asyncio.sleep(SEND_PACING_SECONDS)
 
 
+REFERRAL_AWARENESS_DELAY_HOURS = 72  # ~3 days after onboarding
+REFERRAL_AWARENESS_TEXT = (
+    "💸 Bilasizmi? Do'stingizni FIDEM'ga taklif qiling - u pullik tarifga o'tsa, "
+    "sizga ham pul tushadi. Taklif havolangizni shu yerdan oling 👇"
+)
+
+
+async def _referral_awareness_nudge() -> None:
+    """One-time push telling every onboarded user that referring friends
+    pays real money. Without this, someone who only came here for
+    matchmaking has no way to ever discover the referral program - they'd
+    have to stumble onto the "invite friends" card on the Me page
+    unprompted, with no reason to suspect it involves money at all.
+
+    Fires ~3 days after onboarding for new users; for the existing user
+    base at deploy time it fires immediately (created_at is already in the
+    past), rate-limited to BATCH per pass like every other bulk send here -
+    a gradual one-time announcement, not a backfill migration to run once
+    and delete."""
+    now = now_utc()
+    cutoff = iso(now - timedelta(hours=REFERRAL_AWARENESS_DELAY_HOURS))
+    rows = await db.users.find(
+        {
+            "onboarded": True,
+            "blocked": {"$ne": True},
+            "referral_awareness_sent_at": {"$exists": False},
+            "created_at": {"$lte": cutoff},
+        },
+        {"_id": 0, "id": 1},
+    ).limit(BATCH).to_list(BATCH)
+    for u in rows:
+        await db.users.update_one({"id": u["id"]}, {"$set": {"referral_awareness_sent_at": iso(now)}})
+        await push_notif(u["id"], "referral", REFERRAL_AWARENESS_TEXT, link="/referral", marketing=True)
+        await asyncio.sleep(SEND_PACING_SECONDS)
+
+
 async def _admin_daily_digest() -> None:
     """Once per calendar day, push the owner stats (/stats content) to every
     admin's Telegram — signups by hour, actives, pending P2P queue, money."""
@@ -315,6 +351,7 @@ async def _run_pass() -> None:
     await _daily_picks_push()
     await _weekly_digest()
     await _onboarding_nudges()
+    await _referral_awareness_nudge()
     await _admin_daily_digest()
     await _cleanup_telegram_updates()
     await _snapshot_daily_stats()
