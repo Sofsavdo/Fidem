@@ -222,6 +222,9 @@ class CreatePaymentRequest(BaseModel):
     target_user_id: Optional[str] = None  # for gift
     gift_kind: Optional[str] = None
     order_id: Optional[str] = None  # for concierge orders
+    # Subscription purchases only (premium/standard/vip): 1/3/12-month plans,
+    # 3 and 12 months priced at a discount vs. months * the 1-month rate.
+    months: Literal[1, 3, 12] = 1
 
 
 class PaymentOut(BaseModel):

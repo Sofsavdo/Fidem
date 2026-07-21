@@ -58,6 +58,18 @@ if not ADMIN_PASSWORD:
 PRICE_PREMIUM = int(os.environ.get("PRICE_PREMIUM_UZS", "79000"))
 PRICE_VIP = int(os.environ.get("PRICE_VIP_UZS", "199000"))
 PRICE_STANDARD = int(os.environ.get("PRICE_STANDARD_UZS", "34900"))
+# 3-month prices match the existing "gift a subscription" 3-month prices in
+# models.PLAN_GIFTS exactly (~15-16% off the 1-month rate) - a direct
+# purchase and a self-gift must show the same number for the same plan.
+# 12-month prices are new (~29-32% off) - the deeper discount standard SaaS
+# annual plans use to reward commitment and lower churn. Both are fixed
+# absolute prices, not derived from PRICE_*_UZS, so an env override of the
+# monthly price does not silently double-discount the longer terms.
+PLAN_PRICES = {
+    "standard": {1: PRICE_STANDARD, 3: 89_000, 12: 299_000},
+    "premium": {1: PRICE_PREMIUM, 3: 199_000, 12: 649_000},
+    "vip": {1: PRICE_VIP, 3: 499_000, 12: 1_699_000},
+}
 # Temporarily lowered 9900 -> 4900 until the user base reaches ~500 (empty-
 # market paywall pricing, see FIDEM strategic audit 2026-07). Override via env.
 PRICE_CHAT_UNLOCK = int(os.environ.get("PRICE_CHAT_UNLOCK_UZS", "4900"))
