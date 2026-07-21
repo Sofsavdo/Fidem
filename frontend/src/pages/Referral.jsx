@@ -55,7 +55,7 @@ export default function Referral() {
   const earnings = [
     { key: "referral_earnings_withdrawable", value: data?.referral_earnings_withdrawable, highlight: true },
     { key: "referral_earnings_pending", value: data?.referral_earnings_pending },
-    { key: "referral_earnings_approved", value: data?.referral_earnings_approved },
+    { key: "ref_signup_bonus_label", value: data?.signup_bonus_total, internal: true },
     { key: "referral_earnings_paid_out", value: data?.referral_earnings_paid_out },
   ];
 
@@ -143,6 +143,7 @@ export default function Referral() {
                     <p className={`font-semibold tabular-nums mt-0.5 ${e.highlight ? "text-secondary" : ""}`}>
                       {(e.value ?? 0).toLocaleString()} {t("sum")}
                     </p>
+                    {e.internal && <p className="text-[10px] text-muted-foreground mt-1 leading-tight">{t("ref_signup_bonus_note")}</p>}
                   </div>
                 ))}
               </div>
