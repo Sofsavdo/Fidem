@@ -411,8 +411,12 @@ export default function Chat() {
                   </span>
                   <span className="relative text-center">
                     <p className="text-xs font-semibold leading-tight line-clamp-2">{m.meta.label}</p>
-                    <p className="text-sm font-bold tabular-nums mt-0.5">
-                      {(m.meta.price || 0).toLocaleString()} <span className="text-[10px] font-medium opacity-80">so'm</span>
+                    {/* "so'm" always on its own line - matches the Gift Shop
+                        tile fix: a 6-digit price wrapping only sometimes
+                        made cards look inconsistent. */}
+                    <p className="text-sm font-bold tabular-nums mt-0.5 leading-tight">
+                      {(m.meta.price || 0).toLocaleString()}
+                      <span className="block text-[10px] font-medium opacity-80 leading-none mt-0.5">so'm</span>
                     </p>
                   </span>
                 </div>
