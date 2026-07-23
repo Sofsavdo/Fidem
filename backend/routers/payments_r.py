@@ -341,6 +341,16 @@ async def click_callback(request: Request):
     pid = form.get("merchant_trans_id", "")
     payment = await db.payments.find_one({"id": pid})
 
+    # Diagnostic: CLICK always gets HTTP 200 (protocol requirement) even on
+    # a rejected transaction - the actual pass/fail lives in the JSON body's
+    # "error" field, which never showed up in Railway logs before this line.
+    # Temporary while we track down the "xatolik ro'y berdi" report; safe to
+    # trim once confirmed, no sign/card data included.
+    log.info(
+        "CLICK callback: action=%s pid=%s click_trans_id=%s amount=%s found=%s status=%s",
+        action, pid, form.get("click_trans_id"), form.get("amount"),
+        bool(payment), (payment or {}).get("status"),
+    )
     if not CLICK_SECRET_KEY:
         # Fail closed: with no secret configured we cannot verify the caller
         # is actually CLICK, so no callback can be trusted (previously this
@@ -348,8 +358,10 @@ async def click_callback(request: Request):
         log.error("CLICK_SECRET_KEY is not configured - rejecting payment callback")
         return JSONResponse({"error": -1, "error_note": "SIGN CHECK FAILED"})
     if not verify_click_sign(form, action):
+        log.warning("CLICK callback: SIGN CHECK FAILED for pid=%s action=%s", pid, action)
         return JSONResponse({"error": -1, "error_note": "SIGN CHECK FAILED"})
     if not payment:
+        log.warning("CLICK callback: order not found for merchant_trans_id=%s", pid)
         return JSONResponse({"error": -5, "error_note": "Order not found"})
     if payment["status"] == "success":
         return JSONResponse({"error": -4, "error_note": "Already paid"})
@@ -364,8 +376,13 @@ async def click_callback(request: Request):
         try:
             prepare_amount = int(float(form.get("amount", "0") or 0))
         except (TypeError, ValueError):
+            log.warning("CLICK callback: bad amount format %r for pid=%s", form.get("amount"), pid)
             return JSONResponse({"error": -2, "error_note": "Incorrect parameter amount"})
         if prepare_amount != payment.get("click_amount", 0):
+            log.warning(
+                "CLICK callback: amount mismatch for pid=%s - click sent %s, expected %s",
+                pid, prepare_amount, payment.get("click_amount", 0),
+            )
             return JSONResponse({"error": -2, "error_note": "Incorrect parameter amount"})
         await db.payments.update_one(
             {"id": pid},
@@ -388,8 +405,13 @@ async def click_callback(request: Request):
         try:
             received_amount = int(float(form.get("amount", "0") or 0))
         except (TypeError, ValueError):
+            log.warning("CLICK callback: bad amount format %r for pid=%s (complete)", form.get("amount"), pid)
             return JSONResponse({"error": -2, "error_note": "Incorrect parameter amount"})
         if received_amount != expected_amount:
+            log.warning(
+                "CLICK callback: amount mismatch for pid=%s (complete) - click sent %s, expected %s",
+                pid, received_amount, expected_amount,
+            )
             return JSONResponse({"error": -2, "error_note": "Incorrect parameter amount"})
 
         # Late completion: if this payment already expired, the balance
