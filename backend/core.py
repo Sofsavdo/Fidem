@@ -106,7 +106,7 @@ def mask_name(name: str) -> str:
 def get_webapp_url() -> str:
     return os.environ.get(
         "WEBAPP_URL",
-        "https://fidem-frontend-production.up.railway.app",
+        "https://fidem.up.railway.app",
     ).rstrip("/")
 
 
