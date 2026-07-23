@@ -15,8 +15,8 @@ TELEGRAM_BOT_USERNAME=Fidem_Appbot
 TELEGRAM_WEBHOOK_SECRET=your_webhook_secret
 
 # CORS & URLs
-CORS_ORIGINS=https://fidem-frontend-production.up.railway.app
-WEBAPP_URL=https://fidem-frontend-production.up.railway.app
+CORS_ORIGINS=https://fidem.up.railway.app
+WEBAPP_URL=https://fidem.up.railway.app
 BACKEND_URL=https://fidem-production.up.railway.app
 
 # Environment
