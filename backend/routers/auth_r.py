@@ -328,29 +328,35 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request):
 
     pend = await db.pending_refs.find_one({"telegram_id": tg_id})
     if pend:
-        # Phase 1.6: Anti-fraud - self-referral prevention
-        ref_code = pend["ref_code"]
-        ref_owner = await db.users.find_one({"referral_id": ref_code})
-        if not ref_owner:
-            ref_owner = await db.users.find_one({"referral_username_lower": ref_code.lower()})
+        # Sofsavdo click token - independent of the Fidem-internal referral
+        # attribution below (a pending_refs doc carries exactly one of the two,
+        # never both - see routers/telegram_r.py's _handle_start).
+        if pend.get("sofsavdo_click_token"):
+            await db.users.update_one({"id": uid}, {"$set": {"sofsavdo_click_token": pend["sofsavdo_click_token"]}})
 
-        # Block self-referral (same telegram_id)
-        if ref_owner and ref_owner.get("telegram_id") == tg_id:
-            await db.pending_refs.delete_one({"telegram_id": tg_id})
-        else:
-            # Attribution only - no reward here. A bare "/start CODE" text
-            # message costs the sender nothing and proves nothing (no
-            # WebApp session, no real account yet) - the actual referral
-            # economy only pays out once real signals exist: the tier-capped
-            # 50% cash cut of the invitee's first paid subscription
-            # (payments_r.py), or the 100 so'm internal-balance bonus below
-            # once they complete full onboarding (AI-verified photo + 80%+
-            # profile). An earlier, separate instant-balance click-bonus
-            # used to fire right here; it was never surfaced in any UI/i18n
-            # string and duplicated the real reward system, so it has been
-            # removed rather than kept as an invisible, undocumented perk.
-            await db.users.update_one({"id": uid}, {"$set": {"referred_by": ref_code}})
-            await db.pending_refs.delete_one({"telegram_id": tg_id})
+        if pend.get("ref_code"):
+            # Phase 1.6: Anti-fraud - self-referral prevention
+            ref_code = pend["ref_code"]
+            ref_owner = await db.users.find_one({"referral_id": ref_code})
+            if not ref_owner:
+                ref_owner = await db.users.find_one({"referral_username_lower": ref_code.lower()})
+
+            # Block self-referral (same telegram_id)
+            if not (ref_owner and ref_owner.get("telegram_id") == tg_id):
+                # Attribution only - no reward here. A bare "/start CODE" text
+                # message costs the sender nothing and proves nothing (no
+                # WebApp session, no real account yet) - the actual referral
+                # economy only pays out once real signals exist: the tier-capped
+                # 50% cash cut of the invitee's first paid subscription
+                # (payments_r.py), or the 100 so'm internal-balance bonus below
+                # once they complete full onboarding (AI-verified photo + 80%+
+                # profile). An earlier, separate instant-balance click-bonus
+                # used to fire right here; it was never surfaced in any UI/i18n
+                # string and duplicated the real reward system, so it has been
+                # removed rather than kept as an invisible, undocumented perk.
+                await db.users.update_one({"id": uid}, {"$set": {"referred_by": ref_code}})
+
+        await db.pending_refs.delete_one({"telegram_id": tg_id})
 
     return AuthResponse(token=create_token(uid), user_id=uid, onboarded=False, user=_build_me_payload(doc))
 

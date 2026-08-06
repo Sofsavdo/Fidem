@@ -105,7 +105,19 @@ async def _handle_start(chat_id: int, tg_user_id: str, text: str) -> None:
     function - the route itself should only parse the Telegram update and
     dispatch, not carry this much domain logic inline."""
     parts = text.split(maxsplit=1)
-    ref_code = parts[1].strip() if len(parts) > 1 else None
+    start_param = parts[1].strip() if len(parts) > 1 else None
+
+    # Two independent attribution systems share the single Telegram deep-link
+    # start param: a Fidem referral_id/username (the existing system below, paid
+    # via routers/referral_earnings.py + process_completed_payment's internal
+    # reward) or a Sofsavdo click token - an opaque "sf_..." string minted by
+    # Sofsavdo's own backend when a creator's Flow link redirects here, reported
+    # back verbatim on this user's first paid conversion so Sofsavdo can credit
+    # the right creator (see sofsavdo_integration.py). Mutually exclusive per
+    # link - a bare "sf_" prefix can never collide with a real referral_id/
+    # username, both of which are assigned without it.
+    sofsavdo_click_token = start_param if start_param and start_param.startswith("sf_") else None
+    ref_code = start_param if start_param and not sofsavdo_click_token else None
 
     # Record every /start so the onboarding funnel is measurable and the
     # lifecycle nudger can re-engage people who never open the Mini App.
@@ -124,8 +136,27 @@ async def _handle_start(chat_id: int, tg_user_id: str, text: str) -> None:
 
     existing = await db.users.find_one(
         {"telegram_id": tg_user_id},
-        {"_id": 0, "id": 1, "referred_by": 1},
+        {"_id": 0, "id": 1, "referred_by": 1, "sofsavdo_click_token": 1},
     )
+
+    if sofsavdo_click_token and (not existing or not existing.get("sofsavdo_click_token")):
+        if existing:
+            await db.users.update_one(
+                {"id": existing["id"]},
+                {"$set": {"sofsavdo_click_token": sofsavdo_click_token}},
+            )
+        else:
+            await db.pending_refs.update_one(
+                {"telegram_id": tg_user_id},
+                {
+                    "$set": {
+                        "telegram_id": tg_user_id,
+                        "sofsavdo_click_token": sofsavdo_click_token,
+                        "at": iso(now_utc()),
+                    }
+                },
+                upsert=True,
+            )
 
     if ref_code and (not existing or not existing.get("referred_by")):
         # Try referral_id first (old system)

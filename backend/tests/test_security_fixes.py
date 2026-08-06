@@ -570,6 +570,75 @@ def test_auth_telegram_real_signup_does_not_pay_instant_balance_bonus(monkeypatc
     assert referred_by_writes == [{"referred_by": "OWNER123"}], "attribution should still be recorded"
 
 
+# ---------- Sofsavdo integration: click-token attribution must stay entirely
+# separate from the Fidem-internal referral system above (they share one
+# Telegram deep-link start param but are mutually exclusive per link) ----------
+def test_telegram_start_with_sofsavdo_token_records_pending_without_touching_ref_code(monkeypatch):
+    """A '/start sf_...' message must be staged into pending_refs under
+    sofsavdo_click_token, and must NOT be treated as (or looked up against)
+    a Fidem referral_id/username - it can never match one anyway, since real
+    referral codes are assigned without the sf_ prefix."""
+    from routers import telegram_r
+
+    fake_users = _FakeUsersCollection()
+    fake_pending = _FakePendingRefs()
+    fake_db = type("FakeDb", (), {})()
+    fake_db.users = fake_users
+    fake_db.pending_refs = fake_pending
+    fake_db.bot_starts = _FakePendingRefs()
+    fake_db.telegram_updates = _FakeTelegramUpdates()
+    monkeypatch.setattr(telegram_r, "db", fake_db)
+    monkeypatch.setattr(telegram_r, "TELEGRAM_WEBHOOK_SECRET", "test-secret")
+
+    async def _noop_send(*_a, **_kw):
+        return None
+    monkeypatch.setattr(telegram_r, "send_telegram_message", _noop_send)
+
+    body = {"update_id": 2, "message": {"text": "/start sf_flow123_9999999999_abcdef0123456789", "chat": {"id": 1}, "from": {"id": 999}}}
+    req = _FakeWebhookRequest(body, secret="test-secret")
+    asyncio.run(telegram_r.telegram_webhook(req))
+
+    assert fake_users.inc_calls == []
+    sofsavdo_upserts = [u for q, u in fake_pending.upserts if "sofsavdo_click_token" in u.get("$set", {})]
+    assert len(sofsavdo_upserts) == 1
+    assert sofsavdo_upserts[0]["$set"]["sofsavdo_click_token"] == "sf_flow123_9999999999_abcdef0123456789"
+
+
+class _FakeSofsavdoPendingRefs:
+    """A pending_refs doc carrying only a sofsavdo_click_token - never a
+    ref_code, since _handle_start's two attribution paths are mutually
+    exclusive per start param."""
+
+    async def find_one(self, query, *_a, **_kw):
+        return {"telegram_id": query.get("telegram_id"), "sofsavdo_click_token": "sf_flow123_9999999999_abcdef0123456789"}
+
+    async def delete_one(self, *_a, **_kw):
+        return None
+
+
+def test_auth_telegram_copies_sofsavdo_click_token_from_pending_without_setting_referred_by(monkeypatch):
+    from routers import auth_r
+
+    fake_users = _FakeAuthUsersCollection({"id": "owner-1", "referral_id": "OWNER123", "telegram_id": "owner-tg"})
+    fake_db = type("FakeDb", (), {})()
+    fake_db.users = fake_users
+    fake_db.pending_refs = _FakeSofsavdoPendingRefs()
+    monkeypatch.setattr(auth_r, "db", fake_db)
+    monkeypatch.setattr(auth_r, "TELEGRAM_BOT_TOKEN", "123456:FAKE-BOT-TOKEN-FOR-TESTS")
+
+    from models import TelegramAuthRequest
+    user_json = '{"id": 778, "first_name": "New"}'
+    init_data = _build_valid_init_data("123456:FAKE-BOT-TOKEN-FOR-TESTS", user_json)
+    req = TelegramAuthRequest(init_data=init_data)
+
+    asyncio.run(auth_r.auth_telegram(req, _FakeAuthRequest()))
+
+    click_token_writes = [s for q, s in fake_users.set_calls if "sofsavdo_click_token" in s]
+    assert click_token_writes == [{"sofsavdo_click_token": "sf_flow123_9999999999_abcdef0123456789"}]
+    referred_by_writes = [s for q, s in fake_users.set_calls if "referred_by" in s]
+    assert referred_by_writes == [], "a sofsavdo-only pending doc must never be read as a Fidem ref_code"
+
+
 # ---------- Telegram push delivery: silent-failure fixes ----------
 def test_send_telegram_message_payload_has_no_parse_mode(monkeypatch):
     """parse_mode='HTML' used to be sent unconditionally even though no

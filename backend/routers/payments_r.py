@@ -26,6 +26,7 @@ from core import (
 )
 from models import CreatePaymentRequest, VerificationRequest, new_id
 from services import CLICK_SECRET_KEY, click_pay_link, verify_click_sign
+from sofsavdo_integration import report_sofsavdo_conversion
 
 router = APIRouter(tags=["payments"])
 
@@ -289,7 +290,7 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
             doc["order_id"] = req.order_id
         await db.payments.insert_one(doc)
         # Process the purchase immediately
-        await process_completed_payment(uid, req.purpose, amount, balance_used, req.target_user_id, req.order_id, req.months)
+        await process_completed_payment(uid, req.purpose, amount, balance_used, req.target_user_id, req.order_id, req.months, payment_id=pid)
         return {"ok": True, "payment_id": pid, "status": "paid", "balance_used": balance_used, "click_amount": 0}
 
     # While P2P mode is on (CLICK temporarily disabled by the admin), nothing
@@ -432,6 +433,7 @@ async def click_callback(request: Request):
             payment.get("target_user_id"),
             payment.get("order_id"),
             payment.get("months", 1),
+            payment_id=pid,
         )
         await db.payments.update_one(
             {"id": pid},
@@ -448,14 +450,24 @@ async def click_callback(request: Request):
     return JSONResponse({"error": -3, "error_note": "Action not found"})
 
 
-async def process_completed_payment(uid: str, purpose: str, amount: int, balance_used: int, target_user_id: str = None, order_id: str = None, months: int = 1) -> None:
+async def process_completed_payment(uid: str, purpose: str, amount: int, balance_used: int, target_user_id: str = None, order_id: str = None, months: int = 1, payment_id: str = None) -> None:
     """Process a payment completed via balance (no Click needed)."""
     duration_days = months * 30
 
     # First paid subscription referral reward
     # Only for first paid subscription, not recurring
     if purpose in ("premium", "standard", "vip"):
-        user = await db.users.find_one({"id": uid}, {"_id": 0, "plan": 1, "plan_until": 1, "first_paid_at": 1, "referred_by": 1})
+        user = await db.users.find_one({"id": uid}, {"_id": 0, "plan": 1, "plan_until": 1, "first_paid_at": 1, "referred_by": 1, "sofsavdo_click_token": 1})
+
+        # Sofsavdo integration - independent of the internal Fidem referral logic
+        # below (this user may have no `referred_by` at all, or a different
+        # referrer than whoever's Sofsavdo Flow link brought them here). Only
+        # ever fires on this user's first-ever paid subscription, same "free ->
+        # paid" signal the internal referral reward below uses - a renewal or
+        # upgrade must never re-trigger a creator commission. Never allowed to
+        # affect this payment: report_sofsavdo_conversion swallows its own errors.
+        if user and user.get("plan") == "free" and not user.get("first_paid_at") and user.get("sofsavdo_click_token"):
+            await report_sofsavdo_conversion(user["sofsavdo_click_token"], payment_id or order_id or new_id(), amount, purpose)
         # Renewing the same tier (or better) before it expires extends from
         # the remaining time instead of overwriting it - buying a fresh
         # 3-month plan with 10 days of the current one left should leave 3
