@@ -49,7 +49,7 @@ def test_skips_when_secret_unset(monkeypatch):
     monkeypatch.setattr(si, "SOFSAVDO_INTEGRATION_SECRET", "")
     fake_client = _FakeAsyncClient(_FakeResponse(200))
     with patch("httpx.AsyncClient", fake_client):
-        asyncio.run(si.report_sofsavdo_conversion("sf_flow1_1_abc", "txn_1", 50000, "premium"))
+        asyncio.run(si.report_sofsavdo_conversion("sf_flow1_1_abc", "txn_1", 50000, 25000, "premium"))
     assert fake_client.posted is None, "must never call out when unconfigured"
 
 
@@ -57,7 +57,8 @@ def test_posts_a_correctly_signed_body(monkeypatch):
     monkeypatch.setattr(si, "SOFSAVDO_INTEGRATION_SECRET", "test-secret")
     fake_client = _FakeAsyncClient(_FakeResponse(200))
     with patch("httpx.AsyncClient", fake_client):
-        asyncio.run(si.report_sofsavdo_conversion("sf_flow1_1_abc", "txn_1", 50000, "premium"))
+        # 50,000 so'm payment, 25,000 so'm reward (50% - under the 29,900 bronze cap).
+        asyncio.run(si.report_sofsavdo_conversion("sf_flow1_1_abc", "txn_1", 50000, 25000, "premium"))
 
     assert fake_client.posted is not None
     url, body = fake_client.posted
@@ -65,9 +66,10 @@ def test_posts_a_correctly_signed_body(monkeypatch):
     assert body["clickToken"] == "sf_flow1_1_abc"
     assert body["externalPaymentId"] == "txn_1"
     assert body["amountMinor"] == 5_000_000  # 50,000 so'm -> tiyin
+    assert body["commissionAmountMinor"] == 2_500_000  # 25,000 so'm -> tiyin
     assert body["currency"] == "UZS"
     assert body["planName"] == "premium"
-    expected_sig = si._sign("sf_flow1_1_abc", "txn_1", 5_000_000, body["occurredAt"])
+    expected_sig = si._sign("sf_flow1_1_abc", "txn_1", 5_000_000, 2_500_000, body["occurredAt"])
     assert body["signature"] == expected_sig
 
 
@@ -75,11 +77,11 @@ def test_swallows_a_non_2xx_response(monkeypatch):
     monkeypatch.setattr(si, "SOFSAVDO_INTEGRATION_SECRET", "test-secret")
     fake_client = _FakeAsyncClient(_FakeResponse(400, "bad request"))
     with patch("httpx.AsyncClient", fake_client):
-        asyncio.run(si.report_sofsavdo_conversion("sf_flow1_1_abc", "txn_1", 50000, "premium"))  # must not raise
+        asyncio.run(si.report_sofsavdo_conversion("sf_flow1_1_abc", "txn_1", 50000, 25000, "premium"))  # must not raise
 
 
 def test_swallows_a_network_error(monkeypatch):
     monkeypatch.setattr(si, "SOFSAVDO_INTEGRATION_SECRET", "test-secret")
     fake_client = _FakeAsyncClient(raise_exc=ConnectionError("network down"))
     with patch("httpx.AsyncClient", fake_client):
-        asyncio.run(si.report_sofsavdo_conversion("sf_flow1_1_abc", "txn_1", 50000, "premium"))  # must not raise
+        asyncio.run(si.report_sofsavdo_conversion("sf_flow1_1_abc", "txn_1", 50000, 25000, "premium"))  # must not raise

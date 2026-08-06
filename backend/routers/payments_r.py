@@ -466,8 +466,16 @@ async def process_completed_payment(uid: str, purpose: str, amount: int, balance
         # paid" signal the internal referral reward below uses - a renewal or
         # upgrade must never re-trigger a creator commission. Never allowed to
         # affect this payment: report_sofsavdo_conversion swallows its own errors.
+        #
+        # The reward is Fidem's own real referral economics - 50% of the
+        # payment, capped by tier - not a generic rate Sofsavdo's admin could
+        # set arbitrarily. A Sofsavdo creator isn't a Fidem user and has no
+        # monthly_referral_count of their own, so they're always priced at the
+        # base (bronze) tier cap, same as a brand-new Fidem-internal referrer.
         if user and user.get("plan") == "free" and not user.get("first_paid_at") and user.get("sofsavdo_click_token"):
-            await report_sofsavdo_conversion(user["sofsavdo_click_token"], payment_id or order_id or new_id(), amount, purpose)
+            sofsavdo_reward = min(int(amount * 0.5), get_tier_max_reward(0))
+            if sofsavdo_reward > 0:
+                await report_sofsavdo_conversion(user["sofsavdo_click_token"], payment_id or order_id or new_id(), amount, sofsavdo_reward, purpose)
         # Renewing the same tier (or better) before it expires extends from
         # the remaining time instead of overwriting it - buying a fresh
         # 3-month plan with 10 days of the current one left should leave 3
