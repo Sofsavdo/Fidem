@@ -51,7 +51,7 @@ export default function BoostModal({ onClose }) {
       if (detail === "click_disabled") {
         toast.info(t("click_disabled_error"));
         onClose?.();
-        navigate("/premium?tab=balance");
+        navigate(`/premium?tab=balance&amount=${price}`);
       } else {
         toast.error(detail === "boost_hidden" ? t("boost_hidden_error") : detail || t("error_generic"));
       }

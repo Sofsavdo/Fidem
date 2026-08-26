@@ -41,7 +41,10 @@ export async function purchasePlan(plan, { t, navigate, onPaid } = {}) {
     const detail = (e?.response?.data?.detail || "").toString();
     if (detail === "click_disabled") {
       if (t) toast.info(t("click_disabled_error"));
-      if (navigate) navigate("/premium?tab=balance");
+      // Carry the exact price over so the P2P top-up screen pre-fills the
+      // right amount instead of defaulting to an unrelated package size -
+      // the user shouldn't have to remember/re-enter what they were buying.
+      if (navigate) navigate(`/premium?tab=balance&amount=${PLAN_PRICES[plan]}`);
     } else if (t) {
       toast.error(t("error_generic"));
     }

@@ -75,6 +75,15 @@ export default function Premium() {
   // CLICK can't process < 1000 so'm, so that's the real floor (backend
   // enforces the same in /payments/create for balance_topup).
   const [customTopup, setCustomTopup] = useState("");
+  // Arriving here after a "click_disabled" redirect from elsewhere in the
+  // app (chat unlock, boost, a plan purchase) carries the exact price that
+  // was blocked - pre-fill it once so the user isn't left guessing how much
+  // to transfer. Only runs on landing, so it never fights a manual edit.
+  useEffect(() => {
+    const amt = parseInt(sp.get("amount") || "", 10);
+    if (amt > 0) setCustomTopup(String(amt));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const effectiveTopup = customTopup !== "" ? (parseInt(customTopup, 10) || 0) : topupAmount;
   const [creating, setCreating] = useState(false);
   // Manual P2P top-up (temporary CLICK fallback) — the admin toggles it and
@@ -146,7 +155,7 @@ export default function Premium() {
       const detail = (e?.response?.data?.detail || "").toString();
       if (detail === "click_disabled") {
         toast.info(t("click_disabled_error"));
-        setSearchParams({ tab: "balance" });
+        setSearchParams({ tab: "balance", amount: String(amount) });
       } else {
         toast.error(t("error_generic"));
       }
