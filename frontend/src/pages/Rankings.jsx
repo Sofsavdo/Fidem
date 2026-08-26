@@ -63,7 +63,7 @@ export default function Rankings() {
       const detail = (e?.response?.data?.detail || "").toString();
       if (detail === "click_disabled") {
         toast.info(t("click_disabled_error"));
-        navigate("/premium?tab=balance");
+        navigate(`/premium?tab=balance&amount=${effectiveAmount}`);
       } else {
         toast.error(detail === "click_min_1000" ? t("click_min_error") : t("error_generic"));
       }

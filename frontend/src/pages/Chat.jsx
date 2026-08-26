@@ -113,7 +113,7 @@ export default function Chat() {
       const detail = (err?.response?.data?.detail || "").toString();
       if (detail === "click_disabled") {
         toast.info(t("click_disabled_error"));
-        nav("/premium?tab=balance");
+        nav(`/premium?tab=balance&amount=${access?.price_uzs || 0}`);
       } else {
         toast.error("Error");
       }
@@ -149,7 +149,7 @@ export default function Chat() {
       const detail = (err?.response?.data?.detail || "").toString();
       if (detail === "click_disabled") {
         toast.info(t("click_disabled_error"));
-        nav("/premium?tab=balance");
+        nav(`/premium?tab=balance&amount=${STANDARD_PRICE}`);
       } else {
         toast.error(t("error_generic") || "Error");
       }
