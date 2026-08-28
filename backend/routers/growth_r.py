@@ -1,6 +1,7 @@
 """Growth & monetization features: boost, daily check-in, quiz, invites."""
 from __future__ import annotations
 
+import os
 from datetime import timedelta
 from typing import Optional
 
@@ -21,6 +22,10 @@ BOOST_PRICE = 5000        # 24h boost in UZS (deducts from balance or paid via C
 # daily amount gave no reason to come back tomorrow — losing tomorrow's
 # bigger bonus does.
 STREAK_REWARDS = [100, 200, 400, 800, 1600, 3200, 6400]
+# Set DAILY_STREAK_ENABLED=0 to retire the feature without a code change -
+# /daily/status reports every user as already "completed" (the widget's own
+# retirement state), so the frontend just never opens the modal again.
+DAILY_STREAK_ENABLED = os.environ.get("DAILY_STREAK_ENABLED", "1") != "0"
 
 
 def _streak_reward(day: int) -> int:
@@ -31,6 +36,8 @@ def _streak_reward(day: int) -> int:
 # ---------- Daily check-in / Streak ----------
 @router.get("/daily/status")
 async def daily_status(uid: str = Depends(get_current_user_id)):
+    if not DAILY_STREAK_ENABLED:
+        return {"completed": True, "streak": 0}
     me = await get_user(uid)
     # A completed 7-day ladder is a one-time onboarding hook, not an
     # infinite grind - once a user has claimed all 7 days in a row, the
@@ -64,6 +71,8 @@ async def daily_status(uid: str = Depends(get_current_user_id)):
 
 @router.post("/daily/claim")
 async def daily_claim(uid: str = Depends(get_current_user_id)):
+    if not DAILY_STREAK_ENABLED:
+        raise HTTPException(400, "Kunlik bonus vaqtincha o'chirilgan")
     me = await get_user(uid)
     if me.get("daily_streak_completed"):
         raise HTTPException(400, "Kunlik bonus 7 kunlik siklni yakunladi")
