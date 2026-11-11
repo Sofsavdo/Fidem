@@ -42,6 +42,21 @@ async function compressImage(file, maxDim = 1280, quality = 0.82) {
   return file;
 }
 
+// Upload one image (downscaled first) and return its host-independent URL
+// (/api/files/<id>). Throws on failure; callers show their own message.
+export async function uploadImage(file) {
+  const compressed = await compressImage(file);
+  if (compressed.size > 8 * 1024 * 1024) {
+    const err = new Error("too_large");
+    err.code = "too_large";
+    throw err;
+  }
+  const fd = new FormData();
+  fd.append("file", compressed);
+  const r = await api.post("/files/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
+  return r.data.url;
+}
+
 export default function PhotoUpload({ value, onChange, testid = "photo-upload", avatar = false, name = "" }) {
   const [uploading, setUploading] = useState(false);
 

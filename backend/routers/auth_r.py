@@ -18,6 +18,7 @@ from auth import (
 )
 from core import (
     _client_ip,
+    MAX_EXTRA_PHOTOS,
     ADMIN_BOT_TOKEN,
     ADMIN_EMAIL,
     TELEGRAM_BOT_TOKEN,
@@ -620,6 +621,20 @@ async def update_profile(req: UpdateProfileRequest, uid: str = Depends(get_curre
         # Name is an identity anchor (same rule as /profile/onboard): other
         # users matched/verified/chatted with this name.
         update.pop("name", None)
+    # Extra gallery photos: only the user's own uploads, deduplicated, capped.
+    if "photos" in update:
+        wanted = []
+        for url in update.pop("photos") or []:
+            url = (url or "").strip()
+            if "/api/files/" in url:
+                url = url[url.find("/api/files/"):]   # host-independent form
+            if url and url not in wanted:
+                wanted.append(url)
+        if len(wanted) > MAX_EXTRA_PHOTOS:
+            raise HTTPException(400, "too_many_photos")
+        for url in wanted:
+            await _require_own_photo(uid, url)
+        update["photos"] = wanted
     new_photo = (update.pop("photo_url", None) or "").strip()
     if new_photo and new_photo != (user.get("photo_url") or ""):
         await _require_own_photo(uid, new_photo)

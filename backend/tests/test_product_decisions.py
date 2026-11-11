@@ -256,3 +256,35 @@ def test_user_without_photo_cannot_browse_like_or_message(mdb, monkeypatch):
         ids = {c["id"] for c in out}
         assert "withphoto" in ids and "nophoto" not in ids
     run(go())
+
+
+# ---------- gallery (extra photos) ----------
+def _file(owner, fid):
+    return {"id": "f" + fid[:6], "owner_id": owner, "storage_path": fid, "is_deleted": False}
+
+
+def test_extra_photos_validated_capped_and_hidden_when_locked(mdb):
+    from models import UpdateProfileRequest
+    ids = [("%024x" % i) for i in range(1, 8)]
+
+    async def go():
+        await mdb.users.insert_one(_u("me"))
+        await mdb.files.insert_many([_file("me", i) for i in ids] + [_file("other", "9" * 24)])
+        r = await auth_r.update_profile(UpdateProfileRequest(photos=[f"https://old.example/api/files/{i}" for i in ids[:3]] + [f"/api/files/{ids[0]}"]), uid="me")
+        me = await mdb.users.find_one({"id": "me"})
+        assert me["photos"] == [f"/api/files/{i}" for i in ids[:3]]  # host stripped, de-duplicated
+        with pytest.raises(HTTPException) as e:   # someone else's file
+            await auth_r.update_profile(UpdateProfileRequest(photos=["/api/files/" + "9" * 24]), uid="me")
+        assert e.value.status_code == 400
+        with pytest.raises(HTTPException) as e:   # too many
+            await auth_r.update_profile(UpdateProfileRequest(photos=[f"/api/files/{i}" for i in ids[:6]]), uid="me")
+        assert e.value.detail == "too_many_photos"
+        # removal
+        await auth_r.update_profile(UpdateProfileRequest(photos=[]), uid="me")
+        assert (await mdb.users.find_one({"id": "me"}))["photos"] == []
+    run(go())
+
+    pub = core.user_public(_u("x", photos=["/api/files/" + "a" * 24, "https://img.example/x.png"]))
+    assert pub["photos"] == ["/api/files/" + "a" * 24]            # only own files
+    closed = core.strip_locked_photo(core.user_public(_u("y", photo_public=False, photos=["/api/files/" + "a" * 24])))
+    assert closed["photos"] == [] and closed["photo_url"] is None

@@ -201,6 +201,20 @@ def own_photo_url(u: dict):
     return url[i:] if i >= 0 else None
 
 
+MAX_EXTRA_PHOTOS = 5  # besides the main photo
+
+
+def own_photos(u: dict) -> list:
+    """Extra gallery photos (host-independent paths), own files only, capped."""
+    out = []
+    for url in u.get("photos") or []:
+        if isinstance(url, str) and "/api/files/" in url:
+            path = url[url.find("/api/files/"):]
+            if path not in out:
+                out.append(path)
+    return out[:MAX_EXTRA_PHOTOS]
+
+
 def has_own_photo(u: dict) -> bool:
     return own_photo_url(u) is not None
 
@@ -226,6 +240,7 @@ def strip_locked_photo(pub: dict) -> dict:
         return pub
     out = dict(pub)
     out["photo_url"] = None
+    out["photos"] = []
     out["photo_unlocked"] = False
     return out
 
@@ -259,6 +274,7 @@ def user_public(u: dict, include_private: bool = False) -> dict:
         "relocation": u.get("relocation"),
         "bio": u.get("bio", ""),
         "photo_url": own_photo_url(u),
+        "photos": own_photos(u),
         "photo_verified": bool(u.get("photo_verified", False)),
         "verified_identity": u.get("verified_identity", False),
         "verified_selfie": u.get("verified_selfie", False),

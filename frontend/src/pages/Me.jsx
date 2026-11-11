@@ -4,6 +4,7 @@ import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, PlanPill } from "@/components/Badges";
 import PhotoUpload from "@/components/PhotoUpload";
+import PhotoGallery from "@/components/PhotoGallery";
 import { photoSrc } from "@/lib/photo";
 import { purchasePlan } from "@/lib/purchase";
 import { ChevronRight, Crown, Wallet, Share2, Settings as SettingsIcon, LogOut, ShieldCheck, Clock, SlidersHorizontal, Brain, BookOpen, Phone, Trophy, Rocket, MessageCircle, EyeOff, Camera, Megaphone, Gift } from "lucide-react";
@@ -137,6 +138,8 @@ export default function Me() {
           </div>
         )}
       </div>
+
+      <PhotoGallery />
 
       {/* Contextual upsell — just a teaser + count here (Me is the profile
           settings page, not a place to browse dozens of masked profiles).

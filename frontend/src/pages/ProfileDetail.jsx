@@ -102,6 +102,8 @@ export default function ProfileDetail() {
   const [peekUrl, setPeekUrl] = useState(null);
   const [peekLeft, setPeekLeft] = useState(0);
   const [peeking, setPeeking] = useState(false);
+  const [slideIdx, setSlideIdx] = useState(0);
+  useEffect(() => { setSlideIdx(0); }, [id]);
   useEffect(() => {
     if (!peekUrl) return undefined;
     if (peekLeft <= 0) { setPeekUrl(null); return undefined; }
@@ -168,13 +170,28 @@ export default function ProfileDetail() {
   const photoUrl = peekActive
     ? photoSrc(peekUrl)
     : photoSrc(c.photo_url);
+  // Main photo + gallery, swiped through with taps on the left/right of the photo.
+  const slides = peekActive ? [photoUrl] : [photoUrl, ...(c.photos || []).map(photoSrc)].filter(Boolean);
+  const slide = Math.min(slideIdx, Math.max(0, slides.length - 1));
+  const goSlide = (d) => setSlideIdx((i) => Math.max(0, Math.min(slides.length - 1, Math.min(i, slides.length - 1) + d)));
   const matchLabel = c.match_score >= 80 ? t("match_label_80") : c.match_score >= 60 ? t("match_label_60") : c.match_score >= 40 ? t("match_label_40") : t("match_label_0");
 
   return (
     <div data-testid="profile-detail" className="pb-8">
       <div className="relative aspect-square bg-muted">
-        <PhotoFill src={photoUrl} className={blurred ? "blur-photo" : ""} />
+        <PhotoFill key={slides[slide] || "none"} src={slides[slide] || null} className={blurred ? "blur-photo" : ""} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/0 to-black/0" />
+        {slides.length > 1 && (
+          <>
+            <button type="button" aria-label="prev" data-testid="photo-prev" onClick={() => goSlide(-1)} className="absolute inset-y-0 left-0 w-2/5" />
+            <button type="button" aria-label="next" data-testid="photo-next" onClick={() => goSlide(1)} className="absolute inset-y-0 right-0 w-2/5" />
+            <div className="absolute top-2 inset-x-0 flex justify-center gap-1 pointer-events-none" data-testid="photo-dots">
+              {slides.map((_, i) => (
+                <span key={i} className={`h-1 rounded-full transition-all ${i === slide ? "w-6 bg-white" : "w-3 bg-white/50"}`} />
+              ))}
+            </div>
+          </>
+        )}
         {/* Screenshot deterrent: a faint watermark with the VIEWER's identity
             tiled over the photo. OS screenshots can't be blocked in a web
             app, but any leaked screenshot now identifies who took it. */}
