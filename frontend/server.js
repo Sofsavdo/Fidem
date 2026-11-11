@@ -65,6 +65,30 @@ function proxyUpgrade(req, socket, head) {
 
 const BUILD_DIR = path.join(__dirname, 'build');
 
+// Text assets go out compressed (the main bundle is ~800 KB raw, ~200 KB
+// with brotli) - a big difference on mobile networks. Each file is
+// compressed once and kept in memory; the build is immutable per deploy.
+const zlib = require('zlib');
+const COMPRESSIBLE = new Set(['.html', '.js', '.css', '.json', '.svg', '.map', '.txt', '.webmanifest']);
+const compressCache = new Map();
+function pickEncoding(accept, ext, size) {
+  if (!accept || size < 1024 || !COMPRESSIBLE.has(ext)) return null;
+  if (/\bbr\b/.test(accept)) return 'br';
+  if (/\bgzip\b/.test(accept)) return 'gzip';
+  return null;
+}
+function compressed(filePath, mtime, enc, content) {
+  const key = `${filePath}|${mtime}|${enc}`;
+  let out = compressCache.get(key);
+  if (!out) {
+    out = enc === 'br'
+      ? zlib.brotliCompressSync(content, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 9 } })
+      : zlib.gzipSync(content, { level: 9 });
+    compressCache.set(key, out);
+  }
+  return out;
+}
+
 const mimeTypes = {
   '.html': 'text/html',
   '.js': 'text/javascript',
@@ -106,10 +130,13 @@ const server = http.createServer((req, res) => {
     const extname = path.extname(filePath);
     const contentType = mimeTypes[extname] || 'application/octet-stream';
     
-    // Cache headers
+    // Cache headers: hashed build assets for a year; the HTML shell, the
+    // service worker and the manifest must always be re-checked, or a new
+    // deploy would not reach people for a long time.
     let cacheControl = 'public, max-age=31536000, immutable'; // 1 year for static assets
-    if (filePath.endsWith('index.html')) {
-      cacheControl = 'no-cache, no-store, must-revalidate'; // Never cache HTML
+    const base = path.basename(filePath);
+    if (base === 'index.html' || base === 'sw.js' || base === 'service-worker.js' || base.endsWith('.webmanifest') || base === 'manifest.json') {
+      cacheControl = 'no-cache, no-store, must-revalidate';
     }
     
     // Get file stats for ETag
@@ -137,11 +164,20 @@ const server = http.createServer((req, res) => {
           return;
         }
         
-        res.writeHead(200, { 
+        const headers = {
           'Content-Type': contentType,
           'Cache-Control': cacheControl,
-          'ETag': etag
-        });
+          'ETag': etag,
+          'Vary': 'Accept-Encoding',
+        };
+        const enc = pickEncoding(req.headers['accept-encoding'], extname, content.length);
+        if (enc) {
+          headers['Content-Encoding'] = enc;
+          res.writeHead(200, headers);
+          res.end(compressed(filePath, stats.mtime.getTime(), enc, content));
+          return;
+        }
+        res.writeHead(200, headers);
         res.end(content);
       });
     });

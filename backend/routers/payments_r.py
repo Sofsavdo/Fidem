@@ -666,6 +666,61 @@ async def hamyon_complete(request: Request):
     return {"result": "ok"}
 
 
+async def _sync_with_hamyon(p: dict) -> str | None:
+    """Ask Hamyon for the state of one open payment and settle it here if
+    Hamyon already finished it. Returns Hamyon's status, None on error."""
+    pid = p["id"]
+    try:
+        st = await hamyon_payment_status(p["hamyon_payment_id"])
+        status = st.get("status")
+        if _HAMYON_LAST_STATUS.get(pid) != status:
+            _HAMYON_LAST_STATUS[pid] = status
+            log.info("Hamyon status: order=%s hamyon=%s amount=%s", pid, status, st.get("amount"))
+        if str(st.get("shop_id", HAMYON_SHOP_ID)) != HAMYON_SHOP_ID:
+            return None
+        if status == "paid":
+            await apply_hamyon_result(p, "paid", int(st.get("amount") or 0))
+        elif status == "cancel":
+            await apply_hamyon_result(p, "cancel", reason="timeout")
+        return status
+    except HamyonError as e:
+        log.info("Hamyon status check for %s failed: %s", pid, e)
+    except Exception:
+        log.exception("Hamyon status check for %s failed", pid)
+    return None
+
+
+async def reconcile_open_hamyon_payments() -> int:
+    """Safety net for lost callbacks when nobody keeps the pay sheet open:
+    every card payment still open 2 minutes to 2 hours after it was made is
+    checked with Hamyon and settled. Returns how many were settled."""
+    if not hamyon_enabled():
+        return 0
+    now = now_utc()
+    rows = await db.payments.find(
+        {"method": "hamyon", "status": {"$in": list(HAMYON_OPEN)}, "hamyon_payment_id": {"$exists": True},
+         "created_at": {"$lte": iso(now - timedelta(minutes=2)), "$gte": iso(now - timedelta(hours=2))}},
+        {"_id": 0},
+    ).to_list(200)
+    settled = 0
+    for p in rows:
+        if await _sync_with_hamyon(p) in ("paid", "cancel"):
+            settled += 1
+        await asyncio.sleep(0.2)
+    return settled
+
+
+async def hamyon_reconcile_loop() -> None:
+    while True:
+        try:
+            n = await reconcile_open_hamyon_payments()
+            if n:
+                log.info("Hamyon reconcile: settled %s open payments", n)
+        except Exception as e:  # noqa: BLE001 - keep the loop alive
+            log.warning(f"Hamyon reconcile loop error: {e}")
+        await asyncio.sleep(90)
+
+
 @router.get("/payments/status/{pid}")
 async def payment_status(pid: str, uid: str = Depends(get_current_user_id)):
     """Polled by the transfer screen. For an open Hamyon payment it also asks
@@ -681,20 +736,7 @@ async def payment_status(pid: str, uid: str = Depends(get_current_user_id)):
             {"$set": {"hamyon_checked_at": now_ts}},
         )
         if claimed.modified_count:
-            try:
-                st = await hamyon_payment_status(p["hamyon_payment_id"])
-                if _HAMYON_LAST_STATUS.get(pid) != st.get("status"):
-                    _HAMYON_LAST_STATUS[pid] = st.get("status")
-                    log.info("Hamyon status: order=%s hamyon=%s amount=%s", pid, st.get("status"), st.get("amount"))
-                if str(st.get("shop_id", HAMYON_SHOP_ID)) == HAMYON_SHOP_ID:
-                    if st.get("status") == "paid":
-                        await apply_hamyon_result(p, "paid", int(st.get("amount") or 0))
-                    elif st.get("status") == "cancel":
-                        await apply_hamyon_result(p, "cancel", reason="timeout")
-            except HamyonError as e:
-                log.info("Hamyon status check for %s failed: %s", pid, e)
-            except Exception:
-                log.exception("Hamyon status check for %s failed", pid)
+            await _sync_with_hamyon(p)
             p = await db.payments.find_one({"id": pid}, {"_id": 0}) or p
     if p.get("method") == "hamyon":
         return _hamyon_view(p)

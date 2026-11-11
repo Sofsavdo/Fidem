@@ -136,6 +136,10 @@ async def startup() -> None:
     # this, so without it referral cash could never actually be withdrawn.
     asyncio.create_task(referral_release_loop())
 
+    # Settles card payments whose Hamyon callback never arrived.
+    from routers.payments_r import hamyon_reconcile_loop
+    asyncio.create_task(hamyon_reconcile_loop())
+
     # Keeps the in-memory rate-limit buckets from growing forever.
     asyncio.create_task(rate_limiter_gc_loop())
 
@@ -171,6 +175,11 @@ async def startup() -> None:
     await db.payments.create_index("status")
     await db.payments.create_index("created_at")
     await db.payments.create_index("purpose")
+    # Hamyon: callbacks look payments up by Hamyon's id; the reconcile loop
+    # scans open card payments by time every 90 s.
+    await db.payments.create_index("hamyon_payment_id", sparse=True)
+    await db.payments.create_index([("method", 1), ("status", 1), ("created_at", 1)])
+    await db.bot_starts.create_index("chat_id")
     await db.compat_unlocks.create_index([("user_id", 1), ("target_id", 1)], unique=True)
     await db.compat_reports.create_index([("user_id", 1), ("target_id", 1)], unique=True)
     await db.success_stories.create_index("created_at")

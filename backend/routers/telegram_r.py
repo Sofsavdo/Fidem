@@ -124,7 +124,7 @@ async def _handle_start(chat_id: int, tg_user_id: str, text: str) -> None:
     await db.bot_starts.update_one(
         {"telegram_id": tg_user_id},
         {
-            "$set": {"chat_id": chat_id, "last_start_at": iso(now_utc())},
+            "$set": {"chat_id": chat_id, "last_start_at": iso(now_utc()), "unreachable": False},
             "$setOnInsert": {
                 "telegram_id": tg_user_id,
                 "first_start_at": iso(now_utc()),

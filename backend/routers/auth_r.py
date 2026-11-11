@@ -302,7 +302,7 @@ async def login(req: LoginRequest, request: Request):
 @router.post("/auth/telegram", response_model=AuthResponse)
 async def auth_telegram(req: TelegramAuthRequest, request: Request):
     if not TELEGRAM_BOT_TOKEN:
-        raise HTTPException(500, "Bot token not configured")
+        raise HTTPException(503, "Bot token not configured")
     tg_user = validate_telegram_init_data(req.init_data, TELEGRAM_BOT_TOKEN)
     tg_id = str(tg_user.get("id"))
     if not tg_id:
@@ -408,7 +408,7 @@ async def auth_admin_telegram(req: TelegramAuthRequest):
     Nothing else can reach this: a regular user's initData is signed by the
     OTHER bot's token and fails validation here outright."""
     if not ADMIN_BOT_TOKEN:
-        raise HTTPException(500, "Admin bot token not configured")
+        raise HTTPException(503, "Admin bot token not configured")
     tg_user = validate_telegram_init_data(req.init_data, ADMIN_BOT_TOKEN)
     tg_id = str(tg_user.get("id") or "")
     if not tg_id:
