@@ -11,7 +11,6 @@ import { purposeLabel } from "@/lib/labels";
 import { tapMedium, tapLight, notify } from "@/lib/haptics";
 import { openExternalLink } from "@/lib/telegram";
 import { PLAN_RANK, PLAN_PRICES } from "@/lib/purchase";
-import { FEATURES } from "@/lib/features";
 
 const CHAT_UNLOCK_PRICE = 4900; // mirrors backend PRICE_CHAT_UNLOCK_UZS (comparison only)
 
@@ -23,21 +22,17 @@ const PLANS = [
   // The weekly free conversation belongs to the FREE tier (backend
   // FREE_WEEKLY_INITIATIONS) - paid plans have unlimited messaging, so
   // advertising "1 free chat/week" on Standard was wrong.
-  { key: "free", title: "Free", price: 0, accent: "border-border",
-    perks: ["profile", "candidates", "likes_matches", "chat_replies"] },
-  { key: "standard", title: "Standard", price: 34900, prices: { 1: 34900, 3: 89000, 12: 299000 }, badge: "✅", accent: "border-secondary/50",
-    perks: ["chat_unlimited", "more_filters", "privacy_hidden"] },
   { key: "premium", title: "Premium", price: 79000, prices: { 1: 79000, 3: 199000, 12: 649000 }, badge: "💎", popular: true, accent: "border-gold",
     perks: ["chat_unlimited", "contact_share", "who_viewed", "who_saved", "more_filters", "privacy_incognito"] },
-  { key: "vip", title: "VIP", price: 199000, prices: { 1: 199000, 3: 499000, 12: 1699000 }, badge: "👑", dark: true, accent: "border-white/10",
-    perks: ["max_visibility", "stealth_view", "photo_peek", "priority", "family_share"] },
+  { key: "free", title: "Free", price: 0, accent: "border-border",
+    perks: ["profile", "candidates", "likes_matches", "chat_replies"] },
 ];
 
 const DURATIONS = [1, 3, 12];
 
 const PERK = {
   uz: { profile: "Profil", candidates: "Nomzodlar", likes_matches: "Yoqtirish va moslik", chat_replies: "Kelgan xabarga bepul javob",
-    contact_share: "Telegram/telefon almashish", chat_unlimited: "Cheksiz yozishish", chat_free_weekly_perk: "Haftada 1 bepul suhbat boshlash", more_filters: "Ko'proq filtrlar",
+    contact_share: "Telegram/telefon almashish", chat_unlimited: "Cheksiz yozishma", chat_free_weekly_perk: "Haftada 1 bepul suhbat boshlash", more_filters: "Ko'proq filtrlar",
     who_viewed: "Kim ko'rdi", who_saved: "Kim saqladi", boost_visibility: "Ko'rinish oshadi",
     privacy_hidden: "Maxfiy rejim (ko'rinmaslik)", privacy_incognito: "Incognito ko'rish (iz qoldirmaydi)", photo_peek: "Yopiq rasmni 5 soniya ochish",
     max_visibility: "Maksimal ko'rinish", stealth_view: "Maxfiy ko'rish", priority: "Ustuvorlik", family_share: "Oila ulashish" },
@@ -70,6 +65,9 @@ export default function Premium() {
     }, 200);
     return () => clearTimeout(timer);
   }, [hl, tab]);
+  // One paid plan (Premium) is on sale. Someone who still holds the retired VIP
+  // plan is shown as Premium (VIP includes everything Premium does).
+  const curPlan = user?.plan === "vip" ? "premium" : (user?.plan || "free");
   const [duration, setDuration] = useState(1);
   const [topupAmount, setTopupAmount] = useState(50000);
   // Free-form top-up amount — the preset chips are shortcuts, not a limit.
@@ -208,21 +206,15 @@ export default function Premium() {
             ))}
           </div>
 
-          {PLANS.filter((p) => {
-            // One paid plan is on sale (Premium). Standard/VIP only appear for
-            // people who already hold them - or everywhere when the legacy
-            // flag is on - so nobody loses sight of what they paid for.
-            if (p.key === "free" || p.key === "premium" || FEATURES.legacyTiers) return true;
-            return (user?.plan || "free") === p.key;
-          }).map((p) => {
-            const isCurrent = (user?.plan || "free") === p.key;
+          {PLANS.map((p) => {
+            const isCurrent = curPlan === p.key;
             // VIP already includes everything Standard/Premium do - showing
             // an active "buy" button for a tier the user has already
             // surpassed reads as "you still need to pay for this", which is
             // exactly backwards. Only genuine upgrades (a strictly higher
             // tier) get a buy button; anything at or below the user's
             // current tier shows as already included instead.
-            const alreadyIncluded = !isCurrent && p.key !== "free" && PLAN_RANK[p.key] <= PLAN_RANK[user?.plan || "free"];
+            const alreadyIncluded = !isCurrent && p.key !== "free" && PLAN_RANK[p.key] <= PLAN_RANK[curPlan];
             const price = p.prices ? p.prices[duration] : p.price;
             const fullPrice = p.prices ? p.prices[1] * duration : p.price;
             const discountPct = p.prices && duration > 1 ? Math.round((1 - price / fullPrice) * 100) : 0;
@@ -242,7 +234,7 @@ export default function Premium() {
                 )}
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-heading text-lg font-semibold">{p.title}</span>
+                    <span className="font-heading text-lg font-semibold">{p.key === "free" ? t("plan_basic_name") : p.title}</span>
                     {p.badge && <span className="text-base">{p.badge}</span>}
                   </div>
                   <div className="text-right leading-none">
@@ -323,7 +315,7 @@ export default function Premium() {
           <Link to="/concierge" data-testid="concierge-link" className="block rounded-3xl border border-secondary/30 bg-gradient-to-br from-secondary/8 to-card p-4 active:scale-[0.99] transition">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="font-heading text-base font-semibold flex items-center gap-1.5">👑 {t("concierge_title")}</p>
+                <p className="font-heading text-base font-semibold flex items-center gap-1.5">🤝 {t("concierge_title")}</p>
                 <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{t("concierge_desc")}</p>
               </div>
               <span className="shrink-0 text-xs font-semibold text-secondary inline-flex items-center gap-0.5">199,000 <ArrowUpRight className="w-3.5 h-3.5" /></span>
