@@ -21,6 +21,12 @@ log = logging.getLogger("fidem")
 for _noisy in ("httpx", "httpcore"):
     logging.getLogger(_noisy).setLevel(logging.WARNING)
 
+# Session tokens travel in some query strings (WebSocket, media); uvicorn would
+# log them verbatim. Redact before they reach the log stream.
+from log_redact import install as _install_log_redaction  # noqa: E402
+
+_install_log_redaction()
+
 if os.environ.get("SENTRY_DSN"):
     import sentry_sdk
     sentry_sdk.init(
