@@ -7,6 +7,8 @@ recomputing per request would both be slower and feel random).
 """
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, Depends
 
 from auth import get_current_user_id
@@ -19,6 +21,10 @@ router = APIRouter(tags=["picks"])
 PICKS_PER_DAY = 3
 
 
+async def _empty() -> list:
+    return []
+
+
 async def compute_daily_picks(me_doc: dict) -> list[dict]:
     """Return today's picks for a user (cached per calendar day)."""
     uid = me_doc["id"]
@@ -29,10 +35,18 @@ async def compute_daily_picks(me_doc: dict) -> list[dict]:
         ids = cached.get("candidate_ids", [])
         if not ids:
             return []
-        docs = await db.users.find(
-            {"id": {"$in": ids}, "onboarded": True, "blocked": {"$ne": True}, "hidden_profile": {"$ne": True}},
-            {"_id": 0, "password_hash": 0},
-        ).to_list(len(ids))
+        # The photo-unlock lookup only needs the cached ids, so run it with the
+        # user fetch instead of after it.
+        docs, unlocks = await asyncio.gather(
+            db.users.find(
+                {"id": {"$in": ids}, "onboarded": True, "blocked": {"$ne": True}, "hidden_profile": {"$ne": True}},
+                {"_id": 0, "password_hash": 0},
+            ).to_list(len(ids)),
+            db.photo_unlocks.find(
+                {"requester_id": uid, "target_id": {"$in": ids}, "approved": True},
+                {"_id": 0, "target_id": 1},
+            ).to_list(50),
+        )
         by_id = {d["id"]: d for d in docs}
         docs = [by_id[i] for i in ids if i in by_id]
     else:
@@ -55,10 +69,11 @@ async def compute_daily_picks(me_doc: dict) -> list[dict]:
         except Exception:
             pass
 
-        docs = await db.users.find(query, {"_id": 0, "password_hash": 0}).limit(120).to_list(120)
-
-        # Don't re-pitch people the user already saved.
-        saved_rows = await db.saved.find({"owner_id": uid}, {"_id": 0, "target_id": 1}).to_list(1000)
+        docs, saved_rows = await asyncio.gather(
+            db.users.find(query, {"_id": 0, "password_hash": 0}).limit(120).to_list(120),
+            # Don't re-pitch people the user already saved.
+            db.saved.find({"owner_id": uid}, {"_id": 0, "target_id": 1}).to_list(1000),
+        )
         saved_ids = {r["target_id"] for r in saved_rows}
         docs = [d for d in docs if d["id"] not in saved_ids]
 
@@ -72,22 +87,25 @@ async def compute_daily_picks(me_doc: dict) -> list[dict]:
         docs.sort(key=rank)
         docs = docs[:PICKS_PER_DAY]
 
-        await db.daily_picks.update_one(
-            {"user_id": uid, "date": today},
-            {"$setOnInsert": {
-                "id": new_id(), "user_id": uid, "date": today,
-                "candidate_ids": [d["id"] for d in docs], "created_at": iso(now_utc()),
-            }},
-            upsert=True,
+        # Persist the picks and read photo unlocks in the same round trip.
+        _, unlocks = await asyncio.gather(
+            db.daily_picks.update_one(
+                {"user_id": uid, "date": today},
+                {"$setOnInsert": {
+                    "id": new_id(), "user_id": uid, "date": today,
+                    "candidate_ids": [d["id"] for d in docs], "created_at": iso(now_utc()),
+                }},
+                upsert=True,
+            ),
+            db.photo_unlocks.find(
+                {"requester_id": uid, "target_id": {"$in": [d["id"] for d in docs]}, "approved": True},
+                {"_id": 0, "target_id": 1},
+            ).to_list(50) if docs else _empty(),
         )
 
     if not docs:
         return []
 
-    unlocks = await db.photo_unlocks.find(
-        {"requester_id": uid, "target_id": {"$in": [d["id"] for d in docs]}, "approved": True},
-        {"_id": 0, "target_id": 1},
-    ).to_list(50)
     unlocked = {u["target_id"] for u in unlocks}
 
     out = []
