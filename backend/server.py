@@ -119,8 +119,8 @@ async def startup() -> None:
     asyncio.create_task(setup_telegram_webhook())
     asyncio.create_task(setup_admin_telegram_webhook())
     # One small real AI call: its result goes to the log and the admin panel.
-    from ai_service import ai_self_check
-    asyncio.create_task(ai_self_check())
+    from ai_service import ai_self_check_loop
+    asyncio.create_task(ai_self_check_loop())
     from hamyon import hamyon_enabled
     log.info("Payments: Hamyon %s", "ON" if hamyon_enabled() else "OFF (HAMYON_SHOP_ID / HAMYON_SHOP_KEY not set)")
 

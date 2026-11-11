@@ -528,3 +528,32 @@ def test_insights_report_the_gemini_reason_without_anthropic(monkeypatch):
     monkeypatch.setattr(ai_service, "_gemini_json", boom)
     res = asyncio.run(ai_service.generate_growth_insights("users: 10"))
     assert res["ai_generated"] is False and "timeout" in res["error"]
+
+
+def test_gemini_retries_a_temporary_503(monkeypatch):
+    import ai_service
+
+    class R:
+        def __init__(self, status, payload):
+            self.status_code = status; self.payload = payload; self.text = ""
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise RuntimeError(self.status_code)
+        def json(self): return self.payload
+
+    ok = {"candidates": [{"content": {"parts": [{"text": '{"ok": true}'}]}}]}
+
+    class C:
+        def __init__(self): self.calls = 0
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def post(self, url, params=None, json=None):
+            self.calls += 1
+            return R(503, {}) if self.calls == 1 else R(200, ok)
+
+    cl = C()
+    monkeypatch.setattr(ai_service.httpx, "AsyncClient", lambda **kw: cl)
+    monkeypatch.setattr(ai_service, "GEMINI_API_KEY", "k")
+    monkeypatch.setattr(ai_service, "_GEMINI_RETRY_DELAYS", (0, 0))
+    st = asyncio.run(ai_service.ai_self_check())
+    assert st["ok"] is True and cl.calls == 2
