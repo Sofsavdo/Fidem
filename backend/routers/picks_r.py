@@ -39,7 +39,7 @@ async def compute_daily_picks(me_doc: dict) -> list[dict]:
         # user fetch instead of after it.
         docs, unlocks = await asyncio.gather(
             db.users.find(
-                {"id": {"$in": ids}, "onboarded": True, "blocked": {"$ne": True}, "hidden_profile": {"$ne": True}},
+                {"id": {"$in": ids}, "onboarded": True, "blocked": {"$ne": True}, "hidden_profile": {"$ne": True}, "is_demo": {"$ne": True}},
                 {"_id": 0, "password_hash": 0},
             ).to_list(len(ids)),
             db.photo_unlocks.find(
@@ -55,6 +55,7 @@ async def compute_daily_picks(me_doc: dict) -> list[dict]:
             "onboarded": True,
             "blocked": {"$ne": True},
             "hidden_profile": {"$ne": True},
+            "is_demo": {"$ne": True},
         }
         if me_doc.get("search_gender"):
             query["gender"] = me_doc["search_gender"]

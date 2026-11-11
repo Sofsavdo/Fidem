@@ -7,6 +7,7 @@ import { purchasePlan } from "@/lib/purchase";
 import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot, LocationBadge } from "@/components/Badges";
 import CompatibilityCard from "@/components/CompatibilityCard";
 import { photoSrc } from "@/lib/photo";
+import PhotoFill from "@/components/PhotoFill";
 import { formatLastActive } from "@/lib/time";
 import { Heart, MessageCircle, ArrowLeft, Lock, Clock, Shield, Share2, Crown, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
@@ -166,13 +167,13 @@ export default function ProfileDetail() {
   const blurred = !c.photo_unlocked && !peekActive;
   const photoUrl = peekActive
     ? photoSrc(peekUrl)
-    : (photoSrc(c.photo_url) || "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=900");
+    : photoSrc(c.photo_url);
   const matchLabel = c.match_score >= 80 ? t("match_label_80") : c.match_score >= 60 ? t("match_label_60") : c.match_score >= 40 ? t("match_label_40") : t("match_label_0");
 
   return (
     <div data-testid="profile-detail" className="pb-8">
       <div className="relative aspect-square bg-muted">
-        <img loading="lazy" decoding="async" src={photoUrl} alt={c.name} className={`w-full h-full object-cover ${blurred ? "blur-photo" : ""}`} />
+        <PhotoFill src={photoUrl} name={c.name} className={blurred ? "blur-photo" : ""} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/0 to-black/0" />
         {/* Screenshot deterrent: a faint watermark with the VIEWER's identity
             tiled over the photo. OS screenshots can't be blocked in a web

@@ -7,13 +7,14 @@ import { useApp } from "@/contexts/AppContext";
 import { QK } from "@/hooks/queries";
 import api from "@/lib/api";
 import { photoSrc } from "@/lib/photo";
+import PhotoFill from "@/components/PhotoFill";
 import { formatLastActive } from "@/lib/time";
 
 function CandidateCardInner({ c, onSave, saved }) {
   const { t } = useApp();
   const queryClient = useQueryClient();
+  const photoUrl = photoSrc(c.photo_url);
   const blurred = !c.photo_unlocked;
-  const photoUrl = photoSrc(c.photo_url) || "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=800";
 
   // Warm the profile-detail query on touch so opening the profile feels instant.
   const prefetchDetail = useCallback(() => {
@@ -31,13 +32,7 @@ function CandidateCardInner({ c, onSave, saved }) {
     >
       <Link to={`/candidate/${c.id}`} className="block" onPointerDown={prefetchDetail} onMouseEnter={prefetchDetail}>
         <div className="relative aspect-[4/5] overflow-hidden bg-muted">
-          <img
-            src={photoUrl}
-            alt={c.name}
-            loading="lazy"
-            decoding="async"
-            className={`w-full h-full object-cover transition-all duration-700 ${blurred ? "blur-photo" : ""}`}
-          />
+          <PhotoFill src={photoUrl} name={c.name} className={`transition-all duration-700 ${blurred ? "blur-photo" : ""}`} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/0 to-black/0" />
 
           {/* One small match pill — the rest of the badges live in the profile. */}

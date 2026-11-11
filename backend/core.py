@@ -185,6 +185,14 @@ async def touch_active(uid: str) -> None:
     await db.users.update_one({"id": uid}, {"$set": {"last_active": iso(now_utc())}})
 
 
+def own_photo_url(u: dict):
+    """Only photos hosted by this app (/api/files/<id>) are ever shown. Anything
+    else (stock/demo URLs left over from the old seed data) is treated as 'no
+    photo' so a placeholder is shown instead of someone else's picture."""
+    url = u.get("photo_url")
+    return url if isinstance(url, str) and "/api/files/" in url else None
+
+
 def photo_is_public(u: dict) -> bool:
     """Profile photos are open by default; a user hides theirs with the
     "photo visible to everyone" privacy toggle (stored as photo_public=False)."""
@@ -238,7 +246,7 @@ def user_public(u: dict, include_private: bool = False) -> dict:
         "alcohol": u.get("alcohol") or "",
         "relocation": u.get("relocation"),
         "bio": u.get("bio", ""),
-        "photo_url": u.get("photo_url"),
+        "photo_url": own_photo_url(u),
         "photo_verified": bool(u.get("photo_verified", False)),
         "verified_identity": u.get("verified_identity", False),
         "verified_selfie": u.get("verified_selfie", False),
@@ -304,7 +312,7 @@ def user_public_minimal(u: dict) -> dict:
         "education": u.get("education", ""),
         "profession": u.get("profession", ""),
         "bio": u.get("bio", ""),
-        "photo_url": u.get("photo_url"),
+        "photo_url": own_photo_url(u),
         "verified_selfie": u.get("verified_selfie", False),
         "verified_financial": u.get("verified_financial", False),
         "location_verified": bool(u.get("location_verified", False)),

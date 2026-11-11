@@ -40,6 +40,7 @@ export default function Chat() {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const sendLockRef = useRef(false);
   const [access, setAccess] = useState(null);
   const [unlocking, setUnlocking] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -222,6 +223,9 @@ export default function Chat() {
   const send = async (txt, opts = {}) => {
     const finalText = txt ?? text;
     if (!finalText.trim()) return;
+    // Enter key-repeat / double tap can fire a second send before React has
+    // re-rendered with the cleared input - a ref blocks that window.
+    if (sendLockRef.current) return;
     if (!opts.skipContactCheck && CONTACT_RE.test(finalText)) {
       if (!isPaidPlan) {
         toast.error(t("contact_free_blocked_error"));
@@ -244,13 +248,21 @@ export default function Chat() {
     setMessages((prev) => [...prev, tempMsg]);
     setText("");
 
+    sendLockRef.current = true;
     setSending(true);
     try {
       const r = await api.post("/messages/send", { to_user_id: otherId, text: finalText });
       // Swap the temp bubble for the server's confirmed copy directly - don't
       // wait on the WebSocket echo to know the message made it. The WS
       // dedup check (by id) below already ignores it if it arrives after.
-      setMessages((prev) => prev.map((m) => (m.id === tempMsg.id ? r.data : m)));
+      // The WebSocket echo can land BEFORE this response; then the confirmed
+      // message is already in the list and swapping the temp bubble in would
+      // show the same message twice - just drop the temp copy instead.
+      setMessages((prev) => (
+        prev.some((m) => m.id === r.data.id)
+          ? prev.filter((m) => m.id !== tempMsg.id)
+          : prev.map((m) => (m.id === tempMsg.id ? r.data : m))
+      ));
     } catch (e) {
       console.error("Send message error:", e);
       const detail = (e.response?.data?.detail || "").toString();
@@ -267,7 +279,7 @@ export default function Chat() {
       // Give the text back so a too-long message can be shortened, not retyped.
       if (detail === "message_too_long") setText(finalText);
       load();
-    } finally { setSending(false); }
+    } finally { sendLockRef.current = false; setSending(false); }
   };
 
   // "Share my contact" — composes a message from the contacts saved in
@@ -610,7 +622,7 @@ export default function Chat() {
               maxLength={2000}
               value={text}
               onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && !access?.requires_unlock && send()}
+              onKeyDown={(e) => e.key === "Enter" && !e.repeat && !e.nativeEvent?.isComposing && !access?.requires_unlock && send()}
               disabled={!!access?.requires_unlock || !!access?.blocked}
               placeholder={access?.blocked ? t("user_blocked_error") : access?.requires_unlock ? t("chat_locked_inline") : t("type_message")}
               className="flex-1 min-w-0 rounded-full border border-border bg-card px-4 h-10 text-sm outline-none focus:border-primary disabled:opacity-60 disabled:cursor-not-allowed"

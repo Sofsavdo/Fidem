@@ -275,9 +275,10 @@ export function useCandidateDetail(id) {
   });
 }
 
-export function useSaved(tab = "mine") {
+export function useSaved(tab = "mine", { enabled = true } = {}) {
   const endpoint = tab === "mine" ? "/saved/mine" : `/saved/${tab === "by_others" ? "by-others" : tab}`;
   return useQuery({
+    enabled,
     queryKey: QK.saved(tab),
     queryFn: () => api.get(endpoint).then((r) => r.data || []),
     // switching between the 4 saved tabs keeps the old grid visible

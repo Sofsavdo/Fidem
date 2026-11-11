@@ -2,19 +2,24 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { purchasePlan } from "@/lib/purchase";
-import { Lock, Bookmark, Crown, EyeOff, Camera, Check, X } from "lucide-react";
+import { Lock, Bookmark, Crown, Camera, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { photoSrc } from "@/lib/photo";
 import { useSaved, usePhotoRequests, useDecidePhotoRequest } from "@/hooks/queries";
 import { EmptyState } from "@/components/kit";
+import PhotoFill from "@/components/PhotoFill";
 
+// Three lists are enough: who I liked, who is interested in me (it already
+// includes everyone who saved me), and who looked at my profile. Photo
+// requests are only needed by people who closed their photos, so that tab
+// shows up only while a request is waiting.
 const TABS = [
   { k: "mine", labelKey: "saved_by_me" },
-  { k: "by_others", labelKey: "saved_me" },
-  { k: "viewers", labelKey: "viewed_my_profile" },
   { k: "interested", labelKey: "interested_in_me" },
+  { k: "viewers", labelKey: "viewed_my_profile" },
   { k: "requests", labelKey: "photo_requests_tab" },
 ];
+const TAB_ALIAS = { by_others: "interested" };
 
 // Cheapest plan that unlocks these lists — mirrors PLANS.premium in Premium.jsx.
 const UNLOCK_PRICE = 79000;
@@ -32,11 +37,13 @@ export default function Saved() {
   const [tab, setTab] = useState("mine");
 
   useEffect(() => {
-    const q = searchParams.get("tab");
+    const raw = searchParams.get("tab");
+    const q = TAB_ALIAS[raw] || raw;
     if (q && TABS.some((x) => x.k === q)) setTab(q);
   }, [searchParams]);
 
-  const { data: items = [], isLoading } = useSaved(tab);
+  // "requests" is not a saved list (its data comes from usePhotoRequests below).
+  const { data: items = [], isLoading } = useSaved(tab, { enabled: tab !== "requests" });
   // Incoming photo-permission requests: always fetched so the tab chip can
   // show a count badge even before the tab is opened.
   const { data: photoRequests = [] } = usePhotoRequests();
@@ -68,7 +75,7 @@ export default function Saved() {
     <div className="px-4 md:px-8 pt-6">
       <h1 className="font-heading text-3xl md:text-4xl font-semibold tracking-tight mb-4">{t("liked")}</h1>
       <div className="flex gap-1 mb-4 overflow-x-auto no-scrollbar -mx-4 px-4">
-        {TABS.map((x) => (
+        {TABS.filter((x) => x.k !== "requests" || photoRequests.length > 0 || tab === "requests").map((x) => (
           <button
             key={x.k}
             data-testid={`saved-tab-${x.k}`}
@@ -99,24 +106,6 @@ export default function Saved() {
           </div>
           <span className="shrink-0 rounded-full bg-white text-ink text-xs font-semibold px-3.5 py-2">{t("plan_choose_cta")}</span>
         </button>
-      )}
-
-      {/* Privacy upsell — this page is exactly where "kim ko'rdi" is on the
-          user's mind, so 'see without being seen' lands hardest here. Hidden
-          for people who already run hidden mode. */}
-      {tab !== "mine" && !user?.hidden_profile && (
-        <Link
-          to="/me"
-          data-testid="saved-privacy-promo"
-          className="mb-4 flex items-center gap-3 rounded-3xl bg-card border border-border p-3.5 hover:-translate-y-0.5 active:scale-[0.98] transition-transform"
-        >
-          <span className="shrink-0 w-9 h-9 rounded-2xl bg-primary/10 text-primary grid place-items-center"><EyeOff className="w-4 h-4" /></span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">{t("privacy_promo_title")}</p>
-            <p className="text-[11px] text-muted-foreground truncate">{t("privacy_promo_hint")}</p>
-          </div>
-          <span className="shrink-0 text-xs font-semibold text-primary whitespace-nowrap">{t("privacy_promo_cta")} →</span>
-        </Link>
       )}
 
       {/* Incoming photo-permission requests: WHO is asking, clearly, with
@@ -225,8 +214,8 @@ export default function Saved() {
                 className="flex items-center gap-3 rounded-3xl bg-card border border-border p-3.5 hover:-translate-y-0.5 active:scale-[0.98] transition-transform"
               >
                 <div className="shrink-0 w-16 h-16 rounded-2xl bg-muted overflow-hidden relative">
-                  {photoUrl ? (
-                    <img loading="lazy" decoding="async" src={photoUrl} alt="" className="w-full h-full object-cover" />
+                  {!photoLocked ? (
+                    <PhotoFill src={photoUrl} name={c.name} />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Lock className="w-5 h-5 text-muted-foreground" />
@@ -269,8 +258,8 @@ export default function Saved() {
                 data-testid={`saved-card-${c.id}`}
                 className="block aspect-[4/5] rounded-3xl bg-card border border-border overflow-hidden relative hover:shadow-elevated transition-shadow"
               >
-                {photoUrl ? (
-                  <img loading="lazy" decoding="async" src={photoUrl} alt="" className="w-full h-full object-cover" />
+                {!photoLocked ? (
+                  <PhotoFill src={photoUrl} name={c.name} />
                 ) : (
                   <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center">
                     <Lock className="w-6 h-6 text-muted-foreground" />
