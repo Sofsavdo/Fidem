@@ -77,6 +77,16 @@ REACT_APP_BACKEND_URL=https://fidem-backend-production.up.railway.app
 REACT_APP_ADMIN_TELEGRAM_USERNAME=FidemAppSupport   # "Contact admin" link on the Me page
 ```
 
+Product-focus flags (build-time, all OFF by default; set to `1` to bring one back):
+```bash
+REACT_APP_FEATURE_RANKINGS=1      # gift leaderboard + "boost your rank"
+REACT_APP_FEATURE_GIFT_SHOP=1     # gift shop link on the Me page
+REACT_APP_FEATURE_BOOST=1         # paid profile boost
+REACT_APP_FEATURE_LEGACY_TIERS=1  # sell Standard / VIP besides Premium
+```
+Only Free + Premium are on sale by default; existing Standard/VIP subscribers keep
+their plan and benefits.
+
 Runtime (not build-time) variable on the frontend service, optional but
 recommended for speed:
 ```bash

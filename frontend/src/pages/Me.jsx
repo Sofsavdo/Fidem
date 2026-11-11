@@ -8,6 +8,7 @@ import { photoSrc } from "@/lib/photo";
 import { purchasePlan } from "@/lib/purchase";
 import { ChevronRight, Crown, Wallet, Share2, Settings as SettingsIcon, LogOut, ShieldCheck, Clock, SlidersHorizontal, Brain, BookOpen, Phone, Trophy, Rocket, MessageCircle, EyeOff, Camera, Megaphone, Gift } from "lucide-react";
 import BoostModal from "@/components/BoostModal";
+import { FEATURES } from "@/lib/features";
 import LocationVerifyCard from "@/components/LocationVerifyCard";
 import { toast } from "sonner";
 import { useReferral, useSavedSummary, useLeaderboard, QK } from "@/hooks/queries";
@@ -268,20 +269,23 @@ export default function Me() {
 
       {/* Secondary destinations moved out of the bottom bar (4 tabs keep the
           core loop obvious: candidates -> chats -> interests -> profile). */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${FEATURES.giftShop ? 2 : 1}, minmax(0, 1fr))` }}>
         <Link to="/announcements" data-testid="link-announcements" className="flex items-center gap-3 rounded-3xl bg-card border border-border p-4 active:scale-[0.98] transition-transform">
           <Megaphone className="w-5 h-5 text-secondary" />
           <span className="font-medium text-sm">{t("anons")}</span>
         </Link>
-        <Link to="/gifts" data-testid="link-gifts" className="flex items-center gap-3 rounded-3xl bg-card border border-border p-4 active:scale-[0.98] transition-transform">
-          <Gift className="w-5 h-5 text-primary" />
-          <span className="font-medium text-sm">{t("gift")}</span>
-        </Link>
+        {FEATURES.giftShop && (
+          <Link to="/gifts" data-testid="link-gifts" className="flex items-center gap-3 rounded-3xl bg-card border border-border p-4 active:scale-[0.98] transition-transform">
+            <Gift className="w-5 h-5 text-primary" />
+            <span className="font-medium text-sm">{t("gift")}</span>
+          </Link>
+        )}
       </div>
 
       {/* Rankings teaser — replaces the old badges/achievements card, which
           had no real effect on the user. This one is concrete: your actual
           standing, the current #1, and a direct path to climb it. */}
+      {FEATURES.rankings && (
       <Link to="/rankings" data-testid="rankings-teaser" className="block rounded-3xl bg-gradient-to-br from-gold/12 via-card to-secondary/10 border border-gold/25 p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
@@ -298,6 +302,7 @@ export default function Me() {
           <span className="shrink-0 text-xs font-semibold text-gold-dark whitespace-nowrap">{t("rank_boost_cta")} →</span>
         </div>
       </Link>
+      )}
 
       {/* Premium/balance row */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -311,6 +316,7 @@ export default function Me() {
           <p className="font-heading text-lg mt-2">{(user.balance || 0).toLocaleString()} {t("sum")}</p>
           <p className="text-xs text-secondary mt-0.5">{t("app_balance_title")} →</p>
         </Link>
+        {FEATURES.boost && (
         <button
           type="button"
           onClick={() => setBoostOpen(true)}
@@ -324,8 +330,9 @@ export default function Me() {
           <p className="font-heading text-lg mt-2">{t("boost_title")}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{t("boost_me_hint")} →</p>
         </button>
+        )}
       </div>
-      {boostOpen && <BoostModal onClose={() => setBoostOpen(false)} />}
+      {FEATURES.boost && boostOpen && <BoostModal onClose={() => setBoostOpen(false)} />}
 
       {/* Daily streak lives in Sozlamalar (/me/settings) now — Me stays a
           clean overview page. */}

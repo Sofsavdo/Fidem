@@ -340,7 +340,7 @@ function FilterSheet({ filters, setFilters, onClose }) {
               <button
                 type="button"
                 data-testid="filter-district-locked"
-                onClick={() => { onClose(); purchasePlan("standard", { t, navigate, onPaid: refresh }); }}
+                onClick={() => { onClose(); purchasePlan("premium", { t, navigate, onPaid: refresh }); }}
                 className="mt-1.5 flex items-center justify-between w-full rounded-2xl border border-dashed border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground"
               >
                 {t("more_filters_premium_hint") || t("upgrade")}

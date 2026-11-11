@@ -14,10 +14,11 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { QK } from "@/hooks/queries";
 import { openExternalLink } from "@/lib/telegram";
+import { PLAN_PRICES } from "@/lib/purchase";
 
 // Mirrors the Standard plan price in Premium.jsx — shown next to the one-time
 // unlock so the user can compare "pay once" vs "unlimited messaging".
-const STANDARD_PRICE = 34900;
+const STANDARD_PRICE = PLAN_PRICES.premium; // the single paid plan on sale
 
 function formatMsgTime(iso) {
   try {
@@ -137,7 +138,7 @@ export default function Chat() {
     if (unlocking) return;
     setUnlocking(true);
     try {
-      const r = await api.post("/payments/create", { purpose: "standard", amount: STANDARD_PRICE });
+      const r = await api.post("/payments/create", { purpose: "premium", amount: STANDARD_PRICE });
       if (r.data?.status === "paid") {
         toast.success(t("payment_success"));
         await refreshAccess();
@@ -521,7 +522,7 @@ export default function Chat() {
                   className="relative rounded-xl border-2 border-primary bg-primary/5 p-2.5 text-left transition active:scale-[0.98] disabled:opacity-50"
                 >
                   <span className="absolute -top-2 right-2 rounded-full bg-primary text-white text-[8px] font-bold px-1.5 py-0.5 uppercase tracking-wide">{t("best_value")}</span>
-                  <p className="text-[10px] uppercase tracking-wide text-primary font-semibold">Standard</p>
+                  <p className="text-[10px] uppercase tracking-wide text-primary font-semibold">Premium</p>
                   <p className="font-heading text-lg font-bold tabular-nums leading-tight mt-0.5">
                     {STANDARD_PRICE.toLocaleString()}<span className="text-[10px] font-medium opacity-60"> {t("sum")}{t("plan_per_month")}</span>
                   </p>

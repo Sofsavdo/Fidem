@@ -1,3 +1,4 @@
+import { FEATURES } from "@/lib/features";
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { purchasePlan, PLAN_PRICES } from "@/lib/purchase";
@@ -81,8 +82,8 @@ export default function PrivacyCenter() {
 
         {/* Tier 1 — Standard: invisibility (the actual hidden-mode switch) */}
         <Tier
-          name="Standard"
-          price={34900}
+          name={FEATURES.legacyTiers ? "Standard" : "Premium"}
+          price={FEATURES.legacyTiers ? 34900 : PLAN_PRICES.premium}
           included={isPaid}
           control={
             isPaid ? (
@@ -98,13 +99,15 @@ export default function PrivacyCenter() {
                 {user.hidden_profile ? `✓ ${t("privacy_on_state")}` : t("privacy_turn_on")}
               </button>
             ) : (
-              upgradeBtn("standard", t("privacy_get_standard"))
+              upgradeBtn(FEATURES.legacyTiers ? "standard" : "premium", t("privacy_get_standard"))
             )
           }
         >
           {t("privacy_tier_standard")}
         </Tier>
 
+        {FEATURES.legacyTiers && (
+          <>
         {/* Tier 2 — Premium: incognito viewing */}
         <Tier
           name="Premium"
@@ -141,8 +144,11 @@ export default function PrivacyCenter() {
           {t("privacy_tier_vip")}
         </Tier>
 
+          </>
+        )}
+
         {/* Full-privacy CTA */}
-        {!isVip && (
+        {FEATURES.legacyTiers && !isVip && (
           <Link
             to="/premium?tab=plans&hl=vip"
             data-testid="privacy-full-vip-cta"

@@ -10,7 +10,8 @@ import { PageHead, Segmented, Price, SectionLabel } from "@/components/kit";
 import { purposeLabel } from "@/lib/labels";
 import { tapMedium, tapLight, notify } from "@/lib/haptics";
 import { openExternalLink } from "@/lib/telegram";
-import { PLAN_RANK } from "@/lib/purchase";
+import { PLAN_RANK, PLAN_PRICES } from "@/lib/purchase";
+import { FEATURES } from "@/lib/features";
 
 const CHAT_UNLOCK_PRICE = 4900; // mirrors backend PRICE_CHAT_UNLOCK_UZS (comparison only)
 
@@ -23,11 +24,11 @@ const PLANS = [
   // FREE_WEEKLY_INITIATIONS) - paid plans have unlimited messaging, so
   // advertising "1 free chat/week" on Standard was wrong.
   { key: "free", title: "Free", price: 0, accent: "border-border",
-    perks: ["profile", "candidates", "likes_matches", "chat_replies", "chat_free_weekly_perk"] },
+    perks: ["profile", "candidates", "likes_matches", "chat_replies"] },
   { key: "standard", title: "Standard", price: 34900, prices: { 1: 34900, 3: 89000, 12: 299000 }, badge: "✅", accent: "border-secondary/50",
     perks: ["chat_unlimited", "more_filters", "privacy_hidden"] },
   { key: "premium", title: "Premium", price: 79000, prices: { 1: 79000, 3: 199000, 12: 649000 }, badge: "💎", popular: true, accent: "border-gold",
-    perks: ["chat_unlimited", "who_viewed", "who_saved", "boost_visibility", "privacy_incognito"] },
+    perks: ["chat_unlimited", "contact_share", "who_viewed", "who_saved", "more_filters", "privacy_incognito"] },
   { key: "vip", title: "VIP", price: 199000, prices: { 1: 199000, 3: 499000, 12: 1699000 }, badge: "👑", dark: true, accent: "border-white/10",
     perks: ["max_visibility", "stealth_view", "photo_peek", "priority", "family_share"] },
 ];
@@ -36,17 +37,17 @@ const DURATIONS = [1, 3, 12];
 
 const PERK = {
   uz: { profile: "Profil", candidates: "Nomzodlar", likes_matches: "Yoqtirish va moslik", chat_replies: "Kelgan xabarga bepul javob",
-    chat_unlimited: "Cheksiz yozishish", chat_free_weekly_perk: "Haftada 1 bepul suhbat boshlash", more_filters: "Ko'proq filtrlar",
+    contact_share: "Telegram/telefon almashish", chat_unlimited: "Cheksiz yozishish", chat_free_weekly_perk: "Haftada 1 bepul suhbat boshlash", more_filters: "Ko'proq filtrlar",
     who_viewed: "Kim ko'rdi", who_saved: "Kim saqladi", boost_visibility: "Ko'rinish oshadi",
     privacy_hidden: "Maxfiy rejim (ko'rinmaslik)", privacy_incognito: "Incognito ko'rish (iz qoldirmaydi)", photo_peek: "Yopiq rasmni 5 soniya ochish",
     max_visibility: "Maksimal ko'rinish", stealth_view: "Maxfiy ko'rish", priority: "Ustuvorlik", family_share: "Oila ulashish" },
   ru: { profile: "Профиль", candidates: "Кандидаты", likes_matches: "Лайки и совпадения", chat_replies: "Бесплатный ответ на входящие",
-    chat_unlimited: "Безлимит сообщений", chat_free_weekly_perk: "1 бесплатный чат в неделю", more_filters: "Больше фильтров",
+    contact_share: "Обмен Telegram/телефоном", chat_unlimited: "Безлимит сообщений", chat_free_weekly_perk: "1 бесплатный чат в неделю", more_filters: "Больше фильтров",
     who_viewed: "Кто смотрел", who_saved: "Кто сохранил", boost_visibility: "Больше видимости",
     privacy_hidden: "Скрытый режим (невидимость)", privacy_incognito: "Инкогнито-просмотр (без следов)", photo_peek: "Открыть закрытое фото на 5 секунд",
     max_visibility: "Максимум видимости", stealth_view: "Скрытый просмотр", priority: "Приоритет", family_share: "Семейный доступ" },
   en: { profile: "Profile", candidates: "Candidates", likes_matches: "Likes & matches", chat_replies: "Free reply to incoming",
-    chat_unlimited: "Unlimited messaging", chat_free_weekly_perk: "1 free chat / week", more_filters: "More filters",
+    contact_share: "Share Telegram/phone", chat_unlimited: "Unlimited messaging", chat_free_weekly_perk: "1 free chat / week", more_filters: "More filters",
     who_viewed: "Who viewed", who_saved: "Who saved", boost_visibility: "More visibility",
     privacy_hidden: "Hidden mode (invisibility)", privacy_incognito: "Incognito viewing (no traces)", photo_peek: "Open a locked photo for 5s",
     max_visibility: "Max visibility", stealth_view: "Stealth view", priority: "Priority", family_share: "Family sharing" },
@@ -199,7 +200,13 @@ export default function Premium() {
             ))}
           </div>
 
-          {PLANS.map((p) => {
+          {PLANS.filter((p) => {
+            // One paid plan is on sale (Premium). Standard/VIP only appear for
+            // people who already hold them - or everywhere when the legacy
+            // flag is on - so nobody loses sight of what they paid for.
+            if (p.key === "free" || p.key === "premium" || FEATURES.legacyTiers) return true;
+            return (user?.plan || "free") === p.key;
+          }).map((p) => {
             const isCurrent = (user?.plan || "free") === p.key;
             // VIP already includes everything Standard/Premium do - showing
             // an active "buy" button for a tier the user has already
@@ -285,7 +292,7 @@ export default function Premium() {
 
           {/* Value comparison — compact */}
           {(() => {
-            const n = Math.ceil(34900 / CHAT_UNLOCK_PRICE);
+            const n = Math.ceil(PLAN_PRICES.premium / CHAT_UNLOCK_PRICE);
             return (
               <div className="rounded-3xl border border-gold/30 bg-gold-light/20 p-3.5" data-testid="plan-value-compare">
                 <SectionLabel className="text-gold-dark">{t("plan_compare_title")}</SectionLabel>
@@ -296,7 +303,7 @@ export default function Premium() {
                   </div>
                   <div className="grid place-items-center text-muted-foreground text-[11px] font-medium">vs</div>
                   <div className="flex-1 rounded-2xl bg-secondary/10 border border-secondary/30 p-2.5 text-center">
-                    <p className="text-sm font-semibold text-secondary tabular-nums">34,900</p>
+                    <p className="text-sm font-semibold text-secondary tabular-nums">{PLAN_PRICES.premium.toLocaleString()}</p>
                     <p className="text-[10px] text-secondary/90 mt-0.5">{t("plan_compare_unlimited")}</p>
                   </div>
                 </div>
