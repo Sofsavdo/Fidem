@@ -85,7 +85,7 @@ export default function Settings() {
           <label className="block text-xs font-semibold text-muted-foreground mb-1.5">{t("region")}</label>
           <RegionSelect
             testid="set-region"
-            country={f.country}
+            country={f.country || user?.country || "Uzbekistan"}
             value={f.region}
             onChange={(r) => setF({ ...f, region: r })}
             placeholder={t("select_region") || "Select region"}

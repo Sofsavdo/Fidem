@@ -292,12 +292,12 @@ export default function ProfileDetail() {
             data-testid="profile-tier-upsell"
             onClick={() => {
               posthog.capture("profile_tier_upsell_click", { candidate_id: c.id, candidate_plan: c.plan });
-              purchasePlan(c.plan === "vip" ? "vip" : "premium", { t, navigate: nav, onPaid: refresh });
+              purchasePlan("premium", { t, navigate: nav, onPaid: refresh });
             }}
             className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-gold/15 to-card border border-gold/30 p-3.5 active:scale-[0.98] transition"
           >
             <Crown className="w-5 h-5 text-gold-dark shrink-0" />
-            <p className="text-sm flex-1 min-w-0">{t("profile_tier_upsell_hint").replace("{plan}", c.plan === "vip" ? "VIP" : "Premium")}</p>
+            <p className="text-sm flex-1 min-w-0">{t("profile_tier_upsell_hint").replace("{plan}", "Premium")}</p>
             <span className="text-xs font-semibold text-gold-dark shrink-0">{t("plan_choose_cta")}</span>
           </button>
         )}
