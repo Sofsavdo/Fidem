@@ -79,11 +79,26 @@ async def update_privacy_settings(req: PrivacySettingsRequest, uid: str = Depend
     if req.photo_public is not None:
         updates["photo_public"] = bool(req.photo_public)
     if req.hidden_profile is not None:
-        if req.hidden_profile and me.get("plan", "free") not in PAID_PLANS:
-            raise HTTPException(403, "privacy_requires_plan")
-        if req.hidden_profile and me.get("boost_until") and me["boost_until"] > iso(now_utc()):
-            # An active (paid) boost would keep charging for zero visibility.
-            raise HTTPException(400, "privacy_boost_active")
+        plan = me.get("plan", "free")
+        now_iso = iso(now_utc())
+        boost_until = me.get("boost_until") or ""
+        boost_active = bool(boost_until and boost_until > now_iso)
+        # Premium/VIP bundle a boost that lasts exactly as long as the plan
+        # (boost_until == plan_until). That bundled boost must not lock the
+        # plan's own privacy perks (hidden mode / incognito) - only a boost the
+        # user bought separately conflicts with hiding.
+        bundled_boost = boost_active and plan in ("premium", "vip") and boost_until == me.get("plan_until")
+        if req.hidden_profile:
+            if plan not in PAID_PLANS:
+                raise HTTPException(403, "privacy_requires_plan")
+            if boost_active and not bundled_boost:
+                # An active (paid) boost would keep charging for zero visibility.
+                raise HTTPException(400, "privacy_boost_active")
+            if bundled_boost:
+                updates["boost_until"] = ""  # paused while invisible
+        elif me.get("hidden_profile") and plan in ("premium", "vip") and (me.get("plan_until") or "") > now_iso:
+            # Visible again: hand back the boost that comes with the plan.
+            updates["boost_until"] = me["plan_until"]
         updates["hidden_profile"] = bool(req.hidden_profile)
     if updates:
         await db.users.update_one({"id": uid}, {"$set": updates})

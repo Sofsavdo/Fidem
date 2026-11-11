@@ -13,7 +13,9 @@ router = APIRouter(prefix="/family", tags=["family"])
 
 
 def _is_vip(u: dict) -> bool:
-    return u.get("plan") == "vip"
+    """Family mode belongs to Premium and VIP (VIP is no longer sold on its
+    own, so gating it to VIP made the feature unreachable for new buyers)."""
+    return u.get("plan") in ("premium", "vip")
 
 
 @router.patch("/contacts")

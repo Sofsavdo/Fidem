@@ -251,8 +251,18 @@ export default function Chat() {
     } catch (e) {
       console.error("Send message error:", e);
       const detail = (e.response?.data?.detail || "").toString();
-      toast.error(detail === "contact_free_blocked" ? t("contact_free_blocked_error") : (detail || e.message || t("error")));
+      // Never show a raw backend code to the user.
+      const known = {
+        contact_free_blocked: "contact_free_blocked_error",
+        message_too_long: "msg_too_long_error",
+        empty_message: "msg_empty_error",
+        blocked: "msg_blocked_error",
+        muted: "msg_muted_error",
+      };
+      toast.error(t(known[detail] || "error_generic"));
       setMessages((prev) => prev.filter((m) => m.id !== tempMsg.id));
+      // Give the text back so a too-long message can be shortened, not retyped.
+      if (detail === "message_too_long") setText(finalText);
       load();
     } finally { setSending(false); }
   };
@@ -586,6 +596,7 @@ export default function Chat() {
             {!access?.requires_unlock && <div className="shrink-0"><ChatVoiceRecorder onSend={sendVoice} /></div>}
             <input
               data-testid="chat-input"
+              maxLength={2000}
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !access?.requires_unlock && send()}

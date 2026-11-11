@@ -37,7 +37,7 @@ export default function ProfileDetail() {
   }, [showTierUpsell, c?.id]);
 
   const requestFamily = useCallback(async () => {
-    if (user?.plan !== "vip") {
+    if (!["premium", "vip"].includes(user?.plan)) {
       toast.error(t("family_vip_only"));
       nav("/premium");
       return;

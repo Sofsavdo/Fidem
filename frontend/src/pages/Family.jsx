@@ -63,7 +63,7 @@ export default function Family() {
     return <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full ${m.cls}`}>{m.icon}{m.label}</span>;
   };
 
-  const isVip = user?.plan === "vip";
+  const isVip = ["premium", "vip"].includes(user?.plan); // Premium+ (VIP is legacy)
 
   return (
     <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-6">
@@ -78,7 +78,7 @@ export default function Family() {
         <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 flex gap-3">
           <Crown className="w-5 h-5 text-amber-600 shrink-0" />
           <div className="text-sm">
-            <p className="font-medium text-amber-900">VIP</p>
+            <p className="font-medium text-amber-900">Premium</p>
             <p className="text-amber-800 mt-1">{t("family_vip_only")} <Link to="/premium" className="underline font-medium">{t("upgrade_plan")}</Link></p>
           </div>
         </div>

@@ -8,6 +8,7 @@ import { useDailyStatus, QK } from "@/hooks/queries";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { photoSrc } from "@/lib/photo";
 import { getTheme, setTheme } from "@/lib/theme";
+import { FEATURES } from "@/lib/features";
 
 // Client-side duration probe: reject anything over ~16s before uploading.
 function probeVideoDuration(file) {
@@ -230,7 +231,7 @@ export default function MeSettings() {
                 <Video className="w-4 h-4" /> {videoBusy ? "..." : t("video_upload_btn")}
               </button>
             </>
-          ) : (
+          ) : FEATURES.legacyTiers ? (
             <Link
               to="/premium?tab=plans&hl=vip"
               data-testid="video-intro-vip-cta"
@@ -238,7 +239,7 @@ export default function MeSettings() {
             >
               <Crown className="w-4 h-4" /> {t("privacy_get_vip")}
             </Link>
-          )}
+          ) : null}
         </div>
 
         {/* Daily streak — moved here from the Me front page. Retires

@@ -240,6 +240,10 @@ async def chat_unlock(
 
 
 # ---------- Messages ----------
+# Longest chat message accepted (voice/video carry their own limits).
+MAX_MESSAGE_CHARS = 2000
+
+
 @router.get("/messages/chats")
 async def list_chats(uid: str = Depends(get_current_user_id), limit: int = Query(20)):
     """List user's chats with pagination. Optimized with parallel queries."""
@@ -461,6 +465,10 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
     else:
         # Sanitize text to prevent XSS
         sanitized_text = sanitize_text(req.text, allow_tags=False)
+        if not sanitized_text.strip():
+            raise HTTPException(400, "empty_message")
+        if len(sanitized_text) > MAX_MESSAGE_CHARS:
+            raise HTTPException(400, "message_too_long")
         ok, reason = quick_moderation(sanitized_text)
         if not ok:
             raise HTTPException(422, reason)
