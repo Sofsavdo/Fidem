@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { VerifiedBadge, FinancialBadge, PlanPill } from "@/components/Badges";
-import PhotoUpload from "@/components/PhotoUpload";
 import PhotoGallery from "@/components/PhotoGallery";
 import { photoSrc } from "@/lib/photo";
 import { purchasePlan } from "@/lib/purchase";
@@ -12,7 +11,7 @@ import BoostModal from "@/components/BoostModal";
 import { FEATURES } from "@/lib/features";
 import LocationVerifyCard from "@/components/LocationVerifyCard";
 import { toast } from "sonner";
-import { useReferral, useSavedSummary, useLeaderboard, QK } from "@/hooks/queries";
+import { useReferral, useSavedSummary, useLeaderboard, usePaymentConfig, QK } from "@/hooks/queries";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 
 // Static support contact - a real Telegram account admins actually monitor,
@@ -32,6 +31,7 @@ function openSupportChat() {
 
 export default function Me() {
   const { user, t, logout, refresh, wsEvent } = useApp();
+  const { data: payCfg } = usePaymentConfig();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [boostOpen, setBoostOpen] = useState(false);
@@ -65,6 +65,8 @@ export default function Me() {
 
   if (!user) return null;
 
+  // The wallet only matters once there is money in it or top-ups are possible.
+  const showBalance = (user.balance || 0) > 0 || !!payCfg?.payments_available;
   const isPaidPlan = ["standard", "premium", "vip"].includes(user.plan);
 
   return (
@@ -91,16 +93,9 @@ export default function Me() {
       {/* Profile card — single tappable photo (avatar), no duplicate upload block */}
       <div className="rounded-3xl bg-card border border-border p-4 shadow-soft" data-testid="me-profile-card">
         <div className="flex items-center gap-4">
-          <PhotoUpload
-            avatar
-            name={user.name}
-            value={user.photo_url}
-            onChange={async (url) => {
-              await api.patch("/profile", { photo_url: url });
-              await refresh();
-            }}
-            testid="me-photo-upload"
-          />
+          <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-muted shrink-0" data-testid="me-avatar">
+            {user.photo_url && <img src={photoSrc(user.photo_url)} alt="" className="w-full h-full object-cover" />}
+          </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-medium text-lg truncate">{user.name}, {user.age}</p>
@@ -309,16 +304,18 @@ export default function Me() {
 
       {/* Premium/balance row */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <Link to="/premium?tab=plans" data-testid="link-premium" className="rounded-3xl bg-gradient-to-br from-ink to-zinc-800 text-white p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform">
+        <Link to="/premium?tab=plans" data-testid="link-premium" className={`rounded-3xl bg-gradient-to-br from-ink to-zinc-800 text-white p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform ${showBalance ? "" : "col-span-2 md:col-span-1"}`}>
           <Crown className="w-5 h-5 text-gold" />
           <p className="font-heading text-lg mt-2">{t("premium")}</p>
           <p className="text-xs text-white/70 mt-0.5">{t("premium_subtitle")} →</p>
         </Link>
+        {showBalance && (
         <Link to="/premium?tab=balance" data-testid="link-balance" className="rounded-3xl bg-card border border-border p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform">
           <Wallet className="w-5 h-5 text-secondary" />
           <p className="font-heading text-lg mt-2">{(user.balance || 0).toLocaleString()} {t("sum")}</p>
           <p className="text-xs text-secondary mt-0.5">{t("app_balance_title")} →</p>
         </Link>
+        )}
         {FEATURES.boost && (
         <button
           type="button"

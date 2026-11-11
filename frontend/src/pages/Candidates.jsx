@@ -80,13 +80,13 @@ function DailyPicksStrip({ t }) {
       <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 flex items-center gap-1.5">
         ✨ {t("daily_picks_title")}
       </p>
-      <div className="flex gap-2.5 overflow-x-auto no-scrollbar -mx-4 px-4">
+      <div className="grid grid-cols-3 gap-2.5">
         {picks.map((p) => (
           <Link
             key={p.id}
             to={`/candidate/${p.id}`}
             data-testid={`daily-pick-${p.id}`}
-            className="shrink-0 w-32 rounded-3xl bg-card border border-gold/30 overflow-hidden active:scale-[0.97] transition"
+            className="min-w-0 rounded-3xl bg-card border border-gold/30 overflow-hidden active:scale-[0.97] transition"
           >
             <div className="relative aspect-[4/5] bg-muted">
               <PhotoFill src={photoSrc(p.photo_url)} />
@@ -108,6 +108,15 @@ export default function Candidates() {
   const [showFilter, setShowFilter] = useState(false);
   const [filters, setFilters] = useState({ sort: "match", verified_only: false, financial_only: false });
   const isPaid = ["premium", "vip"].includes(user?.plan);
+
+  const activeCount =
+    (filters.sort && filters.sort !== "match" ? 1 : 0) +
+    (filters.verified_only ? 1 : 0) +
+    (filters.financial_only ? 1 : 0) +
+    (filters.country ? 1 : 0) +
+    (filters.region ? 1 : 0) +
+    (filters.district ? 1 : 0) +
+    (filters.age_min || filters.age_max ? 1 : 0);
 
   const { data: items = [], isLoading } = useCandidates(filters);
   const { data: savedList = [] } = useSaved("mine");
@@ -143,65 +152,40 @@ export default function Candidates() {
             {items.length} {t("candidates").toLowerCase()}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            data-testid="open-filter"
-            onClick={() => setShowFilter(true)}
-            className="rounded-full bg-card border border-border p-3 hover:bg-muted transition"
-          >
-            <SlidersHorizontal className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* sort pills */}
-      <div className="flex gap-2 mb-3 overflow-x-auto no-scrollbar">
-        {["match", "active", "new"].map((s) => (
-          <button
-            key={s}
-            data-testid={`sort-${s}`}
-            onClick={() => setFilters((f) => ({ ...f, sort: s }))}
-            className={`rounded-full px-3 py-1.5 text-xs whitespace-nowrap border transition ${
-              filters.sort === s
-                ? "bg-foreground text-background border-foreground"
-                : "bg-card border-border"
-            }`}
-          >
-            {t(`sort_${s}`)}
-          </button>
-        ))}
         <button
-          data-testid="sort-verified"
-          onClick={() => setFilters((f) => ({ ...f, verified_only: !f.verified_only }))}
-          className={`rounded-full px-3 py-1.5 text-xs whitespace-nowrap border transition ${
-            filters.verified_only ? "bg-secondary text-white border-secondary" : "bg-card border-border"
-          }`}
+          data-testid="open-filter"
+          onClick={() => setShowFilter(true)}
+          className="relative inline-flex items-center gap-2 rounded-full bg-card border border-border pl-3.5 pr-4 py-2.5 text-sm font-medium hover:bg-muted transition"
         >
-          ✓ {t("only_verified")}
-        </button>
-        <button
-          data-testid="sort-financial"
-          onClick={() => setFilters((f) => ({ ...f, financial_only: !f.financial_only }))}
-          className={`rounded-full px-3 py-1.5 text-xs whitespace-nowrap border transition ${
-            filters.financial_only ? "bg-gold text-ink border-gold" : "bg-card border-border"
-          }`}
-        >
-          💎 {t("only_financial")}
-        </button>
-        <button
-          data-testid="sort-vip"
-          onClick={() => setFilters((f) => ({ ...f, vip_only: !f.vip_only }))}
-          className={`rounded-full px-3 py-1.5 text-xs whitespace-nowrap border transition ${
-            filters.vip_only ? "bg-ink text-gold border-ink" : "bg-card border-border"
-          }`}
-        >
-          👑 VIP
+          <SlidersHorizontal className="w-4 h-4" />
+          {t("filter")}
+          {activeCount > 0 && (
+            <span data-testid="filter-count" className="min-w-[18px] h-[18px] px-1 grid place-items-center rounded-full bg-primary text-white text-[10px] font-bold">{activeCount}</span>
+          )}
         </button>
       </div>
 
       {/* Active filter chips */}
-      {(filters.country || filters.region || filters.district || filters.age_min || filters.age_max) && (
+      {activeCount > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-3" data-testid="active-filter-chips">
+          {filters.sort && filters.sort !== "match" && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-foreground px-2.5 py-1 text-[11px] font-medium">
+              {t(`sort_${filters.sort}`)}
+              <button onClick={() => setFilters((f) => ({ ...f, sort: "match" }))} className="ml-0.5 hover:opacity-70" data-testid="chip-clear-sort"><X className="w-3 h-3" /></button>
+            </span>
+          )}
+          {filters.verified_only && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-foreground px-2.5 py-1 text-[11px] font-medium">
+              ✓ {t("only_verified")}
+              <button onClick={() => setFilters((f) => ({ ...f, verified_only: false }))} className="ml-0.5 hover:opacity-70" data-testid="chip-clear-verified"><X className="w-3 h-3" /></button>
+            </span>
+          )}
+          {filters.financial_only && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-foreground px-2.5 py-1 text-[11px] font-medium">
+              💎 {t("only_financial")}
+              <button onClick={() => setFilters((f) => ({ ...f, financial_only: false }))} className="ml-0.5 hover:opacity-70" data-testid="chip-clear-financial"><X className="w-3 h-3" /></button>
+            </span>
+          )}
           {filters.country && (
             <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-foreground px-2.5 py-1 text-[11px] font-medium">
               <MapPin className="w-3 h-3" /> {filters.country}
@@ -290,6 +274,45 @@ function FilterSheet({ filters, setFilters, onClose }) {
           </button>
         </div>
         <div className="space-y-4">
+          <div>
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">{t("filter_sort_title")}</span>
+            <div className="mt-1.5 grid grid-cols-3 gap-2">
+              {["match", "active", "new"].map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  data-testid={`sort-${k}`}
+                  onClick={() => setLocal({ ...local, sort: k })}
+                  className={`rounded-2xl border px-2 py-2.5 text-xs font-medium transition ${
+                    (local.sort || "match") === k ? "bg-foreground text-background border-foreground" : "bg-card border-border"
+                  }`}
+                >
+                  {t(`sort_${k}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">{t("filter_only_title")}</span>
+            <div className="mt-1.5 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                data-testid="sort-verified"
+                onClick={() => setLocal({ ...local, verified_only: !local.verified_only })}
+                className={`rounded-2xl border px-3 py-2.5 text-xs font-medium transition ${local.verified_only ? "bg-secondary text-white border-secondary" : "bg-card border-border"}`}
+              >
+                ✓ {t("only_verified")}
+              </button>
+              <button
+                type="button"
+                data-testid="sort-financial"
+                onClick={() => setLocal({ ...local, financial_only: !local.financial_only })}
+                className={`rounded-2xl border px-3 py-2.5 text-xs font-medium transition ${local.financial_only ? "bg-gold text-ink border-gold" : "bg-card border-border"}`}
+              >
+                💎 {t("only_financial")}
+              </button>
+            </div>
+          </div>
           <label className="block">
             <span className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <MapPin className="w-3.5 h-3.5" /> {t("country")}

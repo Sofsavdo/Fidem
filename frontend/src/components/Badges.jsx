@@ -64,13 +64,8 @@ export function OnlineDot({ online }) {
 }
 
 export function PlanPill({ plan }) {
-  if (plan === "vip")
-    return (
-      <span className="rounded-full px-2 py-0.5 text-[10px] bg-ink text-gold border border-gold/30 font-medium">
-        VIP 👑
-      </span>
-    );
-  if (plan === "premium")
+  // VIP is retired: anyone still holding it is shown as Premium.
+  if (plan === "vip" || plan === "premium")
     return (
       <span className="rounded-full px-2 py-0.5 text-[10px] bg-gold-light text-yellow-900 border border-gold/40 font-medium">
         Premium 💎

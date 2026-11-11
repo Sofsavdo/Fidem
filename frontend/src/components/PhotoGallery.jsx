@@ -55,12 +55,12 @@ export default function PhotoGallery() {
     <div className="rounded-3xl bg-card border border-border p-4 shadow-soft" data-testid="photo-gallery">
       <p className="font-heading text-base font-semibold">{t("gallery_title")}</p>
       <p className="text-xs text-muted-foreground mt-0.5 mb-3">{t("gallery_hint").replace("{n}", MAX_EXTRA)}</p>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         {user.photo_url && (
           <div className="relative aspect-[4/5] rounded-2xl overflow-hidden bg-muted" data-testid="gallery-main">
             <img src={photoSrc(user.photo_url)} alt="" className="w-full h-full object-cover" />
-            <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-black/60 text-white text-[10px] px-2 py-0.5">
-              <Star className="w-3 h-3" /> {t("gallery_main")}
+            <span title={t("gallery_main")} aria-label={t("gallery_main")} className="absolute left-1.5 top-1.5 w-6 h-6 grid place-items-center rounded-full bg-black/60 text-white">
+              <Star className="w-3 h-3" />
             </span>
           </div>
         )}
@@ -82,7 +82,7 @@ export default function PhotoGallery() {
               disabled={busy}
               onClick={() => makeMain(url)}
               data-testid="gallery-make-main"
-              className="absolute inset-x-1.5 bottom-1.5 rounded-full bg-black/60 text-white text-[10px] py-1 disabled:opacity-50"
+              className="absolute inset-x-1 bottom-1 rounded-full bg-black/60 text-white text-[9px] py-0.5 disabled:opacity-50"
             >
               {t("gallery_make_main")}
             </button>

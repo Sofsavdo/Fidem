@@ -62,7 +62,7 @@ function CandidateCardInner({ c, onSave, saved }) {
               <MapPin className="w-3 h-3 shrink-0" />
               {c.region}
               {c.distance_bucket ? ` · ${c.distance_bucket} ${t("away")}` : ""}
-              {" · "}{formatLastActive(c.last_active_minutes, t, c.online)}
+              {(() => { const la = formatLastActive(c.last_active_minutes, t, c.online); return la && la !== "—" ? ` · ${la}` : ""; })()}
             </p>
           </div>
         </div>

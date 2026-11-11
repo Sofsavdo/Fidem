@@ -16,6 +16,8 @@ function png(r, g, b) {
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 }
 (async () => {
+  // start from a clean gallery so the test is repeatable
+  await fetch('http://localhost:18100/api/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + U['qa@fidem.uz'].token }, body: JSON.stringify({ photos: [] }) });
   const b = await chromium.launch();
   let ok = true;
   const check = (n, c) => { console.log((c ? 'PASS ' : 'FAIL ') + n); if (!c) ok = false; };
