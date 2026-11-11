@@ -4,7 +4,7 @@
 // page — an extra navigation step measurably kills purchase intent.
 import api from "@/lib/api";
 import { toast } from "sonner";
-import { openExternalLink } from "@/lib/telegram";
+import { startPayment, payErrorText } from "@/lib/payFlow";
 
 export const PLAN_PRICES = { standard: 34900, premium: 79000, vip: 199000 };
 
@@ -31,12 +31,7 @@ export async function purchasePlan(plan, { t, navigate, onPaid } = {}) {
       if (onPaid) await onPaid();
       return true;
     }
-    if (r.data?.payment_link) {
-      openExternalLink(r.data.payment_link);
-      if (t) toast.info(t("redirecting_payment"));
-      return true;
-    }
-    return false;
+    return startPayment(r.data, t);
   } catch (e) {
     const detail = (e?.response?.data?.detail || "").toString();
     if (detail === "click_disabled") {
@@ -46,7 +41,7 @@ export async function purchasePlan(plan, { t, navigate, onPaid } = {}) {
       // the user shouldn't have to remember/re-enter what they were buying.
       if (navigate) navigate(`/premium?tab=balance&amount=${PLAN_PRICES[plan]}`);
     } else if (t) {
-      toast.error(t("error_generic"));
+      toast.error(payErrorText(detail, t) || t("error_generic"));
     }
     return false;
   } finally {

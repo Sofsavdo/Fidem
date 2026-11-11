@@ -10,7 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { PageHead, Segmented, Price, SectionLabel } from "@/components/kit";
 import { purposeLabel } from "@/lib/labels";
 import { tapMedium, tapLight, notify } from "@/lib/haptics";
-import { openExternalLink } from "@/lib/telegram";
+import { startPayment, payErrorText } from "@/lib/payFlow";
 import { PLAN_RANK, PLAN_PRICES } from "@/lib/purchase";
 
 const CHAT_UNLOCK_PRICE = 4900; // mirrors backend PRICE_CHAT_UNLOCK_UZS (comparison only)
@@ -147,11 +147,9 @@ export default function Premium() {
         refresh();
       } else {
         if (r.data.balance_used > 0) {
-          toast.success(`${t("balance_used")}: ${Number(r.data.balance_used).toLocaleString()} ${t("sum")} · ${t("pay_with_click")}: ${Number(r.data.click_amount).toLocaleString()} ${t("sum")}`);
-        } else {
-          toast.success(t("pay_with_click"));
+          toast.success(`${t("balance_used")}: ${Number(r.data.balance_used).toLocaleString()} ${t("sum")}`);
         }
-        if (r.data.payment_link) openExternalLink(r.data.payment_link);
+        startPayment(r.data, t);
       }
       queryClient.invalidateQueries({ queryKey: QK.payments });
     } catch (e) {
@@ -160,7 +158,7 @@ export default function Premium() {
         toast.info(t("click_disabled_error"));
         setSearchParams({ tab: "balance", amount: String(amount) });
       } else {
-        toast.error(t("error_generic"));
+        toast.error(payErrorText(detail, t) || t("error_generic"));
       }
     } finally { setCreating(false); }
   };

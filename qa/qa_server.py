@@ -5,6 +5,8 @@ os.environ.update(
     ENVIRONMENT="development", ADMIN_PASSWORD="AdminQa#2026", CORS_ORIGINS="*",
     FREE_WEEKLY_INITIATIONS="0", DAILY_STREAK_ENABLED="0",
 )
+if os.environ.get("QA_HAMYON") == "1":   # payments through qa/fake_hamyon.py on :18102
+    os.environ.update(HAMYON_BASE_URL="http://127.0.0.1:18102", HAMYON_SHOP_ID="355", HAMYON_SHOP_KEY="qa-shop-key")
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "backend"))
 import mongomock_motor
 import core

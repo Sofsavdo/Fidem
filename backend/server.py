@@ -121,6 +121,8 @@ async def startup() -> None:
     # One small real AI call: its result goes to the log and the admin panel.
     from ai_service import ai_self_check
     asyncio.create_task(ai_self_check())
+    from hamyon import hamyon_enabled
+    log.info("Payments: Hamyon %s", "ON" if hamyon_enabled() else "OFF (HAMYON_SHOP_ID / HAMYON_SHOP_KEY not set)")
 
     # Re-engagement notifications for inactive users - runs on its own
     # interval for the life of the process, no external cron needed.

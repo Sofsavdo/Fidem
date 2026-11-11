@@ -38,9 +38,11 @@ async def admin_config_health(_: str = Depends(get_current_admin)):
     admin_bot_info = await get_bot_info(ADMIN_BOT_TOKEN) if ADMIN_BOT_TOKEN else None
 
     from ai_service import AI_STATUS
+    from hamyon import hamyon_enabled
 
     return {
         "ai": dict(AI_STATUS),
+        "hamyon_configured": hamyon_enabled(),
         "telegram_admin_count": len(admin_ids),
         "telegram_configured": len(admin_ids) > 0,
         "admin_bot_configured": bool(ADMIN_BOT_TOKEN),

@@ -43,7 +43,7 @@ async def create_concierge_order(
         {"user_id": uid, "status": {"$in": ["active", "in_progress"]}}
     )
     if existing:
-        raise HTTPException(400, "Sizda allaqachon faol Sovchi Concierge buyurtmasi bor")
+        raise HTTPException(400, "Sizda allaqachon faol Shaxsiy sovchi buyurtmasi bor")
 
     order_id = new_id()
 
@@ -68,6 +68,28 @@ async def create_concierge_order(
         await db.concierge_orders.insert_one(order)
         order.pop("_id", None)
         return {"order": order, "payment_link": None}
+
+    from hamyon import hamyon_enabled
+    if hamyon_enabled():
+        from routers.payments_r import generate_payment_id, start_hamyon_payment
+        pid = await generate_payment_id()
+        order = {
+            "id": order_id,
+            "user_id": uid,
+            "amount": CONCIERGE_PRICE_UZS,
+            "status": "awaiting_payment",
+            "matches": [],
+            "payment_id": pid,
+            "payment_method": "hamyon",
+            "created_at": iso(now_utc()),
+        }
+        await db.concierge_orders.insert_one(order)
+        order.pop("_id", None)
+        payment = await start_hamyon_payment({
+            "id": pid, "user_id": uid, "amount": CONCIERGE_PRICE_UZS, "purpose": "concierge",
+            "order_id": order_id, "months": 1, "balance_used": 0, "click_amount": CONCIERGE_PRICE_UZS,
+        })
+        return {"order": order, "payment_link": None, "payment": payment}
 
     # CLICK payment flow
     # P2P mode = CLICK is temporarily disabled by the admin; see payments_r.py

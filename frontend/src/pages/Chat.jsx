@@ -14,7 +14,7 @@ import { tapLight } from "@/lib/haptics";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { QK, usePaymentConfig } from "@/hooks/queries";
-import { openExternalLink } from "@/lib/telegram";
+import { startPayment, payErrorText, onPaid } from "@/lib/payFlow";
 import { PLAN_PRICES } from "@/lib/purchase";
 import { FEATURES } from "@/lib/features";
 
@@ -109,8 +109,7 @@ export default function Chat() {
     try {
       if (method === "click") {
         const r = await api.post("/payments/create", { purpose: "chat_unlock", target_user_id: otherId });
-        if (r.data?.payment_link) openExternalLink(r.data.payment_link);
-        toast.info(t("redirecting_payment") || "To'lov sahifasiga o'tilmoqda...");
+        startPayment(r.data, t);
       } else {
         await api.post("/chat/unlock", { target_id: otherId, method });
         toast.success(t("chat_unlocked") || "Suhbat ochildi ✅");
@@ -122,7 +121,7 @@ export default function Chat() {
         toast.info(t("click_disabled_error"));
         nav(`/premium?tab=balance&amount=${access?.price_uzs || 0}`);
       } else {
-        toast.error("Error");
+        toast.error(payErrorText(detail, t) || t("error_generic"));
       }
     } finally {
       setUnlocking(false);
@@ -148,9 +147,8 @@ export default function Chat() {
       if (r.data?.status === "paid") {
         toast.success(t("payment_success"));
         await refreshAccess();
-      } else if (r.data?.payment_link) {
-        openExternalLink(r.data.payment_link);
-        toast.info(t("redirecting_payment") || "To'lov sahifasiga o'tilmoqda...");
+      } else {
+        startPayment(r.data, t);
       }
     } catch (err) {
       const detail = (err?.response?.data?.detail || "").toString();
@@ -158,12 +156,17 @@ export default function Chat() {
         toast.info(t("click_disabled_error"));
         nav(`/premium?tab=balance&amount=${STANDARD_PRICE}`);
       } else {
-        toast.error(t("error_generic") || "Error");
+        toast.error(payErrorText(detail, t) || t("error_generic"));
       }
     } finally {
       setUnlocking(false);
     }
   };
+
+  // A card-transfer payment confirmed in the pay sheet: reopen the chat state.
+  useEffect(() => onPaid(() => { refreshAccess(); }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [otherId]);
 
   useEffect(() => {
     setHasMoreOlder(true);

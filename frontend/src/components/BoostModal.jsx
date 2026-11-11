@@ -7,7 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { tapMedium, notify } from "@/lib/haptics";
-import { openExternalLink } from "@/lib/telegram";
+import { startPayment, payErrorText } from "@/lib/payFlow";
 
 function hoursLeft(untilIso) {
   if (!untilIso) return 0;
@@ -43,8 +43,8 @@ export default function BoostModal({ onClose }) {
         queryClient.invalidateQueries({ queryKey: QK.boostStatus });
         refresh();
       } else {
-        if (r.data.payment_link) openExternalLink(r.data.payment_link);
-        toast.info(t("redirecting_payment"));
+        onClose?.();
+        startPayment(r.data, t);
       }
     } catch (e) {
       const detail = (e?.response?.data?.detail || "").toString();
@@ -53,7 +53,7 @@ export default function BoostModal({ onClose }) {
         onClose?.();
         navigate(`/premium?tab=balance&amount=${price}`);
       } else {
-        toast.error(detail === "boost_hidden" ? t("boost_hidden_error") : detail || t("error_generic"));
+        toast.error(detail === "boost_hidden" ? t("boost_hidden_error") : payErrorText(detail, t) || t("error_generic"));
       }
     } finally {
       setPaying(false);
