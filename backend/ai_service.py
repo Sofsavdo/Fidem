@@ -7,6 +7,7 @@ call producing the admin panel's AI growth-analyst summary.
 """
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 import logging
@@ -76,6 +77,8 @@ except ValueError:
     GEMINI_THINKING_BUDGET = 512
 # Set to False after a model rejects thinkingConfig, so later calls skip it.
 _THINKING_SUPPORTED = True
+# Waits before retrying a temporary Gemini error (503 overloaded, 429, 5xx).
+_GEMINI_RETRY_DELAYS = (2, 5)
 
 
 async def _gemini_json(prompt: str, images: list[tuple[str, str]], schema: dict,
@@ -110,6 +113,14 @@ async def _gemini_json(prompt: str, images: list[tuple[str, str]], schema: dict,
             gen.pop("thinkingConfig", None)
             log.info("Gemini model %s does not accept thinkingConfig; sending without it", GEMINI_MODEL)
             r = await cl.post(url, params={"key": GEMINI_API_KEY}, json=body)
+        # 503 "model overloaded" / 429 / 5xx are short-lived on Google's side
+        # (prod's first self-check hit a 503): wait a moment and try again.
+        for delay in _GEMINI_RETRY_DELAYS:
+            if r.status_code not in (429, 500, 502, 503, 504):
+                break
+            log.info("Gemini HTTP %s, retrying in %ss", r.status_code, delay)
+            await asyncio.sleep(delay)
+            r = await cl.post(url, params={"key": GEMINI_API_KEY}, json=body)
         r.raise_for_status()
         data = r.json()
     cand = (data.get("candidates") or [{}])[0]
@@ -138,6 +149,18 @@ async def ai_self_check() -> dict:
             AI_STATUS.update(checked=True, ok=False, provider="gemini", error=_classify_ai_error(e))
     log.info("AI self-check: %s", "OK (gemini, %s)" % GEMINI_MODEL if AI_STATUS["ok"] else "FAILED - " + AI_STATUS["error"])
     return AI_STATUS
+
+
+async def ai_self_check_loop() -> None:
+    """Startup check, repeated a few times while it fails for a reason other
+    than a missing key, so a short Google outage at deploy time does not leave
+    the admin panel showing "AI not working" until the next deploy."""
+    for wait in (0, 120, 600, 1800):
+        if wait:
+            await asyncio.sleep(wait)
+        st = await ai_self_check()
+        if st["ok"] or not GEMINI_API_KEY:
+            return
 
 
 # ---------- 1) Compatibility narrative ----------

@@ -41,6 +41,8 @@ from sofsavdo_integration import report_sofsavdo_conversion
 router = APIRouter(tags=["payments"])
 
 HAMYON_OPEN = ("pending", "prepared")
+# Last status Hamyon reported per payment, so the log shows changes only.
+_HAMYON_LAST_STATUS: dict[str, str] = {}
 
 
 def _hamyon_view(doc: dict) -> dict:
@@ -91,6 +93,9 @@ async def start_hamyon_payment(doc: dict) -> dict:
     }
     await db.payments.update_one({"id": doc["id"]}, {"$set": upd})
     doc.update(upd)
+    # Hamyon's own id is what their support asks for when a transfer was not matched.
+    log.info("Hamyon created: order=%s hamyon_id=%s amount=%s purpose=%s",
+             doc["id"], upd["hamyon_payment_id"], upd["hamyon_amount"], doc.get("purpose"))
     return _hamyon_view(doc)
 
 
@@ -678,6 +683,9 @@ async def payment_status(pid: str, uid: str = Depends(get_current_user_id)):
         if claimed.modified_count:
             try:
                 st = await hamyon_payment_status(p["hamyon_payment_id"])
+                if _HAMYON_LAST_STATUS.get(pid) != st.get("status"):
+                    _HAMYON_LAST_STATUS[pid] = st.get("status")
+                    log.info("Hamyon status: order=%s hamyon=%s amount=%s", pid, st.get("status"), st.get("amount"))
                 if str(st.get("shop_id", HAMYON_SHOP_ID)) == HAMYON_SHOP_ID:
                     if st.get("status") == "paid":
                         await apply_hamyon_result(p, "paid", int(st.get("amount") or 0))
