@@ -18,6 +18,7 @@ function png(r, g, b) {
 (async () => {
   // start from a clean gallery so the test is repeatable
   await fetch('http://localhost:18100/api/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + U['qa@fidem.uz'].token }, body: JSON.stringify({ photos: [] }) });
+  await fetch('http://localhost:18100/api/settings/privacy', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + U['qa@fidem.uz'].token }, body: JSON.stringify({ photo_public: true }) });
   const b = await chromium.launch();
   let ok = true;
   const check = (n, c) => { console.log((c ? 'PASS ' : 'FAIL ') + n); if (!c) ok = false; };
@@ -29,7 +30,9 @@ function png(r, g, b) {
   };
   // owner adds photos
   let { ctx, page } = await mk('qa@fidem.uz');
-  await page.goto(APP + '/me', { waitUntil: 'networkidle' });
+  await page.goto(APP + '/', { waitUntil: 'networkidle' });
+  await page.click('[data-testid=nav-me]');   // a cold start on /me is sent home on purpose
+  await page.waitForSelector('[data-testid=photo-gallery]');
   check('top bar has no balance pill', await page.locator('[data-testid=topbar-balance]').count() === 0);
   check('top bar has no VIP badge', !(await page.locator('[data-testid=mobile-topbar]').innerText()).includes('VIP'));
   await page.setInputFiles('[data-testid=gallery-input]', [
@@ -53,7 +56,9 @@ function png(r, g, b) {
   await ctx.close();
   // owner removes one
   ({ ctx, page } = await mk('qa@fidem.uz'));
-  await page.goto(APP + '/me', { waitUntil: 'networkidle' });
+  await page.goto(APP + '/', { waitUntil: 'networkidle' });
+  await page.click('[data-testid=nav-me]');   // a cold start on /me is sent home on purpose
+  await page.waitForSelector('[data-testid=photo-gallery]');
   await page.click('[data-testid=gallery-remove] >> nth=0');
   await page.waitForFunction(() => document.querySelectorAll('[data-testid=gallery-item]').length === 1, null, { timeout: 10000 }).catch(() => {});
   check('removing a photo works', await page.locator('[data-testid=gallery-item]').count() === 1);

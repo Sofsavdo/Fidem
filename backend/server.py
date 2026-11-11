@@ -361,6 +361,28 @@ async def startup() -> None:
     # profile is just tagged so it stays out of feeds and can be bulk-deleted
     # from the admin panel.
     await backfill_demo_flag()
+    await privatize_existing_proofs()
+
+
+async def privatize_existing_proofs() -> None:
+    """Verification proofs and payment receipts used to be stored like profile
+    photos (readable by any signed-in user). Mark every file that is referenced
+    by one of them as private; new ones are uploaded private. Idempotent."""
+    import re as _re
+
+    paths = set()
+    for coll in (db.verifications, db.manual_topups):
+        async for doc in coll.find({"proof_url": {"$type": "string"}}, {"_id": 0, "proof_url": 1}):
+            m = _re.search(r"/api/files/([^?\s]+)", doc.get("proof_url") or "")
+            if m:
+                paths.add(m.group(1))
+    if paths:
+        res = await db.files.update_many(
+            {"storage_path": {"$in": list(paths)}, "is_public": {"$ne": False}},
+            {"$set": {"is_public": False}},
+        )
+        if res.modified_count:
+            log.info(f"Made {res.modified_count} existing proof/receipt files private")
 
 
 async def backfill_demo_flag() -> None:

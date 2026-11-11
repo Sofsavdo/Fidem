@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import api from "@/lib/api";
+import { track } from "@/lib/analytics";
 import { useApp } from "@/contexts/AppContext";
 import GiftModal from "@/components/GiftModal";
 import GiftCelebration, { tierFromPrice } from "@/components/GiftCelebration";
@@ -41,6 +42,7 @@ export default function Chat() {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const sendLockRef = useRef(false);
+  const paywallSeenRef = useRef(false);
   const [access, setAccess] = useState(null);
   const [unlocking, setUnlocking] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -169,6 +171,14 @@ export default function Chat() {
     // eslint-disable-next-line
   }, [otherId, user?.id]);
 
+  useEffect(() => { if (otherId) track("chat_opened"); }, [otherId]);
+  useEffect(() => {
+    if (access?.requires_unlock && !paywallSeenRef.current) {
+      paywallSeenRef.current = true;
+      track("chat_paywall_seen");
+    }
+  }, [access]);
+
   // Socket dropped and came back: pull whatever we missed meanwhile.
   useEffect(() => {
     if (wsEvent?.type !== "resync" || !chatId) return;
@@ -258,6 +268,7 @@ export default function Chat() {
       // The WebSocket echo can land BEFORE this response; then the confirmed
       // message is already in the list and swapping the temp bubble in would
       // show the same message twice - just drop the temp copy instead.
+      track("message_sent");
       setMessages((prev) => (
         prev.some((m) => m.id === r.data.id)
           ? prev.filter((m) => m.id !== tempMsg.id)

@@ -4,6 +4,7 @@ import api, { API } from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { Crown, Check, Wallet, ArrowUpRight, Sparkles, Plus, Receipt, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import { track } from "@/lib/analytics";
 import { usePayments, usePaymentConfig, QK } from "@/hooks/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { PageHead, Segmented, Price, SectionLabel } from "@/components/kit";
@@ -69,6 +70,7 @@ export default function Premium() {
   // plan is shown as Premium (VIP includes everything Premium does).
   const curPlan = user?.plan === "vip" ? "premium" : (user?.plan || "free");
   const [duration, setDuration] = useState(1);
+  useEffect(() => { track("premium_viewed", { tab }); }, [tab]);
   const [topupAmount, setTopupAmount] = useState(50000);
   // Free-form top-up amount — the preset chips are shortcuts, not a limit.
   // CLICK can't process < 1000 so'm, so that's the real floor (backend
@@ -111,7 +113,7 @@ export default function Premium() {
     try {
       const fd = new FormData();
       fd.append("file", receipt);
-      const up = await api.post("/files/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      const up = await api.post("/files/upload?purpose=private", fd, { headers: { "Content-Type": "multipart/form-data" } });
       const proof_url = `${API.replace(/\/api$/, "")}${up.data.url}`;
       await api.post("/payments/manual-topup", { amount: effectiveTopup, proof_url });
       notify("success");
@@ -267,7 +269,7 @@ export default function Premium() {
                 {p.key !== "free" && !isCurrent && !alreadyIncluded && (
                   <button
                     data-testid={`buy-${p.key}`}
-                    onClick={() => runPayment(p.key, price, duration)}
+                    onClick={() => { track("plan_cta_click", { plan: p.key, months: duration }); runPayment(p.key, price, duration); }}
                     disabled={creating || payOff}
                     className={`mt-3.5 w-full rounded-2xl py-2.5 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-50 ${
                       p.dark ? "bg-gold text-ink" : p.popular ? "bg-gradient-to-r from-gold-dark to-gold text-ink" : "bg-primary text-white"

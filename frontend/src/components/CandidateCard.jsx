@@ -8,7 +8,6 @@ import { QK } from "@/hooks/queries";
 import api from "@/lib/api";
 import { photoSrc } from "@/lib/photo";
 import PhotoFill from "@/components/PhotoFill";
-import { formatLastActive } from "@/lib/time";
 
 function CandidateCardInner({ c, onSave, saved }) {
   const { t } = useApp();
@@ -48,8 +47,8 @@ function CandidateCardInner({ c, onSave, saved }) {
             </div>
           )}
 
-          {/* Bottom: name (+ tiny verified tick), online dot, then the only meta
-              that matters at a glance — where, distance, last active. */}
+          {/* Bottom: name, age, verified tick, online dot and the city - nothing
+              else; distance and last-active live on the profile. */}
           <div className="absolute bottom-3 left-3 right-3 text-white">
             <div className="flex items-center gap-1.5 min-w-0">
               <h3 className="font-heading text-xl font-semibold leading-tight truncate">
@@ -61,8 +60,6 @@ function CandidateCardInner({ c, onSave, saved }) {
             <p className="text-xs text-white/85 mt-0.5 flex items-center gap-1 truncate">
               <MapPin className="w-3 h-3 shrink-0" />
               {c.region}
-              {c.distance_bucket ? ` · ${c.distance_bucket} ${t("away")}` : ""}
-              {(() => { const la = formatLastActive(c.last_active_minutes, t, c.online); return la && la !== "—" ? ` · ${la}` : ""; })()}
             </p>
           </div>
         </div>

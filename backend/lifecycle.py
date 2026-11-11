@@ -122,6 +122,52 @@ async def _daily_picks_push() -> None:
         await asyncio.sleep(SEND_PACING_SECONDS)
 
 
+REPLY_REMIND_AFTER_H = 20   # not before: people answer within the day
+REPLY_REMIND_UNTIL_H = 72   # not after: a 3-day-old "reply" nudge is just noise
+
+
+async def _reply_reminders() -> None:
+    """Nudge people whose newest incoming message has waited 20-72 hours for an
+    answer - the cheapest retention lever there is (someone already wrote to
+    them). One reminder per waiting message, at most one per person per pass,
+    sent as a marketing push so notification preferences and the daily cap
+    apply. REPLY_REMINDERS=0 switches it off."""
+    import os
+
+    if os.environ.get("REPLY_REMINDERS", "1") == "0":
+        return
+    now = now_utc()
+    lo, hi = iso(now - timedelta(hours=REPLY_REMIND_UNTIL_H)), iso(now - timedelta(hours=REPLY_REMIND_AFTER_H))
+    pipeline = [
+        {"$match": {"created_at": {"$gte": lo}, "kind": {"$nin": ["system", "gift"]}}},
+        {"$sort": {"created_at": 1}},
+        {"$group": {"_id": "$chat_id", "last": {"$last": "$$ROOT"}}},
+        {"$match": {"last.created_at": {"$lte": hi}}},
+        {"$limit": BATCH},
+    ]
+    rows = await db.messages.aggregate(pipeline).to_list(BATCH)
+    reminded = set()
+    for row in rows:
+        m = row["last"]
+        to_id, from_id = m.get("to_user_id"), m.get("from_user_id")
+        if not to_id or not from_id or m.get("reply_reminded") or to_id in reminded:
+            continue
+        # Mark first: a failed send must not retry on every pass.
+        await db.messages.update_one({"id": m.get("id")}, {"$set": {"reply_reminded": True}})
+        target = await db.users.find_one({"id": to_id, "onboarded": True, "blocked": {"$ne": True}}, {"_id": 0, "id": 1})
+        sender = await db.users.find_one({"id": from_id}, {"_id": 0, "name": 1})
+        if not target or not sender:
+            continue
+        reminded.add(to_id)
+        await push_notif(
+            to_id, "message",
+            f"💬 {sender.get('name', '')} sizga yozgan edi va javob kutmoqda.\n\nSuhbatni davom ettiring — javob berish bepul.",
+            link=f"/chat/{from_id}",
+            marketing=True,
+        )
+        await asyncio.sleep(SEND_PACING_SECONDS)
+
+
 async def _weekly_digest() -> None:
     """Weekly 'X viewed / Y saved you' stat - only when there IS something to
     brag about; silence otherwise."""
@@ -349,6 +395,7 @@ async def _run_pass() -> None:
     await _plan_reminders()
     await _plan_expiry()
     await _daily_picks_push()
+    await _reply_reminders()
     await _weekly_digest()
     await _onboarding_nudges()
     await _referral_awareness_nudge()

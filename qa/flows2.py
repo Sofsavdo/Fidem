@@ -11,6 +11,22 @@ r = req("PATCH", f"/admin/users/{me}", json={"plan": "vip"}); chk("normal user c
 r = req("PATCH", "/profile", json={"plan": "vip", "balance": 999999, "is_admin": True}); 
 m = req("GET", "/auth/me").json(); chk("PATCH /profile cannot set plan/balance/is_admin (mass assignment)", m.get("plan") != "vip" and m.get("balance", 0) < 900000 and not m.get("is_admin"), {k: m.get(k) for k in ("plan", "balance", "is_admin")})
 r = req("POST", "/admin/manual-topups/x/decide", json={"approve": True}); chk("normal user cannot approve topups", r.status_code in (401, 403, 404), r.status_code)
+# ---- FILE ACCESS (private proofs, closed photos)
+_B = "http://127.0.0.1:18100/api"
+_hq = {"Authorization": "Bearer " + U["qa@fidem.uz"]["token"]}
+_hf = {"Authorization": "Bearer " + U["f0@fidem.uz"]["token"]}
+_png = httpx.get(f"{_B}/qa-photo/3.png").content
+_priv = httpx.post(f"{_B}/files/upload?purpose=private", headers=_hq, files={"file": ("proof.png", _png, "image/png")}).json()["url"]
+chk("owner can read their private upload", httpx.get(_B.replace("/api", "") + _priv, headers=_hq).status_code == 200)
+chk("another user cannot read a private proof", httpx.get(_B.replace("/api", "") + _priv, headers=_hf).status_code == 403)
+_me = httpx.get(f"{_B}/auth/me", headers=_hq).json()
+_main = _me["photo_url"]
+chk("open profile photo is readable by others", httpx.get(_B.replace("/api", "") + _main, headers=_hf).status_code == 200)
+httpx.post(f"{_B}/settings/privacy", headers=_hq, json={"photo_public": False})
+import time as _t; _t.sleep(21)   # the server caches the owner's privacy flag for 20 s
+chk("closed profile photo is blocked for others at file level", httpx.get(_B.replace("/api", "") + _main, headers=_hf).status_code == 403)
+chk("...but still readable by the owner", httpx.get(_B.replace("/api", "") + _main, headers=_hq).status_code == 200)
+httpx.post(f"{_B}/settings/privacy", headers=_hq, json={"photo_public": True})
 # ---- P2P topup flow (admin approves -> balance)
 req("POST", "/admin/topup-config", k="ADMIN", json={"p2p_enabled": True, "card_number": "8600 1234 5678 9012", "card_holder": "Test"}) 
 r = req("GET", "/admin/topup-config", k="ADMIN"); print("   admin topup-config GET:", r.status_code, r.text[:120])

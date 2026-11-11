@@ -12,13 +12,21 @@ from models import new_id
 router = APIRouter(tags=["stories"])
 
 
+# The first versions of the app seeded three invented couples (with stock photos)
+# as "social proof". They are not real, so they are never shown publicly; the
+# admin panel still lists them and can delete them. Matching on both the seeded
+# names AND the stock-photo host leaves real stories untouched.
+_SEEDED_COUPLES = ("Aziza & Bobur", "Dilnoza & Sardor", "Madina & Diyor")
+_NOT_SEEDED = {"$nor": [{"couple_names": n, "photo_url": {"$regex": r"images\.unsplash\.com"}} for n in _SEEDED_COUPLES]}
+
+
 def _is_admin(user: dict) -> bool:
     return bool(user.get("is_admin"))
 
 
 @router.get("/stories")
 async def list_stories(featured_only: bool = False, limit: int = 30):
-    q = {"published": True}
+    q = {"published": True, **_NOT_SEEDED}
     if featured_only:
         q["featured"] = True
     rows = await db.success_stories.find(q, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
@@ -27,7 +35,7 @@ async def list_stories(featured_only: bool = False, limit: int = 30):
 
 @router.get("/stories/{story_id}")
 async def get_story(story_id: str):
-    row = await db.success_stories.find_one({"id": story_id, "published": True}, {"_id": 0})
+    row = await db.success_stories.find_one({"id": story_id, "published": True, **_NOT_SEEDED}, {"_id": 0})
     if not row:
         raise HTTPException(404, "Not found")
     # increment view count (non-blocking)

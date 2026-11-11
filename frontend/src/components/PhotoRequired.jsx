@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import api from "@/lib/api";
+import { track } from "@/lib/analytics";
 import { useApp } from "@/contexts/AppContext";
 import PhotoUpload from "@/components/PhotoUpload";
 
@@ -9,12 +10,14 @@ import PhotoUpload from "@/components/PhotoUpload";
 export default function PhotoRequired() {
   const { t, refresh } = useApp();
   const [saving, setSaving] = useState(false);
+  useEffect(() => { track("photo_gate_shown"); }, []);
 
   const save = async (url) => {
     if (!url || saving) return;
     setSaving(true);
     try {
       await api.patch("/profile", { photo_url: url });
+      track("photo_uploaded");
       await refresh();
     } catch (e) {
       console.error("Photo save error:", e);

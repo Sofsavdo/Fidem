@@ -33,7 +33,10 @@ r = req("GET", f"/candidates/{ids[0]}"); d = r.json()
 leak = [k for k in ("email", "password_hash", "contact_phone", "contact_telegram", "contact_instagram", "telegram_id", "ip_address") if k in d]
 chk("candidate detail leaks no private fields", not leak, leak)
 # ---- SIGNUP RULES
-r = httpx.post(f"{B}/auth/register", json=dict(email="minor@fidem.uz", password="QaPass#2026")); tok = r.json()["token"]
+r = httpx.post(f"{B}/auth/register", json=dict(email="minor@fidem.uz", password="QaPass#2026"))
+if "token" not in r.json():  # re-run on the same DB: the account already exists
+    r = httpx.post(f"{B}/auth/login", json=dict(email="minor@fidem.uz", password="QaPass#2026"))
+tok = r.json()["token"]
 r = httpx.post(f"{B}/profile/onboard", headers={"Authorization": f"Bearer {tok}"}, json=dict(gender="male", birth_date="2015-01-01", country="Uzbekistan", marital_status="single", has_children=False, search_gender="female", name="Bola", photo_url="http://127.0.0.1:18100/api/qa-photo/1.png", terms_accepted=True))
 chk("minor cannot sign up (server-side)", r.status_code == 400 and "age_restricted" in r.text, (r.status_code, r.text[:80]))
 r = httpx.get(f"{B}/payments/topup-config", headers=H(ME)); print("   topup-config:", r.json())

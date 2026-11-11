@@ -134,68 +134,6 @@ export default function Me() {
         )}
       </div>
 
-      <PhotoGallery />
-
-      {/* Contextual upsell — just a teaser + count here (Me is the profile
-          settings page, not a place to browse dozens of masked profiles).
-          Tapping goes to the dedicated Saved > Interested page, which shows
-          the actual list and the plan upsell in full. */}
-      {/* While the summary is loading, hold the slot with an equal-height
-          skeleton so the page doesn't jump when the banner pops in — the
-          "Me titraydi" bug was blocks mounting late and pushing everything
-          below them down. Collapses only for users with zero interest. */}
-      {!["premium", "vip"].includes(user.plan) && interestedSummary === undefined && (
-        <div className="rounded-3xl bg-card border border-border p-4 animate-pulse" aria-hidden="true">
-          <div className="h-5 w-2/3 rounded bg-muted" />
-        </div>
-      )}
-      {!["premium", "vip"].includes(user.plan) && interestedSummary?.total > 0 && (
-        <Link
-          to="/saved?tab=interested"
-          data-testid="profile-teaser-banner"
-          className="block rounded-3xl bg-gradient-to-r from-primary/15 via-primary/5 to-card border border-primary/30 p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform"
-        >
-          {/* Stacked layout: avatars+text on top, CTA full-width below — a
-              single horizontal row here squeezed the avatar stack, title,
-              subtitle and button all into too little space. */}
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-3">
-              {/* Masked avatar stack — real (locked) people, not just a line of
-                  text nobody reads. Photos are hidden for free users, so each
-                  circle shows the masked initial on a warm gradient. */}
-              <div className="flex -space-x-3 shrink-0">
-                {(interestedSummary.items || []).slice(0, 3).map((p, i) => (
-                  <div
-                    key={p.id || i}
-                    className="w-11 h-11 rounded-full ring-2 ring-card grid place-items-center font-heading font-semibold text-white text-sm bg-gradient-to-br from-primary to-rose-400 overflow-hidden"
-                    style={{ zIndex: 3 - i }}
-                  >
-                    {p.photo_url ? (
-                      <img src={photoSrc(p.photo_url)} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      (p.name || "?")[0]
-                    )}
-                  </div>
-                ))}
-                {interestedSummary.total > 3 && (
-                  <div className="w-11 h-11 rounded-full ring-2 ring-card grid place-items-center bg-ink text-white text-xs font-bold" style={{ zIndex: 0 }}>
-                    +{interestedSummary.total - 3}
-                  </div>
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold leading-snug">💘 {t("profile_teaser_title")}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{t("profile_teaser_subtitle").replace("{n}", interestedSummary.total)}</p>
-              </div>
-            </div>
-            <span className="block text-center rounded-full bg-primary text-white text-xs font-semibold px-3.5 py-2.5">{t("profile_teaser_cta")}</span>
-          </div>
-        </Link>
-      )}
-
-      {/* Location verification (Map M1) */}
-      <LocationVerifyCard />
-
       {/* Completeness — with a direct CTA to finish the missing parts */}
       <div className="rounded-3xl bg-card border border-border p-4">
         <div className="flex items-center justify-between mb-2">
@@ -265,20 +203,64 @@ export default function Me() {
         </div>
       </div>
 
-      {/* Secondary destinations moved out of the bottom bar (4 tabs keep the
-          core loop obvious: candidates -> chats -> interests -> profile). */}
-      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${FEATURES.giftShop ? 2 : 1}, minmax(0, 1fr))` }}>
-        <Link to="/announcements" data-testid="link-announcements" className="flex items-center gap-3 rounded-3xl bg-card border border-border p-4 active:scale-[0.98] transition-transform">
-          <Megaphone className="w-5 h-5 text-secondary" />
-          <span className="font-medium text-sm">{t("anons")}</span>
+      <PhotoGallery />
+
+      {/* Contextual upsell — just a teaser + count here (Me is the profile
+          settings page, not a place to browse dozens of masked profiles).
+          Tapping goes to the dedicated Saved > Interested page, which shows
+          the actual list and the plan upsell in full. */}
+      {/* While the summary is loading, hold the slot with an equal-height
+          skeleton so the page doesn't jump when the banner pops in — the
+          "Me titraydi" bug was blocks mounting late and pushing everything
+          below them down. Collapses only for users with zero interest. */}
+      {!["premium", "vip"].includes(user.plan) && interestedSummary === undefined && (
+        <div className="rounded-3xl bg-card border border-border p-4 animate-pulse" aria-hidden="true">
+          <div className="h-5 w-2/3 rounded bg-muted" />
+        </div>
+      )}
+      {!["premium", "vip"].includes(user.plan) && interestedSummary?.total > 0 && (
+        <Link
+          to="/saved?tab=interested"
+          data-testid="profile-teaser-banner"
+          className="block rounded-3xl bg-gradient-to-r from-primary/15 via-primary/5 to-card border border-primary/30 p-4 hover:-translate-y-0.5 active:scale-[0.98] transition-transform"
+        >
+          {/* Stacked layout: avatars+text on top, CTA full-width below — a
+              single horizontal row here squeezed the avatar stack, title,
+              subtitle and button all into too little space. */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              {/* Masked avatar stack — real (locked) people, not just a line of
+                  text nobody reads. Photos are hidden for free users, so each
+                  circle shows the masked initial on a warm gradient. */}
+              <div className="flex -space-x-3 shrink-0">
+                {(interestedSummary.items || []).slice(0, 3).map((p, i) => (
+                  <div
+                    key={p.id || i}
+                    className="w-11 h-11 rounded-full ring-2 ring-card grid place-items-center font-heading font-semibold text-white text-sm bg-gradient-to-br from-primary to-rose-400 overflow-hidden"
+                    style={{ zIndex: 3 - i }}
+                  >
+                    {p.photo_url ? (
+                      <img src={photoSrc(p.photo_url)} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      (p.name || "?")[0]
+                    )}
+                  </div>
+                ))}
+                {interestedSummary.total > 3 && (
+                  <div className="w-11 h-11 rounded-full ring-2 ring-card grid place-items-center bg-ink text-white text-xs font-bold" style={{ zIndex: 0 }}>
+                    +{interestedSummary.total - 3}
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold leading-snug">💘 {t("profile_teaser_title")}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t("profile_teaser_subtitle").replace("{n}", interestedSummary.total)}</p>
+              </div>
+            </div>
+            <span className="block text-center rounded-full bg-primary text-white text-xs font-semibold px-3.5 py-2.5">{t("profile_teaser_cta")}</span>
+          </div>
         </Link>
-        {FEATURES.giftShop && (
-          <Link to="/gifts" data-testid="link-gifts" className="flex items-center gap-3 rounded-3xl bg-card border border-border p-4 active:scale-[0.98] transition-transform">
-            <Gift className="w-5 h-5 text-primary" />
-            <span className="font-medium text-sm">{t("gift")}</span>
-          </Link>
-        )}
-      </div>
+      )}
 
       {/* Rankings teaser — replaces the old badges/achievements card, which
           had no real effect on the user. This one is concrete: your actual
@@ -364,6 +346,9 @@ export default function Me() {
         </div>
       </Link>
 
+      {/* Location verification (Map M1) */}
+      <LocationVerifyCard />
+
       {/* Profil */}
       <div>
         <p className="field-label mb-2 px-1">{t("me_group_profile")}</p>
@@ -387,6 +372,8 @@ export default function Me() {
       <div>
         <p className="field-label mb-2 px-1">{t("me_group_app")}</p>
         <div className="rounded-3xl bg-card border border-border divide-y">
+          <NavRow to="/announcements" testid="link-announcements" icon={<Megaphone className="w-4 h-4 text-secondary" />} label={t("anons")} />
+          {FEATURES.giftShop && <NavRow to="/gifts" testid="link-gifts" icon={<Gift className="w-4 h-4 text-primary" />} label={t("gift")} />}
           <NavRow to="/stories" testid="link-stories" icon={<BookOpen className="w-4 h-4 text-foreground" />} label={t("success_stories")} />
           <NavRow to="/me/settings" testid="link-settings" icon={<SlidersHorizontal className="w-4 h-4" />} label={t("me_settings_title")} />
           {user.is_admin && (

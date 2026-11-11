@@ -84,6 +84,16 @@ PAID_PLANS = ("standard", "premium", "vip")
 # Plans that unlock "who viewed / who saved me" (see PLANS.premium.perks in
 # frontend/src/pages/Premium.jsx) — standard alone does not include it.
 WHO_VIEWED_PLANS = ("premium", "vip")
+
+
+async def payments_available() -> bool:
+    """True when at least one way to pay is switched on (online payment keys or
+    the admin's manual card top-up). While nothing can be bought, paywalls that
+    hide people ("who viewed / liked me") would be a dead end, so they open."""
+    from services import CLICK_MERCHANT_ID, CLICK_SECRET_KEY, CLICK_SERVICE_ID
+
+    cfg = await db.settings.find_one({"id": "topup_config"}, {"_id": 0}) or {}
+    return bool(cfg.get("p2p_enabled")) or bool(CLICK_SECRET_KEY and CLICK_MERCHANT_ID and CLICK_SERVICE_ID)
 # Tiered PAID privacy (hidden mode is a monetization feature, free users
 # cannot enable it):
 #   standard  — your profile is invisible everywhere
