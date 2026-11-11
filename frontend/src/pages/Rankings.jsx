@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { photoSrc } from "@/lib/photo";
 import { Skeleton, EmptyState } from "@/components/kit";
 import { tapMedium, notify } from "@/lib/haptics";
-import { openExternalLink } from "@/lib/telegram";
+import { startPayment, payErrorText } from "@/lib/payFlow";
 
 const BOOST_PRESETS = [10000, 30000, 50000, 100000];
 
@@ -53,11 +53,9 @@ export default function Rankings() {
         queryClient.invalidateQueries({ queryKey: QK.leaderboard(period) });
       } else {
         if (r.data.balance_used > 0) {
-          toast.success(`${t("balance_used")}: ${Number(r.data.balance_used).toLocaleString()} ${t("sum")} · ${t("pay_with_click")}: ${Number(r.data.click_amount).toLocaleString()} ${t("sum")}`);
-        } else {
-          toast.success(t("pay_with_click"));
+          toast.success(`${t("balance_used")}: ${Number(r.data.balance_used).toLocaleString()} ${t("sum")}`);
         }
-        if (r.data.payment_link) openExternalLink(r.data.payment_link);
+        startPayment(r.data, t);
       }
     } catch (e) {
       const detail = (e?.response?.data?.detail || "").toString();
@@ -65,7 +63,7 @@ export default function Rankings() {
         toast.info(t("click_disabled_error"));
         navigate(`/premium?tab=balance&amount=${effectiveAmount}`);
       } else {
-        toast.error(detail === "click_min_1000" ? t("click_min_error") : t("error_generic"));
+        toast.error(payErrorText(detail, t) || t("error_generic"));
       }
     } finally {
       setPaying(false);

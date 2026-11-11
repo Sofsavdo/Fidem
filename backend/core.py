@@ -90,8 +90,11 @@ async def payments_available() -> bool:
     """True when at least one way to pay is switched on (online payment keys or
     the admin's manual card top-up). While nothing can be bought, paywalls that
     hide people ("who viewed / liked me") would be a dead end, so they open."""
+    from hamyon import hamyon_enabled
     from services import CLICK_MERCHANT_ID, CLICK_SECRET_KEY, CLICK_SERVICE_ID
 
+    if hamyon_enabled():
+        return True
     cfg = await db.settings.find_one({"id": "topup_config"}, {"_id": 0}) or {}
     return bool(cfg.get("p2p_enabled")) or bool(CLICK_SECRET_KEY and CLICK_MERCHANT_ID and CLICK_SERVICE_ID)
 # Tiered PAID privacy (hidden mode is a monetization feature, free users

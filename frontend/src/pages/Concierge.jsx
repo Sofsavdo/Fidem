@@ -7,7 +7,7 @@ import { photoSrc } from "@/lib/photo";
 import { Link, useNavigate } from "react-router-dom";
 import { useConciergeInfo, useConciergeMine, QK } from "@/hooks/queries";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { openExternalLink } from "@/lib/telegram";
+import { startPayment, payErrorText } from "@/lib/payFlow";
 import { localeFor } from "@/lib/time";
 
 export default function Concierge() {
@@ -21,9 +21,10 @@ export default function Concierge() {
   const orderMutation = useMutation({
     mutationFn: (method) => api.post("/concierge/order", { payment_method: method }),
     onSuccess: (r) => {
-      if (r.data.payment_link) {
-        toast.info(t("redirecting_payment"));
-        setTimeout(() => { openExternalLink(r.data.payment_link); }, 600);
+      if (r.data.payment) {
+        startPayment(r.data.payment, t);
+      } else if (r.data.payment_link) {
+        startPayment(r.data, t);
       } else {
         toast.success("🎉 " + t("order_concierge"));
       }
@@ -36,7 +37,7 @@ export default function Concierge() {
         toast.info(t("click_disabled_error"));
         navigate("/premium?tab=balance");
       } else {
-        toast.error(detail || t("error_generic"));
+        toast.error(payErrorText(detail, t) || detail || t("error_generic"));
       }
     },
   });

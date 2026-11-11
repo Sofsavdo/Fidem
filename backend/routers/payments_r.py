@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import random
+import time
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
@@ -25,10 +26,120 @@ from core import (
     rate_limit_verification,
 )
 from models import CreatePaymentRequest, VerificationRequest, new_id
+from hamyon import (
+    HAMYON_SHOP_ID,
+    HamyonError,
+    cancel_hamyon_payment,
+    create_hamyon_payment,
+    hamyon_enabled,
+    hamyon_payment_status,
+    verify_hamyon_sign,
+)
 from services import CLICK_SECRET_KEY, click_pay_link, verify_click_sign
 from sofsavdo_integration import report_sofsavdo_conversion
 
 router = APIRouter(tags=["payments"])
+
+HAMYON_OPEN = ("pending", "prepared")
+
+
+def _hamyon_view(doc: dict) -> dict:
+    """What the app needs to show the transfer screen and follow the result."""
+    expire_at = int(doc.get("expire_at") or 0)
+    return {
+        "id": doc["id"],
+        "method": "hamyon",
+        "status": doc.get("status"),
+        "purpose": doc.get("purpose"),
+        "amount": doc.get("amount"),
+        "balance_used": doc.get("balance_used", 0),
+        "pay_amount": doc.get("hamyon_amount"),
+        "card": doc.get("card"),
+        "expire_at": expire_at,
+        "expires_in": max(0, expire_at - int(time.time())) if expire_at else 0,
+    }
+
+
+async def start_hamyon_payment(doc: dict) -> dict:
+    """Record the payment, then open it at Hamyon. doc carries id, user_id,
+    purpose, amount, balance_used (already deducted) and click_amount (the
+    part to pay by card). The record is saved first because Hamyon's prepare
+    callback may arrive before its create answer does."""
+    doc.update(method="hamyon", status="pending", created_at=iso(now_utc()))
+    await db.payments.insert_one(doc)
+    doc.pop("_id", None)
+    since = iso(now_utc() - timedelta(minutes=7))
+    open_rows = await db.payments.find(
+        {"method": "hamyon", "status": {"$in": list(HAMYON_OPEN)}, "created_at": {"$gte": since},
+         "hamyon_amount": {"$exists": True}},
+        {"_id": 0, "hamyon_amount": 1},
+    ).to_list(1000)
+    busy = {int(r["hamyon_amount"]) for r in open_rows if r.get("hamyon_amount")}
+    try:
+        res = await create_hamyon_payment(doc["id"], int(doc["click_amount"]), busy)
+    except HamyonError as e:
+        log.error("Hamyon create failed for %s: %s", doc["id"], e)
+        await db.payments.update_one({"id": doc["id"]}, {"$set": {"status": "failed", "error": str(e)[:200]}})
+        if doc.get("balance_used", 0) > 0:
+            await db.users.update_one({"id": doc["user_id"]}, {"$inc": {"balance": doc["balance_used"]}})
+        raise HTTPException(502, "payment_provider_error")
+    upd = {
+        "hamyon_payment_id": str(res["payment_id"]),
+        "hamyon_amount": int(res["amount"]),
+        "card": str(res["card"]),
+        "expire_at": int(res.get("expire_at") or (time.time() + int(res.get("expires_in") or 300))),
+    }
+    await db.payments.update_one({"id": doc["id"]}, {"$set": upd})
+    doc.update(upd)
+    return _hamyon_view(doc)
+
+
+async def apply_hamyon_result(payment: dict, status: str, paid_amount: int | None = None,
+                              reason: str = "", paid_at=None) -> None:
+    """Single place that settles a Hamyon payment (callback, status check or
+    the user's cancel). Safe to call many times: the purchase is delivered
+    exactly once, and a cancel refunds the balance part exactly once."""
+    pid = payment["id"]
+    if status == "paid":
+        expected = int(payment.get("hamyon_amount") or payment.get("click_amount") or 0)
+        if paid_amount is not None and paid_amount != expected:
+            log.error("Hamyon %s: paid amount %s differs from expected %s - not delivered", pid, paid_amount, expected)
+            await db.payments.update_one({"id": pid}, {"$set": {"amount_mismatch": paid_amount}})
+            return
+        prev = await db.payments.find_one_and_update(
+            {"id": pid, "status": {"$in": [*HAMYON_OPEN, "expired", "cancelled"]}},
+            {"$set": {"status": "processing", "updated_at": iso(now_utc())}},
+        )
+        if not prev:
+            return  # already delivered (Hamyon repeats the callback)
+        # A top-up credits what was really transferred (it may be 1-2 so'm
+        # above the asked sum because of the unique-amount rule).
+        amount = expected if prev["purpose"] == "balance_topup" else prev["amount"]
+        try:
+            await process_completed_payment(
+                prev["user_id"], prev["purpose"], amount, prev.get("balance_used", 0),
+                prev.get("target_user_id"), prev.get("order_id"), prev.get("months", 1), payment_id=pid,
+            )
+        except Exception:
+            await db.payments.update_one({"id": pid, "status": "processing"}, {"$set": {"status": prev["status"]}})
+            raise
+        upd = {"status": "success", "paid_at": iso(now_utc()), "hamyon_paid_at": paid_at}
+        if prev.get("balance_refunded") and prev.get("balance_used", 0) > 0:
+            # Cancelled/expired earlier and the balance part went back; the
+            # money did arrive after all, so take that part again.
+            await db.users.update_one({"id": prev["user_id"]}, {"$inc": {"balance": -prev["balance_used"]}})
+            upd["balance_refunded"] = False
+        await db.payments.update_one({"id": pid}, {"$set": upd})
+        log.info("Hamyon %s paid: %s %s so'm", pid, prev["purpose"], expected)
+        return
+
+    prev = await db.payments.find_one_and_update(
+        {"id": pid, "status": {"$in": list(HAMYON_OPEN)}},
+        {"$set": {"status": "cancelled", "cancel_reason": reason or "", "updated_at": iso(now_utc())}},
+    )
+    if prev and prev.get("balance_used", 0) > 0:
+        await db.users.update_one({"id": prev["user_id"]}, {"$inc": {"balance": prev["balance_used"]}})
+        await db.payments.update_one({"id": pid}, {"$set": {"balance_refunded": True}})
 
 
 # Referral tier system helpers
@@ -297,6 +408,30 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
         await process_completed_payment(uid, req.purpose, amount, balance_used, req.target_user_id, req.order_id, req.months, payment_id=pid)
         return {"ok": True, "payment_id": pid, "status": "paid", "balance_used": balance_used, "click_amount": 0}
 
+    # Hamyon (card transfer, confirmed automatically) is the main way to pay
+    # whenever its keys are set; CLICK / manual P2P below are older fallbacks.
+    if hamyon_enabled():
+        if balance_used > 0:
+            res = await db.users.update_one(
+                {"id": uid, "balance": {"$gte": balance_used}},
+                {"$inc": {"balance": -balance_used}},
+            )
+            if res.modified_count == 0:
+                raise HTTPException(409, "Balance changed, please retry")
+        doc = {
+            "id": await generate_payment_id(),
+            "user_id": uid,
+            "amount": amount,
+            "purpose": req.purpose,
+            "months": req.months,
+            "target_user_id": req.target_user_id,
+            "gift_kind": req.gift_kind,
+            "order_id": req.order_id,
+            "balance_used": balance_used,
+            "click_amount": click_amount,
+        }
+        return await start_hamyon_payment(doc)
+
     # While P2P mode is on (CLICK temporarily disabled by the admin), nothing
     # may route to CLICK — users top the balance up via card transfer instead
     # and every purchase is balance-funded. Frontends map this code to a
@@ -461,6 +596,119 @@ async def click_callback(request: Request):
         })
 
     return JSONResponse({"error": -3, "error_note": "Action not found"})
+
+
+# ---------- Hamyon callbacks (set these URLs in the Hamyon bot) ----------
+#   prepare_url  = https://<backend>/api/payments/hamyon/prepare
+#   complete_url = https://<backend>/api/payments/hamyon/complete
+async def _hamyon_form(request: Request) -> dict:
+    return {k: str(v) for k, v in dict(await request.form()).items()}
+
+
+async def _find_hamyon_payment(form: dict) -> dict | None:
+    """Our payment id travels as Hamyon's order_id; Hamyon's own id is kept too."""
+    p = None
+    if form.get("order_id"):
+        p = await db.payments.find_one({"id": form["order_id"], "method": "hamyon"}, {"_id": 0})
+    if not p and form.get("payment_id"):
+        p = await db.payments.find_one({"hamyon_payment_id": form["payment_id"], "method": "hamyon"}, {"_id": 0})
+    if p and p.get("hamyon_payment_id") and form.get("payment_id") and p["hamyon_payment_id"] != form["payment_id"]:
+        log.warning("Hamyon callback: payment_id %s does not match order %s", form.get("payment_id"), p["id"])
+        return None
+    return p
+
+
+@router.post("/payments/hamyon/prepare")
+async def hamyon_prepare(request: Request):
+    form = await _hamyon_form(request)
+    if not verify_hamyon_sign(form):
+        log.warning("Hamyon prepare: bad sign (order=%s)", form.get("order_id"))
+        return JSONResponse({"error": "sign"}, status_code=403)
+    p = await _find_hamyon_payment(form)
+    if p:
+        await db.payments.update_one(
+            {"id": p["id"]},
+            {"$set": {"hamyon_payment_id": form.get("payment_id"), "hamyon_prepared_at": iso(now_utc())}},
+        )
+    else:
+        log.warning("Hamyon prepare: order %s not found", form.get("order_id"))
+    return {"result": "ok"}
+
+
+@router.post("/payments/hamyon/complete")
+async def hamyon_complete(request: Request):
+    form = await _hamyon_form(request)
+    if not verify_hamyon_sign(form):
+        log.warning("Hamyon complete: bad sign (order=%s)", form.get("order_id"))
+        return JSONResponse({"error": "sign"}, status_code=403)
+    p = await _find_hamyon_payment(form)
+    log.info("Hamyon complete: order=%s status=%s amount=%s found=%s",
+             form.get("order_id"), form.get("status"), form.get("amount"), bool(p))
+    if not p:
+        # Nothing to retry into; answer 200 so Hamyon stops repeating it.
+        return {"result": "ok"}
+    try:
+        paid_amount = int(float(form.get("amount") or 0))
+    except ValueError:
+        paid_amount = -1
+    try:
+        await apply_hamyon_result(p, "paid" if form.get("status") == "paid" else "cancel",
+                                  paid_amount, form.get("reason", ""), form.get("paid_at"))
+    except Exception:
+        log.exception("Hamyon complete: delivering %s failed", p["id"])
+        # Non-2xx makes Hamyon retry (0s, 3s, 10s, 30s, 60s).
+        return JSONResponse({"error": "retry"}, status_code=500)
+    return {"result": "ok"}
+
+
+@router.get("/payments/status/{pid}")
+async def payment_status(pid: str, uid: str = Depends(get_current_user_id)):
+    """Polled by the transfer screen. For an open Hamyon payment it also asks
+    Hamyon directly now and then, so a lost callback (or a wrong complete_url)
+    still ends in a delivered purchase."""
+    p = await db.payments.find_one({"id": pid, "user_id": uid}, {"_id": 0})
+    if not p:
+        raise HTTPException(404, "not_found")
+    if p.get("method") == "hamyon" and p.get("status") in HAMYON_OPEN and p.get("hamyon_payment_id"):
+        now_ts = time.time()
+        claimed = await db.payments.update_one(
+            {"id": pid, "$or": [{"hamyon_checked_at": {"$exists": False}}, {"hamyon_checked_at": {"$lt": now_ts - 8}}]},
+            {"$set": {"hamyon_checked_at": now_ts}},
+        )
+        if claimed.modified_count:
+            try:
+                st = await hamyon_payment_status(p["hamyon_payment_id"])
+                if str(st.get("shop_id", HAMYON_SHOP_ID)) == HAMYON_SHOP_ID:
+                    if st.get("status") == "paid":
+                        await apply_hamyon_result(p, "paid", int(st.get("amount") or 0))
+                    elif st.get("status") == "cancel":
+                        await apply_hamyon_result(p, "cancel", reason="timeout")
+            except HamyonError as e:
+                log.info("Hamyon status check for %s failed: %s", pid, e)
+            except Exception:
+                log.exception("Hamyon status check for %s failed", pid)
+            p = await db.payments.find_one({"id": pid}, {"_id": 0}) or p
+    if p.get("method") == "hamyon":
+        return _hamyon_view(p)
+    return {"id": p["id"], "status": p.get("status"), "purpose": p.get("purpose"), "method": p.get("method")}
+
+
+@router.post("/payments/cancel/{pid}")
+async def cancel_payment(pid: str, uid: str = Depends(get_current_user_id)):
+    """The user gave up on a card transfer: close it at Hamyon (so the amount
+    frees up) and refund any balance part right away."""
+    p = await db.payments.find_one({"id": pid, "user_id": uid}, {"_id": 0})
+    if not p:
+        raise HTTPException(404, "not_found")
+    if p.get("method") == "hamyon" and p.get("status") in HAMYON_OPEN:
+        if p.get("hamyon_payment_id"):
+            try:
+                await cancel_hamyon_payment(p["hamyon_payment_id"])
+            except HamyonError as e:
+                log.info("Hamyon cancel for %s: %s", pid, e)
+        await apply_hamyon_result(p, "cancel", reason="user")
+        p = await db.payments.find_one({"id": pid}, {"_id": 0}) or p
+    return {"ok": True, "status": p.get("status")}
 
 
 async def process_completed_payment(uid: str, purpose: str, amount: int, balance_used: int, target_user_id: str = None, order_id: str = None, months: int = 1, payment_id: str = None) -> None:
@@ -684,7 +932,7 @@ async def process_completed_payment(uid: str, purpose: str, amount: int, balance
                     "expires_at": iso(now_utc() + timedelta(days=30)),
                 }},
             )
-            await push_notif(uid, "concierge", "💎 Sovchi Concierge buyurtmangiz qabul qilindi. Admin sizga 5 ta mosni qo'lda topadi!")
+            await push_notif(uid, "concierge", "💎 Shaxsiy sovchi buyurtmangiz qabul qilindi. Admin sizga 5 ta mosni qo'lda topadi!")
 
 
 # NOTE: there is deliberately no admin "confirm payment" endpoint. CLICK
@@ -708,8 +956,14 @@ async def topup_config(uid: str = Depends(get_current_user_id)):
     click_enabled = bool(CLICK_SECRET_KEY and CLICK_MERCHANT_ID and CLICK_SERVICE_ID)
     # payments_available lets the app show a clear "coming soon" state instead
     # of sending users into a payment flow that cannot complete.
-    out = {"p2p_enabled": enabled, "click_enabled": click_enabled, "payments_available": enabled or click_enabled}
-    if enabled:
+    hamyon_on = hamyon_enabled()
+    out = {
+        "p2p_enabled": enabled and not hamyon_on,
+        "click_enabled": click_enabled,
+        "hamyon_enabled": hamyon_on,
+        "payments_available": enabled or click_enabled or hamyon_on,
+    }
+    if out["p2p_enabled"]:
         out["card_number"] = cfg.get("card_number", "")
         out["card_holder"] = cfg.get("card_holder", "")
     return out
@@ -800,14 +1054,20 @@ async def decide_manual_topup(tid: str, approve: bool, reason: str = "", decided
 async def my_payments(uid: str = Depends(get_current_user_id)):
     rows = await db.payments.find({"user_id": uid}, {"_id": 0}).sort("created_at", -1).to_list(200)
     
-    # Expire pending payments older than 10 minutes
+    # Expire pending payments older than 10 minutes. Hamyon closes its own
+    # payments after 5 minutes and tells us (complete callback), so its rows
+    # get a much later safety net here.
     ten_minutes_ago = now_utc() - timedelta(minutes=10)
+    hamyon_cutoff = now_utc() - timedelta(minutes=30)
     for row in rows:
-        if row.get("status") == "pending" and parse_dt(row.get("created_at", now_utc())) < ten_minutes_ago:
+        is_hamyon = row.get("method") == "hamyon"
+        cutoff = hamyon_cutoff if is_hamyon else ten_minutes_ago
+        open_statuses = list(HAMYON_OPEN) if is_hamyon else ["pending"]
+        if row.get("status") in open_statuses and parse_dt(row.get("created_at", now_utc())) < cutoff:
             row["status"] = "expired"
             res = await db.payments.update_one(
-                {"id": row["id"], "status": "pending"},
-                {"$set": {"status": "expired", "updated_at": iso(now_utc())}}
+                {"id": row["id"], "status": {"$in": open_statuses}},
+                {"$set": {"status": "expired", "updated_at": iso(now_utc()), "balance_refunded": row.get("balance_used", 0) > 0}}
             )
             # The balance portion was deducted up-front at create time; if the
             # CLICK half never completed, that money would silently vanish.

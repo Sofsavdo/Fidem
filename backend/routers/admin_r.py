@@ -37,7 +37,12 @@ async def admin_config_health(_: str = Depends(get_current_admin)):
     # server logs) the real reason P2P alerts aren't arriving there.
     admin_bot_info = await get_bot_info(ADMIN_BOT_TOKEN) if ADMIN_BOT_TOKEN else None
 
+    from ai_service import AI_STATUS
+    from hamyon import hamyon_enabled
+
     return {
+        "ai": dict(AI_STATUS),
+        "hamyon_configured": hamyon_enabled(),
         "telegram_admin_count": len(admin_ids),
         "telegram_configured": len(admin_ids) > 0,
         "admin_bot_configured": bool(ADMIN_BOT_TOKEN),
@@ -74,6 +79,7 @@ async def _compute_admin_stats() -> dict:
         top_regions, total_messages, messages_today, total_referrals,
         avg_completeness, new_users,
         pending_payments, pending_verifications, open_reports,
+        pending_topups, pending_withdrawals, pending_concierge,
     ) = await asyncio.gather(
         db.users.count_documents({}),
         db.users.count_documents({"gender": "male"}),
@@ -110,6 +116,10 @@ async def _compute_admin_stats() -> dict:
         db.payments.count_documents({"status": "pending"}),
         db.verifications.count_documents({"status": "pending"}),
         db.reports.count_documents({"status": "open"}),
+        # The queues an admin actually has to work through:
+        db.manual_topups.count_documents({"status": "pending"}),
+        db.withdrawals.count_documents({"status": "pending"}),
+        db.concierge_orders.count_documents({"status": "in_progress"}),
     )
 
     revenue = rev_agg[0]["total"] if rev_agg else 0
@@ -133,6 +143,9 @@ async def _compute_admin_stats() -> dict:
         },
         "conversion_premium": round((premium + vip) / total * 100, 2) if total else 0,
         "pending_payments": pending_payments,
+        "pending_topups": pending_topups,
+        "pending_withdrawals": pending_withdrawals,
+        "pending_concierge": pending_concierge,
         "pending_verifications": pending_verifications,
         "open_reports": open_reports,
         "top_regions": top_regions,
@@ -218,7 +231,9 @@ async def admin_ai_insights(force: bool = False, _: str = Depends(get_current_ad
     opening the tab repeatedly doesn't burn a model call every time;
     force=true (the panel's 'Yangilash' button) always regenerates."""
     cached = await db.ai_insights_cache.find_one({"id": "latest"}, {"_id": 0})
-    if not force and cached and cached.get("generated_at"):
+    # Only a real AI answer is reused; a failure (e.g. before the key was set)
+    # must not stick for hours.
+    if not force and cached and cached.get("generated_at") and cached.get("ai_generated"):
         from core import parse_dt
         age = now_utc() - parse_dt(cached["generated_at"])
         if age < timedelta(minutes=AI_INSIGHTS_CACHE_MINUTES):
@@ -229,7 +244,8 @@ async def admin_ai_insights(force: bool = False, _: str = Depends(get_current_ad
     data = await _build_insights_data()
     insight = await generate_growth_insights(data)
     doc = {**insight, "generated_at": iso(now_utc())}
-    await db.ai_insights_cache.update_one({"id": "latest"}, {"$set": doc}, upsert=True)
+    if insight.get("ai_generated"):
+        await db.ai_insights_cache.update_one({"id": "latest"}, {"$set": doc}, upsert=True)
     return doc
 
 

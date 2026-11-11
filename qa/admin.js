@@ -4,7 +4,9 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
 const APP = 'http://127.0.0.1:18101';
-const IDS = ['ceo','ai','growth','revenue','dashboard','analytics','users','broadcast','anons','payments','p2p','verifications','withdrawals','referrals','messages','concierge','fraud','reports','auditlog'];
+// section -> its sub-tabs (empty = the section is a single screen)
+const NAV = { home: [], users: [], moderation: ['verifications','reports','messages','fraud'], money: ['p2p','withdrawals','payments','referrals'],
+  insights: ['ai','ceo','growth','revenue','analytics'], comms: ['broadcast','anons'], concierge: [], auditlog: [] };
 (async () => {
   const r = await fetch('http://127.0.0.1:18100/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'admin@fidem.uz', password: 'AdminQa#2026' }) });
   const token = (await r.json()).token;
@@ -21,10 +23,7 @@ const IDS = ['ceo','ai','growth','revenue','dashboard','analytics','users','broa
   await page.click('[data-testid=admin-mobile-menu-open]');
   report.push({ id: 'menu: no gift shop entry', errs: [], api: [], over: 0, bad: '', keys: [], legacy: (await page.locator('[data-testid=admin-mobile-tab-giftshop]').count()) ? ['giftshop tab still shown'] : [] });
   await page.click('[data-testid=admin-mobile-menu-close]');
-  for (const id of IDS) {
-    errs = []; bad = [];
-    await page.click('[data-testid=admin-mobile-menu-open]');
-    await page.click(`[data-testid=admin-mobile-tab-${id}]`);
+  const visit = async (id) => {
     await page.waitForLoadState('networkidle').catch(() => {});
     await page.waitForTimeout(700);
     const info = await page.evaluate(() => {
@@ -32,10 +31,18 @@ const IDS = ['ceo','ai','growth','revenue','dashboard','analytics','users','broa
       const keys = (t.match(/\b[a-z]+(?:_[a-z0-9]+){1,}\b/g) || []).filter((k) => !/^(qa|f\d|m\d)/.test(k)).slice(0, 6);
       return { over: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         bad: (t.match(/.{0,20}(undefined|NaN|\[object Object\]).{0,10}/) || [''])[0], keys, len: t.length,
-        legacy: (t.match(/.{0,25}\b(VIP|Click|CLICK|P2P|Concierge|Standard)\b.{0,25}/g) || []).slice(0, 4) };
+        legacy: (t.match(/.{0,25}\b(VIP|Click|CLICK|P2P|Concierge|Standard)\b.{0,25}/g) || []).filter((x) => !/eski vip/i.test(x)).slice(0, 4) };
     });
     await page.screenshot({ path: `${__dirname}/shots/admin_${id}.png`, fullPage: false });
     report.push({ id, errs: [...new Set(errs)].slice(0, 3), api: [...new Set(bad)].slice(0, 4), ...info });
+    errs = []; bad = [];
+  };
+  for (const [sec, subs] of Object.entries(NAV)) {
+    errs = []; bad = [];
+    await page.click('[data-testid=admin-mobile-menu-open]');
+    await page.click(`[data-testid=admin-mobile-tab-${sec}]`);
+    if (!subs.length) { await visit(sec); continue; }
+    for (const sub of subs) { await page.click(`[data-testid=admin-sub-${sub}]`); await visit(`${sec}_${sub}`); }
   }
   for (const x of report) {
     const p = [];
