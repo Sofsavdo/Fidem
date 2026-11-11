@@ -173,7 +173,7 @@ export default function ProfileDetail() {
   return (
     <div data-testid="profile-detail" className="pb-8">
       <div className="relative aspect-square bg-muted">
-        <PhotoFill src={photoUrl} name={c.name} className={blurred ? "blur-photo" : ""} />
+        <PhotoFill src={photoUrl} className={blurred ? "blur-photo" : ""} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/0 to-black/0" />
         {/* Screenshot deterrent: a faint watermark with the VIEWER's identity
             tiled over the photo. OS screenshots can't be blocked in a web

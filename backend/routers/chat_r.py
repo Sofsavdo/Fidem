@@ -18,6 +18,7 @@ from core import (
     chat_id_for,
     db,
     get_user,
+    has_own_photo,
     iso,
     log,
     manager,
@@ -440,6 +441,8 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
         raise target_doc
     if sender_doc.get("muted"):
         raise HTTPException(403, "muted")
+    if not has_own_photo(sender_doc):
+        raise HTTPException(403, "photo_required")
     if not await can_initiate_chat(sender_doc, req.to_user_id):
         # Free-weekly allowance: a free user may open a limited number of new
         # conversations per week. Consume atomically, then record a free unlock

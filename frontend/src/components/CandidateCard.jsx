@@ -32,7 +32,7 @@ function CandidateCardInner({ c, onSave, saved }) {
     >
       <Link to={`/candidate/${c.id}`} className="block" onPointerDown={prefetchDetail} onMouseEnter={prefetchDetail}>
         <div className="relative aspect-[4/5] overflow-hidden bg-muted">
-          <PhotoFill src={photoUrl} name={c.name} className={`transition-all duration-700 ${blurred ? "blur-photo" : ""}`} />
+          <PhotoFill src={photoUrl} className={`transition-all duration-700 ${blurred ? "blur-photo" : ""}`} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/0 to-black/0" />
 
           {/* One small match pill — the rest of the badges live in the profile. */}

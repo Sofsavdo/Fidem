@@ -5,6 +5,7 @@ import { AppProvider, useApp } from "@/contexts/AppContext";
 import Layout from "@/components/Layout";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ScrollToTop from "@/components/ScrollToTop";
+import PhotoRequired from "@/components/PhotoRequired";
 import BrandSplash from "@/components/BrandSplash";
 import { applyTheme, getTheme } from "@/lib/theme";
 
@@ -73,6 +74,9 @@ function Gate({ children }) {
     return <Navigate to="/onboarding" replace />;
   }
 
+  // A profile photo is mandatory - without one there is no app, only the upload.
+  if (user.onboarded && !user.is_admin && !user.photo_url) return <PhotoRequired />;
+
   return children;
 }
 
@@ -113,6 +117,8 @@ function RootRoute() {
   if (!user.onboarded && !hasSeenWelcome()) return <Welcome />;
 
   if (!user.onboarded) return <Navigate to="/onboarding" replace />;
+
+  if (!user.is_admin && !user.photo_url) return <PhotoRequired />;
 
   return (
     <Layout>

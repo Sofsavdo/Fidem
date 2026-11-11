@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from auth import get_current_user_id
-from core import INCOGNITO_PLANS, PAID_PLANS, WHO_VIEWED_PLANS, chat_id_for, db, get_user, iso, log, manager, mask_name, now_utc, parse_dt, push_notif, strip_locked_photo, touch_active, user_public, user_public_minimal
+from core import INCOGNITO_PLANS, PAID_PLANS, WHO_VIEWED_PLANS, chat_id_for, db, get_user, has_own_photo, iso, log, manager, mask_name, now_utc, parse_dt, push_notif, strip_locked_photo, touch_active, user_public, user_public_minimal
 from geo import distance_bucket, haversine_km
 from models import PhotoUnlockDecision, PhotoUnlockRequest, SaveRequest, new_id
 from services import age_from_birth, compute_match
@@ -175,6 +175,10 @@ async def candidates(
         match_lang = "uz"
     if not me_doc.get("onboarded"):
         return []
+    # A profile photo is mandatory: without one there is nothing to browse yet
+    # (the app shows an "upload your photo" screen instead).
+    if not has_own_photo(me_doc):
+        return []
 
     # "more_filters" (district, marital_status, has_children, height range) is
     # a Standard+ perk per the pricing page - free users keep age + region.
@@ -213,7 +217,7 @@ async def candidates(
     # shadow_banned is an admin-only moderation flag, distinct from the
     # user's own hidden_profile toggle — the user is never told they've
     # stopped appearing.
-    query: dict = {"id": id_filter, "onboarded": True, "blocked": {"$ne": True}, "hidden_profile": {"$ne": True}, "shadow_banned": {"$ne": True}, "is_demo": {"$ne": True}}
+    query: dict = {"id": id_filter, "onboarded": True, "blocked": {"$ne": True}, "hidden_profile": {"$ne": True}, "shadow_banned": {"$ne": True}, "is_demo": {"$ne": True}, "photo_url": {"$regex": "/api/files/"}}
 
     if me_doc.get("search_gender"):
         query["gender"] = me_doc["search_gender"]
@@ -638,7 +642,13 @@ async def save_user(req: SaveRequest, uid: str = Depends(get_current_user_id)):
     if req.user_id == uid:
         raise HTTPException(400, "Cannot save self")
 
-    is_new = await db.saved.find_one({"owner_id": uid, "target_id": req.user_id}) is None
+    me_photo, existing = await asyncio.gather(
+        db.users.find_one({"id": uid}, {"_id": 0, "photo_url": 1}),
+        db.saved.find_one({"owner_id": uid, "target_id": req.user_id}),
+    )
+    if not has_own_photo(me_photo or {}):
+        raise HTTPException(403, "photo_required")
+    is_new = existing is None
 
     await db.saved.update_one(
         {"owner_id": uid, "target_id": req.user_id},

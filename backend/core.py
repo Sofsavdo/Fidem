@@ -186,11 +186,23 @@ async def touch_active(uid: str) -> None:
 
 
 def own_photo_url(u: dict):
-    """Only photos hosted by this app (/api/files/<id>) are ever shown. Anything
-    else (stock/demo URLs left over from the old seed data) is treated as 'no
-    photo' so a placeholder is shown instead of someone else's picture."""
+    """The photo as a host-independent path (/api/files/<id>), or None.
+
+    Uploads used to be stored with the absolute URL of whatever backend domain
+    served the app at that moment; after a domain change those stored URLs point
+    at a dead host although the file itself is still ours. Returning only the
+    path lets the client resolve it against the current backend. Anything that
+    is not one of our own files (e.g. the stock/demo URLs the old seed data
+    used) counts as "no photo"."""
     url = u.get("photo_url")
-    return url if isinstance(url, str) and "/api/files/" in url else None
+    if not isinstance(url, str):
+        return None
+    i = url.find("/api/files/")
+    return url[i:] if i >= 0 else None
+
+
+def has_own_photo(u: dict) -> bool:
+    return own_photo_url(u) is not None
 
 
 def photo_is_public(u: dict) -> bool:
