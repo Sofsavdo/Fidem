@@ -231,7 +231,7 @@ def test_stored_absolute_urls_are_normalised_to_a_host_independent_path():
     assert core.user_public(old)["photo_url"] == f"/api/files/{fid}"
 
 
-def test_user_without_photo_cannot_browse_like_or_message(mdb, monkeypatch):
+def test_user_without_photo_cannot_like_or_message_and_is_hidden(mdb, monkeypatch):
     from routers import candidates_r, chat_r, picks_r
     from models import SaveRequest, SendMessageRequest
     for mod in (candidates_r, picks_r, chat_r):
@@ -243,8 +243,8 @@ def test_user_without_photo_cannot_browse_like_or_message(mdb, monkeypatch):
             _u("withphoto", gender="female"),
             _u("hasphoto2", gender="male", search_gender="female"),
         ])
-        assert await candidates_r.candidates(uid="nophoto", sort="match", limit=30) == []
-        assert await picks_r.daily_picks(uid="nophoto") == []
+        # browsing is not emptied server-side (the app shows the upload screen);
+        # liking and messaging are what is refused
         with pytest.raises(HTTPException) as e:
             await candidates_r.save_user(SaveRequest(user_id="withphoto"), uid="nophoto")
         assert e.value.status_code == 403 and e.value.detail == "photo_required"
@@ -288,3 +288,15 @@ def test_extra_photos_validated_capped_and_hidden_when_locked(mdb):
     assert pub["photos"] == ["/api/files/" + "a" * 24]            # only own files
     closed = core.strip_locked_photo(core.user_public(_u("y", photo_public=False, photos=["/api/files/" + "a" * 24])))
     assert closed["photos"] == [] and closed["photo_url"] is None
+
+
+def test_admin_without_photo_is_exempt_from_the_photo_gate(mdb, monkeypatch):
+    from routers import candidates_r
+    from models import SaveRequest
+    monkeypatch.setattr(candidates_r, "db", mdb, raising=False)
+
+    async def go():
+        await mdb.users.insert_many([_u("adm", is_admin=True, photo_url=None), _u("t", gender="female")])
+        r = await candidates_r.save_user(SaveRequest(user_id="t"), uid="adm")
+        assert r  # no photo_required for admins
+    run(go())

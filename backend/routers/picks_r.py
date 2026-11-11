@@ -12,7 +12,7 @@ import asyncio
 from fastapi import APIRouter, Depends
 
 from auth import get_current_user_id
-from core import db, get_user, has_own_photo, iso, now_utc, strip_locked_photo, user_public_minimal
+from core import db, get_user, iso, now_utc, strip_locked_photo, user_public_minimal
 from services import compute_match
 from models import new_id
 
@@ -123,6 +123,6 @@ async def compute_daily_picks(me_doc: dict) -> list[dict]:
 @router.get("/daily-picks")
 async def daily_picks(uid: str = Depends(get_current_user_id)):
     me_doc = await get_user(uid)
-    if not me_doc.get("onboarded") or not has_own_photo(me_doc):
+    if not me_doc.get("onboarded"):
         return []
     return await compute_daily_picks(me_doc)

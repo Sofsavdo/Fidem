@@ -219,6 +219,20 @@ def has_own_photo(u: dict) -> bool:
     return own_photo_url(u) is not None
 
 
+def photo_required_missing(u: dict) -> bool:
+    """True when this account must upload a photo before using the app.
+    Admin accounts are exempt (same rule as the frontend gate)."""
+    return not u.get("is_admin") and not has_own_photo(u)
+
+
+def photo_kind(u: dict) -> str:
+    """none / own / external - for diagnostics only (never logs the URL)."""
+    url = u.get("photo_url")
+    if not url:
+        return "none"
+    return "own" if own_photo_url(u) else "external"
+
+
 def photo_is_public(u: dict) -> bool:
     """Profile photos are open by default; a user hides theirs with the
     "photo visible to everyone" privacy toggle (stored as photo_public=False)."""
