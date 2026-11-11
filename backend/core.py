@@ -23,7 +23,8 @@ from services import (
     is_online,
     last_active_label,
     last_active_minutes,
-    send_telegram_message,
+    send_telegram_message,  # noqa: F401 - kept importable from core for existing callers
+    send_telegram_message_status,
 )
 
 log = logging.getLogger("fidem")
@@ -106,7 +107,7 @@ def mask_name(name: str) -> str:
 def get_webapp_url() -> str:
     return os.environ.get(
         "WEBAPP_URL",
-        "https://fidem.up.railway.app",
+        "https://fidem-frontend-production.up.railway.app",
     ).rstrip("/")
 
 
@@ -312,8 +313,16 @@ def user_public_minimal(u: dict) -> dict:
 
 async def notify_telegram(uid: str, text: str, link: Optional[str] = None, kind: str = "general") -> None:
     """Send Telegram notification with user preference check and rate limiting."""
-    user = await db.users.find_one({"id": uid}, {"telegram_id": 1, "notification_prefs": 1, "_id": 0})
+    user = await db.users.find_one(
+        {"id": uid}, {"telegram_id": 1, "notification_prefs": 1, "telegram_unreachable": 1, "_id": 0}
+    )
     if not user or not user.get("telegram_id"):
+        return
+    # Telegram already told us this chat is closed to the bot (blocked it /
+    # deleted the account) - every further attempt is a wasted API call and
+    # a 403 in the logs. Cleared again when the user /start's the bot or
+    # signs back in through Telegram.
+    if user.get("telegram_unreachable"):
         return
     
     # Check user notification preferences
@@ -353,11 +362,17 @@ async def notify_telegram(uid: str, text: str, link: Optional[str] = None, kind:
             ]
         }
 
-        sent = await send_telegram_message(
+        status = await send_telegram_message_status(
             int(user["telegram_id"]),
             text,
             reply_markup=reply_markup,
         )
+        sent = status == "sent"
+        if status == "unreachable":
+            await db.users.update_one(
+                {"id": uid},
+                {"$set": {"telegram_unreachable": True, "telegram_unreachable_at": iso(now_utc())}},
+            )
 
         # Only mark as sent (and start the cooldown window) if it actually
         # went out. send_telegram_message returning False (bad chat_id, user
@@ -369,8 +384,8 @@ async def notify_telegram(uid: str, text: str, link: Optional[str] = None, kind:
                 {"id": uid},
                 {"$set": {last_notif_key: iso(now_utc())}}
             )
-        else:
-            log.warning(f"telegram notify: send_telegram_message returned False for user {uid} kind={kind}")
+        elif status == "failed":
+            log.warning(f"telegram notify: send failed for user {uid} kind={kind}")
     except Exception as e:
         log.warning(f"telegram notify failed: {e}")
 

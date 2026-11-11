@@ -14,10 +14,11 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { QK } from "@/hooks/queries";
 import { openExternalLink } from "@/lib/telegram";
+import { PLAN_PRICES } from "@/lib/purchase";
 
 // Mirrors the Standard plan price in Premium.jsx — shown next to the one-time
 // unlock so the user can compare "pay once" vs "unlimited messaging".
-const STANDARD_PRICE = 34900;
+const STANDARD_PRICE = PLAN_PRICES.premium; // the single paid plan on sale
 
 function formatMsgTime(iso) {
   try {
@@ -69,20 +70,20 @@ export default function Chat() {
     }
   };
 
+  const [hasMoreOlder, setHasMoreOlder] = useState(true);
+
   const loadOlderMessages = async () => {
-    if (loadingOlder || messages.length === 0 || !chatId) return;
+    if (loadingOlder || messages.length === 0 || !chatId || !hasMoreOlder) return;
     setLoadingOlder(true);
     try {
-      // Load 50 more messages before the oldest one we have
-      const oldestTime = messages[0]?.created_at;
-      const response = await api.get(`/messages/${chatId}?limit=50`);
-      if (response.data && response.data.length > 0) {
-        // Filter out duplicates and prepend older messages
-        const newMsgs = response.data.filter(m => !messages.find(x => x.id === m.id));
-        if (newMsgs.length > 0) {
-          setMessages([...newMsgs, ...messages]);
-        }
-      }
+      // Cursor = created_at of the oldest message we already have.
+      const before = messages[0]?.created_at;
+      const response = await api.get(`/messages/${chatId}`, { params: { limit: 50, before } });
+      const page = response.data || [];
+      if (page.length < 50) setHasMoreOlder(false);
+      const known = new Set(messages.map((x) => x.id));
+      const newMsgs = page.filter((m) => !known.has(m.id));
+      if (newMsgs.length > 0) setMessages((prev) => [...newMsgs, ...prev]);
     } catch (err) {
       console.error("Failed to load older messages:", err);
     } finally {
@@ -137,7 +138,7 @@ export default function Chat() {
     if (unlocking) return;
     setUnlocking(true);
     try {
-      const r = await api.post("/payments/create", { purpose: "standard", amount: STANDARD_PRICE });
+      const r = await api.post("/payments/create", { purpose: "premium", amount: STANDARD_PRICE });
       if (r.data?.status === "paid") {
         toast.success(t("payment_success"));
         await refreshAccess();
@@ -159,9 +160,17 @@ export default function Chat() {
   };
 
   useEffect(() => {
+    setHasMoreOlder(true);
     load();
     // eslint-disable-next-line
-  }, [otherId, user]);
+  }, [otherId, user?.id]);
+
+  // Socket dropped and came back: pull whatever we missed meanwhile.
+  useEffect(() => {
+    if (wsEvent?.type !== "resync" || !chatId) return;
+    api.get(`/messages/${chatId}?limit=50`).then((m) => setMessages(m.data || [])).catch(() => {});
+    // eslint-disable-next-line
+  }, [wsEvent, chatId]);
 
   // Real-time: append incoming WS messages that belong to this chat
   useEffect(() => {
@@ -364,14 +373,14 @@ export default function Chat() {
       </div>
 
       <div className="flex-1 px-4 py-4 space-y-2 overflow-y-auto flex flex-col" data-testid="chat-history">
-        {messages.length > 0 && messages.length >= 50 && (
+        {messages.length >= 50 && hasMoreOlder && (
           <button
             ref={topRef}
             onClick={loadOlderMessages}
             disabled={loadingOlder}
             className="text-xs text-muted-foreground hover:text-secondary disabled:opacity-50 self-center py-2 transition"
           >
-            {loadingOlder ? "⏳ Murakkab..." : "← Eski xabarlar"}
+            {loadingOlder ? "⏳ ..." : "← Eski xabarlar"}
           </button>
         )}
         {messages.length === 0 && (
@@ -513,7 +522,7 @@ export default function Chat() {
                   className="relative rounded-xl border-2 border-primary bg-primary/5 p-2.5 text-left transition active:scale-[0.98] disabled:opacity-50"
                 >
                   <span className="absolute -top-2 right-2 rounded-full bg-primary text-white text-[8px] font-bold px-1.5 py-0.5 uppercase tracking-wide">{t("best_value")}</span>
-                  <p className="text-[10px] uppercase tracking-wide text-primary font-semibold">Standard</p>
+                  <p className="text-[10px] uppercase tracking-wide text-primary font-semibold">Premium</p>
                   <p className="font-heading text-lg font-bold tabular-nums leading-tight mt-0.5">
                     {STANDARD_PRICE.toLocaleString()}<span className="text-[10px] font-medium opacity-60"> {t("sum")}{t("plan_per_month")}</span>
                   </p>

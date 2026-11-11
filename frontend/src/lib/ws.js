@@ -2,7 +2,9 @@
 const BACKEND = process.env.REACT_APP_BACKEND_URL || "https://fidem-backend-production.up.railway.app";
 
 export class WS {
-  constructor({ onMessage, onOpen, onClose }) {
+  constructor({ onMessage, onOpen, onClose, onReconnect }) {
+    this.onReconnect = onReconnect || (() => {});
+    this.hasOpened = false;
     this.onMessage = onMessage || (() => {});
     this.onOpen = onOpen || (() => {});
     this.onClose = onClose || (() => {});
@@ -37,6 +39,8 @@ export class WS {
     }
     this.sock = sock;
     sock.onopen = () => {
+      if (this.hasOpened) this.onReconnect();
+      this.hasOpened = true;
       this.reconnectAttempt = 0;
       this.onOpen();
       this.pingInterval = setInterval(() => {

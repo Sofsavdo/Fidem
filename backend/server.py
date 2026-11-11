@@ -15,6 +15,11 @@ load_dotenv(ROOT_DIR / ".env")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 log = logging.getLogger("fidem")
+# httpx logs every request URL at INFO - for Telegram that URL contains the
+# bot token (".../bot<TOKEN>/sendMessage"), which would end up in the hosting
+# provider's logs. Keep those loggers quiet.
+for _noisy in ("httpx", "httpcore"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
 
 if os.environ.get("SENTRY_DSN"):
     import sentry_sdk

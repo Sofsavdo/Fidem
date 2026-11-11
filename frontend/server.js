@@ -3,6 +3,56 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = process.env.PORT || 3000;
+const net = require('net');
+
+// Optional same-origin API proxy. When BACKEND_INTERNAL_URL is set (e.g.
+// http://fidem-backend.railway.internal:8001) every /api request - including
+// the WebSocket upgrade - is forwarded to the backend, so the browser talks
+// to ONE origin: no CORS preflight round trip before each new API URL.
+// Unset = previous behaviour (static files only).
+let BACKEND = null;
+try {
+  if (process.env.BACKEND_INTERNAL_URL) BACKEND = new URL(process.env.BACKEND_INTERNAL_URL);
+} catch (e) {
+  console.error('Invalid BACKEND_INTERNAL_URL, proxy disabled:', e.message);
+}
+const isApi = (url) => url === '/api' || url.startsWith('/api/') || url.startsWith('/api?');
+
+function proxyHttp(req, res) {
+  const lib = BACKEND.protocol === 'https:' ? require('https') : http;
+  const headers = { ...req.headers, host: BACKEND.host };
+  const up = lib.request({
+    protocol: BACKEND.protocol,
+    hostname: BACKEND.hostname,
+    port: BACKEND.port || (BACKEND.protocol === 'https:' ? 443 : 80),
+    method: req.method,
+    path: req.url,
+    headers,
+  }, (ur) => {
+    res.writeHead(ur.statusCode, ur.headers);
+    ur.pipe(res);
+  });
+  up.on('error', () => {
+    if (!res.headersSent) res.writeHead(502, { 'Content-Type': 'application/json' });
+    res.end('{"detail":"upstream unavailable"}');
+  });
+  req.pipe(up);
+}
+
+function proxyUpgrade(req, socket, head) {
+  const port = Number(BACKEND.port || (BACKEND.protocol === 'https:' ? 443 : 80));
+  const up = net.connect(port, BACKEND.hostname, () => {
+    const lines = [`${req.method} ${req.url} HTTP/1.1`, `Host: ${BACKEND.host}`];
+    for (const [k, v] of Object.entries(req.headers)) {
+      if (k.toLowerCase() !== 'host') lines.push(`${k}: ${v}`);
+    }
+    up.write(lines.join('\r\n') + '\r\n\r\n');
+    if (head && head.length) up.write(head);
+    socket.pipe(up).pipe(socket);
+  });
+  up.on('error', () => socket.destroy());
+  socket.on('error', () => up.destroy());
+}
 const BUILD_DIR = path.join(__dirname, 'build');
 
 const mimeTypes = {
@@ -22,11 +72,19 @@ const mimeTypes = {
 };
 
 const server = http.createServer((req, res) => {
+  if (BACKEND && isApi(req.url)) return proxyHttp(req, res);
+
   // Remove query string
   const urlPath = req.url.split('?')[0];
   
   // Default to index.html for SPA
   let filePath = path.join(BUILD_DIR, urlPath === '/' ? 'index.html' : urlPath);
+  // Never serve anything outside the build directory (../ traversal).
+  if (!path.resolve(filePath).startsWith(BUILD_DIR)) {
+    res.writeHead(403);
+    res.end('Forbidden');
+    return;
+  }
   
   // Check if file exists
   fs.access(filePath, fs.constants.F_OK, (err) => {
@@ -78,6 +136,11 @@ const server = http.createServer((req, res) => {
       });
     });
   });
+});
+
+server.on('upgrade', (req, socket, head) => {
+  if (BACKEND && isApi(req.url)) return proxyUpgrade(req, socket, head);
+  socket.destroy();
 });
 
 server.listen(PORT, '0.0.0.0', () => {
