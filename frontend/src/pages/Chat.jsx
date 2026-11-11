@@ -12,9 +12,10 @@ import { formatLastActive } from "@/lib/time";
 import { tapLight } from "@/lib/haptics";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { QK } from "@/hooks/queries";
+import { QK, usePaymentConfig } from "@/hooks/queries";
 import { openExternalLink } from "@/lib/telegram";
 import { PLAN_PRICES } from "@/lib/purchase";
+import { FEATURES } from "@/lib/features";
 
 // Mirrors the Standard plan price in Premium.jsx — shown next to the one-time
 // unlock so the user can compare "pay once" vs "unlimited messaging".
@@ -52,6 +53,8 @@ export default function Chat() {
 
   const chatId = user && otherId ? [user.id, otherId].sort().join("_") : null;
   const { wsEvent } = useApp();
+  const { data: payCfg } = usePaymentConfig();
+  const payOff = !!payCfg && !payCfg.payments_available; // no way to pay right now
 
   // Fire the three requests independently and paint each as it arrives, so the
   // header and messages show the moment they're ready rather than blocking on
@@ -499,6 +502,10 @@ export default function Chat() {
                 </button>
               )}
 
+              {payOff ? (
+                <p data-testid="chat-pay-soon" className="text-[12px] leading-relaxed rounded-xl bg-muted/60 border border-border p-3">{t("chat_locked_no_pay")}</p>
+              ) : (
+                <>
               {/* Quick top-up balance link if balance is insufficient */}
               {access.balance < access.price_uzs && (
                 <Link to="/premium?tab=balance" data-testid="chat-topup-balance"
@@ -540,6 +547,8 @@ export default function Chat() {
                   <span className="mt-2 block text-center rounded-lg bg-primary text-white text-xs py-1.5 font-semibold">{t("pay_with_click")}</span>
                 </button>
               </div>
+                </>
+              )}
             </div>
           )}
           {/* Free weekly conversation hint — the composer is already open; this
@@ -581,9 +590,11 @@ export default function Chat() {
           )}
           {/* Always-visible message composer (disabled when locked) */}
           <div className="flex items-end gap-1.5 min-w-0">
-            <button data-testid="gift-open" onClick={() => setGiftOpen(true)} disabled={access?.requires_unlock} className="shrink-0 w-10 h-10 grid place-items-center rounded-full bg-muted hover:bg-border disabled:opacity-40" title={t("send_gift")}>
+            {FEATURES.giftShop && (
+              <button data-testid="gift-open" onClick={() => setGiftOpen(true)} disabled={access?.requires_unlock} className="shrink-0 w-10 h-10 grid place-items-center rounded-full bg-muted hover:bg-border disabled:opacity-40" title={t("send_gift")}>
               <Gift className="w-4 h-4" />
             </button>
+            )}
             <button
               data-testid="contact-share-open"
               onClick={() => { setShareOpen((v) => !v); setContactConfirm(null); }}

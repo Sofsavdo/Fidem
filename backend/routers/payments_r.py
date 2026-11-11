@@ -700,7 +700,11 @@ async def process_completed_payment(uid: str, purpose: str, amount: int, balance
 async def topup_config(uid: str = Depends(get_current_user_id)):
     cfg = await db.settings.find_one({"id": "topup_config"}, {"_id": 0}) or {}
     enabled = bool(cfg.get("p2p_enabled"))
-    out = {"p2p_enabled": enabled}
+    from services import CLICK_MERCHANT_ID, CLICK_SERVICE_ID
+    click_enabled = bool(CLICK_SECRET_KEY and CLICK_MERCHANT_ID and CLICK_SERVICE_ID)
+    # payments_available lets the app show a clear "coming soon" state instead
+    # of sending users into a payment flow that cannot complete.
+    out = {"p2p_enabled": enabled, "click_enabled": click_enabled, "payments_available": enabled or click_enabled}
     if enabled:
         out["card_number"] = cfg.get("card_number", "")
         out["card_holder"] = cfg.get("card_holder", "")

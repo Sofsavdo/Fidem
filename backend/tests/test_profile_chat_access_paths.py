@@ -33,7 +33,7 @@ def mdb(monkeypatch):
 
 def _user(uid, **kw):
     base = {"id": uid, "name": uid.upper(), "plan": "free", "gender": "male",
-            "birth_date": "1995-01-01", "region": "Toshkent", "language": "uz"}
+            "birth_date": "1995-01-01", "region": "Toshkent", "language": "uz", "photo_public": False}
     base.update(kw)
     return base
 

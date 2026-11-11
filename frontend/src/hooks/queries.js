@@ -56,6 +56,15 @@ export const QK = {
   adminUserDetail: (id) => ["admin", "userDetail", id],
 };
 
+/** Which ways of paying exist right now (CLICK configured / P2P on). */
+export function usePaymentConfig() {
+  return useQuery({
+    queryKey: ["payments", "config"],
+    queryFn: async () => (await api.get("/payments/topup-config")).data,
+    staleTime: 60_000,
+  });
+}
+
 export function useReferral() {
   return useQuery({
     queryKey: QK.referral,

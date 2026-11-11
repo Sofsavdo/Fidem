@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 
 from auth import get_current_user_id
-from core import PAID_PLANS, db, get_user, iso, now_utc
+from core import PAID_PLANS, db, get_user, iso, now_utc, photo_is_public
 from models import NotificationPreferencesRequest, PrivacySettingsRequest
 
 router = APIRouter(tags=["settings"])
@@ -54,7 +54,7 @@ async def get_privacy_settings(uid: str = Depends(get_current_user_id)):
     me = await get_user(uid)
     boost_active = bool(me.get("boost_until") and me["boost_until"] > iso(now_utc()))
     return {
-        "photo_public": bool(me.get("photo_public", False)),
+        "photo_public": photo_is_public(me),
         "hidden_profile": bool(me.get("hidden_profile", False)),
         "boost_active": boost_active,
     }
@@ -105,6 +105,6 @@ async def update_privacy_settings(req: PrivacySettingsRequest, uid: str = Depend
     merged = {**me, **updates}
     return {
         "ok": True,
-        "photo_public": bool(merged.get("photo_public", False)),
+        "photo_public": photo_is_public(merged),
         "hidden_profile": bool(merged.get("hidden_profile", False)),
     }

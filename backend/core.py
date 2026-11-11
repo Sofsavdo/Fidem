@@ -185,6 +185,12 @@ async def touch_active(uid: str) -> None:
     await db.users.update_one({"id": uid}, {"$set": {"last_active": iso(now_utc())}})
 
 
+def photo_is_public(u: dict) -> bool:
+    """Profile photos are open by default; a user hides theirs with the
+    "photo visible to everyone" privacy toggle (stored as photo_public=False)."""
+    return bool(u.get("photo_public", True))
+
+
 def strip_locked_photo(pub: dict) -> dict:
     """Remove photo_url from API payloads when the viewer has not unlocked the photo.
 
@@ -223,14 +229,14 @@ def user_public(u: dict, include_private: bool = False) -> dict:
         "marital_status": u.get("marital_status", "single"),
         "has_children": u.get("has_children", False),
         "children_count": u.get("children_count", 0),
-        "height_cm": u.get("height_cm", 170),
-        "weight_kg": u.get("weight_kg", 70),
+        "height_cm": u.get("height_cm") or 0,
+        "weight_kg": u.get("weight_kg") or 0,
         "education": u.get("education", ""),
         "profession": u.get("profession", ""),
         "religion": u.get("religion", ""),
-        "smoking": u.get("smoking", "no"),
-        "alcohol": u.get("alcohol", "no"),
-        "relocation": bool(u.get("relocation", False)),
+        "smoking": u.get("smoking") or "",
+        "alcohol": u.get("alcohol") or "",
+        "relocation": u.get("relocation"),
         "bio": u.get("bio", ""),
         "photo_url": u.get("photo_url"),
         "photo_verified": bool(u.get("photo_verified", False)),
@@ -253,7 +259,7 @@ def user_public(u: dict, include_private: bool = False) -> dict:
         # Privacy settings: photo_public feeds strip_locked_photo (an opted-in
         # open photo renders for every viewer); hidden_profile keeps the user
         # out of candidate feeds / viewer lists (they can still browse).
-        "photo_public": bool(u.get("photo_public", False)),
+        "photo_public": photo_is_public(u),
         "hidden_profile": bool(u.get("hidden_profile", False)),
         # 15s VIP video intro - public on the profile page by design.
         "video_intro_url": u.get("video_intro_url") or None,
@@ -294,7 +300,7 @@ def user_public_minimal(u: dict) -> dict:
         "district": u.get("district", ""),
         "marital_status": u.get("marital_status", "single"),
         "has_children": u.get("has_children", False),
-        "height_cm": u.get("height_cm", 170),
+        "height_cm": u.get("height_cm") or 0,
         "education": u.get("education", ""),
         "profession": u.get("profession", ""),
         "bio": u.get("bio", ""),
@@ -307,7 +313,7 @@ def user_public_minimal(u: dict) -> dict:
         "online": is_online(la),
         "plan": u.get("plan", "free"),
         "blocked": u.get("blocked", False),
-        "photo_public": bool(u.get("photo_public", False)),
+        "photo_public": photo_is_public(u),
     }
 
 

@@ -4,7 +4,7 @@ import api, { API } from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { Crown, Check, Wallet, ArrowUpRight, Sparkles, Plus, Receipt, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
-import { usePayments, QK } from "@/hooks/queries";
+import { usePayments, usePaymentConfig, QK } from "@/hooks/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { PageHead, Segmented, Price, SectionLabel } from "@/components/kit";
 import { purposeLabel } from "@/lib/labels";
@@ -130,6 +130,8 @@ export default function Premium() {
   const perk = PERK[lang] || PERK.uz;
 
   const { data: payments = [] } = usePayments();
+  const { data: payCfg } = usePaymentConfig();
+  const payOff = !!payCfg && !payCfg.payments_available; // neither CLICK nor P2P is available
   // Only completed payments are worth showing here - a pending/expired/failed
   // attempt isn't a transaction the user needs to see in their history.
   const successfulPayments = payments.filter((p) => p.status === "success" || p.status === "paid");
@@ -184,6 +186,12 @@ export default function Premium() {
               flow already offers - this just makes it a first-class
               purchase option instead of something only discoverable via
               gifting. */}
+          {payOff && (
+            <div data-testid="payments-soon-banner" className="rounded-2xl border border-gold/40 bg-gold-light/25 p-3 text-[13px] leading-relaxed">
+              <p className="font-semibold">{t("payments_soon_title")}</p>
+              <p className="text-muted-foreground mt-0.5">{t("payments_soon_desc")}</p>
+            </div>
+          )}
           <div className="flex gap-2" data-testid="plan-duration-selector">
             {DURATIONS.map((d) => (
               <button
@@ -268,12 +276,12 @@ export default function Premium() {
                   <button
                     data-testid={`buy-${p.key}`}
                     onClick={() => runPayment(p.key, price, duration)}
-                    disabled={creating}
+                    disabled={creating || payOff}
                     className={`mt-3.5 w-full rounded-2xl py-2.5 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-50 ${
                       p.dark ? "bg-gold text-ink" : p.popular ? "bg-gradient-to-r from-gold-dark to-gold text-ink" : "bg-primary text-white"
                     }`}
                   >
-                    {t("plan_choose_cta")} · {price.toLocaleString()} {t("sum")}
+                    {payOff ? t("payments_soon_cta") : `${t("plan_choose_cta")} · ${price.toLocaleString()} ${t("sum")}`}
                   </button>
                 )}
                 {isCurrent && (
@@ -341,6 +349,12 @@ export default function Premium() {
           </div>
 
           {/* Top-up — the PRIMARY action of this page */}
+          {payOff ? (
+            <div className="rounded-3xl bg-card border border-border p-5 text-center" data-testid="payments-soon-card">
+              <p className="font-heading text-lg font-semibold">{t("payments_soon_title")}</p>
+              <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{t("payments_soon_desc")}</p>
+            </div>
+          ) : (
           <div className="rounded-3xl bg-card border border-border p-4" data-testid="topup-section">
             <div className="flex items-center gap-2">
               <Plus className="w-4 h-4 text-primary" />
@@ -411,6 +425,7 @@ export default function Premium() {
               </>
             )}
           </div>
+          )}
 
           {/* My pending/decided manual top-up requests */}
           {topupCfg?.p2p_enabled && myTopups.length > 0 && (

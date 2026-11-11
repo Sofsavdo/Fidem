@@ -229,7 +229,7 @@ export default function Me() {
             icon={<Camera className="w-4 h-4" />}
             label={t("photo_public_label")}
             hint={t("photo_public_hint")}
-            checked={!!user.photo_public}
+            checked={user.photo_public !== false}
             disabled={privacyMutation.isPending}
             onChange={(v) => privacyMutation.mutate({ photo_public: v })}
           />
