@@ -441,3 +441,59 @@ def test_revoked_admin_token_is_refused(mdb, monkeypatch):
             await auth.get_current_admin(f"Bearer {tok}")
         assert e.value.status_code == 403
     run(go())
+
+
+# ---------- AI plumbing ----------
+def test_gemini_answer_parsing_and_self_check(monkeypatch):
+    import ai_service
+
+    class R:
+        def __init__(self, payload): self.payload = payload
+        def raise_for_status(self): pass
+        def json(self): return self.payload
+
+    class C:
+        def __init__(self, payload): self.payload = payload; self.body = None
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def post(self, url, params=None, json=None): self.body = json; return R(self.payload)
+
+    ok_payload = {"candidates": [{"content": {"parts": [{"text": "thinking...", "thought": True}, {"text": '{"ok": true}'}]}}]}
+    cl = C(ok_payload)
+    monkeypatch.setattr(ai_service.httpx, "AsyncClient", lambda **kw: cl)
+    monkeypatch.setattr(ai_service, "GEMINI_API_KEY", "k")
+    st = asyncio.run(ai_service.ai_self_check())
+    assert st["ok"] is True and st["provider"] == "gemini"
+    assert cl.body["generationConfig"]["maxOutputTokens"] == 256
+
+    cut = {"candidates": [{"finishReason": "MAX_TOKENS", "content": {}}]}
+    monkeypatch.setattr(ai_service.httpx, "AsyncClient", lambda **kw: C(cut))
+    st = asyncio.run(ai_service.ai_self_check())
+    assert st["ok"] is False and "chala" in st["error"]
+
+    monkeypatch.setattr(ai_service, "GEMINI_API_KEY", "")
+    st = asyncio.run(ai_service.ai_self_check())
+    assert st["ok"] is False and "GEMINI_API_KEY" in st["error"]
+
+
+def test_failed_ai_insights_are_not_cached(mdb, monkeypatch):
+    from routers import admin_r
+    import ai_service
+    monkeypatch.setattr(admin_r, "db", mdb, raising=False)
+    calls = []
+
+    async def fake_insights(data):
+        calls.append(1)
+        return {"ai_generated": False, "error": "x"}
+    monkeypatch.setattr(ai_service, "generate_growth_insights", fake_insights)
+
+    async def fake_data():
+        return "d"
+    monkeypatch.setattr(admin_r, "_build_insights_data", fake_data)
+
+    async def go():
+        await admin_r.admin_ai_insights(force=False, _="adm")
+        await admin_r.admin_ai_insights(force=False, _="adm")
+        assert len(calls) == 2  # a failure is retried, not served from cache
+        assert await mdb.ai_insights_cache.count_documents({}) == 0
+    run(go())

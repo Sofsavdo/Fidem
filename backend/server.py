@@ -118,6 +118,9 @@ async def startup() -> None:
     # Set Telegram webhook in background (non-fatal)
     asyncio.create_task(setup_telegram_webhook())
     asyncio.create_task(setup_admin_telegram_webhook())
+    # One small real AI call: its result goes to the log and the admin panel.
+    from ai_service import ai_self_check
+    asyncio.create_task(ai_self_check())
 
     # Re-engagement notifications for inactive users - runs on its own
     # interval for the life of the process, no external cron needed.

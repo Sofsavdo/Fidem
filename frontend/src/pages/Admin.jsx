@@ -21,31 +21,47 @@ import {
   useAdminAiInsights, useRefreshAiInsights,
 } from "@/hooks/queries";
 
-const ALL_MENU_ITEMS = [
-  { id: "ceo", icon: Gauge, label: "CEO Dashboard" },
-  { id: "ai", icon: Bot, label: "AI Tahlilchi" },
-  { id: "growth", icon: Heart, label: "O'sish (Funnel)" },
-  { id: "revenue", icon: DollarSign, label: "Daromad" },
-  { id: "giftshop", icon: Gift, label: "Sovg'alar do'koni" },
-  { id: "dashboard", icon: LayoutDashboard, label: "Boshqaruv" },
-  { id: "analytics", icon: BarChart3, label: "Analitika" },
+// Eight places instead of nineteen: related screens are grouped and shown as
+// sub-tabs, so an admin finds "where do I approve X" without scanning a list.
+const SECTIONS = [
+  { id: "home", icon: Gauge, label: "Bosh sahifa" },
   { id: "users", icon: UsersIcon, label: "Foydalanuvchilar" },
-  { id: "broadcast", icon: Send, label: "Xabar yuborish" },
-  { id: "anons", icon: Megaphone, label: "Anonslar" },
-  { id: "payments", icon: DollarSign, label: "To'lovlar" },
-  { id: "p2p", icon: Wallet, label: "Karta orqali to'ldirish" },
-  { id: "verifications", icon: ShieldCheck, label: "Tasdiqlashlar" },
-  { id: "withdrawals", icon: Wallet, label: "Yechib olishlar" },
-  { id: "referrals", icon: TrendingUp, label: "Referallar" },
-  { id: "messages", icon: MessageSquare, label: "Chat nazorati" },
+  { id: "moderation", icon: ShieldCheck, label: "Moderatsiya", subs: [
+    { id: "verifications", label: "Tasdiqlashlar" },
+    { id: "reports", label: "Shikoyatlar" },
+    { id: "messages", label: "Chat nazorati" },
+    { id: "fraud", label: "Firibgarlik" },
+  ] },
+  { id: "money", icon: Wallet, label: "Pul", subs: [
+    { id: "p2p", label: "Karta orqali to'ldirish" },
+    { id: "withdrawals", label: "Pul yechish" },
+    { id: "payments", label: "To'lovlar tarixi" },
+    { id: "referrals", label: "Referallar" },
+  ] },
+  { id: "insights", icon: BarChart3, label: "Tahlil", subs: [
+    { id: "ai", label: "AI tahlil" },
+    { id: "ceo", label: "Ko'rsatkichlar" },
+    { id: "growth", label: "Voronka" },
+    { id: "revenue", label: "Daromad" },
+    { id: "analytics", label: "Grafiklar" },
+    ...(FEATURES.giftShop ? [{ id: "giftshop", label: "Sovg'alar" }] : []),
+  ] },
+  { id: "comms", icon: Megaphone, label: "Aloqa", subs: [
+    { id: "broadcast", label: "Xabar yuborish" },
+    { id: "anons", label: "Anonslar" },
+  ] },
   { id: "concierge", icon: Search, label: "Shaxsiy sovchi" },
-  { id: "fraud", icon: AlertTriangle, label: "Firibgarlik" },
-  { id: "reports", icon: Settings, label: "Shikoyatlar" },
-  { id: "auditlog", icon: ScrollText, label: "Audit Log" },
+  { id: "auditlog", icon: ScrollText, label: "Audit log" },
 ];
-
-// Sections for products that are switched off stay out of the menu.
-const menuItems = ALL_MENU_ITEMS.filter((m) => m.id !== "giftshop" || FEATURES.giftShop);
+const sectionOf = (tab) => SECTIONS.find((sec) => sec.id === tab || (sec.subs || []).some((x) => x.id === tab)) || SECTIONS[0];
+// Pending work per section, shown as a badge so nothing waits unseen.
+const sectionBadge = (secId, stats) => {
+  if (!stats) return 0;
+  if (secId === "moderation") return (stats.pending_verifications || 0) + (stats.open_reports || 0);
+  if (secId === "money") return (stats.pending_topups || 0) + (stats.pending_withdrawals || 0);
+  if (secId === "concierge") return stats.pending_concierge || 0;
+  return 0;
+};
 
 // Human labels for stored status / action codes (admins should never read raw keys).
 const STATUS_UZ = {
@@ -87,7 +103,9 @@ function AdminPagination({ page, setPage, total, limit }) {
 
 export default function Admin() {
   const { user, t } = useApp();
-  const [activeTab, setActiveTab] = useState("ceo");
+  const [activeTab, setActiveTab] = useState("home");
+  const section = sectionOf(activeTab);
+  const openSection = (sec) => setActiveTab(sec.subs ? sec.subs[0].id : sec.id);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { data: stats } = useAdminStats();
@@ -113,20 +131,25 @@ export default function Admin() {
           </h1>
         </div>
         <nav className="p-2 space-y-1">
-          {menuItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
-                activeTab === item.id
-                  ? "bg-primary text-primary-foreground"
-                  : "hover:bg-muted text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <item.icon className="w-5 h-5 flex-shrink-0" />
-              {sidebarOpen && <span className="text-sm font-medium">{item.label}</span>}
-            </button>
-          ))}
+          {SECTIONS.map((item) => {
+            const badge = sectionBadge(item.id, stats);
+            return (
+              <button
+                key={item.id}
+                onClick={() => openSection(item)}
+                data-testid={`admin-tab-${item.id}`}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
+                  section.id === item.id
+                    ? "bg-primary text-primary-foreground"
+                    : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <item.icon className="w-5 h-5 flex-shrink-0" />
+                {sidebarOpen && <span className="text-sm font-medium flex-1 text-left">{item.label}</span>}
+                {sidebarOpen && badge > 0 && <span className="min-w-[20px] h-5 px-1.5 grid place-items-center rounded-full bg-rose-500 text-white text-[11px] font-bold">{badge}</span>}
+              </button>
+            );
+          })}
         </nav>
         <div className="hidden lg:block absolute bottom-0 left-0 right-0 p-2 border-t border-border">
           <button
@@ -156,21 +179,25 @@ export default function Admin() {
               </button>
             </div>
             <nav className="p-2 space-y-1">
-              {menuItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
-                  data-testid={`admin-mobile-tab-${item.id}`}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
-                    activeTab === item.id
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-muted text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <item.icon className="w-5 h-5 flex-shrink-0" />
-                  <span className="text-sm font-medium">{item.label}</span>
-                </button>
-              ))}
+              {SECTIONS.map((item) => {
+                const badge = sectionBadge(item.id, stats);
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => { openSection(item); setMobileMenuOpen(false); }}
+                    data-testid={`admin-mobile-tab-${item.id}`}
+                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-colors ${
+                      section.id === item.id
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                    <span className="text-sm font-medium flex-1 text-left">{item.label}</span>
+                    {badge > 0 && <span className="min-w-[20px] h-5 px-1.5 grid place-items-center rounded-full bg-rose-500 text-white text-[11px] font-bold">{badge}</span>}
+                  </button>
+                );
+              })}
             </nav>
           </div>
           <div className="flex-1 bg-black/40" onClick={() => setMobileMenuOpen(false)} />
@@ -189,7 +216,7 @@ export default function Admin() {
               >
                 <Menu className="w-5 h-5" />
               </button>
-              <h2 className="font-heading text-xl lg:text-2xl font-semibold truncate">{menuItems.find(m => m.id === activeTab)?.label}</h2>
+              <h2 className="font-heading text-xl lg:text-2xl font-semibold truncate">{section.label}</h2>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
               {configHealth && (
@@ -215,7 +242,24 @@ export default function Admin() {
             </div>
           </div>
 
-          {configHealth && !configHealth.telegram_configured && (activeTab === "ceo" || activeTab === "dashboard") && (
+          {section.subs && (
+            <div className="flex flex-wrap gap-1.5 mb-5" data-testid="admin-subtabs">
+              {section.subs.map((x) => (
+                <button
+                  key={x.id}
+                  onClick={() => setActiveTab(x.id)}
+                  data-testid={`admin-sub-${x.id}`}
+                  className={`rounded-full px-3.5 py-1.5 text-xs font-medium border transition ${
+                    activeTab === x.id ? "bg-foreground text-background border-foreground" : "bg-card border-border hover:bg-muted"
+                  }`}
+                >
+                  {x.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {configHealth && !configHealth.telegram_configured && activeTab === "home" && (
             <details
               data-testid="admin-telegram-not-configured"
               className="mb-6 rounded-2xl bg-rose-50 border border-rose-300 p-4"
@@ -242,13 +286,18 @@ export default function Admin() {
             </details>
           )}
 
-          {activeTab === "ceo" && <AdminCeoDashboard go={setActiveTab} />}
+          {activeTab === "home" && <AdminHome stats={stats} go={setActiveTab} />}
+          {activeTab === "ceo" && (
+            <div className="space-y-6">
+              <AdminCeoDashboard go={setActiveTab} />
+              {stats && <AdminDashboard stats={stats} go={setActiveTab} compact />}
+            </div>
+          )}
           {activeTab === "ai" && <AdminAiInsights />}
           {activeTab === "growth" && <AdminGrowthDashboard />}
           {activeTab === "revenue" && <AdminRevenueDashboard />}
           {activeTab === "giftshop" && <AdminGiftShopDashboard />}
           {activeTab === "auditlog" && <AdminAuditLog />}
-          {activeTab === "dashboard" && stats && <AdminDashboard stats={stats} go={setActiveTab} />}
 
           {activeTab === "analytics" && stats && <AdminAnalytics stats={stats} />}
           {activeTab === "users" && <AdminUsers />}
@@ -293,6 +342,89 @@ const sumFmt = (n) => `${Number(n || 0).toLocaleString()} so'm`;
 // The CEO Dashboard: the four questions an owner asks every morning —
 // how many people came, how many matched, how many chatted, how much money
 // came in — answered in one screen, no digging through operator tabs.
+// Home: what needs a decision today (each card opens the exact queue), today's
+// numbers, and the AI analyst's one-paragraph verdict - the three things an
+// owner checks first. Detailed metrics live under Tahlil.
+function AdminHome({ stats, go }) {
+  const { data: ceo } = useAdminCeo();
+  const { data: ai } = useAdminAiInsights();
+  const { data: health } = useAdminConfigHealth();
+  const aiState = health?.ai;
+  const queue = [
+    { tab: "verifications", label: "Tasdiqlash kutmoqda", value: stats?.pending_verifications || 0, Icon: ShieldCheck },
+    { tab: "reports", label: "Ochiq shikoyatlar", value: stats?.open_reports || 0, Icon: AlertTriangle },
+    { tab: "p2p", label: "Karta to'lovi tekshiruvi", value: stats?.pending_topups || 0, Icon: Wallet },
+    { tab: "withdrawals", label: "Pul yechish so'rovlari", value: stats?.pending_withdrawals || 0, Icon: DollarSign },
+    { tab: "concierge", label: "Sovchi buyurtmalari", value: stats?.pending_concierge || 0, Icon: Search },
+  ];
+  const todo = queue.filter((q) => q.value > 0);
+  return (
+    <div className="space-y-6" data-testid="admin-home">
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Bugun qilinadigan ishlar</p>
+        {todo.length === 0 ? (
+          <div className="rounded-3xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 p-4 text-sm font-medium" data-testid="admin-queue-empty">
+            ✓ Hammasi joyida — kutib turgan so'rov yo'q
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {todo.map((q) => (
+              <button key={q.tab} onClick={() => go(q.tab)} data-testid={`admin-queue-${q.tab}`}
+                className="rounded-2xl border border-primary/40 bg-primary/5 p-4 text-left flex items-center justify-between hover:-translate-y-0.5 transition">
+                <span className="flex items-center gap-2.5 text-sm font-medium"><q.Icon className="w-4 h-4 text-primary" /> {q.label}</span>
+                <span className="flex items-center gap-1 font-heading text-xl text-primary">{q.value} <ChevronRight className="w-4 h-4" /></span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-3xl bg-gradient-to-br from-ink to-zinc-800 text-white p-5">
+        <p className="text-xs uppercase tracking-wider text-white/60">Bugun</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-3">
+          {[
+            ["Yangi foydalanuvchi", ceo?.users?.new_today],
+            ["Faol (bugun)", ceo?.active?.dau ?? stats?.dau],
+            ["Matchlar", ceo?.matches?.today],
+            ["Daromad", ceo ? sumFmt(ceo.revenue?.today) : undefined],
+          ].map(([label, v]) => (
+            <div key={label}>
+              <p className="text-[10px] text-white/60">{label}</p>
+              <p className="font-heading text-2xl font-bold tabular-nums mt-0.5">{v ?? "—"}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 pt-3 border-t border-white/10 grid grid-cols-3 gap-3 text-[11px] text-white/70">
+          <span>Jami: <b className="text-white">{(stats?.total_users || 0).toLocaleString()}</b></span>
+          <span>Oylik faol: <b className="text-white">{stats?.mau ?? "—"}</b></span>
+          <span>Premium: <b className="text-white">{(stats?.premium || 0) + (stats?.vip || 0)}</b></span>
+        </div>
+      </div>
+
+      <button onClick={() => go("ai")} data-testid="admin-home-ai" className="w-full text-left rounded-3xl bg-card border border-border p-4 hover:border-primary/40 transition">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5"><Bot className="w-3.5 h-3.5" /> AI xulosasi</p>
+          {aiState?.checked && (
+            <span data-testid="admin-ai-status" className={`text-[10px] font-semibold rounded-full px-2 py-0.5 ${aiState.ok ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
+              {aiState.ok ? "AI ishlayapti" : "AI ishlamayapti"}
+            </span>
+          )}
+        </div>
+        {aiState?.checked && !aiState.ok && <p className="text-[11px] text-rose-700 mt-1">Sabab: {aiState.error}</p>}
+        {ai?.ai_generated ? (
+          <>
+            <p className="text-sm mt-2 leading-relaxed line-clamp-3">{ai.summary}</p>
+            {ai.recommendations?.[0] && <p className="text-xs text-primary mt-2">👉 {ai.recommendations[0]}</p>}
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground mt-2">{ai?.error ? `AI tahlil ishlamayapti: ${ai.error}` : "AI tahlil yuklanmoqda..."}</p>
+        )}
+        <p className="text-xs font-semibold text-primary mt-2">Batafsil →</p>
+      </button>
+    </div>
+  );
+}
+
 function AdminCeoDashboard({ go }) {
   const { data, isLoading } = useAdminCeo();
   if (isLoading || !data) return <div className="text-center py-12 text-muted-foreground">Yuklanmoqda...</div>;
@@ -369,11 +501,7 @@ function AdminCeoDashboard({ go }) {
         {retention.note && <p className="text-[11px] text-muted-foreground mt-2">{retention.note}</p>}
       </div>
 
-      <div className="flex gap-2 flex-wrap">
-        <button onClick={() => go("ai")} className="text-xs rounded-full border border-border px-4 py-2 hover:bg-muted">🤖 AI tahlilini ko'rish →</button>
-        <button onClick={() => go("growth")} className="text-xs rounded-full border border-border px-4 py-2 hover:bg-muted">O'sish funnel'ini ko'rish →</button>
-        <button onClick={() => go("revenue")} className="text-xs rounded-full border border-border px-4 py-2 hover:bg-muted">Daromad tahlili →</button>
-      </div>
+
     </div>
   );
 }
@@ -713,7 +841,7 @@ function AdminAuditLog() {
 
 // Command-center dashboard: revenue at a glance, actionable "needs attention"
 // cards that jump to the relevant tab, full overview metrics, and top regions.
-function AdminDashboard({ stats, go }) {
+function AdminDashboard({ stats, go, compact = false }) {
   const rev = stats.revenue || {};
   const money = (n) => `${(n || 0).toLocaleString()} so'm`;
   const attention = [
@@ -725,6 +853,7 @@ function AdminDashboard({ stats, go }) {
   const regionMax = regions.length ? (regions[0].count || 1) : 1;
   return (
     <div className="space-y-6" data-testid="admin-stats">
+      {!compact && (<>
       {/* Revenue */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <RevenueTile label="Jami daromad" value={money(rev.total)} accent />
@@ -754,6 +883,7 @@ function AdminDashboard({ stats, go }) {
         </div>
       </div>
 
+      </>)}
       {/* Overview metrics */}
       <div>
         <p className="field-label mb-2 px-1">Umumiy ko'rinish</p>
@@ -778,7 +908,7 @@ function AdminDashboard({ stats, go }) {
       {/* Top regions */}
       {regions.length > 0 && (
         <div className="rounded-3xl bg-card border border-border p-4">
-          <p className="field-label mb-3 px-1 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> Top regions</p>
+          <p className="field-label mb-3 px-1 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> Eng faol hududlar</p>
           <div className="space-y-2">
             {regions.slice(0, 8).map((r, i) => (
               <div key={i} className="flex items-center gap-3">
@@ -1069,7 +1199,7 @@ function AdminUsers() {
       {/* Search and Filters */}
       <div className="space-y-3">
         <input value={qInput} onChange={(e) => { setQInput(e.target.value); setPage(1); }} placeholder="Ism, email yoki username bo'yicha qidirish..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" data-testid="admin-user-search" />
-        <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1">
+        <div className="flex flex-wrap gap-1.5">
           {USER_SEGMENTS.map((s) => (
             <button
               key={s.k}
@@ -1091,29 +1221,32 @@ function AdminUsers() {
             <Trash2 className="w-4 h-4" /> {deleteDemo.isPending ? "O'chirilmoqda..." : `Barcha ${demoTotal} ta demo profilni o'chirish`}
           </button>
         )}
-        <div className="flex flex-wrap gap-2">
-          <select value={filters.gender} onChange={(e) => setFilters(f => ({ ...f, gender: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm min-w-[120px]">
+        <details className="rounded-2xl border border-border bg-card px-4 py-3" data-testid="admin-user-filters">
+          <summary className="cursor-pointer text-sm font-medium">Filtrlar</summary>
+        <div className="grid grid-cols-2 gap-2 mt-3">
+          <select value={filters.gender} onChange={(e) => setFilters(f => ({ ...f, gender: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm w-full">
             <option value="">Jins: Hammasi</option>
             <option value="male">Erkak</option>
             <option value="female">Ayol</option>
           </select>
-          <select value={filters.marital_status} onChange={(e) => setFilters(f => ({ ...f, marital_status: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm min-w-[140px]">
+          <select value={filters.marital_status} onChange={(e) => setFilters(f => ({ ...f, marital_status: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm w-full">
             <option value="">Oilaviy holat: Hammasi</option>
             <option value="single">Yolg'iz</option>
             <option value="married">Turmush qurgan</option>
             <option value="divorced">Ajrashgan</option>
             <option value="widowed">Beva</option>
           </select>
-          <select value={filters.region} onChange={(e) => setFilters(f => ({ ...f, region: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm min-w-[150px]">
+          <select value={filters.region} onChange={(e) => setFilters(f => ({ ...f, region: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm w-full col-span-2">
             <option value="">Hudud: Hammasi</option>
             {regions.map(r => (
               <option key={r} value={r}>{r}</option>
             ))}
           </select>
-          <input type="number" placeholder="Yosh min" value={filters.age_min} onChange={(e) => setFilters(f => ({ ...f, age_min: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm w-24" />
-          <input type="number" placeholder="Yosh max" value={filters.age_max} onChange={(e) => setFilters(f => ({ ...f, age_max: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm w-24" />
-          <button onClick={() => setFilters({ gender: "", region: "", age_min: "", age_max: "", marital_status: "" })} className="text-xs rounded-full border border-border px-3 py-2">Tozalash</button>
+          <input type="number" placeholder="Yosh (dan)" value={filters.age_min} onChange={(e) => setFilters(f => ({ ...f, age_min: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm w-full" />
+          <input type="number" placeholder="Yosh (gacha)" value={filters.age_max} onChange={(e) => setFilters(f => ({ ...f, age_max: e.target.value }))} className="rounded-xl border border-border bg-card px-3 py-2 text-sm w-full" />
+          <button onClick={() => setFilters({ gender: "", region: "", age_min: "", age_max: "", marital_status: "" })} className="col-span-2 text-xs rounded-full border border-border px-3 py-2">Tozalash</button>
         </div>
+        </details>
       </div>
 
       {loading && (

@@ -61,10 +61,12 @@ def _classify_ai_error(e: Exception) -> str:
         return "AI xizmatiga ulanish vaqti tugadi (timeout)"
     if isinstance(e, httpx.ConnectError):
         return "AI xizmatiga ulanib bo'lmadi (tarmoq xatosi)"
-    return "Kutilmagan xatolik"
+    if isinstance(e, (ValueError, KeyError, json.JSONDecodeError)):
+        return f"AI javobi bo'sh yoki chala keldi ({str(e)[:80]})"
+    return f"Kutilmagan xatolik ({type(e).__name__})"
 
 
-async def _gemini_json(prompt: str, images: list[tuple[str, str]], schema: dict) -> dict:
+async def _gemini_json(prompt: str, images: list[tuple[str, str]], schema: dict, max_tokens: int = 2048) -> dict:
     """One Gemini generateContent call returning strict JSON.
 
     images: list of (media_type, base64_data). schema: Gemini response
@@ -78,7 +80,9 @@ async def _gemini_json(prompt: str, images: list[tuple[str, str]], schema: dict)
         "generationConfig": {
             "responseMimeType": "application/json",
             "responseSchema": schema,
-            "maxOutputTokens": 500,
+            # Gemini's "thinking" tokens are counted inside this budget too; 500
+            # left too little room and long answers came back cut off.
+            "maxOutputTokens": max_tokens,
             "temperature": 0,
         },
     }
@@ -87,8 +91,32 @@ async def _gemini_json(prompt: str, images: list[tuple[str, str]], schema: dict)
         r = await cl.post(url, params={"key": GEMINI_API_KEY}, json=body)
         r.raise_for_status()
         data = r.json()
-    text = data["candidates"][0]["content"]["parts"][0]["text"]
+    cand = (data.get("candidates") or [{}])[0]
+    text = "".join(p.get("text", "") for p in (cand.get("content") or {}).get("parts", []) if not p.get("thought"))
+    if not text:
+        raise ValueError(f"empty AI answer (finishReason={cand.get('finishReason')})")
     return json.loads(text)
+
+
+# ---------- 0) Self-check (runs once at startup) ----------
+AI_STATUS = {"checked": False, "ok": False, "provider": "none", "error": "", "model": GEMINI_MODEL}
+
+
+async def ai_self_check() -> dict:
+    """One tiny real call so a wrong/blocked key shows up in the logs and the
+    admin panel right after a deploy, not when the first user is affected."""
+    if not GEMINI_API_KEY:
+        AI_STATUS.update(checked=True, ok=False, provider="none", error="GEMINI_API_KEY o'rnatilmagan")
+    else:
+        try:
+            r = await _gemini_json('Return the JSON object {"ok": true}.', [],
+                                   {"type": "OBJECT", "properties": {"ok": {"type": "BOOLEAN"}}, "required": ["ok"]}, max_tokens=256)
+            ok = bool(r.get("ok"))
+            AI_STATUS.update(checked=True, ok=ok, provider="gemini", error="" if ok else "kutilmagan javob")
+        except Exception as e:  # noqa: BLE001 - reported, never raised
+            AI_STATUS.update(checked=True, ok=False, provider="gemini", error=_classify_ai_error(e))
+    log.info("AI self-check: %s", "OK (gemini, %s)" % GEMINI_MODEL if AI_STATUS["ok"] else "FAILED - " + AI_STATUS["error"])
+    return AI_STATUS
 
 
 # ---------- 1) Compatibility narrative ----------
@@ -451,7 +479,7 @@ async def generate_growth_insights(data: str) -> dict:
 
     if GEMINI_API_KEY:
         try:
-            parsed = await _gemini_json(prompt, [], _INSIGHTS_SCHEMA_GEMINI)
+            parsed = await _gemini_json(prompt, [], _INSIGHTS_SCHEMA_GEMINI, max_tokens=4096)
             trend = parsed.get("trend") if parsed.get("trend") in ("growing", "stable", "declining") else "stable"
             return {
                 "trend": trend,
