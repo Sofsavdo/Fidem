@@ -164,6 +164,37 @@ async def ai_self_check_loop() -> None:
 
 
 # ---------- 1) Compatibility narrative ----------
+_COMPAT_SCHEMA_GEMINI = {
+    "type": "OBJECT",
+    "properties": {
+        "summary": {"type": "STRING"},
+        "strengths": {"type": "ARRAY", "items": {"type": "STRING"}},
+        "watch_outs": {"type": "ARRAY", "items": {"type": "STRING"}},
+        "conversation_starters": {"type": "ARRAY", "items": {"type": "STRING"}},
+    },
+    "required": ["summary", "strengths", "watch_outs", "conversation_starters"],
+}
+
+_LANG_NAME = {"uz": "Uzbek (Latin script)", "ru": "Russian", "en": "English"}
+
+
+def _profile_facts(u: dict) -> dict:
+    """What the model may see about a person: profile facts only - never the
+    name, contacts, photos or anything that identifies them."""
+    from services import age_from_birth
+
+    keys = ("gender", "country", "region", "district", "marital_status", "has_children",
+            "children_count", "height_cm", "education", "profession", "religion",
+            "smoking", "alcohol", "relocation", "looking_for", "bio")
+    out = {k: u.get(k) for k in keys if u.get(k) not in (None, "", 0) or isinstance(u.get(k), bool)}
+    if u.get("birth_date"):
+        out["age"] = age_from_birth(u["birth_date"])
+    for k in ("looking_for", "bio"):
+        if out.get(k):
+            out[k] = str(out[k])[:400]
+    return out
+
+
 async def compatibility_report(
     viewer: dict,
     candidate: dict,
@@ -171,14 +202,55 @@ async def compatibility_report(
     big5_candidate: dict,
     score: int,
     lang: str = "uz",
+    reasons: list[str] | None = None,
 ) -> dict:
-    return _fallback_report(score, lang)
+    """Personal compatibility analysis of two real profiles (Gemini). Falls
+    back to a report built from the actual matching reasons, never to the
+    same canned text for everyone."""
+    lang = lang if lang in _LANG_NAME else "uz"
+    if GEMINI_API_KEY:
+        facts = {
+            "viewer": _profile_facts(viewer),
+            "candidate": _profile_facts(candidate),
+            "match_score": score,
+            "matching_points": reasons or [],
+        }
+        if big5_viewer and big5_candidate:
+            facts["personality_big5_0_100"] = {"viewer": big5_viewer, "candidate": big5_candidate}
+        prompt = (
+            "You are a careful matchmaker on a marriage-focused platform in Uzbekistan. "
+            "Two people's profiles are below (the viewer is reading about the candidate). "
+            "Write a short, honest, specific compatibility analysis for the VIEWER: what "
+            "really fits between these two people, what they should talk through before "
+            "marriage (real differences only: age gap, region/relocation, children, religion, "
+            "lifestyle, goals), and 3 natural first-conversation questions tied to the "
+            "candidate's actual profile. Do not invent facts that are not in the data; if a "
+            "field is missing, do not guess it. No flattery, no generic advice. "
+            f"Write everything in {_LANG_NAME[lang]}. summary: 1-2 sentences. strengths: 2-4 "
+            "items. watch_outs: 1-3 items. conversation_starters: exactly 3.\n\n"
+            f"DATA:\n{json.dumps(facts, ensure_ascii=False)}"
+        )
+        try:
+            parsed = await _gemini_json(prompt, [], _COMPAT_SCHEMA_GEMINI, max_tokens=1500, timeout=30.0)
+            report = {
+                "summary": str(parsed.get("summary") or "").strip(),
+                "strengths": [str(x) for x in (parsed.get("strengths") or [])][:4],
+                "watch_outs": [str(x) for x in (parsed.get("watch_outs") or [])][:3],
+                "conversation_starters": [str(x) for x in (parsed.get("conversation_starters") or [])][:3],
+                "score": score,
+                "ai_generated": True,
+            }
+            if report["summary"]:
+                return report
+        except Exception as e:  # noqa: BLE001 - falls back below
+            log.warning("compatibility_report: gemini failed (%s)", _classify_ai_error(e))
+    return _fallback_report(score, lang, reasons)
 
 
-def _fallback_report(score: int, lang: str) -> dict:
+def _fallback_report(score: int, lang: str, reasons: list[str] | None = None) -> dict:
     base = {
         "uz": {
-            "summary": f"Moslik darajasi: {score}/100. Profil ma'lumotlari asosida munosib nomzod.",
+            "summary": f"Profil ma'lumotlari bo'yicha moslik: {score}/100.",
             "strengths": ["Asosiy qadriyatlar mos", "Hududiy yaqinlik", "Maqsad — oila qurish"],
             "watch_outs": ["Yashash tarzi va kelajak rejalarini batafsil muhokama qiling"],
             "conversation_starters": [
@@ -188,7 +260,7 @@ def _fallback_report(score: int, lang: str) -> dict:
             ],
         },
         "ru": {
-            "summary": f"Совместимость: {score}/100. Достойный кандидат по профилю.",
+            "summary": f"Совместимость по данным профиля: {score}/100.",
             "strengths": ["Совпадение ценностей", "Близость по региону", "Цель — создать семью"],
             "watch_outs": ["Обсудите образ жизни и планы на будущее"],
             "conversation_starters": [
@@ -198,7 +270,7 @@ def _fallback_report(score: int, lang: str) -> dict:
             ],
         },
         "en": {
-            "summary": f"Compatibility: {score}/100. Solid match based on profile.",
+            "summary": f"Compatibility from profile data: {score}/100.",
             "strengths": ["Aligned values", "Geographic proximity", "Marriage-focused goals"],
             "watch_outs": ["Discuss lifestyle and future plans in depth"],
             "conversation_starters": [
@@ -209,6 +281,8 @@ def _fallback_report(score: int, lang: str) -> dict:
         },
     }
     out = base.get(lang, base["uz"]).copy()
+    # The matching points really found for this pair, not a fixed list.
+    out["strengths"] = list(reasons or [])[:4]
     out["score"] = score
     out["ai_generated"] = False
     return out

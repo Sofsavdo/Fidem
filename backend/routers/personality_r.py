@@ -1,6 +1,8 @@
 """Personality (Big 5 / OCEAN) routes."""
 from __future__ import annotations
 
+from datetime import timedelta
+
 from fastapi import APIRouter, Body, Depends, HTTPException
 
 from auth import get_current_user_id
@@ -56,42 +58,80 @@ async def personality_mine(uid: str = Depends(get_current_user_id)):
     }
 
 
+# A generated report is reused for this long (and until either profile changes).
+COMPAT_CACHE_DAYS = 7
+
+
+def _profile_stamp(u: dict) -> str:
+    """Changes whenever a profile field the report depends on changes."""
+    keys = ("birth_date", "region", "district", "country", "marital_status", "has_children",
+            "children_count", "height_cm", "education", "profession", "religion", "smoking",
+            "alcohol", "relocation", "looking_for", "bio", "big5_completed_at")
+    return "|".join(str(u.get(k, "")) for k in keys)
+
+
 @router.get("/personality/compatibility/{target_id}")
 async def compatibility(target_id: str, lang: str = "uz", uid: str = Depends(get_current_user_id)):
     if target_id == uid:
         raise HTTPException(400, "Cannot compute self compatibility")
+    from routers.candidates_r import compute_ai_match
+    from services import compute_match
+
     me = await get_user(uid)
     target = await get_user(target_id)
+    lang = lang if lang in ("uz", "ru", "en") else "uz"
     my_b5 = me.get("big5_scores") or {}
     tg_b5 = target.get("big5_scores") or {}
-    score = big5_compatibility(my_b5, tg_b5) if my_b5 and tg_b5 else 0
+
+    # The same number the candidate card and profile page show, so the app
+    # never shows 78% on the card and 0/100 here. The personality test adds
+    # a separate score when both people have taken it.
+    if me.get("plan") in ("premium", "vip"):
+        score, reasons = compute_ai_match(me, target, lang=lang)
+    else:
+        score, reasons = compute_match(me, target, lang=lang)
+    personality = big5_compatibility(my_b5, tg_b5) if my_b5 and tg_b5 else None
+
+    base = {
+        "score": score,
+        "personality_score": personality,
+        "reasons": reasons,
+        "my_scores": my_b5,
+        "their_scores": tg_b5,
+        "has_my_test": bool(my_b5),
+    }
 
     # Check if user has unlocked AI report (premium feature or paid one-off)
-    plan = me.get("plan", "free")
-    is_premium = plan in ("premium", "vip")
-
+    is_premium = me.get("plan", "free") in ("premium", "vip") or me.get("is_admin")
     unlocked = await db.compat_unlocks.find_one({"user_id": uid, "target_id": target_id})
 
-    # Free preview: only score + trait labels
+    # Free preview: only the score
     if not is_premium and not unlocked:
         return {
-            "score": score,
-            "my_scores": my_b5,
-            "their_scores": tg_b5,
+            **base,
             "locked": True,
             "unlock_price": 20000,
             "message": "Batafsil AI hisobotni qulflash uchun 20,000 so'm yoki Premium tarif kerak.",
         }
 
-    # Full report
-    report = await compatibility_report(me, target, my_b5, tg_b5, score, lang=lang)
-    return {
-        "score": score,
-        "my_scores": my_b5,
-        "their_scores": tg_b5,
-        "report": report,
-        "locked": False,
-    }
+    stamp = f"{lang}:{score}:{personality}:{_profile_stamp(me)}:{_profile_stamp(target)}"
+    since = iso(now_utc() - timedelta(days=COMPAT_CACHE_DAYS))
+    cached = await db.compat_reports.find_one(
+        {"user_id": uid, "target_id": target_id, "stamp": stamp, "created_at": {"$gte": since}},
+        {"_id": 0, "report": 1},
+    )
+    if cached:
+        report = cached["report"]
+    else:
+        report = await compatibility_report(me, target, my_b5, tg_b5, score, lang=lang, reasons=reasons)
+        if report.get("ai_generated"):
+            await db.compat_reports.update_one(
+                {"user_id": uid, "target_id": target_id},
+                {"$set": {"user_id": uid, "target_id": target_id, "stamp": stamp,
+                          "report": report, "created_at": iso(now_utc())}},
+                upsert=True,
+            )
+    return {**base, "report": report, "locked": False}
 
 
 @router.post("/personality/compatibility/{target_id}/unlock")
