@@ -189,16 +189,23 @@ async def candidates(
         # filter and the badge itself stay free (trust is a base-tier value).
         max_distance_km = None
 
-    await touch_active(uid)
+    # last_active bookkeeping doesn't affect this response - don't wait for it.
+    _spawn_bg(touch_active(uid))
 
     # hidden_profile users opted out of being discovered (they can still
     # browse and keep their existing chats) — never surface them in the feed.
     # Users blocked by me (or who blocked me) never appear either — blocks
     # were previously recorded but not applied to the feed at all.
-    block_rows = await db.blocks.find(
-        {"$or": [{"owner_id": uid}, {"target_id": uid}]},
-        {"_id": 0, "owner_id": 1, "target_id": 1},
-    ).to_list(2000)
+    # Three independent lookups -> one round trip. (The user query below
+    # depends on the block list, so these must finish before it.)
+    block_rows, photo_unlocks, my_loc = await asyncio.gather(
+        db.blocks.find(
+            {"$or": [{"owner_id": uid}, {"target_id": uid}]},
+            {"_id": 0, "owner_id": 1, "target_id": 1},
+        ).to_list(2000),
+        db.photo_unlocks.find({"requester_id": uid, "approved": True}, {"_id": 0}).to_list(2000),
+        db.user_locations.find_one({"user_id": uid}, {"_id": 0, "geo_point": 1}),
+    )
     blocked_ids = {r["target_id"] if r["owner_id"] == uid else r["owner_id"] for r in block_rows}
     id_filter: dict = {"$ne": uid}
     if blocked_ids:
@@ -254,18 +261,12 @@ async def candidates(
     cursor = db.users.find(query, {"_id": 0, "password_hash": 0}).limit(200)
     docs = await cursor.to_list(length=200)
 
-    photo_unlocks = await db.photo_unlocks.find(
-        {"requester_id": uid, "approved": True},
-        {"_id": 0},
-    ).to_list(2000)
-
     unlocked_set = {p["target_id"] for p in photo_unlocks}
 
     # Coarse distance (Map M1). Raw coordinates stay server-side: we read both
     # parties' points from the isolated user_locations collection, compute the
     # real distance for filtering, but only ever attach a rounded bucket to
     # the payload. My own point is loaded once; candidates' in one batch.
-    my_loc = await db.user_locations.find_one({"user_id": uid}, {"_id": 0, "geo_point": 1})
     my_pt = my_loc.get("geo_point") if my_loc else None
     cand_pts: dict = {}
     if my_pt:
@@ -361,10 +362,11 @@ async def candidates(
         boosted_hit = [i for i in boosted_ids if i in result_ids]
 
         if boosted_hit:
-            await db.users.update_many(
+            # impression counters: not needed to build the response
+            _spawn_bg(db.users.update_many(
                 {"id": {"$in": boosted_hit}},
                 {"$inc": {"boost_metrics.impressions": 1, "impressions_total": 1}},
-            )
+            ))
 
     except Exception:
         pass
@@ -694,18 +696,20 @@ async def saved_mine(uid: str = Depends(get_current_user_id)):
     rows = await db.saved.find({"owner_id": uid}, {"_id": 0}).sort("at", -1).to_list(500)
 
     target_ids = [r["target_id"] for r in rows]
-    unlocks = await db.photo_unlocks.find(
-        {"requester_id": uid, "target_id": {"$in": target_ids}, "approved": True},
-        {"_id": 0, "target_id": 1},
-    ).to_list(500)
-    unlocked_set = {p["target_id"] for p in unlocks}
-
-    # Users who hid their profile after being saved drop out of the list —
+    # Both lookups only need target_ids: one round trip, not two.
+    # Users who hid their profile after being saved drop out of the list -
     # their card would 404 on open anyway.
-    users = await db.users.find(
-        {"id": {"$in": target_ids}, "hidden_profile": {"$ne": True}},
-        {"_id": 0, "password_hash": 0},
-    ).to_list(len(target_ids))
+    unlocks, users = await asyncio.gather(
+        db.photo_unlocks.find(
+            {"requester_id": uid, "target_id": {"$in": target_ids}, "approved": True},
+            {"_id": 0, "target_id": 1},
+        ).to_list(500),
+        db.users.find(
+            {"id": {"$in": target_ids}, "hidden_profile": {"$ne": True}},
+            {"_id": 0, "password_hash": 0},
+        ).to_list(len(target_ids)),
+    )
+    unlocked_set = {p["target_id"] for p in unlocks}
     users_by_id = {u["id"]: u for u in users}
 
     result = []
