@@ -518,20 +518,16 @@ async def _load_image_b64(image_url: str, image_base64: str) -> tuple[str, str]:
     if not image_url:
         raise ValueError("no image provided")
 
-    # Internal /api/files/ URLs require our own JWT to fetch, which an
-    # external image fetcher can't present - read the bytes directly from
-    # our own storage instead of asking Claude to fetch the URL.
-    m = re.search(r"/api/files/(.+)$", image_url)
-    if m:
-        from storage import get_object
-        data, content_type = await get_object(m.group(1))
-        return content_type or "image/jpeg", base64.b64encode(data).decode()
-
-    async with httpx.AsyncClient(timeout=15.0) as cl:
-        r = await cl.get(image_url)
-        r.raise_for_status()
-        content_type = r.headers.get("content-type", "image/jpeg").split(";")[0]
-        return content_type, base64.b64encode(r.content).decode()
+    # Only our own stored files may be loaded. Fetching an arbitrary
+    # user-supplied URL here would let any signed-in user make the server
+    # request internal addresses (cloud metadata, other private services) and
+    # read the response through the verification result.
+    m = re.search(r"/api/files/([0-9a-fA-F]{24})/?(?:\?.*)?$", image_url)
+    if not m:
+        raise ValueError("only internally stored images can be verified")
+    from storage import get_object
+    data, content_type = await get_object(m.group(1))
+    return content_type or "image/jpeg", base64.b64encode(data).decode()
 
 
 def _sniff_media_type(b64: str) -> str:

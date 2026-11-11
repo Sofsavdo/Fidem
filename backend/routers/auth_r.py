@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 from datetime import timedelta
 from typing import Optional
 
@@ -411,6 +412,43 @@ async def me(uid: str = Depends(get_current_user_id)):
     return _build_me_payload(user)
 
 
+_OWN_FILE_RE = re.compile(r"/api/files/([0-9a-fA-F]{24})/?(?:\?.*)?$")
+
+
+async def _require_own_photo(uid: str, photo_url: str) -> None:
+    """A profile photo must be a file this user uploaded through /files/upload.
+
+    Anything else (an arbitrary external URL) would bypass the face check,
+    hotlink third-party content into other people's browsers, and - when it
+    is fetched for verification - turn the server into a fetch-any-URL proxy.
+    """
+    m = _OWN_FILE_RE.search(photo_url or "")
+    rec = await db.files.find_one({"storage_path": m.group(1), "owner_id": uid, "is_deleted": False}) if m else None
+    if not rec:
+        raise HTTPException(400, "photo_invalid:not_own_file")
+
+
+async def _verify_profile_photo(uid: str, photo_url: str) -> None:
+    """Run the face check for a photo and record the outcome on the user.
+
+    Genuine rejections raise HTTP 400 `photo_invalid:<code>`; an unavailable
+    AI backend lets the user through unverified (see onboard()).
+    """
+    from ai_service import verify_face_photo
+
+    result = await verify_face_photo(image_url=photo_url)
+    code = result.get("code") or "other"
+    if not result.get("valid"):
+        await db.users.update_one({"id": uid}, {"$set": {"photo_verified": False, "photo_verification_code": code}})
+        if code != "verification_unavailable":
+            raise HTTPException(400, f"photo_invalid:{code}")
+    else:
+        await db.users.update_one(
+            {"id": uid},
+            {"$set": {"photo_verified": True, "photo_verified_at": iso(now_utc()), "photo_verification_code": "ok"}},
+        )
+
+
 @router.post("/profile/onboard")
 async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id)):
     update = req.model_dump()
@@ -451,42 +489,10 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
         # Keep the original name regardless of what the client submits.
         update.pop("name", None)
 
+    if photo_url != (user.get("photo_url") or ""):
+        await _require_own_photo(uid, photo_url)
     if not user.get("photo_verified"):
-        from ai_service import verify_face_photo
-
-        result = await verify_face_photo(image_url=photo_url)
-        code = result.get("code") or "other"
-        if not result.get("valid"):
-            await db.users.update_one(
-                {"id": uid},
-                {
-                    "$set": {
-                        "photo_verified": False,
-                        "photo_verification_code": code,
-                    }
-                },
-            )
-            # "verification_unavailable" means the AI vision call itself
-            # failed (rate limit, timeout, outage) - it says nothing about
-            # the photo. Blocking signup on a third-party API hiccup would
-            # take down the entire registration funnel; let the user
-            # through unverified instead, re-checked next time they touch
-            # their photo. Only genuine content rejections (no_face,
-            # multiple_faces, minor, cartoon, celebrity, too_blurry, ...)
-            # actually block onboarding.
-            if code != "verification_unavailable":
-                raise HTTPException(400, f"photo_invalid:{code}")
-        else:
-            await db.users.update_one(
-                {"id": uid},
-                {
-                    "$set": {
-                        "photo_verified": True,
-                        "photo_verified_at": iso(now_utc()),
-                        "photo_verification_code": "ok",
-                    }
-                },
-            )
+        await _verify_profile_photo(uid, photo_url)
 
     update["onboarded"] = True
     update["last_active"] = iso(now_utc())
@@ -577,6 +583,15 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
 async def update_profile(req: UpdateProfileRequest, uid: str = Depends(get_current_user_id)):
     user = await get_user(uid)
     update = {k: v for k, v in req.model_dump().items() if v is not None}
+    if user.get("onboarded"):
+        # Name is an identity anchor (same rule as /profile/onboard): other
+        # users matched/verified/chatted with this name.
+        update.pop("name", None)
+    new_photo = (update.pop("photo_url", None) or "").strip()
+    if new_photo and new_photo != (user.get("photo_url") or ""):
+        await _require_own_photo(uid, new_photo)
+        await _verify_profile_photo(uid, new_photo)
+        update["photo_url"] = new_photo
     # Video intro is a VIP perk: setting a NEW video requires the plan;
     # clearing (empty string) is always allowed so a downgraded user can
     # remove theirs.

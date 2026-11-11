@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Body, Depends, HTTPException
 
 from auth import get_current_admin
-from core import db, iso, log_admin_action, now_utc, push_notif, user_public
+from core import db, iso, log, log_admin_action, now_utc, push_notif, user_public
 from models import AdminUpdateUserRequest, new_id
 from routers.payments_r import process_completed_payment
 

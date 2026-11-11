@@ -301,6 +301,15 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
     if cfg.get("p2p_enabled"):
         raise HTTPException(400, "click_disabled")
 
+    # CLICK not (fully) configured: the callback would be rejected, so sending
+    # the user there ends in CLICK's "Xatolik ro'y berdi" page - and the
+    # balance portion below would already be deducted. Refuse up front with the
+    # same code the frontend already turns into a "pay another way" hint.
+    from services import CLICK_MERCHANT_ID, CLICK_SERVICE_ID
+    if not (CLICK_SECRET_KEY and CLICK_MERCHANT_ID and CLICK_SERVICE_ID):
+        log.error("CLICK is not fully configured (merchant/service/secret) - refusing to create a CLICK payment")
+        raise HTTPException(400, "click_disabled")
+
     pid = await generate_payment_id()
 
     doc = {
@@ -571,7 +580,8 @@ async def process_completed_payment(uid: str, purpose: str, amount: int, balance
         await db.users.update_one({"id": uid}, {"$set": {"plan": "premium", "plan_until": expiry_iso}})
         # Boost stays active exactly as long as the plan does, not a flat 30
         # days regardless of the term bought.
-        await db.users.update_one({"id": uid}, {"$set": {"boost_until": expiry_iso}})
+        # (not while hidden mode is on - a boost would only pay for invisibility)
+        await db.users.update_one({"id": uid, "hidden_profile": {"$ne": True}}, {"$set": {"boost_until": expiry_iso}})
         # Add to lifetime contribution
         await db.users.update_one(
             {"id": uid},
@@ -590,7 +600,8 @@ async def process_completed_payment(uid: str, purpose: str, amount: int, balance
         await db.users.update_one({"id": uid}, {"$set": {"plan": "vip", "plan_until": expiry_iso}})
         # Boost stays active exactly as long as the plan does, not a flat 30
         # days regardless of the term bought.
-        await db.users.update_one({"id": uid}, {"$set": {"boost_until": expiry_iso}})
+        # (not while hidden mode is on - a boost would only pay for invisibility)
+        await db.users.update_one({"id": uid, "hidden_profile": {"$ne": True}}, {"$set": {"boost_until": expiry_iso}})
         # Add to lifetime contribution
         await db.users.update_one(
             {"id": uid},

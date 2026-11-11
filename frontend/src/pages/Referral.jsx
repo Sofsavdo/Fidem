@@ -7,6 +7,7 @@ import { useReferral, useReferralUsername, QK } from "@/hooks/queries";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Skeleton, SectionLabel } from "@/components/kit";
+import { FEATURES } from "@/lib/features";
 
 export default function Referral() {
   const { t } = useApp();
@@ -93,12 +94,12 @@ export default function Referral() {
             <section className="rounded-3xl border border-secondary/25 bg-secondary/5 p-4" data-testid="ref-earn-potential">
               <SectionLabel>{t("ref_how_much_title")}</SectionLabel>
               <p className="text-sm mt-1.5 leading-snug">{t("ref_how_much_desc").replace("{cap}", (data?.tier_cap || 29900).toLocaleString())}</p>
-              <div className="grid grid-cols-3 gap-2 mt-3">
+              <div className={`grid gap-2 mt-3 ${FEATURES.legacyTiers ? "grid-cols-3" : "grid-cols-1"}`}>
                 {[
-                  { plan: "Standard", price: 34900 },
+                  { plan: "Standard", price: 34900, legacy: true },
                   { plan: "Premium", price: 79000 },
-                  { plan: "VIP", price: 199000 },
-                ].map((p) => {
+                  { plan: "VIP", price: 199000, legacy: true },
+                ].filter((p) => FEATURES.legacyTiers || !p.legacy).map((p) => {
                   const reward = Math.min(Math.round(p.price * 0.5), data?.tier_cap || 29900);
                   return (
                     <div key={p.plan} className="rounded-2xl bg-card border border-border p-2.5 text-center">
