@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import time
 from datetime import timedelta
 from typing import Optional
 
@@ -30,7 +31,10 @@ from core import (
     iso,
     log,
     now_utc,
+    own_photo_url,
+    own_photos,
     parse_dt,
+    photo_is_public,
     push_notif,
     rate_limit_auth,
     user_public,
@@ -51,6 +55,30 @@ from storage import MIME, get_object, put_object
 router = APIRouter(tags=["auth"])
 
 
+# owner_id -> (expires_at, photo_is_public, {storage paths of the profile photos}).
+# Image requests come in bursts (a whole feed page), so the owner lookup is kept
+# for a short while instead of costing a DB round trip per picture.
+_OWNER_PHOTO_CACHE: dict = {}
+_OWNER_PHOTO_TTL = 20.0
+
+
+async def _owner_photo_info(owner_id: str):
+    now = time.monotonic()
+    hit = _OWNER_PHOTO_CACHE.get(owner_id)
+    if hit and hit[0] > now:
+        return hit[1], hit[2]
+    u = await db.users.find_one({"id": owner_id}, {"_id": 0, "photo_public": 1, "photo_url": 1, "photos": 1}) or {}
+    paths = set()
+    for url in [own_photo_url(u)] + own_photos(u):
+        if url:
+            paths.add(url.split("/api/files/", 1)[1].split("?", 1)[0])
+    info = (photo_is_public(u), paths)
+    if len(_OWNER_PHOTO_CACHE) > 5000:
+        _OWNER_PHOTO_CACHE.clear()
+    _OWNER_PHOTO_CACHE[owner_id] = (now + _OWNER_PHOTO_TTL, info[0], info[1])
+    return info
+
+
 async def _may_access_file(uid: str, is_admin: bool, rec: dict) -> bool:
     owner_id = rec.get("owner_id")
     if not owner_id:
@@ -61,18 +89,26 @@ async def _may_access_file(uid: str, is_admin: bool, rec: dict) -> bool:
     # Owner can always access their own files
     if uid == owner_id:
         return True
-    # All authenticated users can access profile photos (backward compatibility)
-    # If is_public is not set, assume it's a profile photo and allow access
-    if rec.get("is_public", True):
-        return True
-    # Private photos require approved unlock
-    unlock = await db.photo_unlocks.find_one(
-        {"requester_id": uid, "target_id": owner_id, "approved": True},
-        {"_id": 1},
-    )
-    if unlock:
-        return True
     path = rec.get("storage_path") or ""
+    unlocked = None  # looked up lazily, at most once
+
+    async def has_unlock() -> bool:
+        nonlocal unlocked
+        if unlocked is None:
+            unlocked = bool(await db.photo_unlocks.find_one(
+                {"requester_id": uid, "target_id": owner_id, "approved": True}, {"_id": 1}))
+        return unlocked
+
+    if rec.get("is_public", True):
+        # Profile photos are open unless their owner closed them: then only
+        # people the owner approved can fetch the file itself (not just the
+        # feed, which already hides it).
+        public, photo_paths = await _owner_photo_info(owner_id)
+        if public or path not in photo_paths:
+            return True
+        return await has_unlock()
+    # Private files (verification proofs, receipts, ...): owner/admin only - a
+    # photo unlock does NOT open them - plus voice notes shared inside a chat.
     if path:
         shared = await db.messages.find_one(
             {
@@ -80,7 +116,7 @@ async def _may_access_file(uid: str, is_admin: bool, rec: dict) -> bool:
                     {"from_user_id": uid, "to_user_id": owner_id},
                     {"from_user_id": owner_id, "to_user_id": uid},
                 ],
-                "meta.voice_url": {"$regex": path},
+                "meta.voice_url": {"$regex": re.escape(path)},
             },
             {"_id": 1},
         )
@@ -685,7 +721,7 @@ async def set_filters(req: MessageFilters, uid: str = Depends(get_current_user_i
 
 
 @router.post("/files/upload")
-async def upload_file(request: Request, file: UploadFile = File(...), uid: str = Depends(get_current_user_id)):
+async def upload_file(request: Request, file: UploadFile = File(...), purpose: str = Query("profile"), uid: str = Depends(get_current_user_id)):
     cl = request.headers.get("content-length")
     if cl and cl.isdigit() and int(cl) > 9 * 1024 * 1024:
         raise HTTPException(413, "Max file size 8MB")
@@ -716,7 +752,9 @@ async def upload_file(request: Request, file: UploadFile = File(...), uid: str =
             "content_type": MIME[ext],
             "size": result.get("size", len(data)),
             "is_deleted": False,
-            "is_public": True,  # Profile photos are public by default
+            # Profile photos are open by default; verification proofs and payment
+            # receipts are uploaded with ?purpose=private and stay owner/admin only.
+            "is_public": purpose != "private",
             "created_at": iso(now_utc()),
         }
     )

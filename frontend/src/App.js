@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useEffect } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AppProvider, useApp } from "@/contexts/AppContext";
 import Layout from "@/components/Layout";
@@ -222,12 +222,27 @@ function Inner() {
   );
 }
 
+// The app must open on Nomzodlar. Telegram can hand the Mini App a stale "/me"
+// (a remembered page or an old button link), so a bare "/me" at COLD START goes
+// home. It runs once at boot only - tapping the Me tab later works as usual -
+// and deep links with a query (e.g. /saved?tab=viewers) are never touched.
+function ColdStartHome() {
+  const loc = useLocation();
+  const nav = useNavigate();
+  useEffect(() => {
+    if (loc.pathname === "/me" && !loc.search && !loc.hash) nav("/", { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
       <AppProvider>
         <BrowserRouter>
           <ScrollToTop />
+          <ColdStartHome />
           {/* Keep toasts from piling up and covering the screen on rapid taps:
               at most 2 at once, short-lived, not expanded. */}
           <Toaster position="top-center" richColors visibleToasts={2} duration={2000} expand={false} gap={8} />

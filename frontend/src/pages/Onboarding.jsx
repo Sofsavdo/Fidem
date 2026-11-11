@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
+import { track } from "@/lib/analytics";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import PhotoUpload from "@/components/PhotoUpload";
@@ -202,6 +203,7 @@ export default function Onboarding() {
         referral_code: refCode.trim() || null,
       });
       try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
+      track("onboarding_completed");
       toast.success(t("onboard_complete"));
       // Let the brand-new user actually see their first candidates screen
       // before DailyCheckIn's gamification modal covers it - it fires on
@@ -247,6 +249,7 @@ export default function Onboarding() {
       submit();
       return;
     }
+    track("onboarding_step_done", { step });
     setStep((s) => Math.min(STEPS - 1, s + 1));
   };
   const back = () => setStep((s) => Math.max(0, s - 1));

@@ -300,3 +300,126 @@ def test_admin_without_photo_is_exempt_from_the_photo_gate(mdb, monkeypatch):
         r = await candidates_r.save_user(SaveRequest(user_id="t"), uid="adm")
         assert r  # no photo_required for admins
     run(go())
+
+
+# ---------- file access ----------
+def test_file_access_private_proofs_and_closed_photos(mdb):
+    auth_r._OWNER_PHOTO_CACHE.clear()
+    main, extra, proof = "a" * 24, "b" * 24, "c" * 24
+
+    async def go():
+        await mdb.users.insert_many([
+            _u("owner", photo_public=False, photo_url=f"/api/files/{main}", photos=[f"/api/files/{extra}"]),
+            _u("open", photo_url="/api/files/" + "d" * 24),
+        ])
+        recs = {
+            main: {"owner_id": "owner", "storage_path": main, "is_public": True},
+            extra: {"owner_id": "owner", "storage_path": extra, "is_public": True},
+            proof: {"owner_id": "owner", "storage_path": proof, "is_public": False},
+            "d" * 24: {"owner_id": "open", "storage_path": "d" * 24, "is_public": True},
+        }
+        may = lambda uid, key, admin=False: auth_r._may_access_file(uid, admin, recs[key])
+        # closed profile photos (main + gallery): owner and admin yes, strangers no
+        assert await may("owner", main) and await may("adm", main, True)
+        assert not await may("stranger", main) and not await may("stranger", extra)
+        # an approved unlock opens them
+        await mdb.photo_unlocks.insert_one({"requester_id": "friend", "target_id": "owner", "approved": True})
+        assert await may("friend", main) and await may("friend", extra)
+        # private proofs: owner/admin only - not strangers, and not even someone with a photo unlock
+        assert await may("owner", proof) and await may("adm", proof, True)
+        assert not await may("stranger", proof) and not await may("friend", proof)
+        # open profile photos stay open to every signed-in user
+        assert await may("stranger", "d" * 24)
+    run(go())
+    auth_r._OWNER_PHOTO_CACHE.clear()
+
+
+def test_existing_proofs_and_receipts_are_made_private(mdb, monkeypatch):
+    import server
+    monkeypatch.setattr(server, "db", mdb, raising=False)
+
+    async def go():
+        await mdb.files.insert_many([
+            {"storage_path": "p1", "owner_id": "u", "is_public": True},
+            {"storage_path": "p2", "owner_id": "u", "is_public": True},
+            {"storage_path": "photo", "owner_id": "u", "is_public": True},
+        ])
+        await mdb.verifications.insert_one({"proof_url": "https://x.example/api/files/p1"})
+        await mdb.manual_topups.insert_one({"proof_url": "/api/files/p2?auth=abc"})
+        await server.privatize_existing_proofs()
+        got = {f["storage_path"]: f["is_public"] async for f in mdb.files.find({})}
+        assert got == {"p1": False, "p2": False, "photo": True}
+    run(go())
+
+
+# ---------- invented seed stories are never shown ----------
+def test_seeded_fake_stories_are_hidden_but_real_ones_stay(mdb, monkeypatch):
+    from routers import stories_r
+    monkeypatch.setattr(stories_r, "db", mdb, raising=False)
+
+    async def go():
+        stock = "https://images.unsplash.com/photo-1519741497674-611481863552?w=800"
+        await mdb.success_stories.insert_many([
+            {"id": "s1", "couple_names": "Aziza & Bobur", "photo_url": stock, "published": True, "created_at": "2026-01-01"},
+            {"id": "s2", "couple_names": "Dilnoza & Sardor", "photo_url": stock, "published": True, "created_at": "2026-01-02"},
+            {"id": "r1", "couple_names": "Aziza & Bobur", "photo_url": "/api/files/" + "a" * 24, "published": True, "created_at": "2026-01-03"},
+            {"id": "r2", "couple_names": "Real Couple", "photo_url": stock, "published": True, "created_at": "2026-01-04"},
+        ])
+        ids = {x["id"] for x in await stories_r.list_stories()}
+        assert ids == {"r1", "r2"}
+        with pytest.raises(HTTPException):
+            await stories_r.get_story("s1")
+    run(go())
+
+
+# ---------- "who liked/viewed me" opens while nothing can be bought ----------
+def test_interest_lists_unlock_only_while_payments_are_unavailable(mdb, monkeypatch):
+    from routers import candidates_r
+    monkeypatch.setattr(candidates_r, "db", mdb, raising=False)
+
+    async def go():
+        await mdb.users.insert_many([_u("me"), _u("fan", name="Madina")])
+        await mdb.saved.insert_one({"owner_id": "fan", "target_id": "me", "at": "2026-01-01"})
+
+        async def avail():
+            return False
+        monkeypatch.setattr(candidates_r, "payments_available", avail)
+        out = await candidates_r.saved_by_others(uid="me")
+        assert out[0]["name"] == "Madina" and not out[0].get("locked")      # nothing to buy -> open
+
+        async def avail2():
+            return True
+        monkeypatch.setattr(candidates_r, "payments_available", avail2)
+        out = await candidates_r.saved_by_others(uid="me")
+        assert out[0].get("locked") is True and out[0]["name"] != "Madina"  # paywall is back
+    run(go())
+
+
+# ---------- reply reminders ----------
+def test_reply_reminder_once_per_waiting_message(mdb, monkeypatch):
+    import lifecycle
+    from datetime import timedelta
+    monkeypatch.setattr(lifecycle, "db", mdb, raising=False)
+    monkeypatch.setattr(lifecycle, "SEND_PACING_SECONDS", 0)
+    sent = []
+
+    async def fake_push(uid, kind, text, link=None, marketing=False):
+        sent.append((uid, kind, link, marketing))
+    monkeypatch.setattr(lifecycle, "push_notif", fake_push)
+
+    def ago(h):
+        return core.iso(core.now_utc() - timedelta(hours=h))
+
+    async def go():
+        await mdb.users.insert_many([_u("a", name="Aziza"), _u("b"), _u("c"), _u("d")])
+        await mdb.messages.insert_many([
+            {"id": "m1", "chat_id": "a_b", "from_user_id": "a", "to_user_id": "b", "text": "salom", "created_at": ago(30)},   # waiting 30h
+            {"id": "m2", "chat_id": "a_c", "from_user_id": "a", "to_user_id": "c", "text": "salom", "created_at": ago(40)},
+            {"id": "m3", "chat_id": "a_c", "from_user_id": "c", "to_user_id": "a", "text": "javob", "created_at": ago(3)},    # answered recently
+            {"id": "m4", "chat_id": "a_d", "from_user_id": "a", "to_user_id": "d", "text": "salom", "created_at": ago(2)},    # too fresh
+        ])
+        await lifecycle._reply_reminders()
+        assert sent == [("b", "message", "/chat/a", True)]
+        await lifecycle._reply_reminders()
+        assert len(sent) == 1  # no repeat for the same waiting message
+    run(go())

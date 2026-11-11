@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from auth import get_current_user_id
-from core import INCOGNITO_PLANS, PAID_PLANS, WHO_VIEWED_PLANS, chat_id_for, db, get_user, iso, log, photo_kind, photo_required_missing, manager, mask_name, now_utc, parse_dt, push_notif, strip_locked_photo, touch_active, user_public, user_public_minimal
+from core import INCOGNITO_PLANS, PAID_PLANS, WHO_VIEWED_PLANS, chat_id_for, db, get_user, iso, log, payments_available, photo_kind, photo_required_missing, manager, mask_name, now_utc, parse_dt, push_notif, strip_locked_photo, touch_active, user_public, user_public_minimal
 from geo import distance_bucket, haversine_km
 from models import PhotoUnlockDecision, PhotoUnlockRequest, SaveRequest, new_id
 from services import age_from_birth, compute_match
@@ -745,7 +745,8 @@ async def saved_by_others(uid: str = Depends(get_current_user_id)):
     """Legacy endpoint kept for backward compatibility with old notification links.
     Frontend now uses /saved?tab=by_others but this endpoint remains functional."""
     me_doc = await get_user(uid)
-    is_premium = me_doc.get("plan") in WHO_VIEWED_PLANS
+    # Nothing can be bought yet -> nothing is locked (see core.payments_available).
+    is_premium = me_doc.get("plan") in WHO_VIEWED_PLANS or not await payments_available()
 
     rows = await db.saved.find({"target_id": uid}, {"_id": 0}).sort("at", -1).to_list(500)
 
@@ -783,7 +784,8 @@ async def viewers(uid: str = Depends(get_current_user_id)):
     """Legacy endpoint kept for backward compatibility with old notification links.
     Frontend now uses /saved?tab=viewers but this endpoint remains functional."""
     me_doc = await get_user(uid)
-    is_premium = me_doc.get("plan") in WHO_VIEWED_PLANS
+    # Nothing can be bought yet -> nothing is locked (see core.payments_available).
+    is_premium = me_doc.get("plan") in WHO_VIEWED_PLANS or not await payments_available()
 
     rows = await db.profile_views.find({"target_id": uid}, {"_id": 0}).sort("at", -1).to_list(500)
 
@@ -826,7 +828,8 @@ async def viewers(uid: str = Depends(get_current_user_id)):
 @router.get("/saved/interested")
 async def interested_in_me(uid: str = Depends(get_current_user_id)):
     me_doc = await get_user(uid)
-    is_premium = me_doc.get("plan") in WHO_VIEWED_PLANS
+    # Nothing can be bought yet -> nothing is locked (see core.payments_available).
+    is_premium = me_doc.get("plan") in WHO_VIEWED_PLANS or not await payments_available()
 
     saved_rows = await db.saved.find({"target_id": uid}, {"_id": 0}).to_list(500)
     msg_rows = await db.messages.find({"to_user_id": uid}, {"_id": 0}).to_list(500)
@@ -865,7 +868,8 @@ async def saved_summary(uid: str = Depends(get_current_user_id)):
     recency. Returns up to 5 masked profiles plus the true total count, so
     the UI can show real (if locked) cards instead of a blind redirect."""
     me_doc = await get_user(uid)
-    is_premium = me_doc.get("plan") in WHO_VIEWED_PLANS
+    # Nothing can be bought yet -> nothing is locked (see core.payments_available).
+    is_premium = me_doc.get("plan") in WHO_VIEWED_PLANS or not await payments_available()
 
     view_rows = await db.profile_views.find({"target_id": uid}, {"_id": 0}).sort("at", -1).to_list(500)
     save_rows = await db.saved.find({"target_id": uid}, {"_id": 0}).sort("at", -1).to_list(500)

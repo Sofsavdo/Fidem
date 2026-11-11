@@ -43,7 +43,7 @@ export default function Verification() {
     mutationFn: async ({ kind, file, note }) => {
       const fd = new FormData();
       fd.append("file", file);
-      const r = await api.post("/files/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      const r = await api.post("/files/upload?purpose=private", fd, { headers: { "Content-Type": "multipart/form-data" } });
       const proof_url = `${process.env.REACT_APP_BACKEND_URL}${r.data.url}`;
       return api.post("/verification/request", { kind, note: note || "", proof_url });
     },

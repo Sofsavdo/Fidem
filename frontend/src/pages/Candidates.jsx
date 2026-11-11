@@ -17,6 +17,7 @@ import { tapMedium } from "@/lib/haptics";
 import { EmptyState } from "@/components/kit";
 import HeroScene from "@/components/HeroScene";
 import { useExperiment } from "@/lib/experiments";
+import { track } from "@/lib/analytics";
 
 // Every Nth card in the free-tier feed is a plan pitch instead of a
 // candidate - frequent enough to be seen, rare enough not to feel spammy.
@@ -132,6 +133,7 @@ export default function Candidates() {
       {
         onSuccess: (data) => {
           if (isSaved) return;
+          track("like_sent", { match: !!data?.mutual_match });
           if (data?.mutual_match) {
             window.dispatchEvent(new CustomEvent(MATCH_EVENT, { detail: c }));
           } else {

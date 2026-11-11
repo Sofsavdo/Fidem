@@ -8,6 +8,7 @@ import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot, LocationBadge } f
 import CompatibilityCard from "@/components/CompatibilityCard";
 import { photoSrc } from "@/lib/photo";
 import { religionLabel, educationLabel } from "@/lib/profileValues";
+import { track } from "@/lib/analytics";
 import PhotoFill from "@/components/PhotoFill";
 import { formatLastActive } from "@/lib/time";
 import { Heart, MessageCircle, ArrowLeft, Lock, Clock, Shield, Share2, Crown, Eye, EyeOff } from "lucide-react";
@@ -105,6 +106,7 @@ export default function ProfileDetail() {
   const [peeking, setPeeking] = useState(false);
   const [slideIdx, setSlideIdx] = useState(0);
   useEffect(() => { setSlideIdx(0); }, [id]);
+  useEffect(() => { if (id) track("profile_viewed"); }, [id]);
   useEffect(() => {
     if (!peekUrl) return undefined;
     if (peekLeft <= 0) { setPeekUrl(null); return undefined; }
