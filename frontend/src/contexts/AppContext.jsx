@@ -213,9 +213,10 @@ export function AppProvider({ children }) {
   };
 
   // WebSocket lifecycle — open once user is loaded, close on logout / token change
+  const userId = user?.id;
   useEffect(() => {
     const token = localStorage.getItem("fidem_token");
-    if (!user || !token) {
+    if (!userId || !token) {
       if (wsRef.current) { wsRef.current.stop(); wsRef.current = null; }
       return;
     }
@@ -235,7 +236,7 @@ export function AppProvider({ children }) {
     // Keyed on the id, not the object: every refresh() yields a new user
     // object, which used to tear the socket down and reopen it each time
     // (dropping messages in the gap).
-  }, [user?.id]);
+  }, [userId]);
 
   // Money/plan-affecting notifications (P2P top-up approved, plan granted,
   // withdrawal decided, ...) can originate from an admin action the user
