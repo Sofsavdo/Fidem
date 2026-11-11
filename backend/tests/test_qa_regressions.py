@@ -38,7 +38,8 @@ def run(coro):
 
 def _u(uid, **kw):
     d = {"id": uid, "name": uid.upper(), "plan": "free", "gender": "male", "birth_date": "1995-01-01",
-         "region": "Toshkent", "language": "uz", "onboarded": True, "balance": 0}
+         "region": "Toshkent", "language": "uz", "onboarded": True, "balance": 0,
+         "photo_url": "/api/files/" + "a" * 24}
     d.update(kw)
     return d
 

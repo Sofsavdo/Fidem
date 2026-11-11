@@ -15,6 +15,7 @@ python qa/flows.py && python qa/flows2.py   # auth, feed, likes/match, chat payw
 node qa/crawl.js qa@fidem.uz uz run shots   # 31 pages: console/API errors, overflow, raw i18n keys
 node qa/onboard.js                    # register -> consent -> 3 steps -> feed in a browser
 node qa/chatdup.js                    # sent message shows once even if the WS echo beats the HTTP reply
+node qa/photos.js                     # legacy-host photos load; photo-less user gets the upload gate
 ```
 `crawl.js <user> <lang> <tag> [shots|admin]` writes screenshots to `qa/shots/`.
 Needs `playwright` (`npm i playwright`) for the node scripts. Limits are unit-tested

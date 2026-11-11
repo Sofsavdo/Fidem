@@ -1,22 +1,16 @@
 import React, { useEffect, useState } from "react";
 
-// Fills its (relatively positioned) parent with a profile photo. When there is
-// no photo - or it fails to load - it shows a neutral initial-letter tile
-// instead of a stock picture or the browser's broken-image alt text (which used
-// to print the person's name on top of the match badge).
-export default function PhotoFill({ src, name, className = "" }) {
+// Fills its (relatively positioned) parent with a profile photo. While it loads
+// - or if it fails - a plain neutral tile stays behind it, and the browser's
+// broken-image icon / alt text (which used to print the person's name on top of
+// the match badge) never shows.
+export default function PhotoFill({ src, className = "" }) {
   const [broken, setBroken] = useState(false);
   useEffect(() => { setBroken(false); }, [src]);
-  const initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
   const show = !!src && !broken;
   return (
     <>
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 grid place-items-center bg-gradient-to-br from-primary/15 via-muted to-secondary/15 text-primary/60 font-heading font-semibold text-5xl select-none"
-      >
-        {initial}
-      </div>
+      <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-br from-muted via-muted to-border/60" />
       {show && (
         <img
           src={src}

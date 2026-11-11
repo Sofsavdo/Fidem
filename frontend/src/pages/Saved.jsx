@@ -215,7 +215,7 @@ export default function Saved() {
               >
                 <div className="shrink-0 w-16 h-16 rounded-2xl bg-muted overflow-hidden relative">
                   {!photoLocked ? (
-                    <PhotoFill src={photoUrl} name={c.name} />
+                    <PhotoFill src={photoUrl} />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Lock className="w-5 h-5 text-muted-foreground" />
@@ -259,7 +259,7 @@ export default function Saved() {
                 className="block aspect-[4/5] rounded-3xl bg-card border border-border overflow-hidden relative hover:shadow-elevated transition-shadow"
               >
                 {!photoLocked ? (
-                  <PhotoFill src={photoUrl} name={c.name} />
+                  <PhotoFill src={photoUrl} />
                 ) : (
                   <div className="absolute inset-0 bg-muted flex flex-col items-center justify-center">
                     <Lock className="w-6 h-6 text-muted-foreground" />

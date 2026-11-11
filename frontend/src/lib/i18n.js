@@ -350,6 +350,8 @@ const dict = {
     // Photo / Face verification
     photo_required: "Profil rasmi majburiy",
     photo_required_hint: "Davom etish uchun chiroyli, aniq rasmingizni yuklang",
+    photo_gate_title: "Rasmingizni yuklang",
+    photo_gate_desc: "Rasm yuklamaguncha nomzodlarni ko'rish, yoqtirish va xabar yozish mumkin emas. Rasm hammaga ochiq bo'ladi, xohlasangiz keyin «Men» bo'limidan yopib qo'yishingiz mumkin.",
     photo_verifying: "Rasm tekshirilmoqda...",
     photo_verified: "Rasm tasdiqlandi ✓",
     photo_verification_pending: "Rasm qabul qilindi. Tekshiruv xizmati band — tasdiqlash keyinroq amalga oshiriladi, bu ro'yxatdan o'tishga xalaqit bermaydi.",
@@ -1174,6 +1176,8 @@ const dict = {
     // Photo / Face verification
     photo_required: "Фото профиля обязательно",
     photo_required_hint: "Загрузите чёткое фото лица, чтобы продолжить",
+    photo_gate_title: "Загрузите фото",
+    photo_gate_desc: "Пока нет фото, нельзя смотреть анкеты, ставить симпатии и писать. Фото будет открыто всем; позже его можно скрыть в разделе «Я».",
     photo_verifying: "Проверка фото...",
     photo_verified: "Фото подтверждено ✓",
     photo_verification_pending: "Фото принято. Сервис проверки временно занят — подтверждение будет позже, это не помешает регистрации.",
@@ -1989,6 +1993,8 @@ const dict = {
     // Photo / Face verification
     photo_required: "Profile photo is required",
     photo_required_hint: "Upload a clear photo of your face to continue",
+    photo_gate_title: "Upload your photo",
+    photo_gate_desc: "Until you add a photo you can't browse profiles, like or message. Your photo is visible to everyone; you can hide it later in the Me tab.",
     photo_verifying: "Verifying photo...",
     photo_verified: "Photo verified ✓",
     photo_verification_pending: "Photo accepted. Verification service is busy — it'll be checked later, this won't block your signup.",

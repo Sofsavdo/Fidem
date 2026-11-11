@@ -221,3 +221,38 @@ def test_standard_and_vip_can_no_longer_be_bought(mdb):
                 await payments_r.create_payment(CreatePaymentRequest(purpose=plan), Request(scope), uid="a")
             assert e.value.status_code == 400 and e.value.detail == "plan_unavailable"
     run(go())
+
+
+# ---------- photo is mandatory ----------
+def test_stored_absolute_urls_are_normalised_to_a_host_independent_path():
+    fid = "c" * 24
+    old = _u("o", photo_url=f"https://old-backend.up.railway.app/api/files/{fid}")
+    assert core.own_photo_url(old) == f"/api/files/{fid}"
+    assert core.user_public(old)["photo_url"] == f"/api/files/{fid}"
+
+
+def test_user_without_photo_cannot_browse_like_or_message(mdb, monkeypatch):
+    from routers import candidates_r, chat_r, picks_r
+    from models import SaveRequest, SendMessageRequest
+    for mod in (candidates_r, picks_r, chat_r):
+        monkeypatch.setattr(mod, "db", mdb, raising=False)
+
+    async def go():
+        await mdb.users.insert_many([
+            _u("nophoto", gender="male", search_gender="female", photo_url=None),
+            _u("withphoto", gender="female"),
+            _u("hasphoto2", gender="male", search_gender="female"),
+        ])
+        assert await candidates_r.candidates(uid="nophoto", sort="match", limit=30) == []
+        assert await picks_r.daily_picks(uid="nophoto") == []
+        with pytest.raises(HTTPException) as e:
+            await candidates_r.save_user(SaveRequest(user_id="withphoto"), uid="nophoto")
+        assert e.value.status_code == 403 and e.value.detail == "photo_required"
+        with pytest.raises(HTTPException) as e:
+            await chat_r.send_message(SendMessageRequest(to_user_id="withphoto", text="salom"), uid="nophoto")
+        assert e.value.status_code == 403 and e.value.detail == "photo_required"
+        # and they are invisible to others
+        out = await candidates_r.candidates(uid="hasphoto2", sort="match", limit=30)
+        ids = {c["id"] for c in out}
+        assert "withphoto" in ids and "nophoto" not in ids
+    run(go())

@@ -36,7 +36,7 @@ def mdb(monkeypatch):
 
 async def _seed(database):
     for uid in ("a", "b"):
-        await database.users.insert_one({"id": uid, "name": uid.upper(), "plan": "free"})
+        await database.users.insert_one({"id": uid, "name": uid.upper(), "plan": "free", "photo_url": "/api/files/" + "a" * 24})
 
 
 def test_free_sender_without_unlock_gets_402_and_unknown_target_404(mdb):
