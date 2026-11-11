@@ -409,8 +409,28 @@ async def auth_admin_telegram(req: TelegramAuthRequest):
 @router.get("/auth/me")
 async def me(uid: str = Depends(get_current_user_id)):
     user = await get_user(uid)
+    # Photos became open-by-default. Accounts that never chose (no explicit
+    # photo_public) are told once, with the way to hide theirs. The atomic
+    # flag makes concurrent /auth/me calls send it a single time.
+    if user.get("onboarded") and "photo_public" not in user and not user.get("photo_notice_sent"):
+        res = await db.users.update_one({"id": uid, "photo_notice_sent": {"$ne": True}}, {"$set": {"photo_notice_sent": True}})
+        if res.modified_count == 1:
+            lang = user.get("language", "uz")
+            text = _PHOTO_NOTICE.get(lang, _PHOTO_NOTICE["uz"])
+            asyncio.create_task(push_notif(uid, "privacy", text, link="/me"))
     return _build_me_payload(user)
 
+
+# The short signup (name, birth date, place, family status, photo) completes
+# ~47% of the profile; the referral signup bonus keeps its "real profile" bar
+# (verified photo + terms + core facts) at 40%.
+REFERRAL_MIN_COMPLETENESS = 40
+
+_PHOTO_NOTICE = {
+    "uz": "📸 Endi profil rasmlari hammaga ochiq ko'rinadi. Rasmingizni yopmoqchi bo'lsangiz: «Men» bo'limida «Rasm hammaga ochiq» ni o'chiring.",
+    "ru": "📸 Теперь фото профилей видны всем. Чтобы скрыть своё фото, выключите «Фото открыто для всех» в разделе «Я».",
+    "en": "📸 Profile photos are now visible to everyone. To hide yours, turn off “Photo visible to everyone” under Me.",
+}
 
 _OWN_FILE_RE = re.compile(r"/api/files/([0-9a-fA-F]{24})/?(?:\?.*)?$")
 
@@ -460,6 +480,14 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
     user = await get_user(uid)
     was_onboarded = bool(user.get("onboarded"))
 
+    # Adults only (the signup wheel already stops at 18; the server must too).
+    # (Existing accounts re-sending their stored date while completing the
+    # profile are not re-judged.)
+    if not was_onboarded or update.get("birth_date") != user.get("birth_date"):
+        birth_age = age_from_birth(update.get("birth_date") or "")
+        if birth_age < 18 or birth_age > 100:
+            raise HTTPException(400, "age_restricted")
+
     # Legal consent gate: the first onboarding is the platform's "signature
     # moment" - terms of use, privacy policy and the serious-intent pledge
     # must be explicitly accepted (checkboxes in the consent screen). The
@@ -496,6 +524,11 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
 
     update["onboarded"] = True
     update["last_active"] = iso(now_utc())
+    if not was_onboarded:
+        # New accounts start with an open photo (stated on the photo step); the
+        # explicit value also marks that nobody needs the one-time notice below.
+        update.setdefault("photo_public", True)
+        update["photo_notice_sent"] = True
 
     await db.users.update_one({"id": uid}, {"$set": update})
 
@@ -523,7 +556,7 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
         # already the right one: full onboarding completion (AI-verified
         # photo + 80%+ profile + terms), never a bare "/start" text message.
         referred_by = fresh.get("referred_by")
-        if referred_by and completeness >= 80 and not fresh.get("flagged_as_bot"):
+        if referred_by and completeness >= REFERRAL_MIN_COMPLETENESS and not fresh.get("flagged_as_bot"):
             inviter = await db.users.find_one({"referral_id": referred_by})
             if not inviter:
                 inviter = await db.users.find_one({"referral_username_lower": referred_by.lower()})
@@ -599,7 +632,13 @@ async def update_profile(req: UpdateProfileRequest, uid: str = Depends(get_curre
         raise HTTPException(403, "video_requires_vip")
     locked = {"height_cm", "weight_kg", "marital_status", "has_children", "children_count"}
 
-    if user.get("onboarded") and any(k in update for k in locked):
+    # Only CHANGING an already-given fact re-opens verification; filling in a
+    # value that was never provided (height/weight are optional at signup) is
+    # just completing the profile.
+    changed_locked = any(
+        k in update and user.get(k) not in (None, "", 0) and update[k] != user.get(k) for k in locked
+    )
+    if user.get("onboarded") and changed_locked:
         update["verified_selfie"] = False
         update["pending_admin_review"] = True
 

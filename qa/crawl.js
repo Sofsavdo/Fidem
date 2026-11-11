@@ -31,7 +31,7 @@ const f0 = U['f0@fidem.uz'].id;
       const wide = [...document.querySelectorAll('body *')].filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.right > innerWidth + 2 && getComputedStyle(e).position !== 'fixed'; }).slice(0, 3).map(e => (e.tagName + '.' + String(e.className).slice(0, 40)));
       return { over, len: bodyText.length, keys: [...new Set(keys)].slice(0, 8), bad: /undefined|NaN|\[object Object\]/.test(bodyText) ? bodyText.match(/.{0,25}(undefined|NaN|\[object Object\]).{0,15}/)[0] : '', wide, path: location.pathname + location.search };
     });
-    if (shots) { const nm = (tag + '_' + route.replace(/[^a-z0-9]+/gi, '_')).slice(0, 60); await page.screenshot({ path: `' + __dirname + '/shots/${nm}.png`, fullPage: false }); }
+    if (shots) { const nm = (tag + '_' + route.replace(/[^a-z0-9]+/gi, '_')).slice(0, 60); await page.screenshot({ path: `${__dirname}/shots/${nm}.png`, fullPage: false }); }
     const prob = [];
     if (errs.length) prob.push('console: ' + [...new Set(errs)].slice(0, 3).join(' || '));
     if (bad.length) prob.push('api: ' + [...new Set(bad)].slice(0, 4).join(', '));

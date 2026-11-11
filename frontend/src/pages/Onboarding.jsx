@@ -9,12 +9,21 @@ import CountrySelect from "@/components/CountrySelect";
 import RegionSelect from "@/components/RegionSelect";
 import { ChevronLeft, ChevronRight, Check, Sparkles } from "lucide-react";
 
-const STEPS = 7;
+const STEPS = 3;
 
 const STEP_TITLES = {
-  uz: ["Ism va jins", "Manzil", "Oilaviy holat", "Tana ko'rsatkichlari", "Kasb va odat", "Qidiruv afzalliklari", "Profil rasmi"],
-  ru: ["Имя и пол", "Адрес", "Семейное положение", "Параметры", "Профессия и привычки", "Поисковые предпочтения", "Фото профиля"],
-  en: ["Name & gender", "Location", "Marital status", "Body metrics", "Profession & habits", "Search preferences", "Profile photo"],
+  uz: ["Siz haqingizda", "Manzil va oilaviy holat", "Profil rasmi"],
+  ru: ["О вас", "Место и семейное положение", "Фото профиля"],
+  en: ["About you", "Location & family status", "Profile photo"],
+};
+
+const ageOf = (iso) => {
+  const b = new Date(iso);
+  if (Number.isNaN(b.getTime())) return 0;
+  const n = new Date();
+  let a = n.getFullYear() - b.getFullYear();
+  if (n.getMonth() < b.getMonth() || (n.getMonth() === b.getMonth() && n.getDate() < b.getDate())) a -= 1;
+  return a;
 };
 
 export default function Onboarding() {
@@ -71,28 +80,28 @@ export default function Onboarding() {
     name: user?.name || "",
     gender: user?.gender || "male",
     birth_date: user?.birth_date || "2000-01-01",
-    country: user?.country || "",
+    country: user?.country || "Uzbekistan",
     region: user?.region || "",
     district: user?.district || "",
     marital_status: user?.marital_status || "single",
     has_children: user?.has_children ?? false,
     children_count: user?.children_count || 0,
-    height_cm: user?.height_cm || 170,
-    weight_kg: user?.weight_kg || 70,
+    height_cm: user?.height_cm || 0,
+    weight_kg: user?.weight_kg || 0,
     education: user?.education || "",
     profession: user?.profession || "",
     religion: user?.religion || "",
     looking_for: user?.looking_for || "",
     search_gender: user?.search_gender || "female",
-    search_age_min: user?.search_age_min || 20,
-    search_age_max: user?.search_age_max || 35,
+    search_age_min: user?.search_age_min || 0,
+    search_age_max: user?.search_age_max || 0,
     search_country: user?.search_country || "",
     search_region: user?.search_region || "",
     photo_url: user?.photo_url || "",
     bio: user?.bio || "",
-    smoking: user?.smoking || "no",
-    alcohol: user?.alcohol || "no",
-    relocation: user?.relocation ?? false,
+    smoking: user?.smoking || "",
+    alcohol: user?.alcohol || "",
+    relocation: user?.relocation ?? null,
     ...(draft?.data || {}),
   });
 
@@ -116,7 +125,7 @@ export default function Onboarding() {
   // (name, gender, birth date, country, marital status, ...) always get a
   // default value up front, so they never legitimately show up here.
   const isFieldEmpty = (v) => (typeof v === "boolean" ? false : v === null || v === undefined || v === "" || v === 0);
-  const EDITABLE_MISSING_FIELDS = ["region", "district", "education", "profession", "religion", "looking_for", "bio", "search_region"];
+  const EDITABLE_MISSING_FIELDS = ["region", "height_cm", "weight_kg", "district", "education", "profession", "religion", "smoking", "alcohol", "relocation", "looking_for", "bio", "search_region"];
   const missingKeys = isEdit ? EDITABLE_MISSING_FIELDS.filter((k) => isFieldEmpty(user?.[k])) : [];
 
   const buildPayload = (d) => {
@@ -130,6 +139,15 @@ export default function Onboarding() {
     payload.religion = payload.religion || "";
     payload.profession = payload.profession || "";
     payload.looking_for = payload.looking_for || "";
+    payload.height_cm = Number(payload.height_cm) || 0;
+    payload.weight_kg = Number(payload.weight_kg) || 0;
+    payload.smoking = payload.smoking || "";
+    payload.alcohol = payload.alcohol || "";
+    // Search age window: not asked at signup - centred on the user's own age
+    // (editable any time from the candidates filter).
+    const myAge = ageOf(payload.birth_date) || 26;
+    if (!payload.search_age_min) payload.search_age_min = Math.max(18, myAge - 8);
+    if (!payload.search_age_max) payload.search_age_max = Math.min(70, myAge + 8);
     return payload;
   };
 
@@ -216,14 +234,11 @@ export default function Onboarding() {
     // Step validation
     if (step === 0) {
       if (!data.name?.trim()) { toast.error(t("name_required") || t("name")); return; }
+      if (ageOf(data.birth_date) < 18) { toast.error(t("age_min_error")); return; }
     }
     if (step === 1) {
       if (!data.country) { toast.error(t("country_required") || (t("select_country") || "Select country")); return; }
       // region is only required if the country has a regions list (free-text countries allow blank)
-      // We do not strictly enforce here — onboard endpoint accepts empty region for free-text countries.
-    }
-    if (step === 5) {
-      if (!data.search_country) { toast.error(t("country_required") || (t("select_country") || "Select country")); return; }
     }
     if (step === STEPS - 1) {
       if (!data.photo_url) { toast.error(t("photo_required")); return; }
@@ -303,6 +318,34 @@ export default function Onboarding() {
               {missingKeys.includes("bio") && (
                 <Field label={t("bio")}>
                   <textarea data-testid="ob-edit-bio" rows="3" className="input" value={data.bio} onChange={(e) => set({ bio: e.target.value })} />
+                </Field>
+              )}
+              {(missingKeys.includes("height_cm") || missingKeys.includes("weight_kg")) && (
+                <div className="grid grid-cols-2 gap-3">
+                  {missingKeys.includes("height_cm") && (
+                    <Field label={t("height")}><input data-testid="ob-edit-height" type="number" min="140" max="220" className="input" value={data.height_cm || ""} onChange={(e) => set({ height_cm: +e.target.value })} placeholder="170" /></Field>
+                  )}
+                  {missingKeys.includes("weight_kg") && (
+                    <Field label={t("weight")}><input data-testid="ob-edit-weight" type="number" min="35" max="200" className="input" value={data.weight_kg || ""} onChange={(e) => set({ weight_kg: +e.target.value })} placeholder="70" /></Field>
+                  )}
+                </div>
+              )}
+              {missingKeys.includes("smoking") && (
+                <Field label={`${t("smoking")} (${t("optional") || "optional"})`}>
+                  <RadioGroup testid="ob-edit-smoking" value={data.smoking} onChange={(v) => set({ smoking: v })}
+                    options={[{ value: "no", label: t("no") }, { value: "sometimes", label: t("sometimes") }, { value: "yes", label: t("yes") }]} />
+                </Field>
+              )}
+              {missingKeys.includes("alcohol") && (
+                <Field label={`${t("alcohol")} (${t("optional") || "optional"})`}>
+                  <RadioGroup testid="ob-edit-alcohol" value={data.alcohol} onChange={(v) => set({ alcohol: v })}
+                    options={[{ value: "no", label: t("no") }, { value: "sometimes", label: t("sometimes") }, { value: "yes", label: t("yes") }]} />
+                </Field>
+              )}
+              {missingKeys.includes("relocation") && (
+                <Field label={`${t("relocation")} (${t("optional") || "optional"})`}>
+                  <RadioGroup testid="ob-edit-relocation" value={data.relocation === null ? "" : (data.relocation ? "yes" : "no")} onChange={(v) => set({ relocation: v === "yes" })}
+                    options={[{ value: "no", label: t("no") }, { value: "yes", label: t("yes") }]} />
                 </Field>
               )}
               {missingKeys.includes("search_region") && (
@@ -482,14 +525,6 @@ export default function Onboarding() {
                     placeholder={t("select_region") || "Select region"}
                   />
                 </Field>
-                <Field label={t("district")}>
-                  <input data-testid="ob-district" className="input" value={data.district} onChange={(e) => set({ district: e.target.value })} placeholder={t("select_district")} />
-                </Field>
-              </>
-            )}
-
-            {step === 2 && (
-              <>
                 <Field label={t("marital_status")}>
                   <RadioGroup
                     testid="ob-marital"
@@ -518,82 +553,7 @@ export default function Onboarding() {
               </>
             )}
 
-            {step === 3 && (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label={t("height")}><input data-testid="ob-height" type="number" min="140" max="220" className="input" value={data.height_cm} onChange={(e) => set({ height_cm: +e.target.value })} /></Field>
-                  <Field label={t("weight")}><input data-testid="ob-weight" type="number" min="35" max="200" className="input" value={data.weight_kg} onChange={(e) => set({ weight_kg: +e.target.value })} /></Field>
-                </div>
-                <Field label={t("education")}><input data-testid="ob-education" className="input" value={data.education} onChange={(e) => set({ education: e.target.value })} placeholder={t("education")} /></Field>
-              </>
-            )}
-
-            {step === 4 && (
-              <>
-                <Field label={t("profession")}><input data-testid="ob-profession" className="input" value={data.profession} onChange={(e) => set({ profession: e.target.value })} placeholder={t("profession")} /></Field>
-                <Field label={`${t("religion")} (${t("optional") || "optional"})`}>
-                  <RadioGroup
-                    testid="ob-religion"
-                    value={data.religion || "prefer_not_to_say"}
-                    onChange={(v) => set({ religion: v === "prefer_not_to_say" ? "" : v })}
-                    options={[
-                      { value: "prefer_not_to_say", label: t("prefer_not_to_say") || "Prefer not to say" },
-                      { value: "Islam", label: t("rel_islam") || "Islam" },
-                      { value: "Christianity", label: t("rel_christianity") || "Christianity" },
-                      { value: "Judaism", label: t("rel_judaism") || "Judaism" },
-                      { value: "Buddhism", label: t("rel_buddhism") || "Buddhism" },
-                      { value: "Hinduism", label: t("rel_hinduism") || "Hinduism" },
-                      { value: "Other", label: t("rel_other") || "Other" },
-                      { value: "None", label: t("rel_none") || "Non-religious" },
-                    ]}
-                  />
-                </Field>
-                <Field label={t("smoking")}>
-                  <RadioGroup testid="ob-smoking" value={data.smoking} onChange={(v) => set({ smoking: v })}
-                    options={[{ value: "no", label: t("no") }, { value: "sometimes", label: t("sometimes") }, { value: "yes", label: t("yes") }]} />
-                </Field>
-                <Field label={t("alcohol")}>
-                  <RadioGroup testid="ob-alcohol" value={data.alcohol} onChange={(v) => set({ alcohol: v })}
-                    options={[{ value: "no", label: t("no") }, { value: "sometimes", label: t("sometimes") }, { value: "yes", label: t("yes") }]} />
-                </Field>
-                <Field label={t("relocation")}>
-                  <RadioGroup testid="ob-relocation" value={data.relocation ? "yes" : "no"} onChange={(v) => set({ relocation: v === "yes" })}
-                    options={[{ value: "no", label: t("no") }, { value: "yes", label: t("yes") }]} />
-                </Field>
-              </>
-            )}
-
-            {step === 5 && (
-              <>
-                <Field label={t("looking_for")}>
-                  <textarea data-testid="ob-lookingfor" rows="3" className="input" value={data.looking_for} onChange={(e) => set({ looking_for: e.target.value })} />
-                </Field>
-                <Field as="div" label={t("search_area")}>
-                  <div className="space-y-2">
-                    <CountrySelect
-                      testid="ob-searchcountry"
-                      lang={lang}
-                      value={data.search_country}
-                      onChange={(name) => set({ search_country: name, search_region: "" })}
-                      placeholder={t("select_country") || "Select country"}
-                    />
-                    <RegionSelect
-                      testid="ob-searchregion"
-                      country={data.search_country}
-                      value={data.search_region}
-                      onChange={(r) => set({ search_region: r })}
-                      placeholder={t("select_region") || "Select region"}
-                    />
-                  </div>
-                </Field>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label={`${t("age")} min`}><input data-testid="ob-agemin" type="number" min="18" max="80" className="input" value={data.search_age_min} onChange={(e) => set({ search_age_min: +e.target.value })} /></Field>
-                  <Field label={`${t("age")} max`}><input data-testid="ob-agemax" type="number" min="18" max="80" className="input" value={data.search_age_max} onChange={(e) => set({ search_age_max: +e.target.value })} /></Field>
-                </div>
-              </>
-            )}
-
-            {step === 6 && (
+            {step === 2 && (
               <>
                 <Field label={`${t("photo")} *`}>
                   <PhotoUpload
@@ -624,9 +584,7 @@ export default function Onboarding() {
                     </div>
                   )}
                 </Field>
-                <Field label={t("bio")}>
-                  <textarea data-testid="ob-bio" rows="3" className="input" value={data.bio} onChange={(e) => set({ bio: e.target.value })} />
-                </Field>
+                <p className="text-[12px] leading-relaxed rounded-2xl bg-secondary/8 border border-secondary/20 p-3" data-testid="ob-photo-open-note">{t("photo_open_notice")}</p>
               </>
             )}
           </div>

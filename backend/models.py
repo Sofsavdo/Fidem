@@ -55,8 +55,10 @@ class OnboardingProfile(BaseModel):
     marital_status: MaritalType
     has_children: bool
     children_count: int = 0
-    height_cm: int
-    weight_kg: int
+    # Not asked at signup any more (completed later from the profile): 0 / ""
+    # / None mean "not answered" and are never shown as a real value.
+    height_cm: int = 0
+    weight_kg: int = 0
     education: str = ""
     profession: str = ""
     religion: str = ""
@@ -69,9 +71,9 @@ class OnboardingProfile(BaseModel):
     photo_url: Optional[str] = None
     bio: Optional[str] = ""
     name: str
-    smoking: Literal["no", "sometimes", "yes"] = "no"
-    alcohol: Literal["no", "sometimes", "yes"] = "no"
-    relocation: bool = False
+    smoking: Literal["no", "sometimes", "yes", ""] = ""
+    alcohol: Literal["no", "sometimes", "yes", ""] = ""
+    relocation: Optional[bool] = None
     # Signup consent: terms of use + privacy policy + serious-intent pledge,
     # all confirmed with checkboxes before the wizard. Required for FIRST
     # onboarding (auth_r enforces); ignored on the edit/complete flow.

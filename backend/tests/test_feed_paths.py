@@ -31,7 +31,8 @@ def mdb(monkeypatch):
 
 def _u(uid, **kw):
     d = {"id": uid, "name": uid.upper(), "plan": "free", "gender": "female", "birth_date": "1996-05-05",
-         "region": "Toshkent", "language": "uz", "onboarded": True, "created_at": core.iso(core.now_utc())}
+         "region": "Toshkent", "language": "uz", "onboarded": True, "created_at": core.iso(core.now_utc()),
+         "photo_public": False}  # lock semantics are about photos the owner closed
     d.update(kw)
     return d
 

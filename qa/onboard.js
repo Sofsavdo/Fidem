@@ -23,7 +23,7 @@ const APP = 'http://127.0.0.1:18101';
     await page.waitForTimeout(500);
     const step = await page.evaluate(() => { const s = document.querySelector('[data-testid^="onboarding-step-"],[data-testid=consent-screen]'); return s ? s.getAttribute('data-testid') : 'none'; });
     const tids = await page.evaluate(() => [...document.querySelectorAll('[data-testid]')].map(e => e.getAttribute('data-testid')).filter(x => /^(ob|consent)/.test(x)));
-    await page.screenshot({ path: `' + __dirname + '/shots/ob_${String(i + 2).padStart(2, '0')}_${step}.png` });
+    await page.screenshot({ path: `${__dirname}/shots/ob_${String(i + 2).padStart(2, '0')}_${step}.png` });
     log.push(`${step}: ${tids.join(' ')}`);
     // consent checkboxes
     for (const k of ['terms', 'privacy', 'intent']) { const c = page.locator(`[data-testid=consent-${k}]`); if (await c.count()) await c.first().click({ position: { x: 14, y: 14 } }).catch(() => {}); }

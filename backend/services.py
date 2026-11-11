@@ -469,8 +469,8 @@ def compute_match(viewer: dict, candidate: dict, lang: str = "uz") -> tuple[int,
             reasons.append(reason("has_children"))
 
     # 6. Height delta (10 pts) — prefer opposite-gender adult-typical
-    vh = viewer.get("height_cm", 170)
-    ch = candidate.get("height_cm", 170)
+    vh = viewer.get("height_cm") or 170   # unknown (0) -> neutral
+    ch = candidate.get("height_cm") or 170
     if 5 <= abs(vh - ch) <= 30:
         score += 10
         reasons.append(reason("height"))

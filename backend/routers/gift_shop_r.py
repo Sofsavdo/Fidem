@@ -16,7 +16,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException
 
 from auth import get_current_user_id
-from core import age_from_birth, db, get_user, iso, now_utc
+from core import age_from_birth, db, get_user, iso, now_utc, photo_is_public
 from models import GIFT_PRICES, GiftPurchaseRequest, GiftRedeemRequest, new_id
 from routers.chat_r import charge_for_gift, deliver_gift, resolve_gift_kind
 
@@ -71,7 +71,7 @@ async def gift_recipients(q: str = "", limit: int = 30, uid: str = Depends(get_c
             "age": age_from_birth(u.get("birth_date", "2000-01-01")),
             "region": u.get("region", ""),
             "district": u.get("district", ""),
-            "photo_url": u.get("photo_url") if u.get("photo_public") else None,
+            "photo_url": u.get("photo_url") if photo_is_public(u) else None,
             "online": is_online(u.get("last_active")),
         })
     return out
