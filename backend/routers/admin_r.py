@@ -677,14 +677,17 @@ async def _run_broadcast(user_ids: list[str], text: str) -> None:
 async def _run_tg_broadcast(chat_ids: list[int], text: str, button_text: str) -> None:
     """Direct Telegram sends for people who can't receive in-app notifs
     (no finished account). Always carries a Mini App button."""
-    from core import get_webapp_url
-    from services import send_telegram_message
+    from core import get_webapp_url, mark_telegram_unreachable
+    from services import send_telegram_message_status
 
     kb = {"inline_keyboard": [[{"text": button_text, "web_app": {"url": get_webapp_url()}}]]}
     sent = 0
     for cid in chat_ids:
-        if await send_telegram_message(cid, text, reply_markup=kb):
+        status = await send_telegram_message_status(cid, text, reply_markup=kb)
+        if status == "sent":
             sent += 1
+        elif status == "unreachable":
+            await mark_telegram_unreachable(cid)
         await asyncio.sleep(0.05)  # ~20 msg/s, under Telegram's 30/s cap
     log.info(f"tg broadcast finished: sent={sent} total={len(chat_ids)}")
 
@@ -694,7 +697,8 @@ async def _broadcast_targets(audience: str):
     if audience == "incomplete":
         # Account exists, profile never finished — reach them via Telegram
         rows = await db.users.find(
-            {"telegram_id": {"$nin": [None, ""]}, "onboarded": {"$ne": True}, "blocked": {"$ne": True}},
+            {"telegram_id": {"$nin": [None, ""]}, "onboarded": {"$ne": True}, "blocked": {"$ne": True},
+             "telegram_unreachable": {"$ne": True}},
             {"_id": 0, "telegram_id": 1},
         ).to_list(200000)
         chat_ids = []
@@ -706,7 +710,7 @@ async def _broadcast_targets(audience: str):
         return [], chat_ids
     if audience == "bot_only":
         # Pressed /start but never opened the Mini App at all
-        starts = await db.bot_starts.find({}, {"_id": 0, "telegram_id": 1, "chat_id": 1}).to_list(200000)
+        starts = await db.bot_starts.find({"unreachable": {"$ne": True}}, {"_id": 0, "telegram_id": 1, "chat_id": 1}).to_list(200000)
         with_acct = {
             u["telegram_id"]
             for u in await db.users.find({"telegram_id": {"$nin": [None, ""]}}, {"_id": 0, "telegram_id": 1}).to_list(200000)

@@ -203,3 +203,16 @@ def test_sign_check_and_amount_bump(monkeypatch):
     monkeypatch.setattr(hamyon, "_post", fake_post)
     res = asyncio.run(hamyon.create_hamyon_payment("o1", 50000))
     assert res["amount"] == 50002 and tried == [50000, 50001, 50002]
+
+
+def test_background_reconcile_settles_a_lost_callback(env):
+    client, db, calls = env
+    pay = client.post("/api/payments/create", json={"purpose": "premium"}).json()
+    from datetime import timedelta
+    old = core.iso(core.now_utc() - timedelta(minutes=5))
+    asyncio.run(db.payments.update_one({"id": pay["id"]}, {"$set": {"created_at": old}}))
+    calls["status"], calls["status_amount"] = "paid", pay["pay_amount"]
+    assert asyncio.run(payments_r.reconcile_open_hamyon_payments()) == 1
+    assert _user(db)["plan"] == "premium" and _pay(db, pay["id"])["status"] == "success"
+    # nothing left to do on the next pass
+    assert asyncio.run(payments_r.reconcile_open_hamyon_payments()) == 0

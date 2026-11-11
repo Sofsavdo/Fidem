@@ -71,7 +71,12 @@ async def _tg_call_as(token: str, method: str, **kwargs) -> Optional[httpx.Respo
                 retry_after = int(r.json().get("parameters", {}).get("retry_after", 1))
             except Exception:
                 retry_after = 1
-            wait = min(max(retry_after, 1), 30)
+            if retry_after > 30:
+                # Long locks (setMyName allows only a few changes a day and
+                # answers "retry after 15 hours") cannot be waited out here.
+                log.info(f"Telegram {method} rate-limited for {retry_after}s; skipped")
+                return r
+            wait = max(retry_after, 1)
             log.warning(f"Telegram {method} rate-limited, retrying once after {wait}s")
             await asyncio.sleep(wait)
             r = await _client().post(url, **kwargs)
@@ -273,6 +278,15 @@ async def _tg_set_profile_field(token: str, method: str, field: str, value, lang
 # Telegram only allows BotFather to set (`/setuserpic`), there is no Bot API
 # method for it.
 async def telegram_set_my_name(name: str, language_code: str = "") -> bool:
+    """Only changes the name when it differs: Telegram allows very few
+    setMyName calls a day, so setting it on every deploy hit a 15-hour 429."""
+    payload = {"language_code": language_code} if language_code else {}
+    cur = await _tg_call_as(TELEGRAM_BOT_TOKEN, "getMyName", json=payload)
+    try:
+        if cur is not None and cur.status_code == 200 and cur.json().get("result", {}).get("name") == name:
+            return True
+    except Exception:  # noqa: BLE001 - fall through to setting it
+        pass
     return await _tg_set_profile_field(TELEGRAM_BOT_TOKEN, "setMyName", "name", name, language_code)
 
 

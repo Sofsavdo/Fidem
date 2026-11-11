@@ -13,8 +13,8 @@ import asyncio
 import logging
 from datetime import timedelta
 
-from core import PAID_PLANS, db, get_webapp_url, iso, now_utc, parse_dt, push_notif
-from services import send_telegram_message
+from core import PAID_PLANS, db, get_webapp_url, iso, now_utc, parse_dt, push_notif, mark_telegram_unreachable
+from services import send_telegram_message_status
 
 # Between-send pause in the bulk notification loops below. push_notif fires
 # its Telegram delivery as a fire-and-forget task, so a tight loop over
@@ -236,7 +236,7 @@ async def _onboarding_nudges() -> None:
 
     # (a) bot /start, no account yet
     rows = await db.bot_starts.find(
-        {"nudge_stage": {"$lt": len(BOT_NUDGES)}},
+        {"nudge_stage": {"$lt": len(BOT_NUDGES)}, "unreachable": {"$ne": True}},
         {"_id": 0, "telegram_id": 1, "chat_id": 1, "first_start_at": 1, "nudge_stage": 1},
     ).limit(BATCH).to_list(BATCH)
     for s in rows:
@@ -260,7 +260,9 @@ async def _onboarding_nudges() -> None:
             {"telegram_id": s["telegram_id"], "nudge_stage": stage},
             {"$set": {"nudge_stage": stage + 1, "last_nudge_at": iso(now)}},
         )
-        await send_telegram_message(s["chat_id"], text, reply_markup=_webapp_keyboard("💖 FIDEM'ni ochish"))
+        status = await send_telegram_message_status(s["chat_id"], text, reply_markup=_webapp_keyboard("💖 FIDEM'ni ochish"))
+        if status == "unreachable":
+            await mark_telegram_unreachable(s["chat_id"])
         await asyncio.sleep(SEND_PACING_SECONDS)
 
     # (b) account exists, profile unfinished
@@ -269,6 +271,7 @@ async def _onboarding_nudges() -> None:
             "telegram_id": {"$nin": [None, ""]},
             "onboarded": {"$ne": True},
             "blocked": {"$ne": True},
+            "telegram_unreachable": {"$ne": True},
             "profile_nudge_stage": {"$not": {"$gte": len(PROFILE_NUDGES)}},
         },
         {"_id": 0, "id": 1, "telegram_id": 1, "created_at": 1, "profile_nudge_stage": 1},
@@ -290,7 +293,9 @@ async def _onboarding_nudges() -> None:
             chat_id = int(u["telegram_id"])
         except (TypeError, ValueError):
             continue
-        await send_telegram_message(chat_id, text, reply_markup=_webapp_keyboard("✍️ Anketani tugatish"))
+        status = await send_telegram_message_status(chat_id, text, reply_markup=_webapp_keyboard("✍️ Anketani tugatish"))
+        if status == "unreachable":
+            await mark_telegram_unreachable(chat_id)
         await asyncio.sleep(SEND_PACING_SECONDS)
 
 

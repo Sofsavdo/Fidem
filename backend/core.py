@@ -380,6 +380,22 @@ def user_public_minimal(u: dict) -> dict:
     }
 
 
+async def mark_telegram_unreachable(chat_id) -> None:
+    """Telegram said this chat is closed to the bot (blocked / account gone).
+    Flag it everywhere we keep that chat, so nudges and broadcasts skip it
+    instead of failing (and logging a 403) on every pass. Cleared on /start."""
+    ids = [chat_id, str(chat_id)]
+    try:
+        ids.append(int(chat_id))
+    except (TypeError, ValueError):
+        pass
+    await db.users.update_many(
+        {"telegram_id": {"$in": ids}},
+        {"$set": {"telegram_unreachable": True, "telegram_unreachable_at": iso(now_utc())}},
+    )
+    await db.bot_starts.update_many({"chat_id": {"$in": ids}}, {"$set": {"unreachable": True}})
+
+
 async def notify_telegram(uid: str, text: str, link: Optional[str] = None, kind: str = "general") -> None:
     """Send Telegram notification with user preference check and rate limiting."""
     user = await db.users.find_one(

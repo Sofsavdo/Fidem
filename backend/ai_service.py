@@ -35,8 +35,15 @@ GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest").strip()
 _client = None
 
 
+class NoFallbackAI(RuntimeError):
+    """The Anthropic fallback has no key - say so plainly in the logs instead
+    of the SDK's "Could not resolve authentication method" message."""
+
+
 def _get_client():
     global _client
+    if not os.environ.get("ANTHROPIC_API_KEY", "").strip():
+        raise NoFallbackAI("zaxira AI sozlanmagan (ANTHROPIC_API_KEY yo'q)")
     if _client is None:
         import anthropic
         _client = anthropic.AsyncAnthropic()

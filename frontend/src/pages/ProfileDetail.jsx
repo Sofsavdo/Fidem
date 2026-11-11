@@ -184,7 +184,7 @@ export default function ProfileDetail() {
   if (loading || !c) {
     return (
       <div className="pb-8" data-testid="profile-loading">
-        <div className="relative aspect-square bg-muted animate-pulse" />
+        <div className="relative aspect-[4/5] max-h-[70vh] bg-muted animate-pulse" />
         <div className="px-5 pt-5 space-y-4">
           <div className="h-8 bg-muted rounded-2xl animate-pulse w-1/3" />
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -212,8 +212,8 @@ export default function ProfileDetail() {
 
   return (
     <div data-testid="profile-detail" className="pb-8">
-      <div className="relative aspect-square bg-muted">
-        <PhotoFill key={slides[slide] || "none"} src={slides[slide] || null} className={blurred ? "blur-photo" : ""} />
+      <div className="relative aspect-[4/5] max-h-[70vh] w-full overflow-hidden bg-muted">
+        <PhotoFill key={slides[slide] || "none"} src={slides[slide] || null} contain className={blurred ? "blur-photo" : ""} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/0 to-black/0" />
         {slides.length > 1 && (
           <>
