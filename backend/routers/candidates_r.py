@@ -213,7 +213,7 @@ async def candidates(
     # shadow_banned is an admin-only moderation flag, distinct from the
     # user's own hidden_profile toggle — the user is never told they've
     # stopped appearing.
-    query: dict = {"id": id_filter, "onboarded": True, "blocked": {"$ne": True}, "hidden_profile": {"$ne": True}, "shadow_banned": {"$ne": True}}
+    query: dict = {"id": id_filter, "onboarded": True, "blocked": {"$ne": True}, "hidden_profile": {"$ne": True}, "shadow_banned": {"$ne": True}, "is_demo": {"$ne": True}}
 
     if me_doc.get("search_gender"):
         query["gender"] = me_doc["search_gender"]

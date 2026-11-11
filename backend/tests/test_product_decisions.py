@@ -180,3 +180,44 @@ def test_gift_recipients_endpoint_honours_open_photo_default(mdb, monkeypatch):
         by = {r["id"]: r for r in res}
         assert by["open"]["photo_url"] and by["closed"]["photo_url"] is None
     run(go())
+
+
+# ---------- no demo data ----------
+def test_only_own_hosted_photos_are_ever_returned():
+    assert core.own_photo_url({"photo_url": "https://images.unsplash.com/photo-1?w=800"}) is None
+    assert core.own_photo_url({}) is None
+    assert core.own_photo_url({"photo_url": "/api/files/" + "b" * 24}) == "/api/files/" + "b" * 24
+    assert core.own_photo_url({"photo_url": "https://x.up.railway.app/api/files/" + "b" * 24})
+    stock = _u("s", photo_url="https://images.unsplash.com/photo-1?w=800")
+    assert core.user_public(stock)["photo_url"] is None
+    assert core.user_public_minimal(stock)["photo_url"] is None
+
+
+def test_demo_profiles_stay_out_of_the_feed(mdb, monkeypatch):
+    from routers import candidates_r, picks_r
+    for mod in (candidates_r, picks_r):
+        monkeypatch.setattr(mod, "db", mdb, raising=False)
+
+    async def go():
+        await mdb.users.insert_many([
+            _u("me", gender="male", search_gender="female"),
+            _u("real", gender="female"),
+            _u("demo", gender="female", is_demo=True),
+        ])
+        out = await candidates_r.candidates(uid="me", sort="match", limit=30)
+        ids = {c["id"] for c in out}
+        assert "real" in ids and "demo" not in ids
+    run(go())
+
+
+def test_standard_and_vip_can_no_longer_be_bought(mdb):
+    from models import CreatePaymentRequest
+    from starlette.requests import Request
+    scope = {"type": "http", "method": "POST", "path": "/", "headers": [], "client": ("1.2.3.4", 1)}
+
+    async def go():
+        for plan in ("standard", "vip"):
+            with pytest.raises(HTTPException) as e:
+                await payments_r.create_payment(CreatePaymentRequest(purpose=plan), Request(scope), uid="a")
+            assert e.value.status_code == 400 and e.value.detail == "plan_unavailable"
+    run(go())

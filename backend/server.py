@@ -356,83 +356,11 @@ async def startup() -> None:
         })
         log.info(f"Seeded admin: {ADMIN_EMAIL}")
 
-    onboarded = await db.users.count_documents({"onboarded": True, "is_admin": {"$ne": True}})
-    if onboarded < 12:
-        await seed_demo_users()
+    # Demo profiles and fake success stories used to be seeded here. The app
+    # runs on real users only now - nothing is auto-created; any leftover seed
+    # profile is just tagged so it stays out of feeds and can be bulk-deleted
+    # from the admin panel.
     await backfill_demo_flag()
-    # Seed success stories if none exist (independent of users)
-    stories_count = await db.success_stories.count_documents({})
-    if stories_count == 0:
-        await seed_success_stories()
-
-
-async def seed_demo_users() -> None:
-    demo = [
-        ("Madina", "female", "1998-04-15", "Toshkent", "Yunusobod", 165, 55, "Oliy", "O'qituvchi", "Islom"),
-        ("Aziza", "female", "1996-09-21", "Toshkent", "Chilonzor", 168, 58, "Magistr", "Dizayner", "Islom"),
-        ("Dilnoza", "female", "2000-02-10", "Samarqand", "Markaz", 162, 52, "Oliy", "Tibbiyot", "Islom"),
-        ("Shahnoza", "female", "1995-11-30", "Toshkent", "Mirzo Ulug'bek", 170, 60, "Magistr", "Iqtisodchi", "Islom"),
-        ("Gulnora", "female", "1999-07-05", "Buxoro", "Markaz", 164, 54, "Oliy", "Bank", "Islom"),
-        ("Sevara", "female", "1997-12-18", "Toshkent", "Sergeli", 167, 56, "Oliy", "IT", "Islom"),
-        ("Lola", "female", "2001-03-22", "Andijon", "Markaz", 163, 53, "Bakalavr", "Talaba", "Islom"),
-        ("Nigora", "female", "1994-06-12", "Toshkent", "Yashnobod", 169, 59, "Magistr", "Yurist", "Islom"),
-        ("Bobur", "male", "1995-05-10", "Toshkent", "Yunusobod", 178, 75, "Oliy", "Muhandis", "Islom"),
-        ("Sardor", "male", "1992-08-25", "Toshkent", "Mirzo Ulug'bek", 182, 80, "Magistr", "IT-Direktor", "Islom"),
-        ("Jasur", "male", "1998-01-15", "Samarqand", "Markaz", 175, 72, "Oliy", "Vrach", "Islom"),
-        ("Diyor", "male", "1996-10-08", "Toshkent", "Chilonzor", 180, 78, "Oliy", "Biznes", "Islom"),
-        ("Otabek", "male", "1993-11-19", "Toshkent", "Yashnobod", 179, 77, "Magistr", "Marketing", "Islom"),
-        ("Rustam", "male", "1997-04-30", "Buxoro", "Markaz", 176, 74, "Oliy", "Arxitektor", "Islom"),
-    ]
-    photos_f = [
-        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800",
-        "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=800",
-        "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800",
-        "https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=800",
-        "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=800",
-        "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=800",
-        "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=800",
-        "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=800",
-    ]
-    photos_m = [
-        "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800",
-        "https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=800",
-        "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800",
-        "https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?w=800",
-        "https://images.unsplash.com/photo-1463453091185-61582044d556?w=800",
-        "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=800",
-    ]
-    pf = pm = 0
-    for name, gender, bd, region, district, h, w, edu, prof, rel in demo:
-        uid = new_id()
-        photo = photos_f[pf % len(photos_f)] if gender == "female" else photos_m[pm % len(photos_m)]
-        if gender == "female":
-            pf += 1
-        else:
-            pm += 1
-        doc = {
-            "id": uid,
-            "name": name, "gender": gender, "birth_date": bd,
-            "country": "Uzbekistan", "region": region, "district": district,
-            "marital_status": "single", "has_children": False, "children_count": 0,
-            "height_cm": h, "weight_kg": w,
-            "education": edu, "profession": prof, "religion": rel,
-            "looking_for": "Oila qurish, samimiy va vafodor inson",
-            "search_gender": "male" if gender == "female" else "female",
-            "search_age_min": 20, "search_age_max": 40,
-            "search_region": region, "photo_url": photo,
-            "bio": f"Salom! Men {name}. Oilaviy hayot tarafdoriman.",
-            "onboarded": True, "verified_identity": True, "verified_selfie": True,
-            "verified_financial": False, "plan": "free", "balance": 0,
-            "language": "uz",
-            "created_at": iso(now_utc()), "last_active": iso(now_utc()),
-            # Marks this as a seed/demo profile (marketplace-liquidity filler,
-            # not a real signup) so the admin panel can filter and bulk-remove
-            # them once real users make them unnecessary.
-            "is_demo": True,
-        }
-        doc["completeness"] = compute_completeness(doc)
-        await db.users.insert_one(doc)
-    log.info("Seeded demo users")
 
 
 async def backfill_demo_flag() -> None:
@@ -452,40 +380,6 @@ async def backfill_demo_flag() -> None:
     )
     if res.modified_count:
         log.info(f"Backfilled is_demo on {res.modified_count} legacy seed users")
-
-
-async def seed_success_stories() -> None:
-    stories = [
-        {
-            "couple_names": "Aziza & Bobur",
-            "region": "Toshkent",
-            "year": 2025,
-            "story_text": "FIDEM orqali Bobur bilan tanishganimga 8 oy bo'ldi. Birinchi xabarni u atirgul yuborib boshladi — bu menga juda samimiy tuyuldi. Suhbatlarimizda halol va ochiq edik, oilalarimiz ham bir-birini yoqtirdi. Hozir nikohimizning birinchi yili.",
-            "photo_url": "https://images.unsplash.com/photo-1519741497674-611481863552?w=800",
-            "published": True, "featured": True, "views": 142,
-        },
-        {
-            "couple_names": "Dilnoza & Sardor",
-            "region": "Samarqand",
-            "year": 2024,
-            "story_text": "Onam menga FIDEM'ni tavsiya qildi. Sovchi tizimi ajoyib edi — onam suhbatlarimizni xolisona kuzata oldi va Sardorning oilasini yaxshi deb topdi. AI hisobot bizga moslik 91% ekanini ko'rsatdi. To'yimiz bahorda bo'ldi.",
-            "photo_url": "https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=800",
-            "published": True, "featured": True, "views": 89,
-        },
-        {
-            "couple_names": "Madina & Diyor",
-            "region": "Toshkent · Chilonzor",
-            "year": 2025,
-            "story_text": "Diyor menga shaxsiyat testi orqali yo'l ko'rsatdi — biz ikkalamiz ham yuqori mas'uliyatli va xushmuomalalik darajasiga ega edik. Tanishganimizning 4 oyida nikohlashga qaror qildik. Alloh duosi bilan.",
-            "photo_url": "https://images.unsplash.com/photo-1551027395-99f23ce0a8b1?w=800",
-            "published": True, "featured": False, "views": 67,
-        },
-    ]
-    for s in stories:
-        s["id"] = new_id()
-        s["created_at"] = iso(now_utc())
-        await db.success_stories.insert_one(s)
-    log.info(f"Seeded {len(stories)} success stories")
 
 
 @app.on_event("shutdown")

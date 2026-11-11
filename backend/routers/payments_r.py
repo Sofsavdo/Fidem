@@ -183,6 +183,10 @@ async def my_verifications(uid: str = Depends(get_current_user_id)):
 @router.post("/payments/create")
 async def create_payment(req: CreatePaymentRequest, request: Request, uid: str = Depends(get_current_user_id)):
     rate_limit_payment(request)
+    # One paid plan (Premium) is on sale. Standard/VIP stay valid for people who
+    # already hold them (and admin grants) but can no longer be bought.
+    if req.purpose in ("standard", "vip"):
+        raise HTTPException(400, "plan_unavailable")
     if req.purpose in ("premium", "standard", "vip"):
         amount = PLAN_PRICES[req.purpose][req.months]
     elif req.purpose == "chat_unlock":

@@ -14,6 +14,7 @@ python qa/smoke_mut.py                # every POST/PATCH/DELETE with schema-gene
 python qa/flows.py && python qa/flows2.py   # auth, feed, likes/match, chat paywall, payments, privacy, IDOR
 node qa/crawl.js qa@fidem.uz uz run shots   # 31 pages: console/API errors, overflow, raw i18n keys
 node qa/onboard.js                    # register -> consent -> 3 steps -> feed in a browser
+node qa/chatdup.js                    # sent message shows once even if the WS echo beats the HTTP reply
 ```
 `crawl.js <user> <lang> <tag> [shots|admin]` writes screenshots to `qa/shots/`.
 Needs `playwright` (`npm i playwright`) for the node scripts. Limits are unit-tested

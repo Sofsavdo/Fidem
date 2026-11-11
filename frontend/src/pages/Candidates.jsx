@@ -11,6 +11,7 @@ import CountrySelect from "@/components/CountrySelect";
 import RegionSelect from "@/components/RegionSelect";
 import { useCandidates, useSaved, useToggleSave, useDailyPicks } from "@/hooks/queries";
 import { photoSrc } from "@/lib/photo";
+import PhotoFill from "@/components/PhotoFill";
 import { MATCH_EVENT } from "@/components/MatchCelebration";
 import { tapMedium } from "@/lib/haptics";
 import { EmptyState } from "@/components/kit";
@@ -88,13 +89,7 @@ function DailyPicksStrip({ t }) {
             className="shrink-0 w-32 rounded-3xl bg-card border border-gold/30 overflow-hidden active:scale-[0.97] transition"
           >
             <div className="relative aspect-[4/5] bg-muted">
-              {p.photo_url ? (
-                <img loading="lazy" decoding="async" src={photoSrc(p.photo_url)} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <div className="absolute inset-0 grid place-items-center">
-                  <Lock className="w-5 h-5 text-muted-foreground" />
-                </div>
-              )}
+              <PhotoFill src={photoSrc(p.photo_url)} name={p.name} />
               <span className="absolute top-1.5 right-1.5 rounded-full bg-gold text-ink text-[10px] font-bold px-1.5 py-0.5">{p.match_score}%</span>
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-5 text-white">
                 <p className="text-xs font-semibold truncate">{p.name}, {p.age}</p>
