@@ -19,12 +19,13 @@ try {
 const isApi = (url) => url === '/api' || url.startsWith('/api/') || url.startsWith('/api?');
 
 function proxyHttp(req, res) {
-  const lib = BACKEND.protocol === 'https:' ? require('https') : http;
+  const secure = BACKEND.protocol === 'https:';
+  const lib = secure ? require('https') : http;
   const headers = { ...req.headers, host: BACKEND.host };
   const up = lib.request({
     protocol: BACKEND.protocol,
     hostname: BACKEND.hostname,
-    port: BACKEND.port || (BACKEND.protocol === 'https:' ? 443 : 80),
+    port: BACKEND.port || (secure ? 443 : 80),
     method: req.method,
     path: req.url,
     headers,
@@ -32,7 +33,8 @@ function proxyHttp(req, res) {
     res.writeHead(ur.statusCode, ur.headers);
     ur.pipe(res);
   });
-  up.on('error', () => {
+  up.on('error', (e) => {
+    console.error(`[proxy] ${req.method} ${req.url.split('?')[0]} -> ${BACKEND.host}: ${e.code || ''} ${e.message}`);
     if (!res.headersSent) res.writeHead(502, { 'Content-Type': 'application/json' });
     res.end('{"detail":"upstream unavailable"}');
   });
@@ -40,8 +42,9 @@ function proxyHttp(req, res) {
 }
 
 function proxyUpgrade(req, socket, head) {
-  const port = Number(BACKEND.port || (BACKEND.protocol === 'https:' ? 443 : 80));
-  const up = net.connect(port, BACKEND.hostname, () => {
+  const secure = BACKEND.protocol === 'https:';
+  const port = Number(BACKEND.port || (secure ? 443 : 80));
+  const onConnect = () => {
     const lines = [`${req.method} ${req.url} HTTP/1.1`, `Host: ${BACKEND.host}`];
     for (const [k, v] of Object.entries(req.headers)) {
       if (k.toLowerCase() !== 'host') lines.push(`${k}: ${v}`);
@@ -49,11 +52,16 @@ function proxyUpgrade(req, socket, head) {
     up.write(lines.join('\r\n') + '\r\n\r\n');
     if (head && head.length) up.write(head);
     socket.pipe(up).pipe(socket);
+  };
+  const up = secure
+    ? require('tls').connect({ host: BACKEND.hostname, port, servername: BACKEND.hostname }, onConnect)
+    : net.connect(port, BACKEND.hostname, onConnect);
+  up.on('error', (e) => {
+    console.error(`[proxy] websocket -> ${BACKEND.host}: ${e.code || ''} ${e.message}`);
+    socket.destroy();
   });
-  up.on('error', () => socket.destroy());
   socket.on('error', () => up.destroy());
 }
-const BUILD_DIR = path.join(__dirname, 'build');
 
 const mimeTypes = {
   '.html': 'text/html',
