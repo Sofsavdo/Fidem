@@ -465,6 +465,14 @@ async def generate_growth_insights(data: str) -> dict:
             last_error = _classify_ai_error(e)
             log.warning("growth_insights: gemini call failed (%s), trying fallback: %s", last_error, e)
 
+    if not GEMINI_API_KEY and not os.environ.get("ANTHROPIC_API_KEY", "").strip():
+        # Say exactly what is missing instead of a generic "unexpected error".
+        return {
+            "trend": "stable", "summary": "", "highlights": [], "risks": [],
+            "recommendations": [], "ai_generated": False,
+            "error": "AI kaliti sozlanmagan — Railway'da GEMINI_API_KEY qo'yilsa tahlil ishlaydi",
+        }
+
     try:
         client = _get_client()
         response = await client.messages.create(

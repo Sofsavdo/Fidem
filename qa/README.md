@@ -19,6 +19,7 @@ node qa/photos.js                     # legacy-host photos load; photo-less user
 node qa/gallery.js                    # no balance/VIP in top bar; extra photos: add, swipe on profile, remove
 node qa/coldstart.js                  # opening on a stale /me lands on Nomzodlar; deep links respected
 node qa/district.js                   # country/region/district are pickers; district list follows the region
+node qa/admin.js                      # every admin section: console/API errors, raw keys, overflow, legacy wording
 ```
 `crawl.js <user> <lang> <tag> [shots|admin]` writes screenshots to `qa/shots/`.
 Needs `playwright` (`npm i playwright`) for the node scripts. Limits are unit-tested

@@ -87,6 +87,14 @@ async def get_current_admin(
     data = decode_token(token)
     if not data.get("is_admin"):
         raise HTTPException(status_code=403, detail="Admin only")
+    # The token's is_admin claim lives for the token's whole lifetime; check the
+    # account too, so removing someone's admin rights (or blocking them) takes
+    # effect immediately instead of when their token expires.
+    from core import db  # lazy: core imports this module
+
+    acct = await db.users.find_one({"id": data.get("sub")}, {"_id": 0, "is_admin": 1, "blocked": 1})
+    if not acct or not acct.get("is_admin") or acct.get("blocked"):
+        raise HTTPException(status_code=403, detail="Admin only")
     return data.get("sub")
 
 

@@ -3,6 +3,7 @@ import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
 import { ShieldCheck, Wallet, Users as UsersIcon, DollarSign, TrendingUp, BarChart3, LayoutDashboard, Search, MessageSquare, Settings, ChevronRight, MapPin, Activity, AlertTriangle, Send, Megaphone, Trash2, Bot, Eye, Pencil, Link2, Heart, Crown, Gauge, ScrollText, Ban, VolumeX, EyeOff, Menu, X, Gift, PackageOpen } from "lucide-react";
 import { photoSrc } from "@/lib/photo";
+import { FEATURES } from "@/lib/features";
 import api from "@/lib/api";
 import { PURPOSE_UZ, REF_TYPE_UZ, VERIF_KIND_UZ } from "@/lib/labels";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
@@ -20,7 +21,7 @@ import {
   useAdminAiInsights, useRefreshAiInsights,
 } from "@/hooks/queries";
 
-const menuItems = [
+const ALL_MENU_ITEMS = [
   { id: "ceo", icon: Gauge, label: "CEO Dashboard" },
   { id: "ai", icon: Bot, label: "AI Tahlilchi" },
   { id: "growth", icon: Heart, label: "O'sish (Funnel)" },
@@ -32,16 +33,46 @@ const menuItems = [
   { id: "broadcast", icon: Send, label: "Xabar yuborish" },
   { id: "anons", icon: Megaphone, label: "Anonslar" },
   { id: "payments", icon: DollarSign, label: "To'lovlar" },
-  { id: "p2p", icon: Wallet, label: "P2P To'ldirish" },
+  { id: "p2p", icon: Wallet, label: "Karta orqali to'ldirish" },
   { id: "verifications", icon: ShieldCheck, label: "Tasdiqlashlar" },
   { id: "withdrawals", icon: Wallet, label: "Yechib olishlar" },
   { id: "referrals", icon: TrendingUp, label: "Referallar" },
   { id: "messages", icon: MessageSquare, label: "Chat nazorati" },
-  { id: "concierge", icon: Search, label: "Concierge" },
+  { id: "concierge", icon: Search, label: "Shaxsiy sovchi" },
   { id: "fraud", icon: AlertTriangle, label: "Firibgarlik" },
   { id: "reports", icon: Settings, label: "Shikoyatlar" },
   { id: "auditlog", icon: ScrollText, label: "Audit Log" },
 ];
+
+// Sections for products that are switched off stay out of the menu.
+const menuItems = ALL_MENU_ITEMS.filter((m) => m.id !== "giftshop" || FEATURES.giftShop);
+
+// Human labels for stored status / action codes (admins should never read raw keys).
+const STATUS_UZ = {
+  pending: "Kutilmoqda", approved: "Tasdiqlangan", rejected: "Rad etilgan", paid: "To'langan",
+  completed: "Yakunlangan", in_progress: "Jarayonda", awaiting_payment: "To'lov kutilmoqda",
+  cancelled: "Bekor qilingan", resolved: "Hal qilingan", open: "Ochiq", new: "Yangi",
+};
+const statusUz = (s) => STATUS_UZ[s] || s || "—";
+const ACTION_UZ = {
+  update_user: "Foydalanuvchini o'zgartirdi", delete_demo_users: "Demo profillarni o'chirdi",
+  give_premium: "Premium berdi", give_vip: "VIP berdi", give_standard: "Standard berdi",
+  reset_balance: "Balansni tozaladi", reset_likes: "Like'larni tozaladi", mute: "Ovozini o'chirdi",
+  unmute: "Ovozini yoqdi", shadow_ban: "Yashirin ban", unshadow_ban: "Yashirin bandan chiqardi",
+  ban: "Ban qildi", fraud_block: "Firibgarlik uchun blokladi", delete_message: "Xabarni o'chirdi",
+  approve_verification: "Tasdiqlashni qabul qildi", reject_verification: "Tasdiqlashni rad etdi",
+  approve_withdrawal: "Pul yechishni tasdiqladi", reject_withdrawal: "Pul yechishni rad etdi",
+  p2p_topup_approve: "Karta to'ldirishini tasdiqladi", p2p_topup_reject: "Karta to'ldirishini rad etdi",
+  broadcast: "Xabar yubordi",
+};
+const actionUz = (a) => { const k = String(a || "").replace(/^user_action:/, ""); return ACTION_UZ[k] || k; };
+const FIELD_UZ = {
+  verified_identity: "shaxs", verified_selfie: "selfie", verified_financial: "moliyaviy", add_balance: "balansga qo'shildi",
+  plan: "tarif", blocked: "blok", count: "soni", target_ids: "kimlar", days: "kun", amount: "summa", topup_id: "so'rov",
+};
+const genderUz = (g) => ({ male: "Erkak", female: "Ayol" }[g] || g || "—");
+const maritalUz = (m) => ({ single: "Turmush qurmagan", divorced: "Ajrashgan", widowed: "Beva" }[m] || m || "Noma'lum");
+const planUz = (p) => ({ free: "Bepul", premium: "Premium", vip: "Premium (eski VIP)", standard: "Standard (eski)" }[p] || p || "—");
 
 function AdminPagination({ page, setPage, total, limit }) {
   if (total <= limit) return null;
@@ -184,16 +215,20 @@ export default function Admin() {
             </div>
           </div>
 
-          {configHealth && !configHealth.telegram_configured && (
-            <div
+          {configHealth && !configHealth.telegram_configured && (activeTab === "ceo" || activeTab === "dashboard") && (
+            <details
               data-testid="admin-telegram-not-configured"
-              className="mb-6 rounded-2xl bg-rose-50 border border-rose-300 p-4 flex gap-3 items-start"
+              className="mb-6 rounded-2xl bg-rose-50 border border-rose-300 p-4"
             >
+              <summary className="cursor-pointer text-sm font-semibold text-rose-900 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" /> Admin Telegram bildirishnomalari o'chiq (batafsil)
+              </summary>
+            <div className="mt-3 flex gap-3 items-start">
               <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
               <div className="text-sm text-rose-900">
                 <p className="font-semibold">Admin Telegram bildirishnomalari o'chiq — hech kimga xabar bormaydi</p>
                 <p className="text-rose-800 mt-1 leading-relaxed">
-                  Yangi P2P to'lov so'rovlari, /stats va kunlik hisobot Telegram orqali hech kimga yetib bormaydi,
+                  Yangi karta to'lovi so'rovlari, /stats va kunlik hisobot Telegram orqali hech kimga yetib bormaydi,
                   chunki <code className="bg-rose-100 px-1 rounded">ADMIN_TELEGRAM_IDS</code> muhit o'zgaruvchisida
                   haqiqiy admin ID topilmadi. Tuzatish uchun:
                 </p>
@@ -204,6 +239,7 @@ export default function Admin() {
                 </ol>
               </div>
             </div>
+            </details>
           )}
 
           {activeTab === "ceo" && <AdminCeoDashboard go={setActiveTab} />}
@@ -519,7 +555,7 @@ function AdminRevenueDashboard() {
     <div className="space-y-6">
       <div>
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Haqiqiy pul kirimi (Real Revenue)</p>
-        <p className="text-[11px] text-muted-foreground mb-2">Faqat CLICK orqali muvaffaqiyatli va tasdiqlangan P2P to'lovlar — balansdan qilingan xaridlar bu yerga ikki marta hisoblanmaydi.</p>
+        <p className="text-[11px] text-muted-foreground mb-2">Faqat haqiqiy pul: muvaffaqiyatli onlayn to'lovlar va tasdiqlangan karta to'lovlari. Balansdan qilingan xaridlar ikki marta hisoblanmaydi.</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           <KpiTile label="Bugun" value={sumFmt(real_revenue.today)} accent />
           <KpiTile label="Bu hafta" value={sumFmt(real_revenue.week)} />
@@ -597,7 +633,7 @@ function AdminGiftShopDashboard() {
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Kategoriya bo'yicha</p>
         <div className="grid grid-cols-2 gap-2.5">
           <KpiTile label="Dekorativ sovg'alar" value={sumFmt(deco_total)} />
-          <KpiTile label="Obuna sovg'alari (Standard/Premium/VIP)" value={sumFmt(plan_total)} />
+          <KpiTile label="Obuna sovg'alari (Premium)" value={sumFmt(plan_total)} />
         </div>
       </div>
 
@@ -659,10 +695,12 @@ function AdminAuditLog() {
               <span className="text-[11px] text-muted-foreground tabular-nums">{new Date(r.at).toLocaleString("uz-UZ")}</span>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              <span className="font-mono text-[11px] bg-muted rounded px-1.5 py-0.5">{r.action}</span>
+              <span className="text-[11px] bg-muted rounded px-1.5 py-0.5">{actionUz(r.action)}</span>
               {r.target_name && <> → {r.target_name}</>}
               {r.details && Object.keys(r.details).length > 0 && (
-                <span className="ml-1.5 text-[11px]">{JSON.stringify(r.details)}</span>
+                <span className="block mt-1 text-[11px] break-words">
+                  {Object.entries(r.details).map(([k, v]) => `${FIELD_UZ[k] || k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`).join(" · ")}
+                </span>
               )}
             </p>
           </div>
@@ -727,7 +765,7 @@ function AdminDashboard({ stats, go }) {
           <StatCard label="MAU" value={stats.mau} />
           <StatCard label="Konversiya" value={`${stats.conversion_premium}%`} />
           <StatCard label="Premium" value={stats.premium} />
-          <StatCard label="VIP" value={stats.vip} />
+          <StatCard label="Eski VIP" value={stats.vip} />
           <StatCard label="Erkak / Ayol" value={`${stats.males} / ${stats.females}`} />
           <StatCard label="Referallar" value={stats.referrals?.total || 0} />
           <StatCard label="Bugungi xabarlar" value={stats.messages?.today || 0} />
@@ -1100,10 +1138,10 @@ function AdminUsers() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate flex items-center gap-1.5">
                   {u.online && <span className="w-1.5 h-1.5 rounded-full bg-secondary shrink-0" />}
-                  {u.name} · {u.plan} {u.blocked ? "🚫" : ""}
+                  {u.name} · {planUz(u.plan)} {u.blocked ? "🚫" : ""}
                   {u.is_demo && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold shrink-0">DEMO</span>}
                 </p>
-                <p className="text-xs text-muted-foreground truncate">{u.region} · age {u.age} · {u.gender} · {u.marital_status || "Noma'lum"}</p>
+                <p className="text-xs text-muted-foreground truncate">{u.region} · {u.age} yosh · {genderUz(u.gender)} · {maritalUz(u.marital_status)}</p>
                 <p className="text-[10px] text-muted-foreground">{u.email} · {u.phone || "Telefon yo'q"}</p>
                 <p className="text-[10px] text-muted-foreground">
                   {u.online ? "Hozir onlayn" : `Oxirgi faollik: ${u.last_active_label || "—"}`}
@@ -1241,12 +1279,14 @@ function AdminUsers() {
 
               {/* Actions */}
               <div className="flex gap-2 flex-wrap">
-                <button onClick={() => patch(selectedUser.id, { verified_selfie: !selectedUser.verified_selfie })} className="text-xs rounded-full bg-secondary/10 text-secondary px-3 py-2">{selectedUser.verified_selfie ? "✓ Selfie" : "Verify selfie"}</button>
-                <button onClick={() => patch(selectedUser.id, { verified_financial: !selectedUser.verified_financial })} className="text-xs rounded-full bg-gold-light text-yellow-900 px-3 py-2">{selectedUser.verified_financial ? "💎 Financial" : "Verify financial"}</button>
-                <button onClick={() => patch(selectedUser.id, { plan: selectedUser.plan === "premium" ? "free" : "premium" })} className="text-xs rounded-full bg-primary/10 text-foreground px-3 py-2">{selectedUser.plan === "premium" ? "Cancel Premium" : "Make Premium"}</button>
-                <button onClick={() => patch(selectedUser.id, { plan: selectedUser.plan === "vip" ? "free" : "vip" })} className="text-xs rounded-full bg-ink text-gold px-3 py-2">{selectedUser.plan === "vip" ? "Cancel VIP" : "Make VIP"}</button>
+                <button onClick={() => patch(selectedUser.id, { verified_selfie: !selectedUser.verified_selfie })} className="text-xs rounded-full bg-secondary/10 text-secondary px-3 py-2">{selectedUser.verified_selfie ? "✓ Selfie tasdiqlangan" : "Selfieni tasdiqlash"}</button>
+                <button onClick={() => patch(selectedUser.id, { verified_financial: !selectedUser.verified_financial })} className="text-xs rounded-full bg-gold-light text-yellow-900 px-3 py-2">{selectedUser.verified_financial ? "💎 Moliyaviy tasdiqlangan" : "Moliyaviyni tasdiqlash"}</button>
+                <button onClick={() => patch(selectedUser.id, { plan: selectedUser.plan === "premium" ? "free" : "premium" })} className="text-xs rounded-full bg-primary/10 text-foreground px-3 py-2">{selectedUser.plan === "premium" ? "Premiumni olib tashlash" : "Premium berish"}</button>
+                {selectedUser.plan === "vip" && (
+                  <button onClick={() => patch(selectedUser.id, { plan: "premium" })} className="text-xs rounded-full bg-ink text-gold px-3 py-2">Eski VIP → Premium</button>
+                )}
                 <button onClick={() => patch(selectedUser.id, { add_balance: 10000 })} className="text-xs rounded-full border border-border px-3 py-2">+10k</button>
-                <button onClick={() => patch(selectedUser.id, { blocked: !selectedUser.blocked })} className={`text-xs rounded-full px-3 py-2 ${selectedUser.blocked ? "bg-emerald-100 text-emerald-700" : "bg-red-50 text-red-700"}`}>{selectedUser.blocked ? "Unblock" : "Block"}</button>
+                <button onClick={() => patch(selectedUser.id, { blocked: !selectedUser.blocked })} className={`text-xs rounded-full px-3 py-2 ${selectedUser.blocked ? "bg-emerald-100 text-emerald-700" : "bg-red-50 text-red-700"}`}>{selectedUser.blocked ? "Blokdan chiqarish" : "Bloklash"}</button>
               </div>
 
               {/* Moderation / growth quick actions — one tap, all audit-logged */}
@@ -1316,7 +1356,6 @@ function AdminUserQuickActions({ userId }) {
       </div>
       <div className="flex gap-2 flex-wrap">
         <button onClick={() => run("give_premium")} disabled={actionMut.isPending} className="text-xs rounded-full bg-gold-light text-yellow-900 px-3 py-2 inline-flex items-center gap-1 disabled:opacity-50"><Crown className="w-3 h-3" /> Premium berish</button>
-        <button onClick={() => run("give_vip")} disabled={actionMut.isPending} className="text-xs rounded-full bg-ink text-gold px-3 py-2 inline-flex items-center gap-1 disabled:opacity-50"><Crown className="w-3 h-3" /> VIP berish</button>
         <button onClick={() => run("reset_balance", "Balansni 0 ga tushirishga ishonchingiz komilmi?")} disabled={actionMut.isPending} className="text-xs rounded-full border border-border px-3 py-2 disabled:opacity-50">Balansni tozalash</button>
         <button onClick={() => run("reset_likes", "Barcha yoqtirishlarini o'chirishga ishonchingiz komilmi?")} disabled={actionMut.isPending} className="text-xs rounded-full border border-border px-3 py-2 disabled:opacity-50">Like'larni tozalash</button>
         <button onClick={() => run(data?.muted ? "unmute" : "mute")} disabled={actionMut.isPending} className={`text-xs rounded-full px-3 py-2 inline-flex items-center gap-1 disabled:opacity-50 ${data?.muted ? "bg-emerald-100 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
@@ -1588,8 +1627,8 @@ function AdminManualTopups() {
       <div className="rounded-3xl bg-card border border-border p-5 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold">P2P rejimi (Click o'rniga)</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Yoqilsa — foydalanuvchilar Click o'rniga kartaga o'tkazib, chek yuboradi. Click tuzalgach o'chirib qo'ying.</p>
+            <p className="text-sm font-semibold">Karta orqali to'ldirish rejimi</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Yoqilsa — foydalanuvchilar ko'rsatilgan kartaga pul o'tkazib, chek yuboradi; siz tasdiqlaganingizdan keyin balansiga tushadi. Yoqilishi bilan ilovadagi "To'lov tez orada" holati o'chadi va Premium sotuvi ochiladi.</p>
           </div>
           <button
             onClick={() => setCfg((c) => ({ ...(c || {}), p2p_enabled: !c?.p2p_enabled }))}
@@ -1861,7 +1900,7 @@ function AdminWithdrawals() {
               <div>
                 <p className="text-sm font-medium">{w.user?.name || w.user_id?.slice(0, 8)} · <span className="text-foreground">{w.amount?.toLocaleString()} so'm</span></p>
                 <p className="text-xs text-muted-foreground font-mono">{w.card_number} · {w.holder_name}</p>
-                <p className="text-[10px] text-muted-foreground">{new Date(w.created_at).toLocaleString("uz-UZ")} · {w.status}</p>
+                <p className="text-[10px] text-muted-foreground">{new Date(w.created_at).toLocaleString("uz-UZ")} · {statusUz(w.status)}</p>
               </div>
               {w.status === "pending" && (
                 <div className="flex gap-1">
@@ -1892,7 +1931,7 @@ function AdminWithdrawals() {
                 </div>
                 <div className="p-3 bg-muted rounded-xl">
                   <p className="text-xs text-muted-foreground">Status</p>
-                  <p className="font-medium">{selectedWithdrawal.status}</p>
+                  <p className="font-medium">{statusUz(selectedWithdrawal.status)}</p>
                 </div>
                 <div className="p-3 bg-muted rounded-xl">
                   <p className="text-xs text-muted-foreground">Karta raqami</p>
@@ -1989,9 +2028,9 @@ function AdminConcierge() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">{o.user?.name || o.user_id?.slice(0, 8)} · {(o.amount || 0).toLocaleString()} so'm</p>
-              <p className="text-xs text-muted-foreground">Status: {o.status} · {(o.matches || []).length}/5 mos</p>
+              <p className="text-xs text-muted-foreground">Holat: {statusUz(o.status)} · {(o.matches || []).length}/5 nomzod</p>
             </div>
-            <span className={`text-[10px] px-2 py-1 rounded-full ${o.status === "in_progress" ? "bg-amber-100 text-amber-700" : o.status === "completed" ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"}`}>{o.status}</span>
+            <span className={`text-[10px] px-2 py-1 rounded-full ${o.status === "in_progress" ? "bg-amber-100 text-amber-700" : o.status === "completed" ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"}`}>{statusUz(o.status)}</span>
           </div>
           {o.status === "in_progress" && search.length >= 2 && users.length > 0 && (
             <div className="mt-2 max-h-40 overflow-y-auto border-t border-border/40 pt-2 space-y-1">
@@ -2095,7 +2134,7 @@ function AdminReferrals() {
             <div>
               <p className="text-sm font-medium">{REF_TYPE_UZ[r.type] || r.type} · <span className="text-foreground">{r.amount?.toLocaleString()} so'm</span></p>
               <p className="text-xs text-muted-foreground">{r.user_id?.slice(0, 8)} → {r.referred_user_id?.slice(0, 8)}</p>
-              <p className="text-[10px] text-muted-foreground">{new Date(r.created_at).toLocaleString("uz-UZ")} · {r.status}</p>
+              <p className="text-[10px] text-muted-foreground">{new Date(r.created_at).toLocaleString("uz-UZ")} · {statusUz(r.status)}</p>
             </div>
             {r.status === "pending" && (
               <span className="text-[10px] px-2 py-1 rounded-full bg-amber-100 text-amber-700">Kutilmoqda</span>
