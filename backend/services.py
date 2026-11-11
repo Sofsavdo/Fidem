@@ -85,8 +85,27 @@ async def _tg_call(method: str, **kwargs) -> Optional[httpx.Response]:
     return await _tg_call_as(TELEGRAM_BOT_TOKEN, method, **kwargs)
 
 
-async def send_telegram_message(chat_id: int, text: str, reply_markup: Optional[dict] = None) -> bool:
-    """Send a message via Telegram Bot API. Returns True on success, False otherwise.
+def _is_permanent_telegram_failure(r) -> bool:
+    """True when Telegram says this chat will never accept bot messages.
+
+    403 covers "bot was blocked by the user", "user is deactivated" and
+    "bot was kicked"; 400 "chat not found" means the id is dead. Retrying
+    any of these on every notification only burns Telegram API calls (and
+    log lines) - rate limits (429) and transient 5xx are NOT permanent.
+    """
+    if r.status_code == 403:
+        return True
+    if r.status_code == 400 and "chat not found" in (r.text or "").lower():
+        return True
+    return False
+
+
+async def send_telegram_message_status(chat_id: int, text: str, reply_markup: Optional[dict] = None) -> str:
+    """Send a message via Telegram Bot API.
+
+    Returns "sent", "unreachable" (permanent: the user blocked the bot or the
+    account is gone - callers should stop trying) or "failed" (anything
+    transient worth retrying later).
 
     No parse_mode: every caller sends plain human-typed text (notification
     copy, admin-authored announcement titles/text) with no intentional HTML
@@ -101,14 +120,20 @@ async def send_telegram_message(chat_id: int, text: str, reply_markup: Optional[
         payload["reply_markup"] = reply_markup
     r = await _tg_call("sendMessage", json=payload)
     if r is None:
-        return False
-    if r.status_code != 200:
-        # Previously not logged at all - a non-exception failure (bad
-        # chat_id, user blocked the bot, rate limit, malformed payload...)
-        # was completely invisible; the caller went on to mark the
-        # notification as delivered regardless.
-        log.warning(f"Telegram sendMessage failed: {r.status_code} {r.text[:300]}")
-    return r.status_code == 200
+        return "failed"
+    if r.status_code == 200:
+        return "sent"
+    # Previously not logged at all - a non-exception failure (bad
+    # chat_id, user blocked the bot, rate limit, malformed payload...)
+    # was completely invisible; the caller went on to mark the
+    # notification as delivered regardless.
+    log.warning(f"Telegram sendMessage failed: {r.status_code} {r.text[:300]}")
+    return "unreachable" if _is_permanent_telegram_failure(r) else "failed"
+
+
+async def send_telegram_message(chat_id: int, text: str, reply_markup: Optional[dict] = None) -> bool:
+    """Send a message via Telegram Bot API. Returns True on success, False otherwise."""
+    return (await send_telegram_message_status(chat_id, text, reply_markup)) == "sent"
 
 
 async def send_telegram_photo(chat_id: int, photo: bytes, caption: str, reply_markup: Optional[dict] = None) -> bool:

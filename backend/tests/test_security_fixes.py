@@ -427,6 +427,10 @@ class _FakeUsersCollection:
             self.inc_calls.append((query, update["$inc"]))
         return type("Res", (), {"modified_count": 1})()
 
+    async def update_many(self, query, update):
+        # /start clears the "bot blocked" flag; nothing to track here.
+        return type("Res", (), {"modified_count": 0})()
+
 
 class _FakePendingRefs:
     def __init__(self):
@@ -681,6 +685,32 @@ def test_send_telegram_message_logs_non_200_instead_of_swallowing(monkeypatch, c
         ok = asyncio.run(services.send_telegram_message(123, "hi"))
     assert ok is False
     assert any("400" in r.message for r in caplog.records)
+
+
+def _status_for(monkeypatch, status_code, text):
+    async def fake_post(url, json=None):
+        return type("R", (), {"status_code": status_code, "text": text})()
+
+    class FakeClient:
+        post = staticmethod(fake_post)
+
+    monkeypatch.setattr(services, "_http_client", FakeClient())
+    monkeypatch.setattr(services, "TELEGRAM_BOT_TOKEN", "123:fake")
+    monkeypatch.setattr(services, "_TG_API", "https://api.telegram.org/bot123:fake")
+    return asyncio.run(services.send_telegram_message_status(123, "hi"))
+
+
+def test_telegram_blocked_user_is_reported_unreachable(monkeypatch):
+    """A user who blocked the bot (403) or whose chat is gone must come back
+    as permanently unreachable so notify_telegram can stop retrying them;
+    rate limits / server errors stay a plain transient failure."""
+    assert _status_for(monkeypatch, 200, "{}") == "sent"
+    assert _status_for(monkeypatch, 403, "Forbidden: bot was blocked by the user") == "unreachable"
+    assert _status_for(monkeypatch, 403, "Forbidden: user is deactivated") == "unreachable"
+    assert _status_for(monkeypatch, 400, "Bad Request: chat not found") == "unreachable"
+    assert _status_for(monkeypatch, 400, "Bad Request: can't parse entities") == "failed"
+    assert _status_for(monkeypatch, 429, "Too Many Requests") == "failed"
+    assert _status_for(monkeypatch, 502, "Bad Gateway") == "failed"
 
 
 def test_push_notif_forwards_real_kind_to_notify_telegram(monkeypatch):

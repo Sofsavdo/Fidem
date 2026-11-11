@@ -29,7 +29,7 @@ router = APIRouter(tags=["admin-telegram"])
 def get_backend_url() -> str:
     return os.environ.get(
         "BACKEND_URL",
-        "https://fidem-production.up.railway.app",
+        "https://fidem-backend-production.up.railway.app",
     ).rstrip("/")
 
 

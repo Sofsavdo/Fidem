@@ -33,7 +33,7 @@ router = APIRouter(tags=["telegram"])
 def get_backend_url() -> str:
     return os.environ.get(
         "BACKEND_URL",
-        "https://fidem-production.up.railway.app",
+        "https://fidem-backend-production.up.railway.app",
     ).rstrip("/")
 
 
@@ -132,6 +132,13 @@ async def _handle_start(chat_id: int, tg_user_id: str, text: str) -> None:
             },
         },
         upsert=True,
+    )
+
+    # The user just messaged the bot, so it is reachable again - clear the
+    # "blocked us" flag set by notify_telegram on a permanent 403.
+    await db.users.update_many(
+        {"telegram_id": tg_user_id, "telegram_unreachable": True},
+        {"$set": {"telegram_unreachable": False}},
     )
 
     existing = await db.users.find_one(

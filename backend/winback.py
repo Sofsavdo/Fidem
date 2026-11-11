@@ -38,6 +38,7 @@ async def _run_once() -> int:
     query = {
         "onboarded": True,
         "blocked": {"$ne": True},
+        "telegram_unreachable": {"$ne": True},
         "last_active": {"$lt": inactive_cutoff},
         "$or": [
             {"last_winback_sent_at": {"$exists": False}},
