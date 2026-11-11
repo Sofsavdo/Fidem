@@ -196,7 +196,7 @@ async def ceo_dashboard(_: str = Depends(get_current_admin)):
         "retention": {
             "d1_pct": d1_retention_pct,
             "d1_cohort_size": d1_eligible,
-            "note": "D7/D30 saqlanish 100+ foydalanuvchida shovqinli — kohorta kattalashgach qo'shiladi",
+            "note": "Haftalik va oylik qaytish ko'rsatkichi foydalanuvchilar 100 tadan oshgach chiqadi — hozir hisoblasa, raqam tasodifiy bo'ladi.",
         },
     }
 
@@ -371,7 +371,7 @@ async def revenue_dashboard(_: str = Depends(get_current_admin)):
             "total_users": total_users,
             "premium_conversion_pct": round(paying_users / total_users * 100, 2) if total_users else 0,
         },
-        "ltv_note": "LTV ishonchli hisoblash uchun uzoqroq muddat (kohorta chayqovi) kerak — hozircha ARPPU'ni proksi sifatida ishlating.",
+        "ltv_note": "Bir mijoz umri davomida qancha pul olib kelishini hisoblash uchun hali ma'lumot kam — hozircha «o'rtacha daromad / to'lovchi»ga qarang.",
     }
 
 

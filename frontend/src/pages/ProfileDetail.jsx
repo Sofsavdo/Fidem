@@ -39,20 +39,51 @@ export default function ProfileDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showTierUpsell, c?.id]);
 
-  const requestFamily = useCallback(async () => {
-    if (!["premium", "vip"].includes(user?.plan)) {
-      toast.error(t("family_vip_only"));
-      nav("/premium");
-      return;
-    }
+  // Family contact: the asker needs Premium and their own parents' phone on
+  // file. A missing phone opens a small form right here instead of a dead
+  // "error" toast, then the request goes out.
+  const [famSheet, setFamSheet] = useState(false);
+  const [famPhone, setFamPhone] = useState("");
+  const [famName, setFamName] = useState("");
+  const sendFamilyRequest = useCallback(async () => {
     setFamSending(true);
     try {
       await api.post("/family/request", { target_user_id: id, note: "" });
       toast.success(t("family_request_sent"));
+      track("family_request_sent");
+      return true;
     } catch (e) {
-      toast.error(t("error_generic"));
+      const d = (e?.response?.data?.detail || "").toString();
+      if (d === "family_contact_missing") setFamSheet(true);
+      else if (d === "family_already_requested") toast.info(t("family_already_requested"));
+      else if (d === "premium_required") { toast.error(t("family_vip_only")); nav("/premium"); }
+      else toast.error(t("error_generic"));
+      return false;
     } finally { setFamSending(false); }
-  }, [user?.plan, t, nav, id]);
+  }, [id, t, nav]);
+
+  const requestFamily = useCallback(() => {
+    if (!user?.is_admin && !["premium", "vip"].includes(user?.plan)) {
+      toast.error(t("family_vip_only"));
+      nav("/premium");
+      return;
+    }
+    sendFamilyRequest();
+  }, [user?.plan, user?.is_admin, t, nav, sendFamilyRequest]);
+
+  const saveFamilyAndSend = useCallback(async () => {
+    if (famPhone.replace(/\D/g, "").length < 9) { toast.error(t("family_phone_invalid")); return; }
+    setFamSending(true);
+    try {
+      await api.patch("/family/contacts", { parent_phone: famPhone, parent_name: famName });
+    } catch {
+      setFamSending(false);
+      toast.error(t("family_phone_invalid"));
+      return;
+    }
+    setFamSheet(false);
+    await sendFamilyRequest();
+  }, [famPhone, famName, t, sendFamilyRequest]);
 
   const shareProfile = useCallback(async () => {
     const shareText = `${c.name}, ${c.age} — ${c.region}. FIDEM orqali tanishing!`;
@@ -399,6 +430,25 @@ export default function ProfileDetail() {
         >
           📞 {t("family_request_btn")}
         </button>
+        {famSheet && (
+          <div className="fixed inset-0 flex items-end" style={{ zIndex: 10001 }} data-testid="family-sheet">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setFamSheet(false)} />
+            <div className="relative w-full max-w-md mx-auto bg-card rounded-t-3xl p-5 space-y-3"
+              style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}>
+              <h3 className="font-heading text-lg font-semibold">{t("family_sheet_title")}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">{t("family_sheet_desc")}</p>
+              <input data-testid="family-phone" inputMode="tel" placeholder="+998 90 123 45 67" value={famPhone}
+                onChange={(e) => setFamPhone(e.target.value)}
+                className="w-full px-3.5 py-3 rounded-2xl border border-border bg-background text-sm outline-none focus:border-primary" />
+              <input data-testid="family-name" placeholder={t("family_parent_name_ph")} value={famName}
+                onChange={(e) => setFamName(e.target.value)}
+                className="w-full px-3.5 py-3 rounded-2xl border border-border bg-background text-sm outline-none focus:border-primary" />
+              <button data-testid="family-save-send" onClick={saveFamilyAndSend} disabled={famSending} className="btn-primary">
+                {famSending ? "..." : t("family_save_send")}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

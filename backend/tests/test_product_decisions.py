@@ -557,3 +557,27 @@ def test_gemini_retries_a_temporary_503(monkeypatch):
     monkeypatch.setattr(ai_service, "_GEMINI_RETRY_DELAYS", (0, 0))
     st = asyncio.run(ai_service.ai_self_check())
     assert st["ok"] is True and cl.calls == 2
+
+
+def test_admin_home_reads_insights_from_cache_only(mdb, monkeypatch):
+    from routers import admin_r
+    import ai_service
+    monkeypatch.setattr(admin_r, "db", mdb, raising=False)
+    calls = []
+
+    async def fake_insights(data):
+        calls.append(1)
+        return {"ai_generated": True, "summary": "ok"}
+    monkeypatch.setattr(ai_service, "generate_growth_insights", fake_insights)
+
+    async def fake_data():
+        return "d"
+    monkeypatch.setattr(admin_r, "_build_insights_data", fake_data)
+
+    async def go():
+        empty = await admin_r.admin_ai_insights(force=False, cached_only=True, _="adm")
+        assert empty.get("empty") and calls == []          # home never waits for the model
+        await admin_r.admin_ai_insights(force=False, cached_only=False, _="adm")
+        cached = await admin_r.admin_ai_insights(force=False, cached_only=True, _="adm")
+        assert cached["summary"] == "ok" and len(calls) == 1
+    run(go())

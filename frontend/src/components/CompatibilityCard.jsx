@@ -60,6 +60,17 @@ export default function CompatibilityCard({ targetId }) {
         <div className="text-3xl font-heading font-semibold text-foreground">{data.score}<span className="text-base text-muted-foreground">/100</span></div>
       </div>
 
+      {data.personality_score != null && (
+        <p className="text-xs text-muted-foreground -mt-1 mb-3" data-testid="compat-personality">
+          {t("compat_personality").replace("{score}", data.personality_score)}
+        </p>
+      )}
+      {data.personality_score == null && !data.has_my_test && (
+        <Link to="/personality" className="block text-xs text-primary font-medium -mt-1 mb-3" data-testid="compat-test-cta">
+          {t("compat_test_cta")} →
+        </Link>
+      )}
+
       {data.locked ? (
         <>
           <div className="rounded-xl bg-card/60 backdrop-blur p-3 mb-3">

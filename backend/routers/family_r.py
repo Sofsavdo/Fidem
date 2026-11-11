@@ -1,5 +1,7 @@
-"""Family contact share — Premium users can request exchange of parent phone numbers.
-Both parties must be Premium and explicitly accept.
+"""Family contact share — a Premium user asks to exchange parent phone numbers;
+the other person accepts or declines (any plan: the asker pays for the feature,
+and making the receiver buy Premium too left most requests unanswerable).
+Error details are short codes the app translates.
 """
 from __future__ import annotations
 
@@ -15,7 +17,7 @@ router = APIRouter(prefix="/family", tags=["family"])
 def _is_vip(u: dict) -> bool:
     """Family mode belongs to Premium and VIP (VIP is no longer sold on its
     own, so gating it to VIP made the feature unreachable for new buyers)."""
-    return u.get("plan") in ("premium", "vip")
+    return u.get("plan") in ("premium", "vip") or bool(u.get("is_admin"))
 
 
 @router.patch("/contacts")
@@ -55,19 +57,19 @@ async def request_family_share(
     uid: str = Depends(get_current_user_id),
 ):
     if target_user_id == uid:
-        raise HTTPException(400, "O'zingizga so'rov yubora olmaysiz")
+        raise HTTPException(400, "family_self")
     me = await get_user(uid)
-    other = await get_user(target_user_id)
+    await get_user(target_user_id)  # 404 for an unknown person
     if not _is_vip(me):
-        raise HTTPException(403, "Oilaviy aloqa so'rovi Premium tarifda mavjud")
+        raise HTTPException(403, "premium_required")
     if not me.get("family_contact"):
-        raise HTTPException(400, "Avval o'z oilaviy aloqangizni kiriting (ota-ona telefoni)")
+        raise HTTPException(400, "family_contact_missing")
     # Prevent duplicate active request
     existing = await db.family_requests.find_one({
         "from_user_id": uid, "to_user_id": target_user_id, "status": {"$in": ["pending", "accepted"]}
     })
     if existing:
-        raise HTTPException(400, "Avvalgi so'rov allaqachon mavjud")
+        raise HTTPException(400, "family_already_requested")
     rid = new_id()
     doc = {
         "id": rid,
@@ -99,13 +101,11 @@ async def respond_family_share(
     if req["to_user_id"] != uid:
         raise HTTPException(403, "Bu so'rov sizniki emas")
     if req["status"] != "pending":
-        raise HTTPException(400, "Allaqachon javob berilgan")
+        raise HTTPException(400, "family_already_answered")
     me = await get_user(uid)
     if accept:
-        if not _is_vip(me):
-            raise HTTPException(403, "Oilaviy aloqani qabul qilish uchun Premium tarif kerak")
         if not me.get("family_contact"):
-            raise HTTPException(400, "Avval o'z oilaviy aloqangizni kiriting")
+            raise HTTPException(400, "family_contact_missing")
         await db.family_requests.update_one(
             {"id": request_id},
             {"$set": {"status": "accepted", "responded_at": iso(now_utc())}},

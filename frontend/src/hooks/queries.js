@@ -459,6 +459,15 @@ export function useAdminAiInsights() {
   });
 }
 
+// Home card: the last saved analysis only - never waits for the model.
+export function useAdminAiInsightsCached() {
+  return useQuery({
+    queryKey: ["admin", "aiInsights", "cached"],
+    queryFn: () => api.get("/admin/ai-insights?cached_only=true").then((r) => r.data),
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useRefreshAiInsights() {
   const queryClient = useQueryClient();
   return useMutation({

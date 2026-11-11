@@ -172,6 +172,7 @@ async def startup() -> None:
     await db.payments.create_index("created_at")
     await db.payments.create_index("purpose")
     await db.compat_unlocks.create_index([("user_id", 1), ("target_id", 1)], unique=True)
+    await db.compat_reports.create_index([("user_id", 1), ("target_id", 1)], unique=True)
     await db.success_stories.create_index("created_at")
     # serve_file() (GET /api/files/{path}) queries by storage_path, not path -
     # the old index on "path" indexed a field no record actually has, so
