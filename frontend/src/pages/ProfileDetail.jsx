@@ -7,6 +7,7 @@ import { purchasePlan } from "@/lib/purchase";
 import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot, LocationBadge } from "@/components/Badges";
 import CompatibilityCard from "@/components/CompatibilityCard";
 import { photoSrc } from "@/lib/photo";
+import { religionLabel, educationLabel } from "@/lib/profileValues";
 import PhotoFill from "@/components/PhotoFill";
 import { formatLastActive } from "@/lib/time";
 import { Heart, MessageCircle, ArrowLeft, Lock, Clock, Shield, Share2, Crown, Eye, EyeOff } from "lucide-react";
@@ -17,7 +18,7 @@ import { MATCH_EVENT } from "@/components/MatchCelebration";
 
 export default function ProfileDetail() {
   const { id } = useParams();
-  const { t, user, refresh } = useApp();
+  const { t, lang, user, refresh } = useApp();
   const nav = useNavigate();
   const queryClient = useQueryClient();
   const [famSending, setFamSending] = useState(false);
@@ -308,8 +309,8 @@ export default function ProfileDetail() {
           <Stat label={t("weight")} value={c.weight_kg ? `${c.weight_kg} kg` : "—"} />
           <Stat label={t("marital_status")} value={t(c.marital_status)} />
           <Stat label={t("has_children")} value={c.has_children ? `${t("yes")}${c.children_count ? ` · ${c.children_count}` : ""}` : t("no")} />
-          <Stat label={t("education")} value={c.education || "—"} />
-          <Stat label={t("religion")} value={c.religion || "—"} />
+          <Stat label={t("education")} value={educationLabel(c.education, lang)} />
+          <Stat label={t("religion")} value={religionLabel(c.religion, t)} />
           <Stat label={t("smoking")} value={c.smoking ? t(c.smoking) : "—"} />
           <Stat label={t("alcohol")} value={c.alcohol ? t(c.alcohol) : "—"} />
           <Stat label={t("relocation")} value={c.relocation == null ? "—" : (c.relocation ? t("yes") : t("no"))} />
