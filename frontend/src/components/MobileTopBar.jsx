@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Bell, Crown, Wallet, Sun, Moon } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Bell, Sun, Moon } from "lucide-react";
 import Logo from "@/components/Logo";
 import { useApp } from "@/contexts/AppContext";
 import { getTheme, setTheme, effectiveIsDark } from "@/lib/theme";
@@ -29,10 +29,8 @@ function ThemeToggle() {
 }
 
 export default function MobileTopBar() {
-  const { user, lang, setLang, t } = useApp();
-  const nav = useNavigate();
+  const { user, lang, setLang } = useApp();
   if (!user) return null;
-  const balance = user.balance || 0;
   return (
     <header data-testid="mobile-topbar" className="sticky top-0 z-30 glass border-b border-border/40 px-3 py-2 flex items-center justify-between gap-2" style={{ paddingTop: "max(8px, env(safe-area-inset-top))" }}>
       <Link to="/" className="flex items-center gap-2">
@@ -40,22 +38,6 @@ export default function MobileTopBar() {
         <span className="font-heading font-semibold text-lg leading-none tracking-tight">FIDEM</span>
       </Link>
       <div className="flex items-center gap-1">
-        {/* Unified wallet pill → balance/top-up surface (in-app spending money).
-            Shows balance and (only if > 0) coins side-by-side inside one button */}
-        <button
-          data-testid="topbar-balance"
-          onClick={() => nav("/premium?tab=balance")}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-muted/60 hover:bg-muted text-xs font-medium"
-          title="Wallet"
-        >
-          <Wallet className="w-3.5 h-3.5 text-foreground" />
-          <span>{balance.toLocaleString()} {t("sum")}</span>
-        </button>
-        {user.plan === "vip" && (
-          <span className="inline-flex items-center gap-0.5 px-2 py-1 rounded-full bg-gold-light/60 text-gold-dark text-[10px] font-medium">
-            <Crown className="w-3 h-3" /> VIP
-          </span>
-        )}
         <button
           data-testid="topbar-lang"
           onClick={() => {

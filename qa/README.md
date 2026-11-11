@@ -16,6 +16,7 @@ node qa/crawl.js qa@fidem.uz uz run shots   # 31 pages: console/API errors, over
 node qa/onboard.js                    # register -> consent -> 3 steps -> feed in a browser
 node qa/chatdup.js                    # sent message shows once even if the WS echo beats the HTTP reply
 node qa/photos.js                     # legacy-host photos load; photo-less user gets the upload gate
+node qa/gallery.js                    # no balance/VIP in top bar; extra photos: add, swipe on profile, remove
 ```
 `crawl.js <user> <lang> <tag> [shots|admin]` writes screenshots to `qa/shots/`.
 Needs `playwright` (`npm i playwright`) for the node scripts. Limits are unit-tested

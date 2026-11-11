@@ -122,6 +122,7 @@ class CandidateCard(UserPublic):
 
 class UpdateProfileRequest(BaseModel):
     name: Optional[str] = None
+    photos: Optional[List[str]] = None  # extra gallery photos (own uploads)
     bio: Optional[str] = None
     education: Optional[str] = None
     profession: Optional[str] = None
