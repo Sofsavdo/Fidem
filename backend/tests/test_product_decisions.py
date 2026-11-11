@@ -423,3 +423,21 @@ def test_reply_reminder_once_per_waiting_message(mdb, monkeypatch):
         await lifecycle._reply_reminders()
         assert len(sent) == 1  # no repeat for the same waiting message
     run(go())
+
+
+# ---------- admin rights are checked against the account, not only the token ----------
+def test_revoked_admin_token_is_refused(mdb, monkeypatch):
+    import auth
+    monkeypatch.setattr(core, "db", mdb, raising=False)
+
+    async def go():
+        await mdb.users.insert_one(_u("adm", is_admin=True))
+        tok = auth.create_token("adm", is_admin=True) if hasattr(auth, "create_token") else None
+        if tok is None:
+            pytest.skip("no token factory")
+        assert await auth.get_current_admin(f"Bearer {tok}") == "adm"
+        await mdb.users.update_one({"id": "adm"}, {"$set": {"is_admin": False}})
+        with pytest.raises(HTTPException) as e:
+            await auth.get_current_admin(f"Bearer {tok}")
+        assert e.value.status_code == 403
+    run(go())

@@ -1,5 +1,5 @@
-"""Family contact share — VIP users can request exchange of parent phone numbers.
-Both parties must be VIP and explicitly accept.
+"""Family contact share — Premium users can request exchange of parent phone numbers.
+Both parties must be Premium and explicitly accept.
 """
 from __future__ import annotations
 
@@ -59,7 +59,7 @@ async def request_family_share(
     me = await get_user(uid)
     other = await get_user(target_user_id)
     if not _is_vip(me):
-        raise HTTPException(403, "Faqat VIP foydalanuvchilar oilaviy aloqa so'rovini yubora oladi")
+        raise HTTPException(403, "Oilaviy aloqa so'rovi Premium tarifda mavjud")
     if not me.get("family_contact"):
         raise HTTPException(400, "Avval o'z oilaviy aloqangizni kiriting (ota-ona telefoni)")
     # Prevent duplicate active request
@@ -103,7 +103,7 @@ async def respond_family_share(
     me = await get_user(uid)
     if accept:
         if not _is_vip(me):
-            raise HTTPException(403, "Oilaviy aloqa qabul qilish uchun siz ham VIP bo'lishingiz kerak")
+            raise HTTPException(403, "Oilaviy aloqani qabul qilish uchun Premium tarif kerak")
         if not me.get("family_contact"):
             raise HTTPException(400, "Avval o'z oilaviy aloqangizni kiriting")
         await db.family_requests.update_one(

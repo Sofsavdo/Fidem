@@ -194,7 +194,9 @@ export default function MeSettings() {
           </button>
         </div>
 
-        {/* 15s video intro — VIP perk that proves seriousness on the profile */}
+        {/* 15s video intro — a retired VIP perk: only people who still hold VIP
+            (or builds with the legacy tiers switched on) see this card. */}
+        {(isVip || FEATURES.legacyTiers) && (
         <div className="rounded-3xl bg-card border border-border p-5 space-y-3" data-testid="video-intro-card">
           <div>
             <h2 className="font-semibold flex items-center gap-1.5"><Video className="w-4 h-4" /> {t("video_intro_title")} <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gold/15 text-gold-dark font-bold uppercase">VIP</span></h2>
@@ -241,6 +243,7 @@ export default function MeSettings() {
             </Link>
           ) : null}
         </div>
+        )}
 
         {/* Daily streak — moved here from the Me front page. Retires
             permanently once a user completes the full 7-day ladder. */}

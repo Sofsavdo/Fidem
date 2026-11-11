@@ -8,6 +8,7 @@ import PhotoUpload from "@/components/PhotoUpload";
 import WheelDatePicker from "@/components/WheelDatePicker";
 import CountrySelect from "@/components/CountrySelect";
 import RegionSelect from "@/components/RegionSelect";
+import DistrictSelect from "@/components/DistrictSelect";
 import { ChevronLeft, ChevronRight, Check, Sparkles } from "lucide-react";
 
 const STEPS = 3;
@@ -276,12 +277,12 @@ export default function Onboarding() {
             <div className="space-y-5">
               {missingKeys.includes("region") && (
                 <Field as="div" label={t("region")}>
-                  <RegionSelect testid="ob-edit-region" lang={lang} country={data.country} value={data.region} onChange={(r) => set({ region: r })} placeholder={t("select_region") || "Select region"} />
+                  <RegionSelect testid="ob-edit-region" lang={lang} country={data.country} value={data.region} onChange={(r) => set({ region: r, district: "" })} placeholder={t("select_region") || "Select region"} />
                 </Field>
               )}
               {missingKeys.includes("district") && (
                 <Field label={t("district")}>
-                  <input data-testid="ob-edit-district" className="input" value={data.district} onChange={(e) => set({ district: e.target.value })} placeholder={t("select_district")} />
+                  <DistrictSelect testid="ob-edit-district" country={data.country} region={data.region} value={data.district} onChange={(d) => set({ district: d })} placeholder={t("select_district")} disabledHint={t("select_region")} />
                 </Field>
               )}
               {missingKeys.includes("education") && (
@@ -524,7 +525,7 @@ export default function Onboarding() {
                     testid="ob-region"
                     country={data.country}
                     value={data.region}
-                    onChange={(r) => set({ region: r, search_region: data.search_country && data.search_country !== data.country ? data.search_region : r })}
+                    onChange={(r) => set({ region: r, district: "", search_region: data.search_country && data.search_country !== data.country ? data.search_region : r })}
                     placeholder={t("select_region") || "Select region"}
                   />
                 </Field>

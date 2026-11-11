@@ -9,6 +9,7 @@ import { X, SlidersHorizontal, MapPin, Lock, Crown, EyeOff } from "lucide-react"
 import { toast } from "sonner";
 import CountrySelect from "@/components/CountrySelect";
 import RegionSelect from "@/components/RegionSelect";
+import DistrictSelect from "@/components/DistrictSelect";
 import { useCandidates, useSaved, useToggleSave, useDailyPicks } from "@/hooks/queries";
 import { photoSrc } from "@/lib/photo";
 import PhotoFill from "@/components/PhotoFill";
@@ -336,9 +337,9 @@ function FilterSheet({ filters, setFilters, onClose }) {
             <div className="mt-1.5">
               <RegionSelect
                 testid="filter-region"
-                country={local.country}
+                country={local.country || user?.country || "Uzbekistan"}
                 value={local.region || ""}
-                onChange={(r) => setLocal({ ...local, region: r || undefined })}
+                onChange={(r) => setLocal({ ...local, region: r || undefined, district: undefined })}
                 placeholder={t("select_region") || "Select region"}
               />
             </div>
@@ -349,13 +350,17 @@ function FilterSheet({ filters, setFilters, onClose }) {
               {!isPaid && <Lock className="w-3 h-3" />}
             </span>
             {isPaid ? (
-              <input
-                data-testid="filter-district"
-                className="mt-1.5 w-full rounded-2xl border border-border bg-card px-4 py-3 outline-none focus:border-primary"
-                placeholder={t("select_district")}
-                value={local.district || ""}
-                onChange={(e) => setLocal({ ...local, district: e.target.value || undefined })}
-              />
+              <div className="mt-1.5">
+                <DistrictSelect
+                  testid="filter-district"
+                  country={local.country || user?.country || "Uzbekistan"}
+                  region={local.region}
+                  value={local.district || ""}
+                  onChange={(d) => setLocal({ ...local, district: d || undefined })}
+                  placeholder={t("select_district")}
+                  disabledHint={t("select_region")}
+                />
+              </div>
             ) : (
               <button
                 type="button"

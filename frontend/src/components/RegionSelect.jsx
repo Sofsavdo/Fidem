@@ -12,8 +12,9 @@ import { getRegionsFor } from "@/lib/locations";
  *   onChange: (region: string) => void
  *   placeholder, testid
  */
-export default function RegionSelect({ country, value, onChange, placeholder = "Select region", testid = "region-select" }) {
-  const regions = useMemo(() => getRegionsFor(country), [country]);
+export default function RegionSelect({ country, value, onChange, placeholder = "Select region", testid = "region-select", options, emptyText = "No regions found" }) {
+  // `options` turns this into a generic searchable picker (used for districts).
+  const regions = useMemo(() => options || getRegionsFor(country), [options, country]);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -89,7 +90,7 @@ export default function RegionSelect({ country, value, onChange, placeholder = "
             </div>
             <div className="max-h-72 overflow-y-auto overscroll-contain">
               {filtered.length === 0 && (
-                <div className="px-4 py-6 text-center text-sm text-muted-foreground">No regions found</div>
+                <div className="px-4 py-6 text-center text-sm text-muted-foreground">{emptyText}</div>
               )}
               {filtered.map((r) => {
                 const active = value === r;
