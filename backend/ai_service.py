@@ -66,29 +66,50 @@ def _classify_ai_error(e: Exception) -> str:
     return f"Kutilmagan xatolik ({type(e).__name__})"
 
 
-async def _gemini_json(prompt: str, images: list[tuple[str, str]], schema: dict, max_tokens: int = 2048) -> dict:
+try:
+    # Unbounded "thinking" made the admin growth analysis run past 30 s in prod
+    # (every call timed out). These tasks are short structured answers, so a
+    # small budget keeps them fast; set GEMINI_THINKING_BUDGET=-1 to let the
+    # model decide on its own.
+    GEMINI_THINKING_BUDGET = int(os.environ.get("GEMINI_THINKING_BUDGET", "512"))
+except ValueError:
+    GEMINI_THINKING_BUDGET = 512
+# Set to False after a model rejects thinkingConfig, so later calls skip it.
+_THINKING_SUPPORTED = True
+
+
+async def _gemini_json(prompt: str, images: list[tuple[str, str]], schema: dict,
+                       max_tokens: int = 2048, timeout: float = 45.0) -> dict:
     """One Gemini generateContent call returning strict JSON.
 
     images: list of (media_type, base64_data). schema: Gemini response
     schema (uppercase type names). Raises on any transport/parse problem -
     callers decide the fallback.
     """
+    global _THINKING_SUPPORTED
     parts = [{"inlineData": {"mimeType": mt, "data": b64}} for mt, b64 in images]
     parts.append({"text": prompt})
-    body = {
-        "contents": [{"role": "user", "parts": parts}],
-        "generationConfig": {
-            "responseMimeType": "application/json",
-            "responseSchema": schema,
-            # Gemini's "thinking" tokens are counted inside this budget too; 500
-            # left too little room and long answers came back cut off.
-            "maxOutputTokens": max_tokens,
-            "temperature": 0,
-        },
+    gen = {
+        "responseMimeType": "application/json",
+        "responseSchema": schema,
+        # Gemini's "thinking" tokens are counted inside this budget too; 500
+        # left too little room and long answers came back cut off.
+        "maxOutputTokens": max_tokens,
+        "temperature": 0,
     }
+    body = {"contents": [{"role": "user", "parts": parts}], "generationConfig": gen}
+    use_thinking = _THINKING_SUPPORTED and GEMINI_THINKING_BUDGET >= 0
+    if use_thinking:
+        gen["thinkingConfig"] = {"thinkingBudget": GEMINI_THINKING_BUDGET}
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
-    async with httpx.AsyncClient(timeout=30.0) as cl:
+    async with httpx.AsyncClient(timeout=timeout) as cl:
         r = await cl.post(url, params={"key": GEMINI_API_KEY}, json=body)
+        if r.status_code == 400 and use_thinking and "thinking" in r.text.lower():
+            # This model does not take a thinking budget: retry once without it.
+            _THINKING_SUPPORTED = False
+            gen.pop("thinkingConfig", None)
+            log.info("Gemini model %s does not accept thinkingConfig; sending without it", GEMINI_MODEL)
+            r = await cl.post(url, params={"key": GEMINI_API_KEY}, json=body)
         r.raise_for_status()
         data = r.json()
     cand = (data.get("candidates") or [{}])[0]
@@ -479,7 +500,7 @@ async def generate_growth_insights(data: str) -> dict:
 
     if GEMINI_API_KEY:
         try:
-            parsed = await _gemini_json(prompt, [], _INSIGHTS_SCHEMA_GEMINI, max_tokens=4096)
+            parsed = await _gemini_json(prompt, [], _INSIGHTS_SCHEMA_GEMINI, max_tokens=4096, timeout=90.0)
             trend = parsed.get("trend") if parsed.get("trend") in ("growing", "stable", "declining") else "stable"
             return {
                 "trend": trend,
@@ -493,12 +514,15 @@ async def generate_growth_insights(data: str) -> dict:
             last_error = _classify_ai_error(e)
             log.warning("growth_insights: gemini call failed (%s), trying fallback: %s", last_error, e)
 
-    if not GEMINI_API_KEY and not os.environ.get("ANTHROPIC_API_KEY", "").strip():
-        # Say exactly what is missing instead of a generic "unexpected error".
+    if not os.environ.get("ANTHROPIC_API_KEY", "").strip():
+        # No fallback provider: report the real Gemini reason (or the missing
+        # key) instead of a confusing Anthropic authentication error.
+        if last_error:
+            log.warning("growth_insights: AI unavailable (%s)", last_error)
         return {
             "trend": "stable", "summary": "", "highlights": [], "risks": [],
             "recommendations": [], "ai_generated": False,
-            "error": "AI kaliti sozlanmagan — Railway'da GEMINI_API_KEY qo'yilsa tahlil ishlaydi",
+            "error": last_error or "AI kaliti sozlanmagan — Railway'da GEMINI_API_KEY qo'yilsa tahlil ishlaydi",
         }
 
     try:

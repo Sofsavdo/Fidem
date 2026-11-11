@@ -448,23 +448,40 @@ def test_gemini_answer_parsing_and_self_check(monkeypatch):
     import ai_service
 
     class R:
-        def __init__(self, payload): self.payload = payload
+        def __init__(self, payload, status=200, text=""):
+            self.payload = payload; self.status_code = status; self.text = text
         def raise_for_status(self): pass
         def json(self): return self.payload
 
     class C:
-        def __init__(self, payload): self.payload = payload; self.body = None
+        def __init__(self, payload, reject_thinking=False):
+            self.payload = payload; self.body = None; self.calls = 0; self.reject_thinking = reject_thinking
         async def __aenter__(self): return self
         async def __aexit__(self, *a): return False
-        async def post(self, url, params=None, json=None): self.body = json; return R(self.payload)
+        async def post(self, url, params=None, json=None):
+            self.calls += 1
+            if self.reject_thinking and "thinkingConfig" in json["generationConfig"]:
+                return R({}, 400, "Unknown name thinkingConfig")
+            self.body = json
+            return R(self.payload)
 
     ok_payload = {"candidates": [{"content": {"parts": [{"text": "thinking...", "thought": True}, {"text": '{"ok": true}'}]}}]}
+    monkeypatch.setattr(ai_service, "_THINKING_SUPPORTED", True)
     cl = C(ok_payload)
     monkeypatch.setattr(ai_service.httpx, "AsyncClient", lambda **kw: cl)
     monkeypatch.setattr(ai_service, "GEMINI_API_KEY", "k")
     st = asyncio.run(ai_service.ai_self_check())
     assert st["ok"] is True and st["provider"] == "gemini"
     assert cl.body["generationConfig"]["maxOutputTokens"] == 256
+    # A small thinking budget is sent so answers come back well inside the timeout.
+    assert cl.body["generationConfig"]["thinkingConfig"]["thinkingBudget"] == ai_service.GEMINI_THINKING_BUDGET
+
+    # A model that rejects thinkingConfig gets one retry without it, then never again.
+    cl = C(ok_payload, reject_thinking=True)
+    monkeypatch.setattr(ai_service.httpx, "AsyncClient", lambda **kw: cl)
+    st = asyncio.run(ai_service.ai_self_check())
+    assert st["ok"] is True and cl.calls == 2 and "thinkingConfig" not in cl.body["generationConfig"]
+    assert ai_service._THINKING_SUPPORTED is False
 
     cut = {"candidates": [{"finishReason": "MAX_TOKENS", "content": {}}]}
     monkeypatch.setattr(ai_service.httpx, "AsyncClient", lambda **kw: C(cut))
@@ -497,3 +514,17 @@ def test_failed_ai_insights_are_not_cached(mdb, monkeypatch):
         assert len(calls) == 2  # a failure is retried, not served from cache
         assert await mdb.ai_insights_cache.count_documents({}) == 0
     run(go())
+
+
+def test_insights_report_the_gemini_reason_without_anthropic(monkeypatch):
+    import ai_service
+    import httpx
+
+    async def boom(*a, **kw):
+        raise httpx.ReadTimeout("slow")
+
+    monkeypatch.setattr(ai_service, "GEMINI_API_KEY", "k")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(ai_service, "_gemini_json", boom)
+    res = asyncio.run(ai_service.generate_growth_insights("users: 10"))
+    assert res["ai_generated"] is False and "timeout" in res["error"]
