@@ -34,7 +34,7 @@ class H(BaseHTTPRequestHandler):
             PAYMENTS[pid] = {"payment_id": pid, "order_id": f.get("order_id"), "shop_id": int(f["shop_id"]),
                              "amount": amount, "status": "pending", "expire_at": int(time.time()) + 300}
             return self._json(200, {"payment_id": pid, "order_id": f.get("order_id"), "amount": amount,
-                                    "card": "9860 3566 0000 7213", "expires_in": 300,
+                                    "card": "8600 0000 0000 0001", "expires_in": 300,
                                     "expire_at": PAYMENTS[pid]["expire_at"], "message": "ok"})
         if path == "/payment/cancel":
             p = PAYMENTS.get(f.get("payment_id"))

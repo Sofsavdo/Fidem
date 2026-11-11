@@ -24,7 +24,7 @@ import core  # noqa: E402
 import hamyon  # noqa: E402
 from routers import payments_r  # noqa: E402
 
-SHOP_ID, SHOP_KEY = "355", "test-shop-key"
+SHOP_ID, SHOP_KEY = "12", "test-shop-key"
 
 
 @pytest.fixture

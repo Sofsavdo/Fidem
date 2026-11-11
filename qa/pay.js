@@ -9,7 +9,7 @@ const crypto = require('crypto');
 const U = JSON.parse(fs.readFileSync(__dirname + '/users.json'));
 const APP = 'http://127.0.0.1:18101';
 const API = 'http://localhost:18100/api';
-const SHOP_ID = '355', SHOP_KEY = 'qa-shop-key';
+const SHOP_ID = '12', SHOP_KEY = 'qa-shop-key';
 const md5 = (s) => crypto.createHash('md5').update(s).digest('hex');
 
 async function complete(order, status = 'paid') {
@@ -40,7 +40,7 @@ const me = async (who) => (await fetch(API + '/auth/me', { headers: { Authorizat
   await page.waitForSelector('[data-testid=pay-sheet]', { timeout: 8000 }).catch(() => {});
   check('transfer sheet opens', await page.locator('[data-testid=pay-sheet]').count() === 1);
   const sheetText = await page.locator('[data-testid=pay-sheet]').innerText().catch(() => '');
-  check('sheet shows the card number', sheetText.includes('9860 3566 0000 7213'));
+  check('sheet shows the card number', sheetText.includes('8600 0000 0000 0001'));
   check('sheet shows the exact amount', created && sheetText.replace(/\s/g, '').includes(String(created.pay_amount)));
   check('sheet shows a countdown', /\d:\d\d/.test(sheetText));
   await page.screenshot({ path: __dirname + '/shots/pay_sheet.png' });
