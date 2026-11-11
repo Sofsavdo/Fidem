@@ -372,37 +372,69 @@ async def candidates(
     return result
 
 
+_BG_TASKS: set = set()
+
+
+def _spawn_bg(coro) -> None:
+    """Run a fire-and-forget DB write, keeping a strong reference (the loop
+    only holds weak ones) and logging instead of losing a failure silently."""
+    task = asyncio.ensure_future(coro)
+    _BG_TASKS.add(task)
+
+    def _done(t):
+        _BG_TASKS.discard(t)
+        if not t.cancelled() and t.exception():
+            log.warning("background write failed: %s", t.exception())
+
+    task.add_done_callback(_done)
+
+
 @router.get("/candidates/{target_id}")
 async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_id)):
     if target_id == uid:
         raise HTTPException(400, "Cannot view self as candidate")
 
-    target = await get_user(target_id)
-    me_doc = await get_user(uid)
-
-    # A hidden profile is undiscoverable: direct opens 404 exactly like a
-    # nonexistent user, EXCEPT for admins and people who already have a chat
-    # with them (an existing match must stay able to see who they talk to).
-    if target.get("hidden_profile") and not me_doc.get("is_admin"):
-        has_chat = await db.messages.find_one({"chat_id": chat_id_for(uid, target_id)}, {"_id": 1})
-        if not has_chat:
-            raise HTTPException(404, "User not found")
+    # Both user docs in one round trip (target first so a missing target keeps
+    # its 404 even if the viewer lookup also failed).
+    target, me_doc = await asyncio.gather(get_user(target_id), get_user(uid), return_exceptions=True)
+    if isinstance(target, Exception):
+        raise target
+    if isinstance(me_doc, Exception):
+        raise me_doc
 
     match_lang = me_doc.get("language", "uz")
     if match_lang not in ("uz", "ru", "en"):
         match_lang = "uz"
 
-    # Premium/VIP privacy perk: with hidden mode on, visits are incognito —
+    # Premium/VIP privacy perk: with hidden mode on, visits are incognito -
     # no profile_views record, no "kim ko'rdi" appearance, no notification,
     # and no bump to the target's view counters further below.
     incognito = bool(me_doc.get("hidden_profile")) and me_doc.get("plan") in INCOGNITO_PLANS
+    hidden_gate = bool(target.get("hidden_profile")) and not me_doc.get("is_admin")
+
+    # Every read this view needs is independent: run them together (this
+    # endpoint used to issue ~8 sequential DB round trips).
+    async def _none():
+        return None
+
+    existing_view, has_chat, unlock, my_loc, t_loc = await asyncio.gather(
+        _none() if incognito else db.profile_views.find_one(
+            {"viewer_id": uid, "target_id": target_id}, {"_id": 0, "at": 1},
+        ),
+        db.messages.find_one({"chat_id": chat_id_for(uid, target_id)}, {"_id": 1}) if hidden_gate else _none(),
+        db.photo_unlocks.find_one({"requester_id": uid, "target_id": target_id}, {"_id": 0}),
+        db.user_locations.find_one({"user_id": uid}, {"_id": 0, "geo_point": 1}),
+        db.user_locations.find_one({"user_id": target_id}, {"_id": 0, "geo_point": 1}),
+    )
+
+    # A hidden profile is undiscoverable: direct opens 404 exactly like a
+    # nonexistent user, EXCEPT for admins and people who already have a chat
+    # with them (an existing match must stay able to see who they talk to).
+    if hidden_gate and not has_chat:
+        raise HTTPException(404, "User not found")
 
     should_notify_view = False
     if not incognito:
-        existing_view = await db.profile_views.find_one(
-            {"viewer_id": uid, "target_id": target_id},
-            {"_id": 0, "at": 1},
-        )
         should_notify_view = existing_view is None
         if existing_view and existing_view.get("at"):
             try:
@@ -411,11 +443,13 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
             except Exception:
                 pass
 
-        await db.profile_views.update_one(
+        # Bookkeeping that the response doesn't depend on: don't make the
+        # viewer wait for it.
+        _spawn_bg(db.profile_views.update_one(
             {"viewer_id": uid, "target_id": target_id},
             {"$set": {"viewer_id": uid, "target_id": target_id, "at": iso(now_utc())}},
             upsert=True,
-        )
+        ))
 
     # Use AI match calculation for premium users in detail view too
     if me_doc.get("plan") in ("premium", "vip"):
@@ -427,11 +461,6 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
     pub["match_score"] = score
     pub["match_reasons"] = reasons
 
-    unlock = await db.photo_unlocks.find_one(
-        {"requester_id": uid, "target_id": target_id},
-        {"_id": 0},
-    )
-
     pub["photo_unlocked"] = bool(unlock and unlock.get("approved"))
     pub["photo_unlock_status"] = unlock.get("status") if unlock else "none"
     pub["can_message"] = candidate_can_message(target, me_doc)
@@ -439,8 +468,6 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
     # Coarse distance — both parties must have a verified point; only the
     # rounded bucket is exposed, never the raw coordinates.
     pub["distance_bucket"] = None
-    my_loc = await db.user_locations.find_one({"user_id": uid}, {"_id": 0, "geo_point": 1})
-    t_loc = await db.user_locations.find_one({"user_id": target_id}, {"_id": 0, "geo_point": 1})
     if my_loc and t_loc and my_loc.get("geo_point") and t_loc.get("geo_point"):
         mp, tp = my_loc["geo_point"], t_loc["geo_point"]
         pub["distance_bucket"] = distance_bucket(haversine_km(mp[1], mp[0], tp[1], tp[0]), match_lang)
@@ -453,7 +480,7 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
             if target.get("boost_until") and target["boost_until"] > now_iso:
                 inc["boost_metrics.views"] = 1
 
-            await db.users.update_one({"id": target_id}, {"$inc": inc})
+            _spawn_bg(db.users.update_one({"id": target_id}, {"$inc": inc}))
 
     except Exception:
         pass

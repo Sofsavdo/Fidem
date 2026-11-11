@@ -143,12 +143,23 @@ async def chat_access(target_id: str, uid: str = Depends(get_current_user_id)):
             "free_credits": 0, "free_weekly_left": 0,
             "uses_free_weekly": False, "guarantee_hours": CHAT_GUARANTEE_HOURS,
         }
+    # The refund may grant a credit that the user doc below must reflect, so it
+    # runs first. Everything after it is independent, so fetch it in ONE round
+    # trip (this endpoint used to chain ~7 sequential DB calls, incl. repeating
+    # the reply/unlock lookups that can_initiate_chat also does).
     await _maybe_refund_guarantee(uid, target_id)
-    me = await get_user(uid)
-    is_reply = (await _incoming_count(uid, target_id)) > 0
-    unlocked = bool(await _unlock_doc(uid, target_id))
+    me, incoming, unlock, saved_mine, saved_theirs = await asyncio.gather(
+        get_user(uid),
+        _incoming_count(uid, target_id),
+        _unlock_doc(uid, target_id),
+        db.saved.find_one({"owner_id": uid, "target_id": target_id}, {"_id": 1}),
+        db.saved.find_one({"owner_id": target_id, "target_id": uid}, {"_id": 1}),
+    )
+    is_reply = incoming > 0
+    unlocked = bool(unlock)
     plan_ok = _plan_active(me)
-    can_hard = await can_initiate_chat(me, target_id)
+    # Same rule as can_initiate_chat(): plan, a reply, an unlock, or a match.
+    can_hard = bool(plan_ok or is_reply or unlocked or (saved_mine and saved_theirs))
     fwl = free_weekly_left(me)
     # A free-weekly allowance also opens the composer (consumed on actual send),
     # but only when this isn't already covered by a plan/unlock/match/reply.
