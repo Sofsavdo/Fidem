@@ -63,6 +63,8 @@ function proxyUpgrade(req, socket, head) {
   socket.on('error', () => up.destroy());
 }
 
+const BUILD_DIR = path.join(__dirname, 'build');
+
 const mimeTypes = {
   '.html': 'text/html',
   '.js': 'text/javascript',
