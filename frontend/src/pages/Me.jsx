@@ -6,7 +6,7 @@ import { VerifiedBadge, FinancialBadge, PlanPill } from "@/components/Badges";
 import PhotoUpload from "@/components/PhotoUpload";
 import { photoSrc } from "@/lib/photo";
 import { purchasePlan } from "@/lib/purchase";
-import { ChevronRight, Crown, Wallet, Share2, Settings as SettingsIcon, LogOut, ShieldCheck, Clock, SlidersHorizontal, Brain, BookOpen, Phone, Trophy, Rocket, MessageCircle, EyeOff, Camera } from "lucide-react";
+import { ChevronRight, Crown, Wallet, Share2, Settings as SettingsIcon, LogOut, ShieldCheck, Clock, SlidersHorizontal, Brain, BookOpen, Phone, Trophy, Rocket, MessageCircle, EyeOff, Camera, Megaphone, Gift } from "lucide-react";
 import BoostModal from "@/components/BoostModal";
 import LocationVerifyCard from "@/components/LocationVerifyCard";
 import { toast } from "sonner";
@@ -264,6 +264,19 @@ export default function Me() {
             </Link>
           )}
         </div>
+      </div>
+
+      {/* Secondary destinations moved out of the bottom bar (4 tabs keep the
+          core loop obvious: candidates -> chats -> interests -> profile). */}
+      <div className="grid grid-cols-2 gap-3">
+        <Link to="/announcements" data-testid="link-announcements" className="flex items-center gap-3 rounded-3xl bg-card border border-border p-4 active:scale-[0.98] transition-transform">
+          <Megaphone className="w-5 h-5 text-secondary" />
+          <span className="font-medium text-sm">{t("anons")}</span>
+        </Link>
+        <Link to="/gifts" data-testid="link-gifts" className="flex items-center gap-3 rounded-3xl bg-card border border-border p-4 active:scale-[0.98] transition-transform">
+          <Gift className="w-5 h-5 text-primary" />
+          <span className="font-medium text-sm">{t("gift")}</span>
+        </Link>
       </div>
 
       {/* Rankings teaser — replaces the old badges/achievements card, which

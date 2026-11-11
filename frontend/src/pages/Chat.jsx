@@ -69,20 +69,20 @@ export default function Chat() {
     }
   };
 
+  const [hasMoreOlder, setHasMoreOlder] = useState(true);
+
   const loadOlderMessages = async () => {
-    if (loadingOlder || messages.length === 0 || !chatId) return;
+    if (loadingOlder || messages.length === 0 || !chatId || !hasMoreOlder) return;
     setLoadingOlder(true);
     try {
-      // Load 50 more messages before the oldest one we have
-      const oldestTime = messages[0]?.created_at;
-      const response = await api.get(`/messages/${chatId}?limit=50`);
-      if (response.data && response.data.length > 0) {
-        // Filter out duplicates and prepend older messages
-        const newMsgs = response.data.filter(m => !messages.find(x => x.id === m.id));
-        if (newMsgs.length > 0) {
-          setMessages([...newMsgs, ...messages]);
-        }
-      }
+      // Cursor = created_at of the oldest message we already have.
+      const before = messages[0]?.created_at;
+      const response = await api.get(`/messages/${chatId}`, { params: { limit: 50, before } });
+      const page = response.data || [];
+      if (page.length < 50) setHasMoreOlder(false);
+      const known = new Set(messages.map((x) => x.id));
+      const newMsgs = page.filter((m) => !known.has(m.id));
+      if (newMsgs.length > 0) setMessages((prev) => [...newMsgs, ...prev]);
     } catch (err) {
       console.error("Failed to load older messages:", err);
     } finally {
@@ -159,9 +159,17 @@ export default function Chat() {
   };
 
   useEffect(() => {
+    setHasMoreOlder(true);
     load();
     // eslint-disable-next-line
-  }, [otherId, user]);
+  }, [otherId, user?.id]);
+
+  // Socket dropped and came back: pull whatever we missed meanwhile.
+  useEffect(() => {
+    if (wsEvent?.type !== "resync" || !chatId) return;
+    api.get(`/messages/${chatId}?limit=50`).then((m) => setMessages(m.data || [])).catch(() => {});
+    // eslint-disable-next-line
+  }, [wsEvent, chatId]);
 
   // Real-time: append incoming WS messages that belong to this chat
   useEffect(() => {
@@ -364,14 +372,14 @@ export default function Chat() {
       </div>
 
       <div className="flex-1 px-4 py-4 space-y-2 overflow-y-auto flex flex-col" data-testid="chat-history">
-        {messages.length > 0 && messages.length >= 50 && (
+        {messages.length >= 50 && hasMoreOlder && (
           <button
             ref={topRef}
             onClick={loadOlderMessages}
             disabled={loadingOlder}
             className="text-xs text-muted-foreground hover:text-secondary disabled:opacity-50 self-center py-2 transition"
           >
-            {loadingOlder ? "⏳ Murakkab..." : "← Eski xabarlar"}
+            {loadingOlder ? "⏳ ..." : "← Eski xabarlar"}
           </button>
         )}
         {messages.length === 0 && (

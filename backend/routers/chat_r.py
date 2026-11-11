@@ -111,15 +111,18 @@ async def _maybe_refund_guarantee(uid: str, target_id: str) -> bool:
 async def can_initiate_chat(sender: dict, target_id: str) -> bool:
     if _plan_active(sender):
         return True
-    if await _incoming_count(sender["id"], target_id) > 0:
+    # The four lookups are independent - run them concurrently so a free
+    # sender pays one DB round trip here instead of up to four in sequence.
+    incoming, unlock, mine, theirs = await asyncio.gather(
+        _incoming_count(sender["id"], target_id),
+        _unlock_doc(sender["id"], target_id),
+        db.saved.find_one({"owner_id": sender["id"], "target_id": target_id}, {"_id": 1}),
+        db.saved.find_one({"owner_id": target_id, "target_id": sender["id"]}, {"_id": 1}),
+    )
+    if incoming > 0 or unlock:
         return True
-    if await _unlock_doc(sender["id"], target_id):
-        return True
-    # Check for mutual save (match) - free chat for matched users
-    mutual_save = await db.saved.find_one({"owner_id": sender["id"], "target_id": target_id}) and await db.saved.find_one({"owner_id": target_id, "target_id": sender["id"]})
-    if mutual_save:
-        return True
-    return False
+    # Mutual save (match) - free chat for matched users
+    return bool(mine and theirs)
 
 
 @router.get("/chat/access/{target_id}")
@@ -262,19 +265,20 @@ async def list_chats(uid: str = Depends(get_current_user_id), limit: int = Query
         {"id": {"$in": other_ids}}, {"_id": 0, "password_hash": 0}
     ).to_list(len(other_ids))
 
-    # For unread: use a simple count per chat, not full aggregation
-    unread_tasks = [
-        db.messages.count_documents({"chat_id": cid, "to_user_id": uid, "read": {"$ne": True}})
-        for cid in chat_ids
-    ]
+    # Unread counts for every listed chat in a single grouped query (was one
+    # count_documents round trip per chat).
+    unread_task = db.messages.aggregate([
+        {"$match": {"to_user_id": uid, "read": {"$ne": True}, "chat_id": {"$in": chat_ids}}},
+        {"$group": {"_id": "$chat_id", "n": {"$sum": 1}}},
+    ]).to_list(len(chat_ids))
 
-    unlocks, users, *unread_counts = await asyncio.gather(
-        unlocks_task, users_task, *unread_tasks
+    unlocks, users, unread_rows = await asyncio.gather(
+        unlocks_task, users_task, unread_task
     )
 
     unlocked_set = {p["target_id"] for p in unlocks}
     users_by_id = {u["id"]: u for u in users}
-    unread_by_chat = {cid: count for cid, count in zip(chat_ids, unread_counts)}
+    unread_by_chat = {r["_id"]: r["n"] for r in unread_rows}
 
     items = []
     for row in rows_data:
@@ -334,21 +338,47 @@ async def decide_application(app_id: str, approve: bool = Body(..., embed=True),
 
 
 @router.get("/messages/{chat_id}")
-async def chat_history(chat_id: str, uid: str = Depends(get_current_user_id), limit: int = Query(50)):
-    """Load chat messages with pagination. Limit per request: 50 (capped at 100)."""
+async def chat_history(
+    chat_id: str,
+    uid: str = Depends(get_current_user_id),
+    limit: int = Query(50),
+    before: Optional[str] = Query(None, description="created_at cursor: return only messages older than this"),
+):
+    """Load chat messages with cursor pagination (limit capped at 100).
+
+    Without `before` returns the newest `limit` messages; pass the oldest
+    loaded message's created_at as `before` to page further back.
+    """
     a, b = chat_id.split("_", 1)
     if uid not in (a, b):
         raise HTTPException(403, "Not your chat")
     limit = min(limit, 100)
-    rows = await db.messages.find({"chat_id": chat_id}, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    query = {"chat_id": chat_id}
+    if before:
+        # Clients echo back the serialized datetime ("...Z"); stored values use
+        # isoformat ("...+00:00"), so normalize before the string comparison.
+        try:
+            before = iso(parse_dt(before))
+        except Exception:
+            raise HTTPException(400, "invalid before cursor")
+        query["created_at"] = {"$lt": before}
+    find_task = db.messages.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    if before:
+        # Paging back through old history never changes read state.
+        rows = await find_task
+        modified = 0
+    else:
+        rows, result = await asyncio.gather(
+            find_task,
+            db.messages.update_many(
+                {"chat_id": chat_id, "to_user_id": uid, "read": {"$ne": True}},
+                {"$set": {"read": True}},
+            ),
+        )
+        modified = result.modified_count
     # Reverse to get chronological order (oldest first)
     rows.reverse()
-
-    result = await db.messages.update_many(
-        {"chat_id": chat_id, "to_user_id": uid, "read": {"$ne": True}},
-        {"$set": {"read": True}},
-    )
-    if result.modified_count > 0:
+    if modified > 0:
         # Let the sender's open chat flip its own bubbles to "read" live,
         # instead of only finding out next time they reload the page.
         other_id = b if uid == a else a
@@ -376,12 +406,23 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
     if req.to_user_id == uid:
         raise HTTPException(400, "Cannot message self")
 
-    # Blocks were recorded but never enforced anywhere — a blocked user could
-    # simply keep messaging. Refuse in both directions.
-    if await _block_exists(uid, req.to_user_id):
+    # One round trip for the block check and both user documents (they used
+    # to run one after another, each paying the full DB latency).
+    blocked, sender_doc, target_doc = await asyncio.gather(
+        _block_exists(uid, req.to_user_id),
+        get_user(uid),
+        get_user(req.to_user_id),
+        return_exceptions=True,
+    )
+    # Blocks are enforced in both directions.
+    if isinstance(blocked, Exception):
+        raise blocked
+    if blocked:
         raise HTTPException(403, "blocked")
-
-    sender_doc = await get_user(uid)
+    if isinstance(sender_doc, Exception):
+        raise sender_doc
+    if isinstance(target_doc, Exception):
+        raise target_doc
     if sender_doc.get("muted"):
         raise HTTPException(403, "muted")
     if not await can_initiate_chat(sender_doc, req.to_user_id):
@@ -421,7 +462,6 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
         req.text = sanitized_text
 
     sender = sender_doc
-    await get_user(req.to_user_id)
     cid = chat_id_for(uid, req.to_user_id)
     
     if is_voice:

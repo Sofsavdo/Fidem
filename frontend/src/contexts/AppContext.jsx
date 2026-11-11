@@ -222,6 +222,9 @@ export function AppProvider({ children }) {
     if (wsRef.current) return; // already open
     const ws = new WS({
       onMessage: (m) => setWsEvent({ ...m, ts: Date.now() }),
+      // After a drop, anything sent while we were offline never arrived over
+      // the socket - tell listeners to resync from the server.
+      onReconnect: () => setWsEvent({ type: "resync", ts: Date.now() }),
     });
     ws.start(token);
     wsRef.current = ws;
@@ -229,7 +232,10 @@ export function AppProvider({ children }) {
       ws.stop();
       wsRef.current = null;
     };
-  }, [user]);
+    // Keyed on the id, not the object: every refresh() yields a new user
+    // object, which used to tear the socket down and reopen it each time
+    // (dropping messages in the gap).
+  }, [user?.id]);
 
   // Money/plan-affecting notifications (P2P top-up approved, plan granted,
   // withdrawal decided, ...) can originate from an admin action the user

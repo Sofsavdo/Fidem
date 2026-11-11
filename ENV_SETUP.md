@@ -77,6 +77,17 @@ REACT_APP_BACKEND_URL=https://fidem-backend-production.up.railway.app
 REACT_APP_ADMIN_TELEGRAM_USERNAME=FidemAppSupport   # "Contact admin" link on the Me page
 ```
 
+Runtime (not build-time) variable on the frontend service, optional but
+recommended for speed:
+```bash
+BACKEND_INTERNAL_URL=http://<backend-service>.railway.internal:<PORT>
+```
+When set, `server.js` forwards `/api/*` (including the WebSocket) to the backend.
+Then build the frontend with `REACT_APP_BACKEND_URL=https://<frontend-domain>` so
+the browser talks to a single origin and skips the CORS preflight round trip
+before every new API URL. Leave it unset to keep the browser calling the
+backend domain directly.
+
 ## Railway notes
 - Both services deploy from `Sofsavdo/Fidem` (`main`); the backend uses root
   directory `backend`, the frontend `frontend`.
