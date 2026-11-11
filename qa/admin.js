@@ -5,8 +5,8 @@ const { chromium } = require('playwright');
 const fs = require('fs');
 const APP = 'http://127.0.0.1:18101';
 // section -> its sub-tabs (empty = the section is a single screen)
-const NAV = { home: [], users: [], moderation: ['verifications','reports','messages','fraud'], money: ['p2p','withdrawals','payments','referrals'],
-  insights: ['ai','ceo','growth','revenue','analytics'], comms: ['broadcast','anons'], concierge: [], auditlog: [] };
+const NAV = { home: [], users: [], moderation: ['verifications','reports','messages','fraud'], money: ['payments','p2p','withdrawals','referrals'],
+  insights: ['ai','ceo','growth','revenue'], comms: ['broadcast','anons'], concierge: [], auditlog: [] };
 (async () => {
   const r = await fetch('http://127.0.0.1:18100/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'admin@fidem.uz', password: 'AdminQa#2026' }) });
   const token = (await r.json()).token;
@@ -33,7 +33,7 @@ const NAV = { home: [], users: [], moderation: ['verifications','reports','messa
         bad: (t.match(/.{0,20}(undefined|NaN|\[object Object\]).{0,10}/) || [''])[0], keys, len: t.length,
         legacy: (t.match(/.{0,25}\b(VIP|Click|CLICK|P2P|Concierge|Standard)\b.{0,25}/g) || []).filter((x) => !/eski vip/i.test(x)).slice(0, 4) };
     });
-    await page.screenshot({ path: `${__dirname}/shots/admin_${id}.png`, fullPage: false });
+    await page.screenshot({ path: `${__dirname}/shots/admin_${id}.png`, fullPage: !!process.env.FULL });
     report.push({ id, errs: [...new Set(errs)].slice(0, 3), api: [...new Set(bad)].slice(0, 4), ...info });
     errs = []; bad = [];
   };

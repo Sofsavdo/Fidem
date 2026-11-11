@@ -46,7 +46,7 @@ const T = {
         "Qoidalar buzilganda platforma profilni ogohlantirishsiz cheklash, bloklash yoki o'chirish huquqiga ega. Bloklangan foydalanuvchining to'lovlari qaytarilmaydi.",
       ]],
       ["O'zgartirishlar va aloqa", [
-        "Shartlar yangilanishi mumkin; muhim o'zgarishlarda qayta rozilik so'raladi. Savollar uchun: t.me/FidemAppSupport",
+        "Shartlar yangilanishi mumkin; muhim o'zgarishlarda qayta rozilik so'raladi. Savollar uchun: t.me/Medik005",
       ]],
     ],
   },
@@ -87,7 +87,7 @@ const T = {
         "При нарушении правил платформа вправе ограничить, заблокировать или удалить профиль без предупреждения. Платежи заблокированного пользователя не возвращаются.",
       ]],
       ["Изменения и контакты", [
-        "Условия могут обновляться; при существенных изменениях запрашивается повторное согласие. Вопросы: t.me/FidemAppSupport",
+        "Условия могут обновляться; при существенных изменениях запрашивается повторное согласие. Вопросы: t.me/Medik005",
       ]],
     ],
   },
@@ -128,7 +128,7 @@ const T = {
         "On rule violations the platform may restrict, block or delete a profile without warning. A blocked user's payments are not refunded.",
       ]],
       ["Changes and contact", [
-        "These terms may be updated; material changes require renewed consent. Questions: t.me/FidemAppSupport",
+        "These terms may be updated; material changes require renewed consent. Questions: t.me/Medik005",
       ]],
     ],
   },
@@ -160,7 +160,7 @@ export default function Terms() {
           </section>
         ))}
         <p className="text-sm">
-          <a className="text-primary underline" href="https://t.me/FidemAppSupport" target="_blank" rel="noreferrer">t.me/FidemAppSupport</a>
+          <a className="text-primary underline" href="https://t.me/Medik005" target="_blank" rel="noreferrer">t.me/Medik005</a>
         </p>
       </main>
     </div>

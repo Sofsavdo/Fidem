@@ -18,7 +18,7 @@ import {
   useAdminCeo, useAdminFunnel, useAdminEngagement, useAdminRevenue,
   useAdminConciergeAnalytics, useAdminChatModAnalytics, useAdminAuditLog, useAdminGiftShop,
   useAdminUserDetail, useAdminUserAction, useDeleteDemoUsers, useAdminConfigHealth,
-  useAdminAiInsights, useRefreshAiInsights,
+  useAdminAiInsights, useAdminAiInsightsCached, useRefreshAiInsights,
 } from "@/hooks/queries";
 
 // Eight places instead of nineteen: related screens are grouped and shown as
@@ -33,9 +33,9 @@ const SECTIONS = [
     { id: "fraud", label: "Firibgarlik" },
   ] },
   { id: "money", icon: Wallet, label: "Pul", subs: [
-    { id: "p2p", label: "Karta orqali to'ldirish" },
+    { id: "payments", label: "To'lovlar" },
+    { id: "p2p", label: "To'lov tizimi" },
     { id: "withdrawals", label: "Pul yechish" },
-    { id: "payments", label: "To'lovlar tarixi" },
     { id: "referrals", label: "Referallar" },
   ] },
   { id: "insights", icon: BarChart3, label: "Tahlil", subs: [
@@ -43,7 +43,6 @@ const SECTIONS = [
     { id: "ceo", label: "Ko'rsatkichlar" },
     { id: "growth", label: "Voronka" },
     { id: "revenue", label: "Daromad" },
-    { id: "analytics", label: "Grafiklar" },
     ...(FEATURES.giftShop ? [{ id: "giftshop", label: "Sovg'alar" }] : []),
   ] },
   { id: "comms", icon: Megaphone, label: "Aloqa", subs: [
@@ -51,7 +50,7 @@ const SECTIONS = [
     { id: "anons", label: "Anonslar" },
   ] },
   { id: "concierge", icon: Search, label: "Shaxsiy sovchi" },
-  { id: "auditlog", icon: ScrollText, label: "Audit log" },
+  { id: "auditlog", icon: ScrollText, label: "Admin harakatlari" },
 ];
 const sectionOf = (tab) => SECTIONS.find((sec) => sec.id === tab || (sec.subs || []).some((x) => x.id === tab)) || SECTIONS[0];
 // Pending work per section, shown as a badge so nothing waits unseen.
@@ -219,7 +218,7 @@ export default function Admin() {
               <h2 className="font-heading text-xl lg:text-2xl font-semibold truncate">{section.label}</h2>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
-              {configHealth && (
+              {configHealth && activeTab === "home" && (
                 <span
                   data-testid="admin-bot-status"
                   title={configHealth.admin_bot_configured && !configHealth.admin_bot_token_valid ? "ADMIN_BOT_TOKEN o'rnatilgan, lekin Telegram uni qabul qilmadi - qiymatni qayta tekshiring (bo'sh joy, kesilgan token bo'lishi mumkin)" : undefined}
@@ -287,19 +286,13 @@ export default function Admin() {
           )}
 
           {activeTab === "home" && <AdminHome stats={stats} go={setActiveTab} />}
-          {activeTab === "ceo" && (
-            <div className="space-y-6">
-              <AdminCeoDashboard go={setActiveTab} />
-              {stats && <AdminDashboard stats={stats} go={setActiveTab} compact />}
-            </div>
-          )}
+          {activeTab === "ceo" && <AdminCeoDashboard go={setActiveTab} />}
           {activeTab === "ai" && <AdminAiInsights />}
           {activeTab === "growth" && <AdminGrowthDashboard />}
           {activeTab === "revenue" && <AdminRevenueDashboard />}
           {activeTab === "giftshop" && <AdminGiftShopDashboard />}
           {activeTab === "auditlog" && <AdminAuditLog />}
 
-          {activeTab === "analytics" && stats && <AdminAnalytics stats={stats} />}
           {activeTab === "users" && <AdminUsers />}
           {activeTab === "broadcast" && <AdminBroadcast />}
           {activeTab === "anons" && <AdminAnnouncements />}
@@ -347,7 +340,7 @@ const sumFmt = (n) => `${Number(n || 0).toLocaleString()} so'm`;
 // owner checks first. Detailed metrics live under Tahlil.
 function AdminHome({ stats, go }) {
   const { data: ceo } = useAdminCeo();
-  const { data: ai } = useAdminAiInsights();
+  const { data: ai } = useAdminAiInsightsCached();
   const { data: health } = useAdminConfigHealth();
   const aiState = health?.ai;
   const queue = [
@@ -417,7 +410,7 @@ function AdminHome({ stats, go }) {
             {ai.recommendations?.[0] && <p className="text-xs text-primary mt-2">👉 {ai.recommendations[0]}</p>}
           </>
         ) : (
-          <p className="text-sm text-muted-foreground mt-2">{ai?.error ? `AI tahlil ishlamayapti: ${ai.error}` : "AI tahlil yuklanmoqda..."}</p>
+          <p className="text-sm text-muted-foreground mt-2">{ai?.error ? `AI tahlil ishlamayapti: ${ai.error}` : ai?.empty ? "Hali tahlil qilinmagan — ochib, AI tahlilini boshlang" : "Yuklanmoqda..."}</p>
         )}
         <p className="text-xs font-semibold text-primary mt-2">Batafsil →</p>
       </button>
@@ -436,7 +429,7 @@ function AdminCeoDashboard({ go }) {
         <p className="text-xs uppercase tracking-wider text-white/60">Bugun</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-3">
           <div>
-            <p className="text-[10px] text-white/60">Yangi userlar</p>
+            <p className="text-[10px] text-white/60">Yangi foydalanuvchilar</p>
             <p className="font-heading text-2xl font-bold tabular-nums mt-0.5">{users.new_today}</p>
           </div>
           <div>
@@ -444,7 +437,7 @@ function AdminCeoDashboard({ go }) {
             <p className="font-heading text-2xl font-bold tabular-nums mt-0.5">{matches.today}</p>
           </div>
           <div>
-            <p className="text-[10px] text-white/60">Yangi chatlar</p>
+            <p className="text-[10px] text-white/60">Yangi suhbatlar</p>
             <p className="font-heading text-2xl font-bold tabular-nums mt-0.5">{chats.new_today}</p>
           </div>
           <div>
@@ -467,36 +460,36 @@ function AdminCeoDashboard({ go }) {
       <div>
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Faol foydalanuvchilar</p>
         <div className="grid grid-cols-3 gap-2.5">
-          <KpiTile label="DAU" value={active.dau} />
-          <KpiTile label="WAU" value={active.wau} />
-          <KpiTile label="MAU" value={active.mau} />
+          <KpiTile label="Bugun faol" value={active.dau} />
+          <KpiTile label="Hafta faol" value={active.wau} />
+          <KpiTile label="Oy faol" value={active.mau} />
         </div>
       </div>
 
       <div>
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Match va Chat</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          <KpiTile label="Match (bugun)" value={matches.today} sub={matches.match_rate_today_pct != null ? `${matches.match_rate_today_pct}% yangi userdan` : null} />
+          <KpiTile label="Match (bugun)" value={matches.today} sub={matches.match_rate_today_pct != null ? `${matches.match_rate_today_pct}% yangi foydalanuvchidan` : null} />
           <KpiTile label="Match (hafta)" value={matches.week} />
           <KpiTile label="Match (oy)" value={matches.month} />
-          <KpiTile label="Chat rate" value={chats.chat_rate_today_pct != null ? `${chats.chat_rate_today_pct}%` : "—"} sub="matchdan chatga" />
+          <KpiTile label="Suhbatga o'tish" value={chats.chat_rate_today_pct != null ? `${chats.chat_rate_today_pct}%` : "—"} sub="matchdan yozishmagacha" />
         </div>
       </div>
 
       <div>
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Monetizatsiya</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          <KpiTile label="Konversiya" value={`${monetization.premium_conversion_pct}%`} sub={`${monetization.paying_users} to'lovchi`} />
-          <KpiTile label="ARPU" value={sumFmt(monetization.arpu)} />
-          <KpiTile label="ARPPU" value={sumFmt(monetization.arppu)} />
-          <KpiTile label="MRR" value={sumFmt(monetization.mrr)} sub="faol obunalar" />
+          <KpiTile label="To'lovchilar ulushi" value={`${monetization.premium_conversion_pct}%`} sub={`${monetization.paying_users} to'lovchi`} />
+          <KpiTile label="O'rtacha daromad / foydalanuvchi" value={sumFmt(monetization.arpu)} />
+          <KpiTile label="O'rtacha daromad / to'lovchi" value={sumFmt(monetization.arppu)} />
+          <KpiTile label="Oylik obuna daromadi" value={sumFmt(monetization.mrr)} sub="faol obunalar" />
         </div>
       </div>
 
       <div>
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Saqlanish</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-          <KpiTile label="D1 Retention" value={retention.d1_pct != null ? `${retention.d1_pct}%` : "—"} sub={`kohorta: ${retention.d1_cohort_size} kishi`} />
+          <KpiTile label="Ertasi kuni qaytganlar" value={retention.d1_pct != null ? `${retention.d1_pct}%` : "—"} sub={`${retention.d1_cohort_size} kishidan`} />
         </div>
         {retention.note && <p className="text-[11px] text-muted-foreground mt-2">{retention.note}</p>}
       </div>
@@ -595,6 +588,21 @@ function AdminAiInsights() {
 // Growth Dashboard: the acquisition->activation->engagement funnel, plus
 // like/match/chat KPI cards — the dating-app-specific numbers a generic
 // SaaS dashboard never shows.
+// Funnel steps with percentages that make sense: the start is the first step
+// that actually has people (Telegram /start is not tracked for everyone), and
+// "next" is the share of the previous step that reached this one.
+function funnelSteps(raw) {
+  const all = raw || [];
+  const first = all.findIndex((x) => x.count > 0);
+  const steps = first > 0 ? all.slice(first) : all;
+  const base = steps[0]?.count || 0;
+  return steps.map((x, i) => ({
+    ...x,
+    top: base ? Math.round((x.count / base) * 100) : 0,
+    next: i > 0 && steps[i - 1].count ? Math.round((x.count / steps[i - 1].count) * 100) : 0,
+  }));
+}
+
 function AdminGrowthDashboard() {
   const { data: funnel, isLoading: fLoading } = useAdminFunnel();
   const { data: eng, isLoading: eLoading } = useAdminEngagement();
@@ -602,27 +610,27 @@ function AdminGrowthDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Foydalanuvchi Funnel</p>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Foydalanuvchi yo'li (voronka)</p>
         {fLoading || !funnel ? (
           <div className="text-center py-8 text-muted-foreground">Yuklanmoqda...</div>
         ) : (
           <div className="rounded-3xl bg-card border border-border p-4 space-y-1.5">
-            {funnel.steps.map((s, i) => (
+            {funnelSteps(funnel.steps).map((s, i, steps) => (
               <div key={s.key}>
                 <div className="flex items-center justify-between text-sm py-2">
                   <span className="font-medium">{i + 1}. {s.label}</span>
                   <span className="tabular-nums">
                     <strong>{s.count.toLocaleString()}</strong>
-                    <span className="text-muted-foreground text-xs ml-2">({s.pct_of_top}% boshidan)</span>
+                    <span className="text-muted-foreground text-xs ml-2">({s.top}% boshidan)</span>
                   </span>
                 </div>
                 <div className="h-2 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${s.pct_of_top}%` }} />
+                  <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${s.top}%` }} />
                 </div>
-                {i < funnel.steps.length - 1 && (
+                {i < steps.length - 1 && s.count > 0 && (
                   <p className="text-[10px] text-red-500 mt-1 mb-1">
-                    ↓ keyingi bosqichga: {s.pct_of_previous != null ? funnel.steps[i + 1].pct_of_previous : "—"}% o'tadi
-                    {funnel.steps[i + 1] && s.count > 0 && ` (${(s.count - funnel.steps[i + 1].count).toLocaleString()} kishi chiqib ketdi)`}
+                    ↓ keyingi bosqichga {steps[i + 1].next}% o'tdi
+                    {s.count > steps[i + 1].count && ` · ${(s.count - steps[i + 1].count).toLocaleString()} kishi to'xtadi`}
                   </p>
                 )}
               </div>
@@ -636,7 +644,7 @@ function AdminGrowthDashboard() {
       ) : (
         <>
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Like KPI</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Yoqtirishlar</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <KpiTile label="Bugun" value={eng.likes.today} />
               <KpiTile label="Bu hafta" value={eng.likes.week} />
@@ -645,7 +653,7 @@ function AdminGrowthDashboard() {
             </div>
           </div>
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Match KPI</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Matchlar</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <KpiTile label="Bugun" value={eng.matches.today} />
               <KpiTile label="Bu hafta" value={eng.matches.week} />
@@ -654,9 +662,9 @@ function AdminGrowthDashboard() {
             </div>
           </div>
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Chat KPI</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Suhbatlar</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-              <KpiTile label="Yangi chatlar (bugun)" value={eng.chats.new_today} />
+              <KpiTile label="Yangi suhbatlar (bugun)" value={eng.chats.new_today} />
               <KpiTile label="Faol chatlar (hafta)" value={eng.chats.active_this_week} />
               <KpiTile label="Xabarlar (bugun)" value={eng.chats.messages_today} />
               <KpiTile label="Javob berish %" value={eng.chats.reply_rate_pct != null ? `${eng.chats.reply_rate_pct}%` : "—"} />
@@ -682,7 +690,7 @@ function AdminRevenueDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Haqiqiy pul kirimi (Real Revenue)</p>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Haqiqiy pul kirimi</p>
         <p className="text-[11px] text-muted-foreground mb-2">Faqat haqiqiy pul: muvaffaqiyatli onlayn to'lovlar va tasdiqlangan karta to'lovlari. Balansdan qilingan xaridlar ikki marta hisoblanmaydi.</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           <KpiTile label="Bugun" value={sumFmt(real_revenue.today)} accent />
@@ -708,12 +716,12 @@ function AdminRevenueDashboard() {
       )}
 
       <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">KPI</p>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Asosiy ko'rsatkichlar</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          <KpiTile label="ARPU" value={sumFmt(kpi.arpu)} sub={`${kpi.total_users} user`} />
-          <KpiTile label="ARPPU" value={sumFmt(kpi.arppu)} sub={`${kpi.paying_users} to'lovchi`} />
-          <KpiTile label="MRR" value={sumFmt(kpi.mrr)} sub="faol obunalar" />
-          <KpiTile label="Konversiya" value={`${kpi.premium_conversion_pct}%`} />
+          <KpiTile label="O'rtacha daromad / foydalanuvchi" value={sumFmt(kpi.arpu)} sub={`${kpi.total_users} foydalanuvchi`} />
+          <KpiTile label="O'rtacha daromad / to'lovchi" value={sumFmt(kpi.arppu)} sub={`${kpi.paying_users} to'lovchi`} />
+          <KpiTile label="Oylik obuna daromadi" value={sumFmt(kpi.mrr)} sub="faol obunalar" />
+          <KpiTile label="To'lovchilar ulushi" value={`${kpi.premium_conversion_pct}%`} />
         </div>
         {ltv_note && <p className="text-[11px] text-muted-foreground mt-2">💡 {ltv_note}</p>}
       </div>
@@ -841,91 +849,6 @@ function AdminAuditLog() {
 
 // Command-center dashboard: revenue at a glance, actionable "needs attention"
 // cards that jump to the relevant tab, full overview metrics, and top regions.
-function AdminDashboard({ stats, go, compact = false }) {
-  const rev = stats.revenue || {};
-  const money = (n) => `${(n || 0).toLocaleString()} so'm`;
-  const attention = [
-    { label: "Kutilayotgan to'lovlar", value: stats.pending_payments || 0, tab: "payments", Icon: DollarSign },
-    { label: "Kutilayotgan tasdiqlashlar", value: stats.pending_verifications || 0, tab: "verifications", Icon: ShieldCheck },
-    { label: "Ochiq shikoyatlar", value: stats.open_reports || 0, tab: "reports", Icon: AlertTriangle },
-  ];
-  const regions = stats.top_regions || [];
-  const regionMax = regions.length ? (regions[0].count || 1) : 1;
-  return (
-    <div className="space-y-6" data-testid="admin-stats">
-      {!compact && (<>
-      {/* Revenue */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <RevenueTile label="Jami daromad" value={money(rev.total)} accent />
-        <RevenueTile label="Bugun" value={money(rev.today)} />
-        <RevenueTile label="Shu hafta" value={money(rev.week)} />
-        <RevenueTile label="Shu oy" value={money(rev.month)} />
-      </div>
-
-      {/* Needs attention — actionable */}
-      <div>
-        <p className="field-label mb-2 px-1">E'tibor kerak</p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {attention.map((a) => (
-            <button
-              key={a.tab}
-              onClick={() => go(a.tab)}
-              data-testid={`admin-attention-${a.tab}`}
-              className={`rounded-3xl border p-4 text-left flex items-center justify-between transition hover:-translate-y-0.5 ${a.value > 0 ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}
-            >
-              <div>
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground flex items-center gap-1"><a.Icon className="w-3.5 h-3.5" /> {a.label}</p>
-                <p className={`font-heading text-2xl mt-1 ${a.value > 0 ? "text-primary" : ""}`}>{a.value}</p>
-              </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground" />
-            </button>
-          ))}
-        </div>
-      </div>
-
-      </>)}
-      {/* Overview metrics */}
-      <div>
-        <p className="field-label mb-2 px-1">Umumiy ko'rinish</p>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          <StatCard label="Foydalanuvchilar" value={(stats.total_users || 0).toLocaleString()} icon={<UsersIcon className="w-4 h-4" />} />
-          <StatCard label="Anketa to'ldirganlar" value={(stats.onboarded || 0).toLocaleString()} />
-          <StatCard label="DAU" value={stats.dau} />
-          <StatCard label="WAU" value={stats.wau} />
-          <StatCard label="MAU" value={stats.mau} />
-          <StatCard label="Konversiya" value={`${stats.conversion_premium}%`} />
-          <StatCard label="Premium" value={stats.premium} />
-          <StatCard label="Eski VIP" value={stats.vip} />
-          <StatCard label="Erkak / Ayol" value={`${stats.males} / ${stats.females}`} />
-          <StatCard label="Referallar" value={stats.referrals?.total || 0} />
-          <StatCard label="Bugungi xabarlar" value={stats.messages?.today || 0} />
-          {stats.quality && <StatCard label="O'rtacha to'liqlik" value={`${stats.quality.avg_completion}%`} />}
-          {stats.quality && <StatCard label="Qaytish (retention)" value={`${stats.quality.retention_rate}%`} />}
-          {stats.quality && <StatCard label="Xabar / user" value={stats.quality.avg_messages_per_user} />}
-        </div>
-      </div>
-
-      {/* Top regions */}
-      {regions.length > 0 && (
-        <div className="rounded-3xl bg-card border border-border p-4">
-          <p className="field-label mb-3 px-1 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> Eng faol hududlar</p>
-          <div className="space-y-2">
-            {regions.slice(0, 8).map((r, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <span className="w-28 shrink-0 text-sm truncate">{r._id}</span>
-                <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full bg-primary rounded-full" style={{ width: `${(r.count / regionMax) * 100}%` }} />
-                </div>
-                <span className="w-12 text-right text-sm tabular-nums text-muted-foreground">{r.count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 const StatCard = React.memo(function StatCard({ label, value, icon }) {
   return (
     <div className="rounded-3xl bg-card border border-border p-4">
@@ -1028,109 +951,6 @@ function AdminBroadcast() {
   );
 }
 
-function AdminAnalytics({ stats }) {
-  const revenueData = [
-    { name: "Bugun", value: stats.revenue?.today || 0 },
-    { name: "Hafta", value: stats.revenue?.week || 0 },
-    { name: "Oy", value: stats.revenue?.month || 0 },
-  ];
-
-  const purposeData = (stats.revenue?.by_purpose || []).map(p => ({
-    name: PURPOSE_UZ[p._id] || p._id,
-    value: p.total,
-    count: p.count,
-  }));
-
-  const regionData = (stats.top_regions || []).map(r => ({
-    name: r._id,
-    value: r.count,
-  }));
-
-  const genderData = [
-    { name: "Erkak", value: stats.males || 0 },
-    { name: "Ayol", value: stats.females || 0 },
-  ];
-
-  const COLORS = ["hsl(var(--primary))", "hsl(var(--secondary))"];
-
-  return (
-    <div className="space-y-6" data-testid="admin-analytics">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="rounded-3xl bg-card border border-border p-4">
-          <h3 className="font-heading text-lg mb-4 flex items-center gap-2"><TrendingUp className="w-4 h-4" /> Daromad (so'm)</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={revenueData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" fill="hsl(var(--primary))" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="rounded-3xl bg-card border border-border p-4">
-          <h3 className="font-heading text-lg mb-4 flex items-center gap-2"><UsersIcon className="w-4 h-4" /> Jins nisbati</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie data={genderData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label>
-                {genderData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {purposeData.length > 0 && (
-        <div className="rounded-3xl bg-card border border-border p-4">
-          <h3 className="font-heading text-lg mb-4">Daromad bo'yicha</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={purposeData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" fill="hsl(var(--secondary))" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {regionData.length > 0 && (
-        <div className="rounded-3xl bg-card border border-border p-4">
-          <h3 className="font-heading text-lg mb-4 flex items-center gap-2"><MapPin className="w-4 h-4" /> Top hududlar</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={regionData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" fill="hsl(var(--gold))" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      <div className="rounded-3xl bg-card border border-border p-4">
-        <h3 className="font-heading text-lg mb-4 flex items-center gap-2"><Activity className="w-4 h-4" /> Xabarlar statistikasi</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="p-4 bg-muted rounded-2xl">
-            <p className="text-sm text-muted-foreground">Jami xabarlar</p>
-            <p className="text-2xl font-semibold">{stats.messages?.total?.toLocaleString() || 0}</p>
-          </div>
-          <div className="p-4 bg-muted rounded-2xl">
-            <p className="text-sm text-muted-foreground">Bugun xabarlar</p>
-            <p className="text-2xl font-semibold">{stats.messages?.today?.toLocaleString() || 0}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // Quick audience segments: joined recently / active recently / paying.
 const USER_SEGMENTS = [
   { k: "all", label: "Hammasi", params: {} },
@@ -1138,7 +958,6 @@ const USER_SEGMENTS = [
   { k: "active", label: "🟢 Faol (7 kun)", params: { active_within_days: 7, sort: "active" } },
   { k: "regular", label: "🔁 Doimiy (bugun faol)", params: { active_within_days: 1, sort: "active" } },
   { k: "paid", label: "💎 To'lovchilar", params: { plan: "paid" } },
-  { k: "demo", label: "🧪 Demo profillar", params: { is_demo: true } },
 ];
 
 function AdminUsers() {
@@ -1690,6 +1509,7 @@ function AdminAnnouncements() {
 }
 
 function AdminManualTopups() {
+  const { data: health } = useAdminConfigHealth();
   // Temporary P2P top-up moderation while CLICK is down: admin publishes a
   // card number, users transfer + attach a receipt, admin credits balances.
   const [cfg, setCfg] = useState(null);
@@ -1754,8 +1574,20 @@ function AdminManualTopups() {
     } finally { setBusy(null); }
   };
 
+  const hamyonOn = !!health?.hamyon_configured;
   return (
     <div className="max-w-2xl space-y-4">
+      {hamyonOn && (
+        <div className="rounded-3xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 p-5" data-testid="admin-hamyon-on">
+          <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">✓ Hamyon ulangan — to'lovlar avtomatik tasdiqlanadi</p>
+          <p className="text-xs text-emerald-800 dark:text-emerald-300 mt-1.5 leading-relaxed">
+            Foydalanuvchi kartaga aniq summani o'tkazadi, Hamyon pulni ko'rgach tarif yoki balans o'zi yoqiladi.
+            Hammasi «To'lovlar» bo'limida ko'rinadi. Qo'lda chek tekshirish kerak emas.
+          </p>
+        </div>
+      )}
+      {!hamyonOn && (
+      <>
       {/* Config: toggle + receiving card */}
       <div className="rounded-3xl bg-card border border-border p-5 space-y-3">
         <div className="flex items-center justify-between">
@@ -1788,8 +1620,12 @@ function AdminManualTopups() {
           {saving ? "..." : "Saqlash"}
         </button>
       </div>
+      </>
+      )}
 
-      {/* Queue */}
+      {/* Queue (old manual card top-ups; hidden once Hamyon is on and nothing is waiting) */}
+      {(!hamyonOn || items.length > 0 || status !== "pending") && (
+      <>
       <div className="flex gap-2">
         {[["pending", "Kutilmoqda"], ["approved", "Tasdiqlangan"], ["rejected", "Rad etilgan"]].map(([k, l]) => (
           <button key={k} onClick={() => setStatus(k)}
@@ -1833,9 +1669,13 @@ function AdminManualTopups() {
           </div>
         ))}
       </div>
+      </>
+      )}
     </div>
   );
 }
+
+const METHOD_UZ = { hamyon: "Karta (Hamyon)", balance: "Balansdan", manual_p2p: "Karta (qo'lda)", click: "CLICK" };
 
 function AdminPayments() {
   // Successful payments are the default view; pending/expired/failed noise
@@ -1851,8 +1691,8 @@ function AdminPayments() {
   const blockPayment = (id) => blockMutation.mutate({ id, block: true }, { onSuccess: () => toast.success("Bloklandi") });
   const unblockPayment = (id) => blockMutation.mutate({ id, block: false }, { onSuccess: () => toast.success("Blokdan chiqarildi") });
 
-  const statusPill = (s) => {
-    if (s === "success" || s === "paid") return <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">✓ {s === "paid" ? "Balansdan" : "CLICK"}</span>;
+  const statusPill = (s, method) => {
+    if (s === "success" || s === "paid") return <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">✓ {METHOD_UZ[method] || (s === "paid" ? "Balansdan" : "Onlayn")}</span>;
     if (s === "pending") return <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Kutilmoqda</span>;
     return <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">{s}</span>;
   };
@@ -1885,16 +1725,17 @@ function AdminPayments() {
                   {p.user_name || p.user_id?.slice(0, 8)}
                   {p.user_telegram ? <span className="text-muted-foreground font-normal"> · @{p.user_telegram}</span> : null}
                 </p>
-                <p className="text-sm">{PURPOSE_UZ[p.purpose] || p.purpose} · <span className="font-semibold tabular-nums">{p.amount?.toLocaleString()} so'm</span>{p.balance_used > 0 && p.click_amount > 0 ? <span className="text-[10px] text-muted-foreground"> (balans {p.balance_used?.toLocaleString()} + CLICK {p.click_amount?.toLocaleString()})</span> : null}</p>
+                <p className="text-sm">{PURPOSE_UZ[p.purpose] || p.purpose} · <span className="font-semibold tabular-nums">{p.amount?.toLocaleString()} so'm</span>{p.balance_used > 0 && p.click_amount > 0 ? <span className="text-[10px] text-muted-foreground"> (balans {p.balance_used?.toLocaleString()} + karta {(p.hamyon_amount || p.click_amount)?.toLocaleString()})</span> : null}</p>
                 <p className="text-[10px] text-muted-foreground">{p.created_at ? new Date(p.created_at).toLocaleString("uz-UZ") : "—"} {p.blocked_by_admin && "· 🚫 Bloklangan"}</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                {statusPill(p.status)}
+                {statusPill(p.status, p.method)}
+                {/* Blocking only means something for a payment that is still open. */}
                 {p.blocked_by_admin ? (
                   <button onClick={() => unblockPayment(p.id)} className="text-xs rounded-full bg-emerald-100 text-emerald-700 px-3 py-1.5">Blokdan chiqarish</button>
-                ) : (
+                ) : ["pending", "prepared"].includes(p.status) ? (
                   <button onClick={() => blockPayment(p.id)} className="text-xs rounded-full bg-red-50 text-red-700 px-3 py-1.5">Bloklash</button>
-                )}
+                ) : null}
               </div>
             </div>
           </div>
@@ -2123,7 +1964,7 @@ function AdminConciergeAnalyticsPanel() {
   if (isLoading || !data) return null;
   return (
     <div className="rounded-3xl bg-card border border-border p-4">
-      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Concierge Analitika</p>
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Buyurtmalar statistikasi</p>
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
         <KpiTile label="Arizalar" value={data.applications} />
         <KpiTile label="To'lov kutmoqda" value={data.awaiting_payment} />

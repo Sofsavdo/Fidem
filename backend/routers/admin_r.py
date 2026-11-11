@@ -224,13 +224,17 @@ async def _build_insights_data() -> str:
 
 
 @router.get("/ai-insights")
-async def admin_ai_insights(force: bool = False, _: str = Depends(get_current_admin)):
+async def admin_ai_insights(force: bool = False, cached_only: bool = False, _: str = Depends(get_current_admin)):
     """The 'AI tahlilchi' panel: a growth/activity analysis in Uzbek, backed
     by the exact same numbers as /admin/stats plus 7d/30d trend snapshots
     and winback effectiveness. Cached for AI_INSIGHTS_CACHE_MINUTES so
     opening the tab repeatedly doesn't burn a model call every time;
     force=true (the panel's 'Yangilash' button) always regenerates."""
     cached = await db.ai_insights_cache.find_one({"id": "latest"}, {"_id": 0})
+    if cached_only:
+        # The panel's home card: show the last analysis instantly and never
+        # make the home screen wait for a model call.
+        return cached if cached and cached.get("ai_generated") else {"empty": True, "ai_generated": False}
     # Only a real AI answer is reused; a failure (e.g. before the key was set)
     # must not stick for hours.
     if not force and cached and cached.get("generated_at") and cached.get("ai_generated"):

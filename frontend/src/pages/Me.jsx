@@ -14,20 +14,7 @@ import { toast } from "sonner";
 import { useReferral, useSavedSummary, useLeaderboard, usePaymentConfig, QK } from "@/hooks/queries";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 
-// Static support contact - a real Telegram account admins actually monitor,
-// not the bot (which only understands the mini-app commands).
-const ADMIN_TELEGRAM_USERNAME = process.env.REACT_APP_ADMIN_TELEGRAM_USERNAME || "FidemAppSupport";
-
-// Inside the Telegram Mini App webview a plain target=_blank anchor to t.me
-// is silently swallowed - Telegram links must go through openTelegramLink.
-function openSupportChat() {
-  const url = `https://t.me/${ADMIN_TELEGRAM_USERNAME}`;
-  const tg = window.Telegram?.WebApp;
-  if (tg?.openTelegramLink) {
-    try { tg.openTelegramLink(url); return; } catch { /* fall through */ }
-  }
-  window.open(url, "_blank", "noopener");
-}
+import { openSupportChat } from "@/lib/support";
 
 export default function Me() {
   const { user, t, logout, refresh, wsEvent } = useApp();

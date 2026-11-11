@@ -48,7 +48,10 @@ export default function Family() {
       toast.success(accept ? t("accept_word") + " ✓" : t("reject_word") + " ✓");
       queryClient.invalidateQueries({ queryKey: QK.familyRequests });
     },
-    onError: () => toast.error(t("error_generic")),
+    onError: (e) => {
+      const d = (e?.response?.data?.detail || "").toString();
+      toast.error(d === "family_contact_missing" ? t("family_add_own_first") : t("error_generic"));
+    },
   });
 
   const respond = (id, accept) => respondMutation.mutate({ id, accept });

@@ -10,9 +10,7 @@ import { useApp } from "@/contexts/AppContext";
 import { notify, tapLight } from "@/lib/haptics";
 import { track } from "@/lib/analytics";
 import { PAY_EVENT, PAID_EVENT } from "@/lib/payFlow";
-import { openExternalLink } from "@/lib/telegram";
-
-const SUPPORT_URL = `https://t.me/${process.env.REACT_APP_ADMIN_TELEGRAM_USERNAME || "FidemAppSupport"}`;
+import { openSupportChat } from "@/lib/support";
 
 const groupDigits = (n) => String(n ?? "").replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 const formatCard = (c) => String(c || "").replace(/\s+/g, "").replace(/(\d{4})(?=\d)/g, "$1 ");
@@ -172,7 +170,7 @@ export default function PayTransferSheet() {
               <button
                 type="button"
                 data-testid="pay-support"
-                onClick={() => openExternalLink(SUPPORT_URL)}
+                onClick={openSupportChat}
                 className="w-full mt-4 rounded-2xl border border-border py-3 text-sm font-medium hover:bg-muted transition"
               >
                 {t("contact_admin")}

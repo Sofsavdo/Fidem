@@ -24,7 +24,7 @@ const P = {
         "Yopiq rasmlar faqat siz ruxsat bergan foydalanuvchilarga ko'rsatiladi va serverdan ruxsatsiz uzatilmaydi. Ilova ichida rasmlarni saqlab olish va ulashish funksiyalari cheklangan. Maxfiy rejim yoqilganda profilingiz qidiruv va ro'yxatlarda ko'rinmaydi.",
       ]],
       ["Saqlash muddati va o'chirish", [
-        "Ma'lumotlar akkaunt faol bo'lgan davrda saqlanadi. Akkauntni va unga bog'liq ma'lumotlarni o'chirishni so'rash uchun qo'llab-quvvatlashga murojaat qiling: t.me/FidemAppSupport",
+        "Ma'lumotlar akkaunt faol bo'lgan davrda saqlanadi. Akkauntni va unga bog'liq ma'lumotlarni o'chirishni so'rash uchun qo'llab-quvvatlashga murojaat qiling: t.me/Medik005",
       ]],
       ["Rozilik", [
         "Ro'yxatdan o'tishda rozilik belgisini qo'yish orqali siz ushbu siyosatga muvofiq ma'lumotlaringiz qayta ishlanishiga rozilik bildirasiz. Siyosat yangilanishi mumkin; muhim o'zgarishlarda xabardor qilinasiz.",
@@ -51,7 +51,7 @@ const P = {
         "Закрытые фото показываются только пользователям, которым вы дали разрешение, и не передаются без него. Сохранение и шаринг фото внутри приложения ограничены. При включённом скрытом режиме ваш профиль не отображается в поиске и списках.",
       ]],
       ["Срок хранения и удаление", [
-        "Данные хранятся, пока аккаунт активен. Для удаления аккаунта и связанных данных обратитесь в поддержку: t.me/FidemAppSupport",
+        "Данные хранятся, пока аккаунт активен. Для удаления аккаунта и связанных данных обратитесь в поддержку: t.me/Medik005",
       ]],
       ["Согласие", [
         "Ставя галочку согласия при регистрации, вы соглашаетесь на обработку данных в соответствии с настоящей политикой. Политика может обновляться; о существенных изменениях вы будете уведомлены.",
@@ -78,7 +78,7 @@ const P = {
         "Locked photos are shown only to users you approve and are never served without permission. Saving and sharing photos inside the app is restricted. With hidden mode on, your profile does not appear in search or lists.",
       ]],
       ["Retention and deletion", [
-        "Data is kept while the account is active. To delete your account and related data, contact support: t.me/FidemAppSupport",
+        "Data is kept while the account is active. To delete your account and related data, contact support: t.me/Medik005",
       ]],
       ["Consent", [
         "By ticking the consent checkbox at signup you agree to your data being processed under this policy. The policy may be updated; you will be notified of material changes.",
@@ -110,7 +110,7 @@ export default function Privacy() {
           </section>
         ))}
         <p className="text-sm">
-          <a className="text-primary underline" href="https://t.me/FidemAppSupport" target="_blank" rel="noreferrer">t.me/FidemAppSupport</a>
+          <a className="text-primary underline" href="https://t.me/Medik005" target="_blank" rel="noreferrer">t.me/Medik005</a>
         </p>
       </main>
     </div>
