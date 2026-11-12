@@ -19,6 +19,10 @@ const EDUCATION = {
 
 const norm = (v) => String(v || "").trim().toLowerCase().replace(/[‘’ʻ`]/g, "'");
 
+export function religionKey(value) {
+  return value ? RELIGION[norm(value)] || "" : "";
+}
+
 export function religionLabel(value, t) {
   if (!value) return "—";
   const key = RELIGION[norm(value)];

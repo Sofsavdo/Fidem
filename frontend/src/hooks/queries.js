@@ -739,6 +739,32 @@ export function useAdminDeleteMessage() {
   });
 }
 
+export function useAdminModeration() {
+  return useQuery({
+    queryKey: ["admin", "moderation"],
+    queryFn: () => api.get("/admin/moderation").then((r) => r.data),
+    staleTime: 30_000,
+  });
+}
+
+export function useAdminModerationEvents(params) {
+  return useQuery({
+    queryKey: ["admin", "moderationEvents", params],
+    queryFn: () => api.get("/admin/moderation/events", { params }).then((r) => r.data),
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useAdminModerationActions() {
+  const queryClient = useQueryClient();
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["admin"] });
+  return {
+    setAi: useMutation({ mutationFn: (on) => api.post("/admin/moderation", { ai_enabled: on }), onSuccess: refresh }),
+    unmute: useMutation({ mutationFn: (uid) => api.post(`/admin/users/${uid}/unmute-temp`), onSuccess: refresh }),
+  };
+}
+
 export function useAdminFraud(params) {
   return useQuery({
     queryKey: QK.adminFraud(params),

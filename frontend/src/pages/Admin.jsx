@@ -13,7 +13,7 @@ import {
   useAdminStats, useAdminUsers, useAdminRegions, useAdminUserSearch, useUpdateAdminUser,
   useAdminPayments, useAdminPaymentBlock, useAdminVerifications, useAdminDecideVerification,
   useAdminReports, useAdminWithdrawals, useAdminWithdrawalDecision, useAdminConcierge,
-  useAdminConciergeMatch, useAdminReferrals, useAdminReferrers, useAdminReferrerDetail, useAdminMessages, useAdminDeleteMessage,
+  useAdminConciergeMatch, useAdminReferrals, useAdminReferrers, useAdminReferrerDetail, useAdminMessages, useAdminDeleteMessage, useAdminModeration, useAdminModerationEvents, useAdminModerationActions,
   useAdminFraud, useAdminMarkSafe, useAdminBroadcast,
   useAdminCeo, useAdminFunnel, useAdminEngagement, useAdminRevenue,
   useAdminConciergeAnalytics, useAdminChatModAnalytics, useAdminAuditLog, useAdminGiftShop,
@@ -70,7 +70,7 @@ const STATUS_UZ = {
 };
 const statusUz = (s) => STATUS_UZ[s] || s || "—";
 const ACTION_UZ = {
-  update_user: "Foydalanuvchini o'zgartirdi", set_women_free: "Ayollar uchun bepul Premium'ni o'zgartirdi", delete_demo_users: "Demo profillarni o'chirdi",
+  update_user: "Foydalanuvchini o'zgartirdi", set_women_free: "Ayollar uchun bepul Premium'ni o'zgartirdi", set_ai_moderation: "Chat AI nazoratini o'zgartirdi", unmute_temp: "Yozish taqiqini olib tashladi", delete_demo_users: "Demo profillarni o'chirdi",
   give_premium: "Premium berdi", give_vip: "VIP berdi", give_standard: "Standard berdi",
   reset_balance: "Balansni tozaladi", reset_likes: "Like'larni tozaladi", mute: "Ovozini o'chirdi",
   unmute: "Ovozini yoqdi", shadow_ban: "Yashirin ban", unshadow_ban: "Yashirin bandan chiqardi",
@@ -81,7 +81,7 @@ const ACTION_UZ = {
   broadcast: "Xabar yubordi",
 };
 const actionUz = (a) => { const k = String(a || "").replace(/^user_action:/, ""); return ACTION_UZ[k] || k; };
-const FIELD_UZ = { women_free: "Ayollar uchun bepul",
+const FIELD_UZ = { women_free: "Ayollar uchun bepul", ai_enabled: "AI nazorat",
   verified_identity: "shaxs", verified_selfie: "selfie", verified_financial: "moliyaviy", add_balance: "balansga qo'shildi",
   plan: "tarif", blocked: "blok", count: "soni", target_ids: "kimlar", days: "kun", amount: "summa", topup_id: "so'rov",
 };
@@ -1865,7 +1865,10 @@ function AdminVerifications() {
   );
 }
 
-const REPORT_REASON_UZ = { money_request: "💸 Pul / karta so'radi (avtomatik aniqlandi)" };
+const REPORT_REASON_UZ = {
+  money_request: "💸 Pul / karta so'radi (avtomatik aniqlandi)",
+  abuse: "🛡️ Qayta-qayta haqorat / behayo xabar (avtomatik, 24 soat yozish taqiqlandi)",
+};
 
 function AdminReports() {
   const { data: list = [] } = useAdminReports();
@@ -2215,6 +2218,73 @@ function AdminChatModAnalyticsPanel({ onOpenUser }) {
   );
 }
 
+const MOD_CAT_UZ = {
+  insult: "Haqorat", obscene: "So'kinish", sexual: "Behayo / jinsiy", harassment: "Bezovta qilish",
+  threat: "Tahdid", hate: "Nafrat", scam: "Firibgarlik", drugs: "Giyohvandlik", other: "Qoidaga zid",
+};
+
+function AdminModerationPanel({ onOpenUser }) {
+  const { data: st } = useAdminModeration();
+  const [page, setPage] = useState(1);
+  const limit = 15;
+  const { data } = useAdminModerationEvents({ page, limit });
+  const { setAi, unmute } = useAdminModerationActions();
+  const items = data?.items || [];
+  const now = Date.now();
+  return (
+    <div className="rounded-3xl bg-card border border-border p-4 space-y-3" data-testid="admin-moderation">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">🛡️ Chat nazorati</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+            Haqorat, so'kinish va behayo xabarlar suhbatdoshga yetib bormaydi, yuboruvchi ogohlantiriladi.
+            24 soatda 3 marta buzgan odam 24 soat yoza olmaydi. AI o'chiq bo'lsa ham so'zlar ro'yxati ishlayveradi.
+          </p>
+        </div>
+        <button
+          data-testid="admin-moderation-ai-toggle"
+          onClick={() => setAi.mutate(!st?.ai_enabled, { onSuccess: () => toast.success(st?.ai_enabled ? "AI nazorat o'chirildi" : "AI nazorat yoqildi") })}
+          disabled={!st || setAi.isPending}
+          className={`shrink-0 text-xs rounded-full px-3 py-1.5 font-semibold ${st?.ai_enabled ? "bg-secondary text-white" : "bg-muted text-muted-foreground"}`}
+        >
+          🤖 AI: {st?.ai_enabled ? "yoqilgan" : "o'chiq"}
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <KpiTile label="Bloklangan xabar (24 soat)" value={st?.blocked_24h ?? "—"} accent={(st?.blocked_24h || 0) > 0} />
+        <KpiTile label="Hozir yoza olmaydi" value={st?.muted_now ?? "—"} />
+      </div>
+      {items.length === 0 && <p className="text-xs text-muted-foreground">Hozircha bloklangan xabar yo'q</p>}
+      <div className="space-y-1.5">
+        {items.map((e) => {
+          const mutedUntil = e.from_user?.muted_until ? new Date(e.from_user.muted_until) : null;
+          const muted = mutedUntil && mutedUntil.getTime() > now;
+          return (
+            <div key={e.id} className="rounded-2xl border border-rose-200 dark:border-rose-900 bg-rose-50/50 dark:bg-rose-950/20 p-2.5" data-testid={`adm-mod-${e.id}`}>
+              <div className="flex items-center gap-2 text-xs flex-wrap">
+                <span className="rounded-full bg-rose-600 text-white px-2 py-0.5 text-[10px] font-semibold">{MOD_CAT_UZ[e.category] || e.category}</span>
+                <span className="text-muted-foreground">{e.source === "ai" ? "🤖 AI" : "📋 so'z ro'yxati"}</span>
+                <button onClick={() => onOpenUser(e.from_user_id)} className="font-medium underline truncate max-w-[40%]">{e.from_user?.name || e.from_user_id?.slice(0, 8)}</button>
+                <span className="text-muted-foreground">→ {e.to_user_name || "—"}</span>
+              </div>
+              <p className="text-sm mt-1 break-words">«{e.text}»</p>
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-[10px] text-muted-foreground">{new Date(e.created_at).toLocaleString("uz-UZ")} · jami buzish: {e.from_user?.moderation_strikes || 1}</span>
+                {muted && (
+                  <button onClick={() => unmute.mutate(e.from_user_id, { onSuccess: () => toast.success("Yozish ochildi") })} className="text-[11px] rounded-full border border-border px-2 py-0.5">
+                    🔓 Yozishni ochish
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <AdminPagination page={page} setPage={setPage} total={data?.total || 0} limit={limit} />
+    </div>
+  );
+}
+
 function AdminMessages() {
   const [q, setQ] = useState("");
   const [userIdFilter, setUserIdFilter] = useState("");
@@ -2235,10 +2305,11 @@ function AdminMessages() {
 
   return (
     <div className="space-y-4" data-testid="admin-messages">
+      <AdminModerationPanel onOpenUser={setUserIdFilter} />
       <AdminChatModAnalyticsPanel onOpenUser={setUserIdFilter} />
       <div className="space-y-2">
-        <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search messages by text..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" />
-        <input value={userIdFilter} onChange={(e) => { setUserIdFilter(e.target.value); setPage(1); }} placeholder="Filter by user ID..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" />
+        <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Xabar matni bo'yicha qidirish..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" />
+        <input value={userIdFilter} onChange={(e) => { setUserIdFilter(e.target.value); setPage(1); }} placeholder="Foydalanuvchi ID bo'yicha..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" />
       </div>
 
       {loading && (

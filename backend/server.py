@@ -183,6 +183,8 @@ async def startup() -> None:
     await db.compat_unlocks.create_index([("user_id", 1), ("target_id", 1)], unique=True)
     await db.compat_reports.create_index([("user_id", 1), ("target_id", 1)], unique=True)
     await db.contact_exchanges.create_index([("chat_id", 1), ("status", 1)])
+    await db.moderation_events.create_index([("from_user_id", 1), ("created_at", -1)])
+    await db.moderation_events.create_index([("created_at", -1)])
     await db.reports.create_index([("target_id", 1), ("status", 1)])
     await db.success_stories.create_index("created_at")
     # serve_file() (GET /api/files/{path}) queries by storage_path, not path -

@@ -7,7 +7,7 @@ import { purchasePlan } from "@/lib/purchase";
 import { VerifiedBadge, FinancialBadge, MatchBadge, OnlineDot, LocationBadge } from "@/components/Badges";
 import CompatibilityCard from "@/components/CompatibilityCard";
 import { photoSrc } from "@/lib/photo";
-import { religionLabel, educationLabel } from "@/lib/profileValues";
+import { religionLabel, religionKey, educationLabel } from "@/lib/profileValues";
 import { track } from "@/lib/analytics";
 import PhotoFill from "@/components/PhotoFill";
 import { formatLastActive } from "@/lib/time";
@@ -281,7 +281,7 @@ export default function ProfileDetail() {
             <h1 className="font-heading text-3xl font-semibold flex items-center gap-2">
               {c.name}, {c.age} <OnlineDot online={c.online} />
             </h1>
-            <p className="text-sm text-white/85">{c.region} · {c.district}{c.distance_bucket ? ` · ${c.distance_bucket} ${t("away")}` : ""} · {formatLastActive(c.last_active_minutes, t, c.online)}</p>
+            <p className="text-sm text-white/85">📍 {c.region} · {c.district}{c.distance_bucket ? ` · ${c.distance_bucket} ${t("away")}` : ""} · {formatLastActive(c.last_active_minutes, t, c.online)}</p>
           </div>
         </div>
       </div>
@@ -334,26 +334,26 @@ export default function ProfileDetail() {
         )}
 
         {/* ---- Section: basic info ---- */}
-        <p className="field-label pt-1">{t("pd_section_basic")}</p>
+        <p className="field-label pt-1">📋 {t("pd_section_basic")}</p>
 
-        {/* Key stats — 2 columns on mobile, 3 on larger */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2" data-testid="profile-stats">
-          <Stat label={t("height")} value={c.height_cm ? `${c.height_cm} sm` : "—"} />
-          <Stat label={t("weight")} value={c.weight_kg ? `${c.weight_kg} kg` : "—"} />
-          <Stat label={t("marital_status")} value={t(c.marital_status)} />
-          <Stat label={t("has_children")} value={c.has_children ? `${t("yes")}${c.children_count ? ` · ${c.children_count}` : ""}` : t("no")} />
-          <Stat label={t("education")} value={educationLabel(c.education, lang)} />
-          <Stat label={t("religion")} value={religionLabel(c.religion, t)} />
-          <Stat label={t("smoking")} value={c.smoking ? t(c.smoking) : "—"} />
-          <Stat label={t("alcohol")} value={c.alcohol ? t(c.alcohol) : "—"} />
-          <Stat label={t("relocation")} value={c.relocation == null ? "—" : (c.relocation ? t("yes") : t("no"))} />
+        {/* Key facts — each with an emoji that matches the answer, so the
+            profile reads at a glance instead of as a list of plain labels. */}
+        <div className="grid grid-cols-2 gap-2" data-testid="profile-stats">
+          {profileFacts(c, t, lang).map((f, i, all) => (
+            <Stat key={f.key} {...f} wide={all.length % 2 === 1 && i === all.length - 1} />
+          ))}
         </div>
 
         {/* Profession card — separate row for clarity */}
-        <div className="rounded-2xl bg-card border border-border p-4">
-          <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">{t("profession")}</p>
-          <p className="text-base mt-1 font-medium">{c.profession || "—"}</p>
-        </div>
+        {c.profession && (
+          <div className="rounded-2xl bg-card border border-border p-3.5 flex items-center gap-3" data-testid="profile-profession">
+            <span className="w-10 h-10 shrink-0 rounded-xl grid place-items-center text-xl bg-indigo-50 dark:bg-indigo-950/40" aria-hidden>💼</span>
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{t("profession")}</p>
+              <p className="text-base font-semibold leading-tight break-words">{c.profession}</p>
+            </div>
+          </div>
+        )}
 
         {c.avg_response_min != null && (
           <div className="rounded-2xl bg-secondary/5 border border-secondary/20 p-3 flex items-center gap-2 text-sm" data-testid="response-speed">
@@ -365,11 +365,11 @@ export default function ProfileDetail() {
         )}
 
         {/* ---- Section: personality & interests ---- */}
-        <p className="field-label pt-3">{t("pd_section_personality")}</p>
+        <p className="field-label pt-3">✨ {t("pd_section_personality")}</p>
 
         {c.bio && (
           <div className="rounded-2xl bg-card border border-border p-4">
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-2">{t("bio")}</p>
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-2">✍️ {t("bio")}</p>
             <p className="text-sm leading-relaxed whitespace-pre-wrap">{c.bio}</p>
           </div>
         )}
@@ -454,11 +454,50 @@ export default function ProfileDetail() {
   );
 }
 
-const Stat = memo(function Stat({ label, value }) {
+const TONES = {
+  sky: "bg-sky-50 dark:bg-sky-950/40",
+  rose: "bg-rose-50 dark:bg-rose-950/40",
+  amber: "bg-amber-50 dark:bg-amber-950/40",
+  violet: "bg-violet-50 dark:bg-violet-950/40",
+  emerald: "bg-emerald-50 dark:bg-emerald-950/40",
+  teal: "bg-teal-50 dark:bg-teal-950/40",
+};
+
+const RELIGION_EMOJI = {
+  rel_islam: "🕌", rel_christianity: "⛪", rel_judaism: "🕍",
+  rel_buddhism: "☸️", rel_hinduism: "🕉️", rel_other: "🙏",
+};
+
+const habitEmoji = (v, no, yes) => (v === "no" ? no : v ? yes : "");
+
+// Profile facts with an emoji that fits the answer. Facts the person
+// didn't fill in are left out instead of showing a row of dashes.
+function profileFacts(c, t, lang) {
+  const facts = [
+    c.height_cm && { key: "height", emoji: "📏", tone: "sky", label: t("height"), value: `${c.height_cm} sm` },
+    c.weight_kg && { key: "weight", emoji: "⚖️", tone: "sky", label: t("weight"), value: `${c.weight_kg} kg` },
+    c.marital_status && { key: "marital", emoji: c.marital_status === "single" ? "💫" : "💍", tone: "rose", label: t("marital_status"), value: t(c.marital_status) },
+    c.has_children != null && {
+      key: "children", emoji: c.has_children ? "👨‍👩‍👧" : "🧸", tone: "rose", label: t("has_children"),
+      value: c.has_children ? `${t("yes")}${c.children_count ? ` · ${c.children_count}` : ""}` : t("no"),
+    },
+    c.education && { key: "education", emoji: "🎓", tone: "violet", label: t("education"), value: educationLabel(c.education, lang) },
+    c.religion && { key: "religion", emoji: RELIGION_EMOJI[religionKey(c.religion)] || "🙏", tone: "emerald", label: t("religion"), value: religionLabel(c.religion, t) },
+    c.smoking && { key: "smoking", emoji: habitEmoji(c.smoking, "🚭", "🚬"), tone: "amber", label: t("smoking"), value: t(c.smoking) },
+    c.alcohol && { key: "alcohol", emoji: habitEmoji(c.alcohol, "🥤", "🍷"), tone: "amber", label: t("alcohol"), value: t(c.alcohol) },
+    c.relocation != null && { key: "relocation", emoji: c.relocation ? "✈️" : "🏡", tone: "teal", label: t("relocation"), value: c.relocation ? t("yes") : t("no") },
+  ];
+  return facts.filter(Boolean);
+}
+
+const Stat = memo(function Stat({ emoji, tone, label, value, wide }) {
   return (
-    <div className="rounded-2xl bg-card border border-border p-3 min-w-0">
-      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
-      <p className="text-sm font-semibold mt-1 leading-tight break-words">{value}</p>
+    <div className={`rounded-2xl bg-card border border-border p-2.5 min-w-0 flex items-center gap-2.5 ${wide ? "col-span-2" : ""}`} data-testid="profile-fact">
+      <span className={`w-9 h-9 shrink-0 rounded-xl grid place-items-center text-lg ${TONES[tone] || "bg-muted"}`} aria-hidden>{emoji}</span>
+      <div className="min-w-0">
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium leading-tight">{label}</p>
+        <p className="text-sm font-semibold mt-0.5 leading-tight break-words">{value}</p>
+      </div>
     </div>
   );
 });

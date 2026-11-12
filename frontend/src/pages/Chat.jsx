@@ -271,6 +271,8 @@ export default function Chat() {
         contact_use_button: "contact_use_button_error",
         money_request_blocked: "money_request_blocked_error",
         selfie_required: "selfie_required_error",
+        message_blocked: "message_blocked_error",
+        muted_temp: "muted_temp_error",
         photo_required: "photo_required_error",
         message_too_long: "msg_too_long_error",
         empty_message: "msg_empty_error",
@@ -284,7 +286,7 @@ export default function Chat() {
       }
       setMessages((prev) => prev.filter((m) => m.id !== tempMsg.id));
       // Give the text back so it can be fixed, not retyped.
-      if (detail === "message_too_long" || detail === "contact_use_button") setText(finalText);
+      if (detail === "message_too_long" || detail === "contact_use_button" || detail === "message_blocked") setText(finalText);
       if (detail === "contact_use_button") openExchange();
       load();
     } finally { sendLockRef.current = false; setSending(false); }
