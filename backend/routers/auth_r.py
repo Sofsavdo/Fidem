@@ -246,7 +246,7 @@ def _build_me_payload(user: dict) -> dict:
 
 @router.post("/auth/register", response_model=AuthResponse)
 async def register(req: RegisterRequest, request: Request):
-    rate_limit_auth(request)
+    rate_limit_auth(request, req.email)
     existing = await db.users.find_one({"email": req.email.lower()})
     if existing:
         raise HTTPException(400, "Email already registered")
@@ -259,7 +259,9 @@ async def register(req: RegisterRequest, request: Request):
     doc = {
         "id": uid,
         "email": req.email.lower(),
-        "password_hash": hash_pw(req.password),
+        # bcrypt takes ~0.2 s of CPU: off the event loop so one sign-up
+        # doesn't stall every other request in this single worker.
+        "password_hash": await asyncio.to_thread(hash_pw, req.password),
         "name": req.name or req.email.split("@")[0],
         "created_at": iso(now_utc()),
         "last_active": iso(now_utc()),
@@ -290,9 +292,9 @@ async def register(req: RegisterRequest, request: Request):
 
 @router.post("/auth/login", response_model=AuthResponse)
 async def login(req: LoginRequest, request: Request):
-    rate_limit_auth(request)
+    rate_limit_auth(request, req.email)
     user = await db.users.find_one({"email": req.email.lower()})
-    if not user or not check_pw(req.password, user.get("password_hash", "")):
+    if not user or not await asyncio.to_thread(check_pw, req.password, user.get("password_hash", "")):
         raise HTTPException(401, "Invalid credentials")
     is_admin = bool(user.get("is_admin", False))
     return AuthResponse(

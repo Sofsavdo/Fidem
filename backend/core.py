@@ -665,9 +665,13 @@ class RateLimiter:
             del self.hits[k]
 
 
-auth_limiter = RateLimiter(max_attempts=10, window_sec=300)
-payment_limiter = RateLimiter(max_attempts=5, window_sec=60)
-verification_limiter = RateLimiter(max_attempts=5, window_sec=600)
+# Uzbek mobile carriers put many subscribers behind one public IP (CGNAT),
+# so a tight per-IP limit blocks real people during an ad wave. Per-account
+# keys carry the tight limits; per-IP buckets only stop floods.
+auth_limiter = RateLimiter(max_attempts=10, window_sec=300)          # per IP + email
+auth_ip_limiter = RateLimiter(max_attempts=120, window_sec=300)      # per IP (flood guard)
+payment_limiter = RateLimiter(max_attempts=5, window_sec=60)         # per account
+verification_limiter = RateLimiter(max_attempts=5, window_sec=600)   # per account
 
 
 def _client_ip(request: Request) -> str:
@@ -688,19 +692,21 @@ def _client_ip(request: Request) -> str:
     return ip
 
 
-def rate_limit_auth(request: Request) -> None:
-    auth_limiter.check(f"auth:{_client_ip(request)}")
+def rate_limit_auth(request: Request, account: str = "") -> None:
+    ip = _client_ip(request)
+    auth_ip_limiter.check(f"authip:{ip}")
+    auth_limiter.check(f"auth:{ip}:{(account or '').strip().lower()}")
 
 
-def rate_limit_payment(request: Request) -> None:
-    payment_limiter.check(f"payment:{_client_ip(request)}")
+def rate_limit_payment(request: Request, uid: str = "") -> None:
+    payment_limiter.check(f"payment:{uid or _client_ip(request)}")
 
 
-def rate_limit_verification(request: Request) -> None:
+def rate_limit_verification(request: Request, uid: str = "") -> None:
     # /verification/request triggers a Gemini/Claude vision API call per
     # submission - unlimited submissions is an unbounded-cost / provider-DoS
     # vector, not just a UX nuisance.
-    verification_limiter.check(f"verification:{_client_ip(request)}")
+    verification_limiter.check(f"verification:{uid or _client_ip(request)}")
 
 
 async def rate_limiter_gc_loop() -> None:
@@ -711,6 +717,7 @@ async def rate_limiter_gc_loop() -> None:
         await asyncio.sleep(900)
         try:
             auth_limiter.gc()
+            auth_ip_limiter.gc()
             payment_limiter.gc()
             verification_limiter.gc()
         except Exception:

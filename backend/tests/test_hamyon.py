@@ -35,7 +35,7 @@ def env(monkeypatch):
     monkeypatch.setattr(hamyon, "HAMYON_SHOP_ID", SHOP_ID)
     monkeypatch.setattr(hamyon, "HAMYON_SHOP_KEY", SHOP_KEY)
     monkeypatch.setattr(payments_r, "HAMYON_SHOP_ID", SHOP_ID)
-    monkeypatch.setattr(payments_r, "rate_limit_payment", lambda request: None)
+    monkeypatch.setattr(payments_r, "rate_limit_payment", lambda *a, **k: None)
 
     calls = {"create": [], "status": "pending", "cancel": [], "deliver": 0}
 

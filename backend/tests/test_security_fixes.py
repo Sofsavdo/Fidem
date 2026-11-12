@@ -747,3 +747,39 @@ def test_push_notif_forwards_real_kind_to_notify_telegram(monkeypatch):
 
     asyncio.run(_run())
     assert received_kinds == ["referral"], received_kinds
+
+
+# ---------- rate limits under carrier NAT (many people, one public IP) ----------
+from fastapi import HTTPException  # noqa: E402
+def _req_from(ip: str):
+    class R:
+        client = type("C", (), {"host": ip})()
+        headers = {}
+    return R()
+
+
+def test_shared_ip_does_not_block_other_accounts():
+    """Uzbek mobile carriers share one public IP between many subscribers:
+    one person hitting their limit must not lock out everybody else."""
+    core.verification_limiter.hits.clear()
+    core.payment_limiter.hits.clear()
+    req = _req_from("203.0.113.9")
+    for _ in range(5):
+        core.rate_limit_verification(req, "user-a")
+    with pytest.raises(HTTPException):
+        core.rate_limit_verification(req, "user-a")
+    for i in range(20):
+        core.rate_limit_verification(req, f"user-{i + 1}")
+        core.rate_limit_payment(req, f"user-{i + 1}")
+
+
+def test_login_limit_is_per_account_with_an_ip_flood_guard():
+    core.auth_limiter.hits.clear()
+    core.auth_ip_limiter.hits.clear()
+    req = _req_from("203.0.113.10")
+    for _ in range(10):
+        core.rate_limit_auth(req, "a@x.uz")
+    with pytest.raises(HTTPException):
+        core.rate_limit_auth(req, "a@x.uz")
+    for i in range(50):
+        core.rate_limit_auth(req, f"u{i}@x.uz")
