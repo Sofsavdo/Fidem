@@ -486,7 +486,7 @@ export default function Chat() {
           <ShieldAlert className="w-3 h-3 shrink-0" /> {t("chat_safety_line")}
         </p>
         {messages.length === 0 && messagesLoaded && !isAi && !access?.requires_unlock && (
-          <Openers other={other} onPick={(o) => { setText(o); track("chat_opener_used"); }} />
+          <Openers other={other} onPick={(o) => { track("chat_opener_used"); send(o); }} />
         )}
         {messages.length === 0 && (isAi || !messagesLoaded || access?.requires_unlock) && (
           <div className="text-center py-12 text-muted-foreground text-sm">👋</div>
@@ -728,7 +728,7 @@ export default function Chat() {
         </div>
       </div>
       <QuestionDeck open={deckOpen} onClose={() => setDeckOpen(false)}
-        onPick={(q) => { setText(q); setDeckOpen(false); track("chat_deck_question_used"); }} />
+        onPick={(q) => { setDeckOpen(false); track("chat_deck_question_used"); send(q); }} />
       {giftOpen && (
         <GiftModal
           targetId={otherId}
