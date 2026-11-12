@@ -87,32 +87,27 @@ export default function ProfileDetail() {
 
   const shareProfile = useCallback(async () => {
     const shareText = `${c.name}, ${c.age} — ${c.region}. FIDEM orqali tanishing!`;
-    const shareUrl = `https://t.me/${window.Telegram?.WebApp?.initDataUnsafe?.user?.username || 'Fidem_Appbot'}?start=share_${id}`;
-    
-    if (window.Telegram?.WebApp) {
+    // The bot's username, not the viewer's: the link used to be built from the
+    // viewer's own Telegram username, so it opened their chat, not the app.
+    const shareUrl = c.share_url || `https://t.me/Fidem_Appbot?start=share_${id}`;
+    const tg = window.Telegram?.WebApp;
+    if (tg?.openTelegramLink && tg.initData) {
+      tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`);
+      return;
+    }
+    if (navigator.share) {
       try {
-        window.Telegram.WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`);
-        toast.success(t("share_success"));
+        await navigator.share({ title: `${c.name} — FIDEM`, text: shareText, url: shareUrl });
+        return;
       } catch (e) {
-        toast.error(t("error_generic"));
+        if (e?.name === "AbortError") return; // the person closed the share sheet
       }
-    } else {
-      // Fallback for web
-      if (navigator.share) {
-        try {
-          await navigator.share({
-            title: `${c.name} — FIDEM`,
-            text: shareText,
-            url: shareUrl,
-          });
-        } catch (e) {
-          toast.error(t("error_generic"));
-        }
-      } else {
-        // Copy to clipboard
-        navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
-        toast.success(t("share_copied"));
-      }
+    }
+    try {
+      await navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
+      toast.success(t("share_copied"));
+    } catch {
+      window.prompt(t("share_copied"), shareUrl);
     }
   }, [c, id, t]);
 
@@ -300,12 +295,6 @@ export default function ProfileDetail() {
               preload="metadata"
               className="w-full rounded-3xl bg-black max-h-72"
             />
-          </div>
-        )}
-
-        {c.is_ai && (
-          <div data-testid="profile-ai-note" className="rounded-2xl border border-violet-300 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/40 p-3 text-sm leading-relaxed">
-            🤖 {t("ai_profile_note")}
           </div>
         )}
 

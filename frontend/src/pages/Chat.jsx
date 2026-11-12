@@ -212,8 +212,8 @@ export default function Chat() {
   const [shareOpen, setShareOpen] = useState(false);
   const { state: cx, reload: reloadCx } = useContactExchange(otherId);
   // Women write only after the live selfie check (fake female profiles).
-  // AI conversation partners: labelled, free, text only, no contact exchange.
-  const isAi = !!(other?.is_ai || access?.is_ai || String(otherId).startsWith("ai_"));
+  // The FIDEM assistant: free, text only, no contact exchange.
+  const isAi = !!(other?.is_ai || access?.is_ai || otherId === "ai_assistant");
   const needsSelfie = !isAi && user?.gender === "female" && !user?.verified_selfie && !user?.is_admin;
   const openExchange = () => { setShareOpen(true); reloadCx(true); };
   useEffect(() => {
@@ -410,7 +410,7 @@ export default function Chat() {
         )}
         {isAi && (
           <p data-testid="chat-ai-note" className="self-center max-w-[92%] text-center text-[11px] text-violet-800 dark:text-violet-200 bg-violet-100 dark:bg-violet-950/50 rounded-2xl px-3 py-1.5">
-            🤖 {otherId === "ai_assistant" ? t("assistant_chat_note") : t("ai_chat_note")}
+            🤖 {t("assistant_chat_note")}
           </p>
         )}
         <p data-testid="chat-safety" className="self-center max-w-[92%] text-center text-[11px] text-muted-foreground bg-muted/60 rounded-full px-3 py-1 inline-flex items-center gap-1">

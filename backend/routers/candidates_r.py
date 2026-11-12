@@ -221,10 +221,8 @@ async def candidates(
 
     if me_doc.get("search_gender"):
         query["gender"] = me_doc["search_gender"]
-    # AI conversation partners (labelled) - only while the admin keeps them on.
-    import ai_personas
-    if not await ai_personas.enabled():
-        query["is_ai"] = {"$ne": True}
+    # The AI assistant is never a candidate.
+    query["is_ai"] = {"$ne": True}
 
     # Travel Mode: if user has active travel_region, use it as filter unless explicit region passed
     if not region:
@@ -350,9 +348,6 @@ async def candidates(
             trust_bonus = (10 if d.get("verified_selfie") else 0) + (5 if d.get("photo_verified") else 0)
             return (
                 0 if boosted else 1,
-                # Real people always come before the AI conversation partners,
-                # which only fill the list while it's thin.
-                1 if d.get("is_ai") else 0,
                 0 if same_region else 1,
                 -(x.get("match_score", 0) + fresh_bonus + trust_bonus),
                 -x.get("completeness", 0),
@@ -517,6 +512,9 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
             )
         )
 
+    # Share link: opens this profile through the bot (see telegram_r "share_").
+    from core import TELEGRAM_BOT_USERNAME
+    pub["share_url"] = f"https://t.me/{TELEGRAM_BOT_USERNAME}?start=share_{target_id}"
     return strip_locked_photo(pub)
 
 

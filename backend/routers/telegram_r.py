@@ -117,7 +117,9 @@ async def _handle_start(chat_id: int, tg_user_id: str, text: str) -> None:
     # link - a bare "sf_" prefix can never collide with a real referral_id/
     # username, both of which are assigned without it.
     sofsavdo_click_token = start_param if start_param and start_param.startswith("sf_") else None
-    ref_code = start_param if start_param and not sofsavdo_click_token else None
+    # "share_<profile id>": someone shared a profile; open that profile.
+    share_target = start_param[6:] if start_param and start_param.startswith("share_") else None
+    ref_code = start_param if start_param and not sofsavdo_click_token and not share_target else None
 
     # Record every /start so the onboarding funnel is measurable and the
     # lifecycle nudger can re-engage people who never open the Mini App.
@@ -208,6 +210,20 @@ async def _handle_start(chat_id: int, tg_user_id: str, text: str) -> None:
                 )
 
     webapp_url = get_webapp_url()
+    shared_line = ""
+    if share_target:
+        shared = await db.users.find_one(
+            {"id": share_target, "onboarded": True, "blocked": {"$ne": True},
+             "hidden_profile": {"$ne": True}, "shadow_banned": {"$ne": True}},
+            {"_id": 0, "id": 1, "name": 1, "birth_date": 1, "region": 1},
+        )
+        if shared:
+            from core import age_from_birth
+            webapp_url = f"{webapp_url.rstrip('/')}/candidate/{shared['id']}"
+            shared_line = (
+                f"👤 Sizga profil ulashildi: {shared.get('name', '')}, "
+                f"{age_from_birth(shared.get('birth_date', '2000-01-01'))} — {shared.get('region', '')}\n\n"
+            )
 
     from core import women_free_active
     promo_line = "🎁 Ayollar uchun Premium hozir bepul\n\n" if await women_free_active() else ""
@@ -218,15 +234,15 @@ async def _handle_start(chat_id: int, tg_user_id: str, text: str) -> None:
         "✅ Xavfsiz chat, yopiq rasmlar\n"
         "✅ Oilaviy aloqa — ota-onalar ham ishtirok etadi\n"
         "✅ Telegram ichida, o'rnatish shart emas\n\n"
-        + promo_line +
-        "👇 Ilovani ochish uchun tugmani bosing"
+        + promo_line + shared_line +
+        ("👇 Profilni ochish uchun tugmani bosing" if shared_line else "👇 Ilovani ochish uchun tugmani bosing")
     )
 
     keyboard = {
         "inline_keyboard": [
             [
                 {
-                    "text": "💖 FIDEM'ni ochish",
+                    "text": "👤 Profilni ochish" if shared_line else "💖 FIDEM'ni ochish",
                     "web_app": {
                         "url": webapp_url,
                     },

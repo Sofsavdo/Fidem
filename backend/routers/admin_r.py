@@ -81,7 +81,7 @@ async def _compute_admin_stats() -> dict:
         pending_payments, pending_verifications, open_reports,
         pending_topups, pending_withdrawals, pending_concierge,
     ) = await asyncio.gather(
-        # AI conversation partners are not real users: left out of the counts.
+        # The AI assistant is not a real user: left out of the counts.
         db.users.count_documents({"is_ai": {"$ne": True}}),
         db.users.count_documents({"gender": "male", "is_ai": {"$ne": True}}),
         db.users.count_documents({"gender": "female", "is_ai": {"$ne": True}}),
@@ -954,29 +954,27 @@ async def admin_moderation_events(page: int = 1, limit: int = 30, user_id: str =
     return {"items": rows, "total": total, "page": page, "limit": limit}
 
 
-@router.get("/ai-personas")
-async def admin_get_ai_personas(_: str = Depends(get_current_admin)):
-    import ai_personas
+@router.get("/ai-assistant")
+async def admin_get_ai_assistant(_: str = Depends(get_current_admin)):
+    import ai_assistant
     since = iso(now_utc() - timedelta(hours=24))
-    chats_24h, replies_24h, total = await asyncio.gather(
-        db.messages.distinct("from_user_id", {"to_user_id": {"$regex": "^ai_"}, "created_at": {"$gte": since}}),
-        db.messages.count_documents({"from_user_id": {"$regex": "^ai_"}, "created_at": {"$gte": since}}),
-        db.users.count_documents({"is_ai": True, "ai_role": "candidate"}),
+    people, replies = await asyncio.gather(
+        db.messages.distinct("from_user_id", {"to_user_id": ai_assistant.ASSISTANT_ID, "created_at": {"$gte": since}}),
+        db.messages.count_documents({"from_user_id": ai_assistant.ASSISTANT_ID, "created_at": {"$gte": since}}),
     )
-    return {"enabled": await ai_personas.enabled(), "personas": total,
-            "people_24h": len(chats_24h), "replies_24h": replies_24h}
+    return {"enabled": await ai_assistant.enabled(), "people_24h": len(people), "replies_24h": replies}
 
 
-@router.post("/ai-personas")
-async def admin_set_ai_personas(enabled: bool = Body(..., embed=True), admin_uid: str = Depends(get_current_admin)):
-    import ai_personas
+@router.post("/ai-assistant")
+async def admin_set_ai_assistant(enabled: bool = Body(..., embed=True), admin_uid: str = Depends(get_current_admin)):
+    import ai_assistant
     await db.settings.update_one(
-        {"id": "ai_personas"},
-        {"$set": {"id": "ai_personas", "enabled": enabled, "updated_at": iso(now_utc())}},
+        {"id": "ai_assistant"},
+        {"$set": {"id": "ai_assistant", "enabled": enabled, "updated_at": iso(now_utc())}},
         upsert=True,
     )
-    ai_personas.reset_settings_cache()
-    await log_admin_action(admin_uid, "set_ai_personas", None, {"enabled": enabled})
+    ai_assistant.reset_settings_cache()
+    await log_admin_action(admin_uid, "set_ai_assistant", None, {"enabled": enabled})
     return {"ok": True, "enabled": enabled}
 
 

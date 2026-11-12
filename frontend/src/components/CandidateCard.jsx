@@ -35,11 +35,6 @@ function CandidateCardInner({ c, onSave, saved }) {
           <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/0 to-black/0" />
 
           {/* One small match pill — the rest of the badges live in the profile. */}
-          {c.is_ai && (
-            <span data-testid="ai-badge" className="absolute top-3 right-3 rounded-full bg-violet-600/90 text-white text-[11px] font-bold px-2 py-0.5 shadow" title={t("ai_badge_hint")}>
-              🤖 AI
-            </span>
-          )}
           <div className="absolute top-3 left-3">
             <MatchBadge score={c.match_score ?? 0} />
           </div>

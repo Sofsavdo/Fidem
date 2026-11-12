@@ -212,7 +212,12 @@ export default function Onboarding() {
       // on top of the "profile ready" moment.
       try { sessionStorage.setItem("fidem_just_onboarded", "1"); } catch { /* ignore */ }
       await refresh();
-      nav("/", { replace: true });
+      let next = "/";
+      try {
+        next = sessionStorage.getItem("fidem_after_onboarding") || "/";
+        sessionStorage.removeItem("fidem_after_onboarding");
+      } catch { /* private mode */ }
+      nav(next, { replace: true });
     } catch (e) {
       const detail = (e.response?.data?.detail || "").toString();
       if (detail === "photo_required") {

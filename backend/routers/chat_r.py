@@ -10,7 +10,7 @@ from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Resp
 from auth import decode_token, get_current_user_id
 from ai_service import detect_contact_info, detect_money_request
 import moderation
-import ai_personas
+import ai_assistant
 from core import (
     CHAT_GUARANTEE_HOURS,
     CHAT_UNLOCK_COINS,
@@ -133,11 +133,11 @@ async def can_initiate_chat(sender: dict, target_id: str) -> bool:
 async def chat_access(target_id: str, uid: str = Depends(get_current_user_id)):
     if target_id == uid:
         raise HTTPException(400, "self")
-    if target_id.startswith("ai_"):
+    if target_id == ai_assistant.ASSISTANT_ID:
         target = await db.users.find_one({"id": target_id}, {"_id": 0, "is_ai": 1})
         if target and target.get("is_ai"):
             me_ai = await get_user(uid)
-            on = await ai_personas.enabled()
+            on = await ai_assistant.enabled()
             return {
                 "can_message": on, "is_ai": True, "ai_off": not on, "blocked": False, "is_reply": False,
                 "unlocked": True, "plan": me_ai.get("plan", "free"), "plan_active": _plan_active(me_ai),
@@ -455,10 +455,10 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
         raise sender_doc
     if isinstance(target_doc, Exception):
         raise target_doc
-    # AI conversation partners: free to talk to (no paywall, no selfie gate),
-    # text only, and only while the admin keeps them switched on.
+    # The FIDEM assistant: free to talk to (no paywall, no selfie gate), text
+    # only, and only while the admin keeps it switched on.
     target_is_ai = bool(target_doc.get("is_ai"))
-    if target_is_ai and not await ai_personas.enabled():
+    if target_is_ai and not await ai_assistant.enabled():
         raise HTTPException(403, "ai_off")
     if target_is_ai and req.kind in ("voice", "video"):
         raise HTTPException(400, "ai_text_only")
@@ -562,7 +562,7 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
     # before the WS echo arrived, making the just-sent message vanish.
     if target_is_ai:
         asyncio.create_task(manager.broadcast_chat([uid], {"type": "message", "data": dict(msg)}))
-        ai_personas.schedule_reply(uid, req.to_user_id, cid)
+        ai_assistant.schedule_reply(uid, req.to_user_id, cid)
         return msg
     asyncio.create_task(manager.broadcast_chat([uid, req.to_user_id], {"type": "message", "data": dict(msg)}))
     asyncio.create_task(push_notif(

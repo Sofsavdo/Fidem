@@ -756,19 +756,19 @@ export function useAdminModerationEvents(params) {
   });
 }
 
-export function useAdminAiPersonas() {
+export function useAdminAiAssistant() {
   return useQuery({
-    queryKey: ["admin", "aiPersonas"],
-    queryFn: () => api.get("/admin/ai-personas").then((r) => r.data),
+    queryKey: ["admin", "aiAssistant"],
+    queryFn: () => api.get("/admin/ai-assistant").then((r) => r.data),
     staleTime: 30_000,
   });
 }
 
-export function useAdminSetAiPersonas() {
+export function useAdminSetAiAssistant() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (on) => api.post("/admin/ai-personas", { enabled: on }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "aiPersonas"] }),
+    mutationFn: (on) => api.post("/admin/ai-assistant", { enabled: on }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "aiAssistant"] }),
   });
 }
 

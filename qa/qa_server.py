@@ -64,8 +64,8 @@ async def seed_admin():
         "marital_status": "single", "has_children": False, "children_count": 0, "height_cm": 180, "weight_kg": 80,
     })
 asyncio.get_event_loop().run_until_complete(seed_admin())
-# AI conversation partners (labelled); off unless AI_PERSONAS=1 or switched on in admin
-import ai_personas
-asyncio.get_event_loop().run_until_complete(ai_personas.ensure_personas())
+# the FIDEM assistant (pinned in Messages)
+import ai_assistant
+asyncio.get_event_loop().run_until_complete(ai_assistant.ensure_assistant())
 import uvicorn
 uvicorn.run(server.app, host="127.0.0.1", port=18100, log_level="warning")
