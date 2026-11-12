@@ -18,6 +18,11 @@ export class WS {
     this.shouldRun = true;
     this._open(token);
   }
+  send(obj) {
+    try {
+      if (this.sock && this.sock.readyState === 1) this.sock.send(JSON.stringify(obj));
+    } catch { /* not connected: nothing to do */ }
+  }
   stop() {
     this.shouldRun = false;
     if (this.pingInterval) { clearInterval(this.pingInterval); this.pingInterval = null; }

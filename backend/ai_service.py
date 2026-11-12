@@ -84,6 +84,9 @@ except ValueError:
     GEMINI_THINKING_BUDGET = 512
 # Set to False after a model rejects thinkingConfig, so later calls skip it.
 _THINKING_SUPPORTED = True
+# Some models reject a zero budget ("thinking can't be turned off") but take
+# the default one; remembered after the first refusal.
+_ZERO_BUDGET_REJECTED = [False]
 # Waits before retrying a temporary Gemini error (503 overloaded, 429, 5xx).
 _GEMINI_RETRY_DELAYS = (2, 5)
 
@@ -110,18 +113,27 @@ async def _gemini_json(prompt: str, images: list[tuple[str, str]], schema: dict,
     }
     body = {"contents": [{"role": "user", "parts": parts}], "generationConfig": gen}
     budget = GEMINI_THINKING_BUDGET if thinking_budget is None else thinking_budget
-    use_thinking = _THINKING_SUPPORTED and budget >= 0
+    use_thinking = _THINKING_SUPPORTED and budget >= 0 and not (budget == 0 and _ZERO_BUDGET_REJECTED[0])
     if use_thinking:
         gen["thinkingConfig"] = {"thinkingBudget": budget}
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+    # The key goes in a header, never in the URL: an HTTP error message
+    # quotes the URL, and that used to put the key into the logs.
+    headers = {"x-goog-api-key": GEMINI_API_KEY}
     async with httpx.AsyncClient(timeout=timeout) as cl:
-        r = await cl.post(url, params={"key": GEMINI_API_KEY}, json=body)
-        if r.status_code == 400 and use_thinking and "thinking" in r.text.lower():
-            # This model does not take a thinking budget: retry once without it.
-            _THINKING_SUPPORTED = False
+        r = await cl.post(url, headers=headers, json=body)
+        if r.status_code == 400 and use_thinking:
+            # The model refused the thinking setting (some models need
+            # thinking on, some take no budget): retry once without it.
+            log.info("Gemini 400 with thinkingBudget=%s (%s); retrying without it", budget, r.text[:200])
             gen.pop("thinkingConfig", None)
-            log.info("Gemini model %s does not accept thinkingConfig; sending without it", GEMINI_MODEL)
-            r = await cl.post(url, params={"key": GEMINI_API_KEY}, json=body)
+            r2 = await cl.post(url, headers=headers, json=body)
+            if r2.status_code < 400:
+                if budget == 0:
+                    _ZERO_BUDGET_REJECTED[0] = True
+                elif thinking_budget is None:
+                    _THINKING_SUPPORTED = False
+            r = r2
         # 503 "model overloaded" / 429 / 5xx are short-lived on Google's side
         # (prod's first self-check hit a 503): wait a moment and try again.
         for delay in (_GEMINI_RETRY_DELAYS if retry else ()):
@@ -129,7 +141,9 @@ async def _gemini_json(prompt: str, images: list[tuple[str, str]], schema: dict,
                 break
             log.info("Gemini HTTP %s, retrying in %ss", r.status_code, delay)
             await asyncio.sleep(delay)
-            r = await cl.post(url, params={"key": GEMINI_API_KEY}, json=body)
+            r = await cl.post(url, headers=headers, json=body)
+        if r.status_code >= 400:
+            log.warning("Gemini HTTP %s: %s", r.status_code, r.text[:300])
         r.raise_for_status()
         data = r.json()
     cand = (data.get("candidates") or [{}])[0]

@@ -458,7 +458,7 @@ def test_gemini_answer_parsing_and_self_check(monkeypatch):
             self.payload = payload; self.body = None; self.calls = 0; self.reject_thinking = reject_thinking
         async def __aenter__(self): return self
         async def __aexit__(self, *a): return False
-        async def post(self, url, params=None, json=None):
+        async def post(self, url, params=None, json=None, headers=None):
             self.calls += 1
             if self.reject_thinking and "thinkingConfig" in json["generationConfig"]:
                 return R({}, 400, "Unknown name thinkingConfig")
@@ -547,7 +547,7 @@ def test_gemini_retries_a_temporary_503(monkeypatch):
         def __init__(self): self.calls = 0
         async def __aenter__(self): return self
         async def __aexit__(self, *a): return False
-        async def post(self, url, params=None, json=None):
+        async def post(self, url, params=None, json=None, headers=None):
             self.calls += 1
             return R(503, {}) if self.calls == 1 else R(200, ok)
 

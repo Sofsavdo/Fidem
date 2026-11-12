@@ -280,6 +280,7 @@ export function AppProvider({ children }) {
         user, loading, lang, t, changeLang, setLang: changeLang,
         login, register, logout, refresh: loadMe,
         wsEvent, isOnline,
+        wsSend: (obj) => wsRef.current?.send(obj),
       }}
     >
       {children}
