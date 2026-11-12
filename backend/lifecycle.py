@@ -91,7 +91,12 @@ async def _daily_picks_push() -> None:
     ready. Import here (not at module top) to avoid a circular import."""
     from routers.picks_r import compute_daily_picks
 
-    today = now_utc().date().isoformat()
+    # Daytime in Uzbekistan only (UTC+5): a "today's picks" message at 3 am
+    # is noise; the next pass in the window sends it.
+    local_hour = (now_utc() + timedelta(hours=5)).hour
+    if not 8 <= local_hour < 21:
+        return
+    today = (now_utc() + timedelta(hours=5)).date().isoformat()
     week_ago = iso(now_utc() - timedelta(days=7))
     rows = await db.users.find(
         {

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import random
 import time
 from datetime import datetime, timedelta
@@ -12,11 +13,13 @@ from starlette.responses import JSONResponse
 from auth import get_current_user_id
 from core import (
     PLAN_PRICES,
+    PREMIUM_PERIODS,
     PRICE_CHAT_UNLOCK,
     TELEGRAM_BOT_USERNAME,
     chat_id_for,
     db,
     get_user,
+    women_free_active,
     iso,
     log,
     now_utc,
@@ -41,6 +44,8 @@ from sofsavdo_integration import report_sofsavdo_conversion
 router = APIRouter(tags=["payments"])
 
 HAMYON_OPEN = ("pending", "prepared")
+# A referral pays only when the inviter's account is at least this old.
+REFERRAL_MIN_INVITER_AGE_DAYS = int(os.environ.get("REFERRAL_MIN_INVITER_AGE_DAYS", "3"))
 # Last status Hamyon reported per payment, so the log shows changes only.
 _HAMYON_LAST_STATUS: dict[str, str] = {}
 
@@ -124,6 +129,7 @@ async def apply_hamyon_result(payment: dict, status: str, paid_amount: int | Non
             await process_completed_payment(
                 prev["user_id"], prev["purpose"], amount, prev.get("balance_used", 0),
                 prev.get("target_user_id"), prev.get("order_id"), prev.get("months", 1), payment_id=pid,
+                days=prev.get("days"),
             )
         except Exception:
             await db.payments.update_one({"id": pid, "status": "processing"}, {"$set": {"status": prev["status"]}})
@@ -304,7 +310,10 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
     if req.purpose in ("standard", "vip"):
         raise HTTPException(400, "plan_unavailable")
     if req.purpose in ("premium", "standard", "vip"):
-        amount = PLAN_PRICES[req.purpose][req.months]
+        if req.purpose == "premium" and req.days:
+            amount = PREMIUM_PERIODS[req.days]
+        else:
+            amount = PLAN_PRICES[req.purpose][req.months]
     elif req.purpose == "chat_unlock":
         amount = PRICE_CHAT_UNLOCK
         if not req.target_user_id:
@@ -397,6 +406,7 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
             "purpose": req.purpose,
             "amount": amount,
             "months": req.months,
+            "days": req.days,
             "balance_used": balance_used,
             "click_amount": 0,
             "status": "paid",
@@ -410,7 +420,7 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
             doc["order_id"] = req.order_id
         await db.payments.insert_one(doc)
         # Process the purchase immediately
-        await process_completed_payment(uid, req.purpose, amount, balance_used, req.target_user_id, req.order_id, req.months, payment_id=pid)
+        await process_completed_payment(uid, req.purpose, amount, balance_used, req.target_user_id, req.order_id, req.months, payment_id=pid, days=req.days)
         return {"ok": True, "payment_id": pid, "status": "paid", "balance_used": balance_used, "click_amount": 0}
 
     # Hamyon (card transfer, confirmed automatically) is the main way to pay
@@ -429,6 +439,7 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
             "amount": amount,
             "purpose": req.purpose,
             "months": req.months,
+            "days": req.days,
             "target_user_id": req.target_user_id,
             "gift_kind": req.gift_kind,
             "order_id": req.order_id,
@@ -462,6 +473,7 @@ async def create_payment(req: CreatePaymentRequest, request: Request, uid: str =
         "amount": amount,
         "purpose": req.purpose,
         "months": req.months,
+        "days": req.days,
         "target_user_id": req.target_user_id,
         "gift_kind": req.gift_kind,
         "order_id": req.order_id,
@@ -587,6 +599,7 @@ async def click_callback(request: Request):
             payment.get("order_id"),
             payment.get("months", 1),
             payment_id=pid,
+            days=payment.get("days"),
         )
         await db.payments.update_one(
             {"id": pid},
@@ -761,9 +774,9 @@ async def cancel_payment(pid: str, uid: str = Depends(get_current_user_id)):
     return {"ok": True, "status": p.get("status")}
 
 
-async def process_completed_payment(uid: str, purpose: str, amount: int, balance_used: int, target_user_id: str = None, order_id: str = None, months: int = 1, payment_id: str = None) -> None:
-    """Process a payment completed via balance (no Click needed)."""
-    duration_days = months * 30
+async def process_completed_payment(uid: str, purpose: str, amount: int, balance_used: int, target_user_id: str = None, order_id: str = None, months: int = 1, payment_id: str = None, days: int | None = None) -> None:
+    """Deliver a paid purchase (balance, card transfer or CLICK)."""
+    duration_days = days or months * 30
 
     # First paid subscription referral reward
     # Only for first paid subscription, not recurring
@@ -809,10 +822,12 @@ async def process_completed_payment(uid: str, purpose: str, amount: int, balance
                 if not inviter:
                     inviter = await db.users.find_one({"referral_username_lower": referred_by.lower()})
                 
-                if inviter:
-                    # Check inviter account age >= 30 days
+                if inviter and inviter.get("id") != uid and not inviter.get("blocked"):
+                    # Fraud guard: a brand-new inviter account earns nothing.
+                    # 30 days meant NOBODY could earn in a newly launched app;
+                    # the 14-day hold below still protects against refunds.
                     inviter_age = now_utc() - parse_dt(inviter.get("created_at", now_utc()))
-                    if inviter_age >= timedelta(days=30):
+                    if inviter_age >= timedelta(days=REFERRAL_MIN_INVITER_AGE_DAYS):
                         # Check for duplicate earning (idempotency)
                         existing_earning = await db.users.find_one(
                             {
@@ -867,8 +882,6 @@ async def process_completed_payment(uid: str, purpose: str, amount: int, balance
                                     }
                                 )
                                 
-                                # Mark as first paid ONLY after earning is successfully created
-                                await db.users.update_one({"id": uid}, {"$set": {"first_paid_at": iso(now_utc())}})
                                 
                                 # Notify inviter
                                 await push_notif(
@@ -877,7 +890,17 @@ async def process_completed_payment(uid: str, purpose: str, amount: int, balance
                                     f"Tabriklaymiz! Sizning taklifingiz birinchi obunani faollashtirdi. {reward:,} so'm mukofot 14 kundan keyin o'tkaziladi 🎉"
                                 )
 
-    duration_label = {1: "1 oy", 3: "3 oy", 12: "1 yil"}.get(months, f"{months} oy")
+        # The first paid subscription is a one-time event: mark it whatever
+        # happened above (no inviter, young inviter...). It used to be set only
+        # when a referral reward was created, so a later renewal could still
+        # pay a referral reward and re-report a Sofsavdo conversion.
+        if user and not user.get("first_paid_at"):
+            await db.users.update_one({"id": uid, "first_paid_at": {"$exists": False}}, {"$set": {"first_paid_at": iso(now_utc())}})
+
+    duration_label = (
+        {1: "1 kun", 15: "15 kun", 30: "1 oy"}.get(days, f"{days} kun") if days
+        else {1: "1 oy", 3: "3 oy", 12: "1 yil"}.get(months, f"{months} oy")
+    )
     if purpose == "premium":
         await db.users.update_one({"id": uid}, {"$set": {"plan": "premium", "plan_until": expiry_iso}})
         # Boost stays active exactly as long as the plan does, not a flat 30
@@ -1012,6 +1035,9 @@ async def topup_config(uid: str = Depends(get_current_user_id)):
         "click_enabled": click_enabled,
         "hamyon_enabled": hamyon_on,
         "payments_available": enabled or click_enabled or hamyon_on,
+        # Prices the Premium page shows (days -> so'm) and the launch promo.
+        "premium_periods": {str(k): v for k, v in PREMIUM_PERIODS.items()},
+        "women_free": await women_free_active(),
     }
     if out["p2p_enabled"]:
         out["card_number"] = cfg.get("card_number", "")
@@ -1167,9 +1193,11 @@ async def my_referral(uid: str = Depends(get_current_user_id)):
     count = await db.users.count_documents({"referred_by": {"$in": match_codes}})
 
     # Count paid referrals (users who have made at least one successful payment)
+    # Friends who have paid at least once (the current plan alone undercounts:
+    # an expired plan reads "free" again).
     paid_referrals = await db.users.count_documents({
         "referred_by": {"$in": match_codes},
-        "plan": {"$ne": "free"}
+        "first_paid_at": {"$exists": True},
     })
 
     # Tier standing - drives "how much can I earn" on the Referral page (a

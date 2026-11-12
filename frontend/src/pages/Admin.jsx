@@ -70,7 +70,7 @@ const STATUS_UZ = {
 };
 const statusUz = (s) => STATUS_UZ[s] || s || "—";
 const ACTION_UZ = {
-  update_user: "Foydalanuvchini o'zgartirdi", delete_demo_users: "Demo profillarni o'chirdi",
+  update_user: "Foydalanuvchini o'zgartirdi", set_women_free: "Ayollar uchun bepul Premium'ni o'zgartirdi", delete_demo_users: "Demo profillarni o'chirdi",
   give_premium: "Premium berdi", give_vip: "VIP berdi", give_standard: "Standard berdi",
   reset_balance: "Balansni tozaladi", reset_likes: "Like'larni tozaladi", mute: "Ovozini o'chirdi",
   unmute: "Ovozini yoqdi", shadow_ban: "Yashirin ban", unshadow_ban: "Yashirin bandan chiqardi",
@@ -81,7 +81,7 @@ const ACTION_UZ = {
   broadcast: "Xabar yubordi",
 };
 const actionUz = (a) => { const k = String(a || "").replace(/^user_action:/, ""); return ACTION_UZ[k] || k; };
-const FIELD_UZ = {
+const FIELD_UZ = { women_free: "Ayollar uchun bepul",
   verified_identity: "shaxs", verified_selfie: "selfie", verified_financial: "moliyaviy", add_balance: "balansga qo'shildi",
   plan: "tarif", blocked: "blok", count: "soni", target_ids: "kimlar", days: "kun", amount: "summa", topup_id: "so'rov",
 };
@@ -1508,6 +1508,39 @@ function AdminAnnouncements() {
   );
 }
 
+// Launch promo switch: Premium free for every woman while it is on.
+function AdminWomenFreePromo() {
+  const [promo, setPromo] = useState(null);
+  const [saving, setSaving] = useState(false);
+  React.useEffect(() => { api.get("/admin/promo").then((r) => setPromo(r.data)).catch(() => {}); }, []);
+  const toggle = async () => {
+    if (!promo || saving) return;
+    const next = !promo.women_free;
+    if (!window.confirm(next ? "Ayollar uchun Premium bepul qilinsinmi?" : "Ayollar uchun bepul Premium o'chirilsinmi? Ular yana oddiy tarifga qaytadi.")) return;
+    setSaving(true);
+    try {
+      await api.post("/admin/promo", { women_free: next });
+      setPromo({ ...promo, women_free: next });
+      toast.success("Saqlandi");
+    } catch { toast.error("Xatolik"); } finally { setSaving(false); }
+  };
+  return (
+    <div className="rounded-3xl bg-card border border-border p-5 flex items-center justify-between gap-3" data-testid="admin-women-free">
+      <div>
+        <p className="text-sm font-semibold">🎁 Ayollar uchun Premium bepul</p>
+        <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+          Yoqilganda har bir ayol Premium'ning barcha imkoniyatlaridan bepul foydalanadi.
+          {promo ? ` Hozir ${promo.women_count} ta ayol anketasi.` : ""}
+        </p>
+      </div>
+      <button onClick={toggle} disabled={!promo || saving} data-testid="admin-women-free-toggle"
+        className={`shrink-0 w-12 h-7 rounded-full transition relative ${promo?.women_free ? "bg-secondary" : "bg-muted"}`}>
+        <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-all ${promo?.women_free ? "left-6" : "left-1"}`} />
+      </button>
+    </div>
+  );
+}
+
 function AdminManualTopups() {
   const { data: health } = useAdminConfigHealth();
   // Temporary P2P top-up moderation while CLICK is down: admin publishes a
@@ -1577,6 +1610,7 @@ function AdminManualTopups() {
   const hamyonOn = !!health?.hamyon_configured;
   return (
     <div className="max-w-2xl space-y-4">
+      <AdminWomenFreePromo />
       {hamyonOn && (
         <div className="rounded-3xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 p-5" data-testid="admin-hamyon-on">
           <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">✓ Hamyon ulangan — to'lovlar avtomatik tasdiqlanadi</p>
@@ -1725,7 +1759,7 @@ function AdminPayments() {
                   {p.user_name || p.user_id?.slice(0, 8)}
                   {p.user_telegram ? <span className="text-muted-foreground font-normal"> · @{p.user_telegram}</span> : null}
                 </p>
-                <p className="text-sm">{PURPOSE_UZ[p.purpose] || p.purpose} · <span className="font-semibold tabular-nums">{p.amount?.toLocaleString()} so'm</span>{p.balance_used > 0 && p.click_amount > 0 ? <span className="text-[10px] text-muted-foreground"> (balans {p.balance_used?.toLocaleString()} + karta {(p.hamyon_amount || p.click_amount)?.toLocaleString()})</span> : null}</p>
+                <p className="text-sm">{PURPOSE_UZ[p.purpose] || p.purpose}{p.days ? ` (${p.days === 30 ? "1 oy" : `${p.days} kun`})` : ""} · <span className="font-semibold tabular-nums">{p.amount?.toLocaleString()} so'm</span>{p.balance_used > 0 && p.click_amount > 0 ? <span className="text-[10px] text-muted-foreground"> (balans {p.balance_used?.toLocaleString()} + karta {(p.hamyon_amount || p.click_amount)?.toLocaleString()})</span> : null}</p>
                 <p className="text-[10px] text-muted-foreground">{p.created_at ? new Date(p.created_at).toLocaleString("uz-UZ") : "—"} {p.blocked_by_admin && "· 🚫 Bloklangan"}</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
@@ -2035,9 +2069,19 @@ function AdminReferrals() {
   const { data: referrers = [], isLoading } = useAdminReferrers();
   const { data: detail } = useAdminReferrerDetail(openId);
   const { data: ledger = [] } = useAdminReferrals({});
+  const [summary, setSummary] = useState(null);
+  React.useEffect(() => { api.get("/admin/referrals/summary").then((r) => setSummary(r.data)).catch(() => {}); }, []);
 
   return (
     <div className="space-y-3" data-testid="admin-referrals">
+      {summary && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" data-testid="admin-ref-summary">
+          <KpiTile label="Taklif bilan kelgan" value={summary.invited} />
+          <KpiTile label="To'lov qilgan" value={summary.paid} sub={`${summary.conversion_pct}%`} />
+          <KpiTile label="Kutilayotgan mukofot" value={sumFmt(summary.earnings_pending)} sub="14 kunlik tekshiruvda" />
+          <KpiTile label="Yechishga tayyor" value={sumFmt(summary.earnings_withdrawable)} sub={summary.pending_withdrawals ? `${summary.pending_withdrawals} ta so'rov kutmoqda` : "so'rov yo'q"} accent={summary.pending_withdrawals > 0} />
+        </div>
+      )}
       {isLoading && <p className="text-sm text-muted-foreground py-4 text-center">Yuklanmoqda...</p>}
       {!isLoading && referrers.length === 0 && (
         <p className="text-sm text-muted-foreground py-6 text-center">Hozircha hech kim referal orqali odam taklif qilmagan</p>

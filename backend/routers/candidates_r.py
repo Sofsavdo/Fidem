@@ -341,10 +341,13 @@ async def candidates(
             same_region = bool(my_region) and d.get("region", "") == my_region
             created = d.get("created_at", "")
             fresh_bonus = 15 if created >= fresh_3d else (8 if created >= fresh_7d else 0)
+            # Trust first: verified people rise in the feed, which is also the
+            # reason to get verified (the main edge over sovchi channels).
+            trust_bonus = (10 if d.get("verified_selfie") else 0) + (5 if d.get("photo_verified") else 0)
             return (
                 0 if boosted else 1,
                 0 if same_region else 1,
-                -(x.get("match_score", 0) + fresh_bonus),
+                -(x.get("match_score", 0) + fresh_bonus + trust_bonus),
                 -x.get("completeness", 0),
             )
 

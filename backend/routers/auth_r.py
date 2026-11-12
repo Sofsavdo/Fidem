@@ -236,6 +236,8 @@ def _build_me_payload(user: dict) -> dict:
     pub["contact_instagram"] = user.get("contact_instagram", "")
     # Paid-plan period end (None for grandfathered/legacy purchases).
     pub["plan_until"] = user.get("plan_until")
+    # "women_free" while the launch promo gives this account Premium.
+    pub["plan_source"] = user.get("plan_source") or ("paid" if user.get("plan") in ("standard", "premium", "vip") else None)
     return pub
 
 

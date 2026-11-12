@@ -2,57 +2,21 @@ import React, { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api, { API } from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
-import { Crown, Check, Wallet, ArrowUpRight, Sparkles, Plus, Receipt, ChevronDown } from "lucide-react";
+import { Wallet, ArrowUpRight, Plus, Receipt, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { track } from "@/lib/analytics";
 import { usePayments, usePaymentConfig, QK } from "@/hooks/queries";
 import { useQueryClient } from "@tanstack/react-query";
-import { PageHead, Segmented, Price, SectionLabel } from "@/components/kit";
+import { PageHead, Segmented, SectionLabel } from "@/components/kit";
 import { purposeLabel } from "@/lib/labels";
 import { tapMedium, tapLight, notify } from "@/lib/haptics";
 import { startPayment, payErrorText } from "@/lib/payFlow";
-import { PLAN_RANK, PLAN_PRICES } from "@/lib/purchase";
-
-const CHAT_UNLOCK_PRICE = 4900; // mirrors backend PRICE_CHAT_UNLOCK_UZS (comparison only)
-
-// 3/12-month prices mirror backend core.PLAN_PRICES exactly - the backend
-// is the source of truth (and what actually gets charged); duplicated here
-// only so the price can be shown before the purchase call, same as the
-// existing 1-month `price` always was.
-const PLANS = [
-  // The weekly free conversation belongs to the FREE tier (backend
-  // FREE_WEEKLY_INITIATIONS) - paid plans have unlimited messaging, so
-  // advertising "1 free chat/week" on Standard was wrong.
-  { key: "premium", title: "Premium", price: 79000, prices: { 1: 79000, 3: 199000, 12: 649000 }, badge: "💎", popular: true, accent: "border-gold",
-    perks: ["chat_unlimited", "contact_share", "who_viewed", "who_saved", "more_filters", "privacy_incognito"] },
-  { key: "free", title: "Free", price: 0, accent: "border-border",
-    perks: ["profile", "candidates", "likes_matches", "chat_replies"] },
-];
-
-const DURATIONS = [1, 3, 12];
-
-const PERK = {
-  uz: { profile: "Profil", candidates: "Nomzodlar", likes_matches: "Yoqtirish va moslik", chat_replies: "Kelgan xabarga bepul javob",
-    contact_share: "Telegram/telefon almashish", chat_unlimited: "Cheksiz yozishma", chat_free_weekly_perk: "Haftada 1 bepul suhbat boshlash", more_filters: "Ko'proq filtrlar",
-    who_viewed: "Kim ko'rdi", who_saved: "Kim saqladi", boost_visibility: "Ko'rinish oshadi",
-    privacy_hidden: "Maxfiy rejim (ko'rinmaslik)", privacy_incognito: "Incognito ko'rish (iz qoldirmaydi)", photo_peek: "Yopiq rasmni 5 soniya ochish",
-    max_visibility: "Maksimal ko'rinish", stealth_view: "Maxfiy ko'rish", priority: "Ustuvorlik", family_share: "Oila ulashish" },
-  ru: { profile: "Профиль", candidates: "Кандидаты", likes_matches: "Лайки и совпадения", chat_replies: "Бесплатный ответ на входящие",
-    contact_share: "Обмен Telegram/телефоном", chat_unlimited: "Безлимит сообщений", chat_free_weekly_perk: "1 бесплатный чат в неделю", more_filters: "Больше фильтров",
-    who_viewed: "Кто смотрел", who_saved: "Кто сохранил", boost_visibility: "Больше видимости",
-    privacy_hidden: "Скрытый режим (невидимость)", privacy_incognito: "Инкогнито-просмотр (без следов)", photo_peek: "Открыть закрытое фото на 5 секунд",
-    max_visibility: "Максимум видимости", stealth_view: "Скрытый просмотр", priority: "Приоритет", family_share: "Семейный доступ" },
-  en: { profile: "Profile", candidates: "Candidates", likes_matches: "Likes & matches", chat_replies: "Free reply to incoming",
-    contact_share: "Share Telegram/phone", chat_unlimited: "Unlimited messaging", chat_free_weekly_perk: "1 free chat / week", more_filters: "More filters",
-    who_viewed: "Who viewed", who_saved: "Who saved", boost_visibility: "More visibility",
-    privacy_hidden: "Hidden mode (invisibility)", privacy_incognito: "Incognito viewing (no traces)", photo_peek: "Open a locked photo for 5s",
-    max_visibility: "Max visibility", stealth_view: "Stealth view", priority: "Priority", family_share: "Family sharing" },
-};
+import { PeriodTiles, OfferPerks, TrustLine, usePremiumPeriods, formatSum } from "@/components/PremiumPeriods";
 
 const TOPUP_PACKAGES = [10000, 30000, 50000, 100000, 200000, 500000];
 
 export default function Premium() {
-  const { t, lang, user, refresh } = useApp();
+  const { t, user, refresh } = useApp();
   const queryClient = useQueryClient();
   const [sp, setSearchParams] = useSearchParams();
   const tab = sp.get("tab") || "plans";
@@ -68,8 +32,11 @@ export default function Premium() {
   }, [hl, tab]);
   // One paid plan (Premium) is on sale. Someone who still holds the retired VIP
   // plan is shown as Premium (VIP includes everything Premium does).
-  const curPlan = user?.plan === "vip" ? "premium" : (user?.plan || "free");
-  const [duration, setDuration] = useState(1);
+  const [days, setDays] = useState(15);
+  const { prices, cfg: priceCfg } = usePremiumPeriods();
+  const promoOn = !!priceCfg?.women_free;
+  const womenFree = user?.plan_source === "women_free";
+  const hasPaid = !womenFree && ["premium", "vip"].includes(user?.plan);
   useEffect(() => { track("premium_viewed", { tab }); }, [tab]);
   const [topupAmount, setTopupAmount] = useState(50000);
   // Free-form top-up amount — the preset chips are shortcuts, not a limit.
@@ -127,7 +94,6 @@ export default function Premium() {
     } finally { setSubmittingP2p(false); }
   };
   const [showHistory, setShowHistory] = useState(false);
-  const perk = PERK[lang] || PERK.uz;
 
   const { data: payments = [] } = usePayments();
   const { data: payCfg } = usePaymentConfig();
@@ -136,11 +102,11 @@ export default function Premium() {
   // attempt isn't a transaction the user needs to see in their history.
   const successfulPayments = payments.filter((p) => p.status === "success" || p.status === "paid");
 
-  const runPayment = async (purpose, amount, months = 1) => {
+  const runPayment = async (purpose, amount, months = 1, periodDays = null) => {
     setCreating(true);
     tapMedium();
     try {
-      const r = await api.post("/payments/create", { purpose, amount, months });
+      const r = await api.post("/payments/create", periodDays ? { purpose, amount, days: periodDays } : { purpose, amount, months });
       if (r.data.status === "paid") {
         notify("success");
         toast.success(t("payment_success"));
@@ -190,126 +156,57 @@ export default function Premium() {
               <p className="text-muted-foreground mt-0.5">{t("payments_soon_desc")}</p>
             </div>
           )}
-          <div className="flex gap-2" data-testid="plan-duration-selector">
-            {DURATIONS.map((d) => (
-              <button
-                key={d}
-                type="button"
-                data-testid={`duration-${d}`}
-                onClick={() => { tapLight(); setDuration(d); }}
-                className={`flex-1 rounded-2xl border py-2 text-sm font-semibold transition active:scale-[0.97] ${
-                  duration === d ? "bg-primary text-white border-primary shadow-sm" : "bg-card border-border hover:border-primary/40"
-                }`}
-              >
-                {d === 1 ? t("plan_duration_1") : d === 3 ? t("plan_duration_3") : t("plan_duration_12")}
+
+          {womenFree ? (
+            <div className="rounded-3xl border-2 border-secondary/40 bg-gradient-to-b from-secondary/10 to-card p-5 space-y-3" data-testid="women-free-card">
+              <p className="font-heading text-xl font-semibold">{t("women_free_title")}</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">{t("women_free_desc")}</p>
+              <OfferPerks />
+            </div>
+          ) : hasPaid ? (
+            <div className="rounded-3xl border-2 border-gold bg-gradient-to-b from-gold-light/30 to-card p-5 space-y-3" data-testid="plan-premium">
+              <p className="font-heading text-xl font-semibold">💎 Premium · ✓ {t("current_plan")}</p>
+              {user?.plan_until && (
+                <p className="text-sm text-muted-foreground">{t("plan_active_until").replace("{date}", new Date(user.plan_until).toLocaleDateString())}</p>
+              )}
+              <OfferPerks />
+              <p className="text-xs font-semibold pt-1">{t("plan_extend")}</p>
+              <PeriodTiles prices={prices} value={days} onChange={(d) => { tapLight(); setDays(d); }} />
+              <button data-testid="buy-premium" onClick={() => runPayment("premium", prices[days], 1, days)} disabled={creating || payOff} className="btn-primary">
+                {t("prem_cta").replace("{price}", formatSum(prices[days]))}
               </button>
-            ))}
-          </div>
-
-          {PLANS.map((p) => {
-            const isCurrent = curPlan === p.key;
-            // VIP already includes everything Standard/Premium do - showing
-            // an active "buy" button for a tier the user has already
-            // surpassed reads as "you still need to pay for this", which is
-            // exactly backwards. Only genuine upgrades (a strictly higher
-            // tier) get a buy button; anything at or below the user's
-            // current tier shows as already included instead.
-            const alreadyIncluded = !isCurrent && p.key !== "free" && PLAN_RANK[p.key] <= PLAN_RANK[curPlan];
-            const price = p.prices ? p.prices[duration] : p.price;
-            const fullPrice = p.prices ? p.prices[1] * duration : p.price;
-            const discountPct = p.prices && duration > 1 ? Math.round((1 - price / fullPrice) * 100) : 0;
-            const durationSuffix = duration === 1 ? t("plan_per_month") : duration === 3 ? t("plan_per_3months") : t("plan_per_year");
-            return (
-              <div
-                key={p.key}
-                data-testid={`plan-${p.key}`}
-                className={`relative rounded-3xl border-2 p-4 transition ${p.accent} ${
-                  p.dark ? "bg-ink text-white" : p.popular ? "bg-gradient-to-b from-gold-light/30 to-card" : "bg-card"
-                } ${isCurrent ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""} ${hl === p.key && !isCurrent ? "ring-2 ring-gold ring-offset-2 ring-offset-background" : ""}`}
+              <TrustLine />
+            </div>
+          ) : (
+            <div className="rounded-3xl border-2 border-gold bg-gradient-to-b from-gold-light/30 to-card p-5 space-y-4" data-testid="plan-premium">
+              <div>
+                <p className="font-heading text-xl font-semibold">💎 {t("prem_hero_title")}</p>
+                <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{t("prem_hero_sub")}</p>
+              </div>
+              <PeriodTiles prices={prices} value={days} onChange={(d) => { tapLight(); setDays(d); }} />
+              <OfferPerks />
+              <button
+                data-testid="buy-premium"
+                onClick={() => { track("plan_cta_click", { plan: "premium", days }); runPayment("premium", prices[days], 1, days); }}
+                disabled={creating || payOff}
+                className="btn-primary"
               >
-                {p.popular && (
-                  <span className="absolute -top-2.5 left-4 inline-flex items-center gap-1 rounded-full bg-gold text-ink text-[10px] font-bold px-2.5 py-0.5 shadow-sm">
-                    <Sparkles className="w-3 h-3" /> {t("plan_most_popular")}
-                  </span>
-                )}
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-heading text-lg font-semibold">{p.key === "free" ? t("plan_basic_name") : p.title}</span>
-                    {p.badge && <span className="text-base">{p.badge}</span>}
-                  </div>
-                  <div className="text-right leading-none">
-                    {p.price === 0 ? (
-                      <span className="font-heading text-lg font-semibold">{t("plan_free_title")}</span>
-                    ) : (
-                      <>
-                        {discountPct > 0 && (
-                          <div className="flex items-center justify-end gap-1.5">
-                            <span className={`text-[10px] line-through opacity-50 tabular-nums ${p.dark ? "text-white" : ""}`}>{fullPrice.toLocaleString()}</span>
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-secondary/15 text-secondary">-{discountPct}%</span>
-                          </div>
-                        )}
-                        <span className="font-heading text-lg font-semibold tabular-nums">
-                          {price.toLocaleString()}<span className="text-xs font-medium opacity-60"> {t("sum")}{durationSuffix}</span>
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
+                {payOff ? t("payments_soon_cta") : t("prem_cta").replace("{price}", formatSum(prices[days]))}
+              </button>
+              <TrustLine />
+              {promoOn && user?.gender === "male" && (
+                <p className="text-[12px] text-center text-secondary font-medium" data-testid="women-active-note">{t("women_free_men_note")}</p>
+              )}
+            </div>
+          )}
 
-                <ul className="mt-3 grid grid-cols-1 gap-1.5">
-                  {p.perks.map((k) => (
-                    <li key={k} className={`text-[13px] flex items-center gap-2 ${p.dark ? "text-white/90" : "text-foreground/90"}`}>
-                      <Check className={`w-3.5 h-3.5 shrink-0 ${p.dark ? "text-gold" : "text-secondary"}`} /> {perk[k] || k}
-                    </li>
-                  ))}
-                </ul>
-
-                {p.key !== "free" && !isCurrent && !alreadyIncluded && (
-                  <button
-                    data-testid={`buy-${p.key}`}
-                    onClick={() => { track("plan_cta_click", { plan: p.key, months: duration }); runPayment(p.key, price, duration); }}
-                    disabled={creating || payOff}
-                    className={`mt-3.5 w-full rounded-2xl py-2.5 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-50 ${
-                      p.dark ? "bg-gold text-ink" : p.popular ? "bg-gradient-to-r from-gold-dark to-gold text-ink" : "bg-primary text-white"
-                    }`}
-                  >
-                    {payOff ? t("payments_soon_cta") : `${t("plan_choose_cta")} · ${price.toLocaleString()} ${t("sum")}`}
-                  </button>
-                )}
-                {isCurrent && (
-                  <p className={`mt-3 text-xs font-semibold text-center ${p.dark ? "text-gold" : "text-secondary"}`}>
-                    ✓ {t("current_plan")}
-                  </p>
-                )}
-                {alreadyIncluded && (
-                  <p className="mt-3 text-xs font-semibold text-center text-secondary">
-                    ✓ {t("plan_already_included")}
-                  </p>
-                )}
-              </div>
-            );
-          })}
-
-          {/* Value comparison — compact */}
-          {(() => {
-            const n = Math.ceil(PLAN_PRICES.premium / CHAT_UNLOCK_PRICE);
-            return (
-              <div className="rounded-3xl border border-gold/30 bg-gold-light/20 p-3.5" data-testid="plan-value-compare">
-                <SectionLabel className="text-gold-dark">{t("plan_compare_title")}</SectionLabel>
-                <div className="mt-2.5 flex items-stretch gap-2">
-                  <div className="flex-1 rounded-2xl bg-card/70 border border-border p-2.5 text-center">
-                    <p className="text-sm font-semibold line-through decoration-primary/50 tabular-nums">{(n * CHAT_UNLOCK_PRICE).toLocaleString()}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{t("plan_compare_separate").replace("{n}", n)}</p>
-                  </div>
-                  <div className="grid place-items-center text-muted-foreground text-[11px] font-medium">vs</div>
-                  <div className="flex-1 rounded-2xl bg-secondary/10 border border-secondary/30 p-2.5 text-center">
-                    <p className="text-sm font-semibold text-secondary tabular-nums">{PLAN_PRICES.premium.toLocaleString()}</p>
-                    <p className="text-[10px] text-secondary/90 mt-0.5">{t("plan_compare_unlimited")}</p>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
+          {/* What stays free - short, so the difference is clear */}
+          {!womenFree && !hasPaid && (
+            <div className="rounded-3xl border border-border bg-card p-4" data-testid="plan-free">
+              <p className="text-sm font-semibold">{t("plan_basic_name")} · {t("plan_free_title")}</p>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{t("plan_free_summary")}</p>
+            </div>
+          )}
 
           {/* Concierge — compact */}
           <Link to="/concierge" data-testid="concierge-link" className="block rounded-3xl border border-secondary/30 bg-gradient-to-br from-secondary/8 to-card p-4 active:scale-[0.99] transition">

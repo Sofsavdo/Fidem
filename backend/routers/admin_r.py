@@ -548,6 +548,39 @@ async def admin_payments(status: Optional[str] = None, page: int = 1, limit: int
 
 
 # ---------- Referral tracking ----------
+@router.get("/referrals/summary")
+async def admin_referrals_summary(_: str = Depends(get_current_admin)):
+    """One-line health of the referral programme for the admin panel."""
+    invited = await db.users.count_documents({"referred_by": {"$nin": [None, ""]}})
+    paid = await db.users.count_documents({"referred_by": {"$nin": [None, ""]}, "first_paid_at": {"$exists": True}})
+    rows = await db.users.aggregate([
+        {"$match": {"$or": [
+            {"referral_earnings_pending": {"$gt": 0}},
+            {"referral_earnings_withdrawable": {"$gt": 0}},
+            {"referral_earnings_paid_out": {"$gt": 0}},
+        ]}},
+        {"$group": {
+            "_id": None,
+            "pending": {"$sum": {"$ifNull": ["$referral_earnings_pending", 0]}},
+            "withdrawable": {"$sum": {"$ifNull": ["$referral_earnings_withdrawable", 0]}},
+            "paid_out": {"$sum": {"$ifNull": ["$referral_earnings_paid_out", 0]}},
+            "earners": {"$sum": 1},
+        }},
+    ]).to_list(1)
+    agg = rows[0] if rows else {}
+    pending_withdrawals = await db.withdrawals.count_documents({"status": "pending"})
+    return {
+        "invited": invited,
+        "paid": paid,
+        "conversion_pct": round(paid / invited * 100, 1) if invited else 0,
+        "earnings_pending": int(agg.get("pending", 0)),
+        "earnings_withdrawable": int(agg.get("withdrawable", 0)),
+        "earnings_paid_out": int(agg.get("paid_out", 0)),
+        "earners": int(agg.get("earners", 0)),
+        "pending_withdrawals": pending_withdrawals,
+    }
+
+
 @router.get("/referrers")
 async def admin_referrers(limit: int = 100, _: str = Depends(get_current_admin)):
     """Who is actually distributing referral links: every user that at least
@@ -557,7 +590,12 @@ async def admin_referrers(limit: int = 100, _: str = Depends(get_current_admin))
         {"$group": {
             "_id": "$referred_by",
             "invited": {"$sum": 1},
-            "paid": {"$sum": {"$cond": [{"$in": ["$plan", ["standard", "premium", "vip"]]}, 1, 0]}},
+            # "has paid at least once" - the current plan alone undercounts
+            # (an expired plan reads free again).
+            "paid": {"$sum": {"$cond": [{"$or": [
+                {"$gt": ["$first_paid_at", None]},
+                {"$in": ["$plan", ["standard", "premium", "vip"]]},
+            ]}, 1, 0]}},
             "last_signup": {"$max": "$created_at"},
         }},
         {"$sort": {"invited": -1}},
@@ -611,11 +649,11 @@ async def admin_referrer_detail(user_id: str, _: str = Depends(get_current_admin
     codes = [c for c in [ref.get("referral_id"), ref.get("referral_username_lower"), ref.get("referral_username")] if c]
     invited = await db.users.find(
         {"referred_by": {"$in": codes}},
-        {"_id": 0, "id": 1, "name": 1, "gender": 1, "region": 1, "plan": 1,
+        {"_id": 0, "id": 1, "name": 1, "gender": 1, "region": 1, "plan": 1, "first_paid_at": 1,
          "created_at": 1, "last_active": 1, "onboarded": 1, "completeness": 1},
     ).sort("created_at", -1).to_list(1000)
     for u in invited:
-        u["is_paid"] = u.get("plan", "free") in ("standard", "premium", "vip")
+        u["is_paid"] = bool(u.get("first_paid_at")) or u.get("plan", "free") in ("standard", "premium", "vip")
     return {
         "referrer": user_public(ref, include_private=True),
         "earnings_withdrawable": ref.get("referral_earnings_withdrawable", 0),
@@ -868,6 +906,28 @@ async def admin_regions(_: str = Depends(get_current_admin)):
     # entry in the admin filter dropdown.
     regions = await db.users.distinct("region", {"region": {"$nin": ["", None]}})
     return {"regions": sorted(regions)}
+
+
+# --- Launch promo: Premium free for women (see core.women_free_active).
+
+@router.get("/promo")
+async def admin_get_promo(_: str = Depends(get_current_admin)):
+    from core import women_free_active
+    women = await db.users.count_documents({"gender": "female", "onboarded": True})
+    return {"women_free": await women_free_active(), "women_count": women}
+
+
+@router.post("/promo")
+async def admin_set_promo(women_free: bool = Body(..., embed=True), admin_uid: str = Depends(get_current_admin)):
+    from core import reset_promo_cache
+    await db.settings.update_one(
+        {"id": "promo"},
+        {"$set": {"id": "promo", "women_free": women_free, "updated_at": iso(now_utc())}},
+        upsert=True,
+    )
+    reset_promo_cache()
+    await log_admin_action(admin_uid, "set_women_free", None, {"women_free": women_free})
+    return {"ok": True, "women_free": women_free}
 
 
 # --- Manual (P2P) top-up moderation — see payments_r.py for the user side.

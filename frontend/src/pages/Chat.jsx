@@ -15,12 +15,12 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { QK, usePaymentConfig } from "@/hooks/queries";
 import { startPayment, payErrorText, onPaid } from "@/lib/payFlow";
-import { PLAN_PRICES } from "@/lib/purchase";
+import { purchasePlan, PREMIUM_PERIODS_DEFAULT } from "@/lib/purchase";
 import { FEATURES } from "@/lib/features";
 
 // Mirrors the Standard plan price in Premium.jsx — shown next to the one-time
 // unlock so the user can compare "pay once" vs "unlimited messaging".
-const STANDARD_PRICE = PLAN_PRICES.premium; // the single paid plan on sale
+const PREMIUM_FROM = PREMIUM_PERIODS_DEFAULT[1]; // cheapest Premium period (1 day)
 
 function formatMsgTime(iso) {
   try {
@@ -137,33 +137,12 @@ export default function Chat() {
     else unlockChat("click");
   };
 
-  // Subscribe straight from chat: create the Standard payment and open CLICK,
-  // instead of bouncing to the plans page to pick again.
-  const subscribeStandard = async () => {
+  // Premium from the chat paywall: the quick picker (1 day / 15 days / month).
+  const subscribeStandard = () => {
     if (unlocking) return;
-    setUnlocking(true);
-    try {
-      const r = await api.post("/payments/create", { purpose: "premium", amount: STANDARD_PRICE });
-      if (r.data?.status === "paid") {
-        toast.success(t("payment_success"));
-        await refreshAccess();
-      } else {
-        startPayment(r.data, t);
-      }
-    } catch (err) {
-      const detail = (err?.response?.data?.detail || "").toString();
-      if (detail === "click_disabled") {
-        toast.info(t("click_disabled_error"));
-        nav(`/premium?tab=balance&amount=${STANDARD_PRICE}`);
-      } else {
-        toast.error(payErrorText(detail, t) || t("error_generic"));
-      }
-    } finally {
-      setUnlocking(false);
-    }
+    purchasePlan("premium", { source: "chat", reason: t("chat_unlimited_desc"), onPaid: refreshAccess });
   };
 
-  // A card-transfer payment confirmed in the pay sheet: reopen the chat state.
   useEffect(() => onPaid(() => { refreshAccess(); }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [otherId]);
@@ -567,7 +546,7 @@ export default function Chat() {
                   <span className="absolute -top-2 right-2 rounded-full bg-primary text-white text-[8px] font-bold px-1.5 py-0.5 uppercase tracking-wide">{t("best_value")}</span>
                   <p className="text-[10px] uppercase tracking-wide text-primary font-semibold">Premium</p>
                   <p className="font-heading text-lg font-bold tabular-nums leading-tight mt-0.5">
-                    {STANDARD_PRICE.toLocaleString()}<span className="text-[10px] font-medium opacity-60"> {t("sum")}{t("plan_per_month")}</span>
+                    <span className="text-sm">{t("price_per_day_from").replace("{price}", PREMIUM_FROM.toLocaleString())}</span>
                   </p>
                   <p className="text-[10px] text-secondary mt-0.5 leading-tight font-medium">{t("chat_unlimited_desc")}</p>
                   <span className="mt-2 block text-center rounded-lg bg-primary text-white text-xs py-1.5 font-semibold">{t("pay_with_click")}</span>

@@ -1,7 +1,7 @@
 import { FEATURES } from "@/lib/features";
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { purchasePlan, PLAN_PRICES } from "@/lib/purchase";
+import { purchasePlan, PLAN_PRICES, PREMIUM_PERIODS_DEFAULT } from "@/lib/purchase";
 import api from "@/lib/api";
 import { useApp } from "@/contexts/AppContext";
 import { toast } from "sonner";
@@ -64,7 +64,7 @@ export default function PrivacyCenter() {
       data-testid={`privacy-upgrade-${hl}`}
       className="w-full flex items-center justify-center gap-1.5 rounded-2xl bg-primary/10 border border-primary/25 px-4 py-2.5 text-sm font-semibold text-primary active:scale-[0.98] transition disabled:opacity-50"
     >
-      {label} · {(PLAN_PRICES[hl] || 0).toLocaleString()} {t("sum")} <ChevronRight className="w-4 h-4" />
+      {label} · {t("price_per_day_from").replace("{price}", PREMIUM_PERIODS_DEFAULT[1].toLocaleString())} <ChevronRight className="w-4 h-4" />
     </button>
   );
 

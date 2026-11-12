@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
-import { purchasePlan } from "@/lib/purchase";
+import { purchasePlan, PREMIUM_PERIODS_DEFAULT } from "@/lib/purchase";
 import { Lock, Bookmark, Crown, Camera, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { photoSrc } from "@/lib/photo";
@@ -22,7 +22,6 @@ const TABS = [
 const TAB_ALIAS = { by_others: "interested" };
 
 // Cheapest plan that unlocks these lists — mirrors PLANS.premium in Premium.jsx.
-const UNLOCK_PRICE = 79000;
 
 export default function Saved() {
   const { t, user, refresh } = useApp();
@@ -102,7 +101,7 @@ export default function Saved() {
         >
           <div className="min-w-0">
             <p className="font-heading text-base font-semibold flex items-center gap-1.5"><Crown className="w-4 h-4 text-gold" /> {t("who_viewed_unlock_hint")}</p>
-            <p className="text-xs text-white/70 mt-0.5">{t("premium")} · {UNLOCK_PRICE.toLocaleString()} {t("sum")}{t("plan_per_month")}</p>
+            <p className="text-xs text-white/70 mt-0.5">{t("premium")} · {t("price_per_day_from").replace("{price}", PREMIUM_PERIODS_DEFAULT[1].toLocaleString())}</p>
           </div>
           <span className="shrink-0 rounded-full bg-white text-ink text-xs font-semibold px-3.5 py-2">{t("plan_choose_cta")}</span>
         </button>
