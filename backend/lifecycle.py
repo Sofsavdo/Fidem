@@ -305,38 +305,33 @@ async def _onboarding_nudges() -> None:
 
 
 REFERRAL_AWARENESS_DELAY_HOURS = 72  # ~3 days after onboarding
-REFERRAL_AWARENESS_TEXT = (
-    "💸 Bilasizmi? Do'stingizni FIDEM'ga taklif qiling - u pullik tarifga o'tsa, "
-    "sizga ham pul tushadi. Taklif havolangizni shu yerdan oling 👇"
-)
 
 
 async def _referral_awareness_nudge() -> None:
-    """One-time push telling every onboarded user that referring friends
-    pays real money. Without this, someone who only came here for
-    matchmaking has no way to ever discover the referral program - they'd
-    have to stumble onto the "invite friends" card on the Me page
-    unprompted, with no reason to suspect it involves money at all.
-
-    Fires ~3 days after onboarding for new users; for the existing user
-    base at deploy time it fires immediately (created_at is already in the
-    past), rate-limited to BATCH per pass like every other bulk send here -
-    a gradual one-time announcement, not a backfill migration to run once
-    and delete."""
+    """The one timed invite-a-friend push (invite_prompts.py has the bonus and
+    the anti-spam rules). Only people who joined 3+ days ago and were active
+    in the last two weeks, only in daytime in Uzbekistan (UTC+5), a batch per
+    pass. Each person is looked at once."""
+    import invite_prompts
     now = now_utc()
-    cutoff = iso(now - timedelta(hours=REFERRAL_AWARENESS_DELAY_HOURS))
+    if not 10 <= (now + timedelta(hours=5)).hour < 21:
+        return
     rows = await db.users.find(
         {
             "onboarded": True,
             "blocked": {"$ne": True},
+            "is_ai": {"$ne": True},
             "referral_awareness_sent_at": {"$exists": False},
-            "created_at": {"$lte": cutoff},
+            "created_at": {"$lte": iso(now - timedelta(hours=REFERRAL_AWARENESS_DELAY_HOURS))},
+            "last_active": {"$gte": iso(now - timedelta(days=14))},
         },
         {"_id": 0, "id": 1},
     ).limit(BATCH).to_list(BATCH)
     for u in rows:
+        # maybe_prompt never raises; the mark goes after it because the rules
+        # count this very stamp as "prompted recently".
+        await invite_prompts.maybe_prompt(u["id"], "lifecycle")
         await db.users.update_one({"id": u["id"]}, {"$set": {"referral_awareness_sent_at": iso(now)}})
-        await push_notif(u["id"], "referral", REFERRAL_AWARENESS_TEXT, link="/referral", marketing=True)
         await asyncio.sleep(SEND_PACING_SECONDS)
 
 

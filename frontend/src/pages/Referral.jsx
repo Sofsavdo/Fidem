@@ -90,6 +90,19 @@ export default function Referral() {
           </div>
         ) : (
           <>
+            {/* The immediate, certain bonus: Premium days per friend who finishes the profile. */}
+            {data?.bonus_days_per_friend > 0 && (
+              <section className="rounded-3xl border border-gold/40 bg-gold-light/20 p-4" data-testid="ref-bonus-days">
+                <SectionLabel>{t("ref_bonus_title")}</SectionLabel>
+                <p className="text-sm mt-1.5 leading-snug">
+                  {t("ref_bonus_desc")
+                    .replace("{days}", data.bonus_days_per_friend)
+                    .replace("{earned}", data.bonus_days_earned || 0)
+                    .replace("{cap}", data.bonus_days_cap)}
+                </p>
+              </section>
+            )}
+
             {/* "How much can I earn" - the concrete number that was missing,
                 answered up front with real plan prices instead of a vague promise. */}
             <section className="rounded-3xl border border-secondary/25 bg-secondary/5 p-4" data-testid="ref-earn-potential">
