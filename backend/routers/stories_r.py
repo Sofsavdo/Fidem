@@ -6,6 +6,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Depends, HTTPException
 
 from auth import get_current_user_id
+from guest import require_onboarded
 from core import db, iso, now_utc
 from models import new_id
 
@@ -49,7 +50,7 @@ async def get_story(story_id: str):
 @router.post("/stories/submit")
 async def submit_story(
     payload: dict = Body(...),
-    uid: str = Depends(get_current_user_id),
+    uid: str = Depends(require_onboarded),
 ):
     """Users can submit their story for admin review (not auto-published)."""
     doc = {

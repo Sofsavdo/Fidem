@@ -11,6 +11,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from starlette.responses import JSONResponse
 
 from auth import get_current_user_id
+from guest import require_onboarded
 from core import (
     PLAN_PRICES,
     PREMIUM_PERIODS,
@@ -304,7 +305,7 @@ async def selfie_challenge(uid: str = Depends(get_current_user_id)):
 
 
 @router.post("/verification/request")
-async def request_verification(req: VerificationRequest, request: Request, uid: str = Depends(get_current_user_id)):
+async def request_verification(req: VerificationRequest, request: Request, uid: str = Depends(require_onboarded)):
     rate_limit_verification(request, uid)
     doc = {
         "id": new_id(),
@@ -347,7 +348,7 @@ async def my_verifications(uid: str = Depends(get_current_user_id)):
 
 
 @router.post("/payments/create")
-async def create_payment(req: CreatePaymentRequest, request: Request, uid: str = Depends(get_current_user_id)):
+async def create_payment(req: CreatePaymentRequest, request: Request, uid: str = Depends(require_onboarded)):
     rate_limit_payment(request, uid)
     # One paid plan (Premium) is on sale. Standard/VIP stay valid for people who
     # already hold them (and admin grants) but can no longer be bought.
@@ -1094,7 +1095,7 @@ async def manual_topup(
     request: Request,
     amount: int = Body(..., embed=True),
     proof_url: str = Body(..., embed=True),
-    uid: str = Depends(get_current_user_id),
+    uid: str = Depends(require_onboarded),
 ):
     rate_limit_payment(request, uid)
     cfg = await db.settings.find_one({"id": "topup_config"}) or {}

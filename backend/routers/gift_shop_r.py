@@ -16,6 +16,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException
 
 from auth import get_current_user_id
+from guest import require_onboarded
 from core import age_from_birth, db, get_user, iso, now_utc, photo_is_public
 from models import GIFT_PRICES, GiftPurchaseRequest, GiftRedeemRequest, new_id
 from routers.chat_r import charge_for_gift, deliver_gift, resolve_gift_kind
@@ -102,7 +103,7 @@ async def gift_inventory(uid: str = Depends(get_current_user_id)):
 
 
 @router.post("/gifts/purchase")
-async def gift_purchase(req: GiftPurchaseRequest, uid: str = Depends(get_current_user_id)):
+async def gift_purchase(req: GiftPurchaseRequest, uid: str = Depends(require_onboarded)):
     kind, meta = resolve_gift_kind(req.gift_kind)
     sender = await get_user(uid)
 
@@ -138,7 +139,7 @@ async def gift_purchase(req: GiftPurchaseRequest, uid: str = Depends(get_current
 
 
 @router.post("/gifts/inventory/{item_id}/redeem")
-async def gift_redeem(item_id: str, req: GiftRedeemRequest, uid: str = Depends(get_current_user_id)):
+async def gift_redeem(item_id: str, req: GiftRedeemRequest, uid: str = Depends(require_onboarded)):
     if req.to_user_id == uid:
         raise HTTPException(400, "O'zingizga sovg'a yubora olmaysiz")
     sender = await get_user(uid)

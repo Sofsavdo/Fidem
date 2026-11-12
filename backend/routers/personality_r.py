@@ -6,6 +6,7 @@ from datetime import timedelta
 from fastapi import APIRouter, Body, Depends, HTTPException
 
 from auth import get_current_user_id
+from guest import require_onboarded
 from big5 import (
     TRAIT_LABELS,
     big5_compatibility,
@@ -135,7 +136,7 @@ async def compatibility(target_id: str, lang: str = "uz", uid: str = Depends(get
 
 
 @router.post("/personality/compatibility/{target_id}/unlock")
-async def compatibility_unlock(target_id: str, uid: str = Depends(get_current_user_id)):
+async def compatibility_unlock(target_id: str, uid: str = Depends(require_onboarded)):
     """Pay 20,000 from balance to unlock detailed AI report."""
     PRICE = 20000
     if await db.compat_unlocks.find_one({"user_id": uid, "target_id": target_id}):

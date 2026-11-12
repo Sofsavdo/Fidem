@@ -9,6 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from auth import get_current_user_id
+from guest import require_onboarded
 from core import INCOGNITO_PLANS, PAID_PLANS, WHO_VIEWED_PLANS, chat_id_for, db, get_user, iso, log, payments_available, photo_kind, photo_required_missing, manager, mask_name, now_utc, parse_dt, push_notif, strip_locked_photo, touch_active, user_public, user_public_minimal
 from geo import distance_bucket, haversine_km
 from models import PhotoUnlockDecision, PhotoUnlockRequest, SaveRequest, new_id
@@ -173,7 +174,11 @@ async def candidates(
     match_lang = me_doc.get("language", "uz")
     if match_lang not in ("uz", "ru", "en"):
         match_lang = "uz"
-    if not me_doc.get("onboarded"):
+    # Guests (profile not finished) can browse once they said who they look
+    # for; only the first few profiles show photos (see guest.py).
+    from guest import is_guest
+    guest = is_guest(me_doc)
+    if guest and not me_doc.get("search_gender"):
         return []
     # A profile photo is mandatory. The app shows an "upload your photo" screen
     # instead of the feed (frontend gate) and liking/messaging is refused here;
@@ -303,7 +308,9 @@ async def candidates(
             continue
 
         # Use AI match calculation for premium users
-        if me_doc.get("plan") in ("premium", "vip"):
+        if guest:
+            score, reasons = None, []   # no profile yet to match against
+        elif me_doc.get("plan") in ("premium", "vip"):
             score, reasons = compute_ai_match(me_doc, d, lang=match_lang)
         else:
             score, reasons = compute_match(me_doc, d, lang=match_lang)
@@ -349,7 +356,7 @@ async def candidates(
             return (
                 0 if boosted else 1,
                 0 if same_region else 1,
-                -(x.get("match_score", 0) + fresh_bonus + trust_bonus),
+                -((x.get("match_score") or 0) + fresh_bonus + trust_bonus),
                 -x.get("completeness", 0),
             )
 
@@ -363,6 +370,10 @@ async def candidates(
         enriched.sort(key=lambda x: docs_by_id.get(x["id"], {}).get("created_at", ""), reverse=True)
 
     result = enriched[:limit]
+    if guest:
+        from guest import lock_photos, open_ids
+        allowed = await open_ids(me_doc, [x["id"] for x in result])
+        result = [x if x["id"] in allowed else lock_photos(x) for x in result]
     if not result:
         log.info(
             "feed empty: viewer=%s photo=%s matched=%d (gender=%s age=%s-%s region=%s) kept=%d",
@@ -425,7 +436,10 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
     # Premium/VIP privacy perk: with hidden mode on, visits are incognito -
     # no profile_views record, no "kim ko'rdi" appearance, no notification,
     # and no bump to the target's view counters further below.
-    incognito = bool(me_doc.get("hidden_profile")) and me_doc.get("plan") in INCOGNITO_PLANS
+    from guest import is_guest
+    guest = is_guest(me_doc)
+    # Guests leave no trace either (no "viewed you", no notification).
+    incognito = guest or (bool(me_doc.get("hidden_profile")) and me_doc.get("plan") in INCOGNITO_PLANS)
     hidden_gate = bool(target.get("hidden_profile")) and not target.get("is_ai") and not me_doc.get("is_admin")
 
     # Every read this view needs is independent: run them together (this
@@ -468,7 +482,9 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
         ))
 
     # Use AI match calculation for premium users in detail view too
-    if me_doc.get("plan") in ("premium", "vip"):
+    if guest:
+        score, reasons = None, []
+    elif me_doc.get("plan") in ("premium", "vip"):
         score, reasons = compute_ai_match(me_doc, target, lang=match_lang)
     else:
         score, reasons = compute_match(me_doc, target, lang=match_lang)
@@ -515,12 +531,17 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
     # Share link: opens this profile through the bot (see telegram_r "share_").
     from core import TELEGRAM_BOT_USERNAME
     pub["share_url"] = f"https://t.me/{TELEGRAM_BOT_USERNAME}?start=share_{target_id}"
+    if guest:
+        from guest import lock_photos
+        pub["can_message"] = False
+        if target_id not in (me_doc.get("guest_open_ids") or []):
+            return lock_photos(pub)
     return strip_locked_photo(pub)
 
 
 # ---------- VIP photo peek (privacy tier 3) ----------
 @router.post("/photo-peek/{target_id}")
-async def photo_peek(target_id: str, uid: str = Depends(get_current_user_id)):
+async def photo_peek(target_id: str, uid: str = Depends(require_onboarded)):
     """VIP + hidden-mode perk: reveal a locked photo once per profile, for a
     few seconds (the frontend enforces the 5s display; the once-per-profile
     rule is enforced here). Deliberately silent — no notification to the
@@ -544,7 +565,7 @@ async def photo_peek(target_id: str, uid: str = Depends(get_current_user_id)):
 
 # ---------- Photo unlock ----------
 @router.post("/photo-unlock/request")
-async def request_photo_unlock(req: PhotoUnlockRequest, uid: str = Depends(get_current_user_id)):
+async def request_photo_unlock(req: PhotoUnlockRequest, uid: str = Depends(require_onboarded)):
     existing = await db.photo_unlocks.find_one(
         {"requester_id": uid, "target_id": req.target_user_id}
     )
@@ -651,7 +672,7 @@ async def decide_photo_unlock(req: PhotoUnlockDecision, uid: str = Depends(get_c
 
 # ---------- Saved / Likes ----------
 @router.post("/saved")
-async def save_user(req: SaveRequest, uid: str = Depends(get_current_user_id)):
+async def save_user(req: SaveRequest, uid: str = Depends(require_onboarded)):
     if req.user_id == uid:
         raise HTTPException(400, "Cannot save self")
 

@@ -10,6 +10,18 @@ const MAX_EXTRA = 5; // besides the main photo (mirrors backend MAX_EXTRA_PHOTOS
 
 // "My photos": the main photo plus up to 5 more. The main photo is the one
 // shown on cards; the rest are swiped through on the profile.
+// "photo_invalid:<code>" from the server -> the matching explanation
+// (only your own photos: no nature, cars, memes or someone else).
+function photoError(e, t) {
+  const d = (e?.response?.data?.detail || "").toString();
+  if (d.startsWith("photo_invalid:")) {
+    const key = `photo_invalid_${d.split(":")[1]}`;
+    const txt = t(key);
+    if (txt && txt !== key) return txt;
+  }
+  return t("error_generic");
+}
+
 export default function PhotoGallery() {
   const { t, user, refresh } = useApp();
   const [busy, setBusy] = useState(false);
@@ -23,7 +35,7 @@ export default function PhotoGallery() {
       await refresh();
     } catch (e) {
       console.error("Gallery save error:", e);
-      toast.error(t("error_generic"));
+      toast.error(photoError(e, t));
     } finally {
       setBusy(false);
     }
@@ -41,7 +53,7 @@ export default function PhotoGallery() {
       await refresh();
     } catch (err) {
       console.error("Gallery upload error:", err);
-      toast.error(err?.code === "too_large" ? "Rasm juda katta (max 8MB)" : t("error_generic"));
+      toast.error(err?.code === "too_large" ? "Rasm juda katta (max 8MB)" : photoError(err, t));
     } finally {
       setBusy(false);
     }

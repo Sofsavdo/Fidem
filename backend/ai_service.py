@@ -473,6 +473,62 @@ async def verify_face_photo(image_url: str = "", image_base64: str = "") -> dict
         }
 
 
+# ---------- 5b) Gallery photos and main-photo changes: the same person ----------
+_SAME_PERSON_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "valid": {"type": "BOOLEAN"},
+        "code": {"type": "STRING", "enum": ["ok", "no_person", "different_person", "not_a_photo", "inappropriate"]},
+        "reason_uz": {"type": "STRING"},
+    },
+    "required": ["valid", "code", "reason_uz"],
+}
+
+_SAME_PERSON_PROMPTS = {
+    "gallery": (
+        "Two photos from one profile on a serious marriage app. Image 1 is the person's main profile "
+        "photo (their face). Image 2 is an extra photo they want to add. VALID only if image 2 is a real "
+        "photograph that shows a person, and that person (or one of the people) is clearly the same "
+        "person as in image 1. Reject with code no_person if it shows no person (nature, landscape, "
+        "flowers, food, animals, cars, objects, text, quotes, memes, screenshots); not_a_photo for "
+        "drawings, cartoons or AI images; different_person if the person is clearly someone else; "
+        "inappropriate for nudity or sexual content. reason_uz: one short sentence in Uzbek."
+    ),
+    "main_vs_selfie": (
+        "Image 1 is a verified live selfie of a user of a marriage app. Image 2 is the new main profile "
+        "photo they want to set. VALID only if image 2 is a real photograph of the same person's face "
+        "as image 1. Otherwise code different_person (someone else), no_person (no face) or not_a_photo. "
+        "reason_uz: one short sentence in Uzbek."
+    ),
+}
+
+
+async def verify_same_person_photo(reference_url: str, new_url: str, kind: str = "gallery") -> dict:
+    """Is the new photo a real photo of the same person as the reference?
+
+    valid is None when the check could not run (no AI, load error): callers
+    decide; gallery photos let it through, a main-photo change does not keep
+    the selfie badge without a positive answer.
+    """
+    if not GEMINI_API_KEY:
+        return {"valid": None, "code": "verification_unavailable", "reason": ""}
+    try:
+        ref = await _load_image_b64(reference_url, "")
+        new = await _load_image_b64(new_url, "")
+    except Exception as e:
+        log.warning("same_person: could not load photos: %s", e)
+        return {"valid": None, "code": "verification_unavailable", "reason": ""}
+    try:
+        parsed = await _gemini_json(_SAME_PERSON_PROMPTS.get(kind, _SAME_PERSON_PROMPTS["gallery"]),
+                                    [ref, new], _SAME_PERSON_SCHEMA, max_tokens=300, timeout=30.0)
+        valid = bool(parsed.get("valid"))
+        return {"valid": valid, "code": parsed.get("code") or ("ok" if valid else "no_person"),
+                "reason": parsed.get("reason_uz") or ""}
+    except Exception as e:
+        log.warning("same_person: AI call failed: %s", e)
+        return {"valid": None, "code": "verification_unavailable", "reason": ""}
+
+
 # ---------- 6) P2P top-up receipt review ----------
 _P2P_SCHEMA_GEMINI = {
     "type": "OBJECT",

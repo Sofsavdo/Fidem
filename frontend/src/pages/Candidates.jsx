@@ -1,3 +1,4 @@
+import { askToRegister, isGuest } from "@/lib/guest";
 import React, { useState, useMemo, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import posthog from "posthog-js";
@@ -148,6 +149,13 @@ export default function Candidates() {
 
   return (
     <div className="px-4 md:px-8 pt-6 pb-4">
+      {isGuest(user) && (
+        <button data-testid="guest-banner" onClick={() => askToRegister("banner")}
+          className="w-full mb-4 rounded-2xl bg-gradient-to-r from-primary/15 to-secondary/15 border border-primary/30 px-4 py-3 text-left">
+          <p className="text-sm font-semibold">👀 {t("guest_banner_title")}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{t("guest_banner_desc")} <span className="text-primary font-semibold">{t("reg_sheet_cta")} →</span></p>
+        </button>
+      )}
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="font-heading text-3xl md:text-4xl font-semibold tracking-tight">{t("candidates")}</h1>
