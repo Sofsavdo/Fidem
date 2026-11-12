@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from starlette.responses import JSONResponse
 
+import invite_prompts
 from auth import get_current_user_id
 from guest import require_onboarded
 from core import (
@@ -1275,4 +1276,8 @@ async def my_referral(uid: str = Depends(get_current_user_id)):
         "monthly_tier": tier,
         "tier_cap": tier_cap,
         "next_tier_threshold": next_tier_threshold,
+        # Premium days for every friend who finishes their profile (invite_prompts.py)
+        "bonus_days_per_friend": invite_prompts.BONUS_DAYS_PER_FRIEND,
+        "bonus_days_earned": int(me_doc.get("invite_bonus_days") or 0),
+        "bonus_days_cap": invite_prompts.BONUS_DAYS_CAP,
     }

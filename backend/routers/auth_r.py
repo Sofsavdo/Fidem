@@ -486,6 +486,7 @@ async def me(uid: str = Depends(get_current_user_id)):
 # ~47% of the profile; the referral signup bonus keeps its "real profile" bar
 # (verified photo + terms + core facts) at 40%.
 REFERRAL_MIN_COMPLETENESS = 40
+REFERRAL_MIN_INVITER_AGE_DAYS = int(os.environ.get("REFERRAL_MIN_INVITER_AGE_DAYS", "3"))
 
 _PHOTO_NOTICE = {
     "uz": "📸 Endi profil rasmlari hammaga ochiq ko'rinadi. Rasmingizni yopmoqchi bo'lsangiz: «Men» bo'limida «Rasm hammaga ochiq» ni o'chiring.",
@@ -641,9 +642,10 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
                 inviter = await db.users.find_one({"referral_username_lower": referred_by.lower()})
 
             if inviter:
-                # Check inviter account age >= 30 days
+                # Same minimum inviter age as the paid-referral reward (3 days).
+                # It was 30 here, so in a newly launched app nobody could earn the bonus.
                 inviter_age = now_utc() - parse_dt(inviter.get("created_at", now_utc()))
-                if inviter_age >= timedelta(days=30):
+                if inviter_age >= timedelta(days=REFERRAL_MIN_INVITER_AGE_DAYS):
                     # Check for duplicate earning (idempotency)
                     existing_earning = await db.users.find_one(
                         {
@@ -681,11 +683,14 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
                                 "$inc": {"balance": SIGNUP_BONUS},
                             }
                         )
+                        import invite_prompts
+                        bonus_days = await invite_prompts.grant_friend_bonus(inviter["id"])
+                        days_line = f" va +{bonus_days} kun Premium" if bonus_days else ""
                         await push_notif(
                             inviter["id"],
                             "referral",
-                            f"🎉 Do'stingiz FIDEM'ga qo'shildi! +{SIGNUP_BONUS} so'm ichki balansingizga tushdi "
-                            "(tarif yoki sovg'a uchun ishlatishingiz mumkin).",
+                            f"🎉 Do'stingiz FIDEM'ga qo'shildi! +{SIGNUP_BONUS} so'm ichki balans{days_line} sizga yozildi.",
+                            link="/referral",
                         )
 
     return {"ok": True, "completeness": completeness}

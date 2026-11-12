@@ -686,6 +686,8 @@ async def save_user(req: SaveRequest, uid: str = Depends(require_onboarded)):
                 {"chat_id": cid},
                 {"$set": {"status": "match"}},
             )
+            import invite_prompts
+            invite_prompts.prompt_after_match(uid, req.user_id)
 
     if is_new:
         try:
