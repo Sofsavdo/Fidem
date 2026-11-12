@@ -411,6 +411,8 @@ async def admin_user_detail(target_id: str, _: str = Depends(get_current_admin))
     pub["recent_payments"] = recent_payments
     pub["shadow_banned"] = bool(user.get("shadow_banned"))
     pub["muted"] = bool(user.get("muted"))
+    pub["muted_until"] = user.get("muted_until")
+    pub["moderation_strikes"] = user.get("moderation_strikes", 0)
     return pub
 
 
@@ -906,6 +908,56 @@ async def admin_regions(_: str = Depends(get_current_admin)):
     # entry in the admin filter dropdown.
     regions = await db.users.distinct("region", {"region": {"$nin": ["", None]}})
     return {"regions": sorted(regions)}
+
+
+# --- Chat moderation (see moderation.py): AI switch + blocked-message log.
+
+@router.get("/moderation")
+async def admin_get_moderation(_: str = Depends(get_current_admin)):
+    import moderation
+    since = iso(now_utc() - timedelta(hours=24))
+    blocked_24h, muted_now = await asyncio.gather(
+        db.moderation_events.count_documents({"created_at": {"$gte": since}}),
+        db.users.count_documents({"muted_until": {"$gt": iso(now_utc())}}),
+    )
+    return {"ai_enabled": await moderation.ai_enabled(), "blocked_24h": blocked_24h, "muted_now": muted_now}
+
+
+@router.post("/moderation")
+async def admin_set_moderation(ai_enabled: bool = Body(..., embed=True), admin_uid: str = Depends(get_current_admin)):
+    import moderation
+    await db.settings.update_one(
+        {"id": "moderation"},
+        {"$set": {"id": "moderation", "ai_enabled": ai_enabled, "updated_at": iso(now_utc())}},
+        upsert=True,
+    )
+    moderation.reset_settings_cache()
+    await log_admin_action(admin_uid, "set_ai_moderation", None, {"ai_enabled": ai_enabled})
+    return {"ok": True, "ai_enabled": ai_enabled}
+
+
+@router.get("/moderation/events")
+async def admin_moderation_events(page: int = 1, limit: int = 30, user_id: str = "", _: str = Depends(get_current_admin)):
+    q = {"from_user_id": user_id} if user_id else {}
+    limit = max(1, min(limit, 100))
+    total, rows = await asyncio.gather(
+        db.moderation_events.count_documents(q),
+        db.moderation_events.find(q, {"_id": 0}).sort("created_at", -1).skip((max(page, 1) - 1) * limit).limit(limit).to_list(limit),
+    )
+    ids = list({r["from_user_id"] for r in rows} | {r.get("to_user_id") for r in rows if r.get("to_user_id")})
+    users = await db.users.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "name": 1, "muted_until": 1, "moderation_strikes": 1}).to_list(len(ids)) if ids else []
+    umap = {u["id"]: u for u in users}
+    for r in rows:
+        r["from_user"] = umap.get(r["from_user_id"], {})
+        r["to_user_name"] = umap.get(r.get("to_user_id"), {}).get("name")
+    return {"items": rows, "total": total, "page": page, "limit": limit}
+
+
+@router.post("/users/{target_id}/unmute-temp")
+async def admin_unmute_temp(target_id: str, admin_uid: str = Depends(get_current_admin)):
+    await db.users.update_one({"id": target_id}, {"$unset": {"muted_until": ""}})
+    await log_admin_action(admin_uid, "unmute_temp", target_id, {})
+    return {"ok": True}
 
 
 # --- Launch promo: Premium free for women (see core.women_free_active).

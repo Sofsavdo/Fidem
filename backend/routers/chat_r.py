@@ -8,7 +8,8 @@ from typing import Optional
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
 
 from auth import decode_token, get_current_user_id
-from ai_service import detect_contact_info, detect_money_request, quick_moderation
+from ai_service import detect_contact_info, detect_money_request
+import moderation
 from core import (
     CHAT_GUARANTEE_HOURS,
     CHAT_UNLOCK_COINS,
@@ -442,6 +443,8 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
         raise target_doc
     if sender_doc.get("muted"):
         raise HTTPException(403, "muted")
+    if moderation.muted_now(sender_doc):
+        raise HTTPException(403, "muted_temp")
     if photo_required_missing(sender_doc):
         raise HTTPException(403, "photo_required")
     if selfie_required_to_write(sender_doc):
@@ -475,9 +478,6 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
             raise HTTPException(400, "empty_message")
         if len(sanitized_text) > MAX_MESSAGE_CHARS:
             raise HTTPException(400, "message_too_long")
-        ok, reason = quick_moderation(sanitized_text)
-        if not ok:
-            raise HTTPException(422, reason)
         # Asking for money / card details is the classic scam: blocked for
         # everyone and flagged for the admin.
         if detect_money_request(sanitized_text):
@@ -489,6 +489,13 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
         # selfie-verified people.
         if detect_contact_info(sanitized_text):
             raise HTTPException(403, "contact_use_button")
+        # Insults, swearing, indecent proposals: rules first, then the AI.
+        # A blocked message is never stored or delivered; the sender is
+        # warned and the attempt goes to the admin's moderation log.
+        category, source = await moderation.check_message(sanitized_text)
+        if category:
+            muted = await moderation.record_block(uid, req.to_user_id, sanitized_text, category, source)
+            raise HTTPException(422, "muted_temp" if muted else "message_blocked")
         req.text = sanitized_text
 
     sender = sender_doc

@@ -89,7 +89,8 @@ _GEMINI_RETRY_DELAYS = (2, 5)
 
 
 async def _gemini_json(prompt: str, images: list[tuple[str, str]], schema: dict,
-                       max_tokens: int = 2048, timeout: float = 45.0) -> dict:
+                       max_tokens: int = 2048, timeout: float = 45.0,
+                       thinking_budget: int | None = None, retry: bool = True) -> dict:
     """One Gemini generateContent call returning strict JSON.
 
     images: list of (media_type, base64_data). schema: Gemini response
@@ -108,9 +109,10 @@ async def _gemini_json(prompt: str, images: list[tuple[str, str]], schema: dict,
         "temperature": 0,
     }
     body = {"contents": [{"role": "user", "parts": parts}], "generationConfig": gen}
-    use_thinking = _THINKING_SUPPORTED and GEMINI_THINKING_BUDGET >= 0
+    budget = GEMINI_THINKING_BUDGET if thinking_budget is None else thinking_budget
+    use_thinking = _THINKING_SUPPORTED and budget >= 0
     if use_thinking:
-        gen["thinkingConfig"] = {"thinkingBudget": GEMINI_THINKING_BUDGET}
+        gen["thinkingConfig"] = {"thinkingBudget": budget}
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
     async with httpx.AsyncClient(timeout=timeout) as cl:
         r = await cl.post(url, params={"key": GEMINI_API_KEY}, json=body)
@@ -122,7 +124,7 @@ async def _gemini_json(prompt: str, images: list[tuple[str, str]], schema: dict,
             r = await cl.post(url, params={"key": GEMINI_API_KEY}, json=body)
         # 503 "model overloaded" / 429 / 5xx are short-lived on Google's side
         # (prod's first self-check hit a 503): wait a moment and try again.
-        for delay in _GEMINI_RETRY_DELAYS:
+        for delay in (_GEMINI_RETRY_DELAYS if retry else ()):
             if r.status_code not in (429, 500, 502, 503, 504):
                 break
             log.info("Gemini HTTP %s, retrying in %ss", r.status_code, delay)
@@ -296,11 +298,6 @@ def _fallback_report(score: int, lang: str, reasons: list[str] | None = None) ->
 
 
 # ---------- 3) Moderation ----------
-BAD_WORDS_UZ = [
-    "axmoq", "ahmoq", "tentak", "jinni", "xromoy", "fohisha", "qahba", "jalab",
-    "pisi", "kuc̈hak", "yotamiz", "yotaylik", "yotib", "ko'kragim", "ko'krak rasm",
-    "rasm berasanmi",
-]
 
 # Off-platform contact exchange. This is the free tier's main monetization
 # leak: two free users use the weekly free chat to swap Telegram/phone and
@@ -358,12 +355,10 @@ def detect_money_request(text: str) -> bool:
 
 
 def quick_moderation(text: str) -> tuple[bool, str]:
-    t = (text or "").lower()
-
-    for bw in BAD_WORDS_UZ:
-        if bw in t:
-            return False, "Sizning xabaringizda noo'rin so'zlar bor. Iltimos, hurmatli bo'ling."
-
+    """Whole-word rules only (see moderation.py); kept for older callers."""
+    from moderation import rule_check
+    if rule_check(text):
+        return False, "Sizning xabaringizda noo'rin so'zlar bor. Iltimos, hurmatli bo'ling."
     return True, ""
 
 
