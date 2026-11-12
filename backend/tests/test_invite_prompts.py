@@ -53,13 +53,13 @@ def _user(**kw):
 # ---------- the bonus ----------
 def test_friend_bonus_adds_premium_days_up_to_a_cap(db):
     run(db.users.insert_one(_user()))
-    assert run(ip.grant_friend_bonus("u1")) == ip.BONUS_DAYS_PER_FRIEND
+    assert run(ip.grant_friend_bonus("u1")) == ("premium", ip.BONUS_DAYS_PER_FRIEND)
     u = run(db.users.find_one({"id": "u1"}))
     assert u["plan"] == "premium" and u["invite_bonus_days"] == ip.BONUS_DAYS_PER_FRIEND
     for _ in range(20):
         run(ip.grant_friend_bonus("u1"))
     assert run(db.users.find_one({"id": "u1"}))["invite_bonus_days"] == ip.BONUS_DAYS_CAP
-    assert run(ip.grant_friend_bonus("u1")) == 0
+    assert run(ip.grant_friend_bonus("u1")) == ("premium", 0)
 
 
 def test_bonus_extends_an_active_plan_instead_of_replacing_it(db):
@@ -207,5 +207,93 @@ def test_friend_finishing_the_profile_pays_the_inviter(monkeypatch):
         # the same friend can never pay twice
         await auth_r.onboard(req, uid="n1")
         assert (await database.users.find_one({"id": "inv"}))["invite_bonus_days"] == ip.BONUS_DAYS_PER_FRIEND
+
+    run(go())
+
+
+# ---------- women: Boost instead of Premium days ----------
+def _woman(**kw):
+    return _user(id="w1", gender="female", verified_selfie=True, **kw)
+
+
+def test_woman_is_paid_in_boost_not_premium_days(db):
+    run(db.users.insert_one(_woman()))
+    assert run(ip.grant_friend_bonus("w1")) == ("boost", ip.BOOST_DAYS_PER_FRIEND)
+    u = run(db.users.find_one({"id": "w1"}))
+    assert core.parse_dt(u["boost_until"]) > now_utc() + timedelta(days=ip.BOOST_DAYS_PER_FRIEND - 1)
+    assert u["invite_boost_days"] == ip.BOOST_DAYS_PER_FRIEND
+    assert not u.get("plan_until") and not u.get("invite_bonus_days")      # Premium untouched
+
+
+def test_boost_days_add_to_a_running_boost_and_stop_at_the_cap(db):
+    until = now_utc() + timedelta(days=5)
+    run(db.users.insert_one(_woman(boost_until=iso(until))))
+    run(ip.grant_friend_bonus("w1"))
+    u = run(db.users.find_one({"id": "w1"}))
+    assert core.parse_dt(u["boost_until"]) == until + timedelta(days=ip.BOOST_DAYS_PER_FRIEND)
+    for _ in range(20):
+        run(ip.grant_friend_bonus("w1"))
+    assert run(db.users.find_one({"id": "w1"}))["invite_boost_days"] == ip.BOOST_DAYS_CAP
+    assert run(ip.grant_friend_bonus("w1")) == ("boost", 0)
+
+
+def test_boost_goes_only_to_verified_women_with_a_visible_profile(db):
+    run(db.users.insert_many([
+        _user(id="unverified", gender="female"),
+        _user(id="hidden", gender="female", verified_selfie=True, hidden_profile=True),
+    ]))
+    assert run(ip.grant_friend_bonus("unverified")) == ("boost", 0)
+    assert run(ip.grant_friend_bonus("hidden")) == ("boost", 0)
+    assert not run(db.users.find_one({"id": "unverified"})).get("boost_until")
+
+
+def test_womens_prompt_offers_boost_and_skips_those_who_cannot_get_it(db):
+    run(db.users.insert_many([_woman(), _user(id="unverified", gender="female")]))
+    assert run(ip.maybe_prompt("w1", "match")) is True
+    assert run(ip.maybe_prompt("unverified", "match")) is False
+    text = db._sent[0][2]
+    assert "Boost" in text and "Premium" not in text.split("Boost")[0]
+    assert f"+{ip.BOOST_DAYS_PER_FRIEND} kun" in text
+
+
+def test_woman_inviter_gets_boost_through_the_real_onboarding(monkeypatch):
+    import ai_service
+    from models import OnboardingProfile
+    from routers import auth_r
+
+    database = mongomock_motor.AsyncMongoMockClient()["t"]
+    for mod in (core, auth_r):
+        monkeypatch.setattr(mod, "db", database, raising=False)
+    pushed = []
+
+    async def fake_push(uid, kind, text, link=None, **k):
+        pushed.append((uid, text))
+        return True
+
+    async def ok(image_url="", image_base64=""):
+        return {"valid": True, "code": "ok"}
+
+    async def nothing(*a, **k):
+        return None
+
+    monkeypatch.setattr(auth_r, "push_notif", fake_push)
+    monkeypatch.setattr(ai_service, "verify_face_photo", ok)
+    monkeypatch.setattr(auth_r, "notify_new_profile_to_relevant_users", nothing)
+
+    async def go():
+        await database.users.insert_one({"id": "inv", "name": "I", "gender": "female", "verified_selfie": True,
+                                         "plan": "free", "referral_id": "INV1", "onboarded": True,
+                                         "created_at": iso(now_utc() - timedelta(days=7))})
+        await database.users.insert_one({"id": "n1", "onboarded": False, "plan": "free", "balance": 0,
+                                         "referred_by": "INV1", "created_at": iso(now_utc())})
+        await database.files.insert_one({"storage_path": "b" * 24, "owner_id": "n1", "is_deleted": False})
+        await auth_r.onboard(OnboardingProfile(
+            gender="male", birth_date="1996-03-04", country="Uzbekistan", region="Toshkent", marital_status="single",
+            has_children=False, search_gender="female", search_age_min=20, search_age_max=36, name="Ali",
+            photo_url="http://h/api/files/" + "b" * 24, terms_accepted=True), uid="n1")
+        inv = await database.users.find_one({"id": "inv"})
+        assert inv["invite_boost_days"] == ip.BOOST_DAYS_PER_FRIEND and core.parse_dt(inv["boost_until"]) > now_utc()
+        assert inv["plan"] == "free" and inv["balance"] == 100
+        assert any(u == "inv" and f"+{ip.BOOST_DAYS_PER_FRIEND} kun Boost" in t for u, t in pushed)
 
     run(go())

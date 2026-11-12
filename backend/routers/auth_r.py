@@ -684,8 +684,9 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
                             }
                         )
                         import invite_prompts
-                        bonus_days = await invite_prompts.grant_friend_bonus(inviter["id"])
-                        days_line = f" va +{bonus_days} kun Premium" if bonus_days else ""
+                        bonus_kind, bonus_days = await invite_prompts.grant_friend_bonus(inviter["id"])
+                        days_line = (f" va +{bonus_days} kun {'Boost' if bonus_kind == 'boost' else 'Premium'}"
+                                     if bonus_days else "")
                         await push_notif(
                             inviter["id"],
                             "referral",
