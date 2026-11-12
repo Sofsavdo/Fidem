@@ -8,6 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
 
 from auth import get_current_user_id
+from guest import require_onboarded
 from core import db, get_user, iso, now_utc, parse_dt, push_notif, user_public
 from models import new_id
 
@@ -70,7 +71,7 @@ async def daily_status(uid: str = Depends(get_current_user_id)):
 
 
 @router.post("/daily/claim")
-async def daily_claim(uid: str = Depends(get_current_user_id)):
+async def daily_claim(uid: str = Depends(require_onboarded)):
     if not DAILY_STREAK_ENABLED:
         raise HTTPException(400, "Kunlik bonus vaqtincha o'chirilgan")
     me = await get_user(uid)
@@ -123,7 +124,7 @@ async def boost_status(uid: str = Depends(get_current_user_id)):
 
 
 @router.post("/boost/activate")
-async def boost_activate(request: Request, use_balance: bool = Body(True, embed=True), uid: str = Depends(get_current_user_id)):
+async def boost_activate(request: Request, use_balance: bool = Body(True, embed=True), uid: str = Depends(require_onboarded)):
     """Activate 24h boost. If use_balance=True, deduct from balance; otherwise client should redirect to CLICK payment."""
     # Boost is pure visibility; a hidden profile has none to multiply. Refuse
     # instead of silently taking money for nothing (settings_r enforces the

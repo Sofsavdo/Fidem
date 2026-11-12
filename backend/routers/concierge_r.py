@@ -7,6 +7,7 @@ from datetime import timedelta
 from fastapi import APIRouter, Body, Depends, HTTPException
 
 from auth import get_current_admin, get_current_user_id
+from guest import require_onboarded
 from core import db, get_user, iso, log, now_utc, push_notif, user_public
 from models import new_id
 from services import click_pay_link
@@ -36,7 +37,7 @@ async def concierge_info(uid: str = Depends(get_current_user_id)):
 @router.post("/concierge/order")
 async def create_concierge_order(
     payment_method: str = Body("click", embed=True),
-    uid: str = Depends(get_current_user_id),
+    uid: str = Depends(require_onboarded),
 ):
     me = await get_user(uid)
     existing = await db.concierge_orders.find_one(

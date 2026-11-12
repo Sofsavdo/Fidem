@@ -8,6 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
 
 from auth import decode_token, get_current_user_id
+from guest import require_onboarded
 from ai_service import detect_contact_info, detect_money_request
 import moderation
 import ai_assistant
@@ -218,7 +219,7 @@ async def _create_unlock(uid: str, target_id: str, source: str, guarantee: bool)
 async def chat_unlock(
     target_id: str = Body(..., embed=True),
     method: str = Body("balance", embed=True),
-    uid: str = Depends(get_current_user_id),
+    uid: str = Depends(require_onboarded),
 ):
     if target_id == uid:
         raise HTTPException(400, "Cannot unlock self")
@@ -354,7 +355,7 @@ async def list_applications(uid: str = Depends(get_current_user_id)):
 
 
 @router.post("/messages/applications/{app_id}/decide")
-async def decide_application(app_id: str, approve: bool = Body(..., embed=True), uid: str = Depends(get_current_user_id)):
+async def decide_application(app_id: str, approve: bool = Body(..., embed=True), uid: str = Depends(require_onboarded)):
     row = await db.applications.find_one({"id": app_id, "to_user_id": uid})
     if not row:
         raise HTTPException(404, "Application not found")
@@ -462,11 +463,15 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
         raise HTTPException(403, "ai_off")
     if target_is_ai and req.kind in ("voice", "video"):
         raise HTTPException(400, "ai_text_only")
+    # Guests (profile not finished) can look around and ask the assistant;
+    # writing to people needs the finished profile.
+    if not target_is_ai and not sender_doc.get("onboarded") and not sender_doc.get("is_admin"):
+        raise HTTPException(403, "onboarding_required")
     if sender_doc.get("muted"):
         raise HTTPException(403, "muted")
     if moderation.muted_now(sender_doc):
         raise HTTPException(403, "muted_temp")
-    if photo_required_missing(sender_doc):
+    if not target_is_ai and photo_required_missing(sender_doc):
         raise HTTPException(403, "photo_required")
     if not target_is_ai and selfie_required_to_write(sender_doc):
         raise HTTPException(403, "selfie_required")
@@ -728,7 +733,7 @@ async def contact_exchange_status(other_id: str, uid: str = Depends(get_current_
 
 
 @router.post("/chat/contact-exchange/{other_id}")
-async def contact_exchange_request(other_id: str, uid: str = Depends(get_current_user_id)):
+async def contact_exchange_request(other_id: str, uid: str = Depends(require_onboarded)):
     if other_id == uid:
         raise HTTPException(400, "cannot_self")
     if await db.blocks.find_one({"$or": [{"owner_id": uid, "target_id": other_id}, {"owner_id": other_id, "target_id": uid}]}):
@@ -758,7 +763,7 @@ async def contact_exchange_request(other_id: str, uid: str = Depends(get_current
 
 
 @router.post("/chat/contact-exchange/{other_id}/respond")
-async def contact_exchange_respond(other_id: str, accept: bool = Body(..., embed=True), uid: str = Depends(get_current_user_id)):
+async def contact_exchange_respond(other_id: str, accept: bool = Body(..., embed=True), uid: str = Depends(require_onboarded)):
     me = await get_user(uid)
     ex = await db.contact_exchanges.find_one({"chat_id": chat_id_for(uid, other_id), "to_id": uid, "status": "pending"}, {"_id": 0})
     if not ex:
@@ -1012,7 +1017,7 @@ async def deliver_gift(sender: dict, uid: str, to_user_id: str, kind: str, meta:
 
 
 @router.post("/gifts/send")
-async def send_gift(req: SendGiftRequest, uid: str = Depends(get_current_user_id)):
+async def send_gift(req: SendGiftRequest, uid: str = Depends(require_onboarded)):
     kind, meta = resolve_gift_kind(req.gift_kind)
     sender = await get_user(uid)
     await get_user(req.to_user_id)  # validates exists

@@ -69,7 +69,7 @@ def env(monkeypatch):
     app = FastAPI()
     app.include_router(payments_r.router, prefix="/api")
     app.dependency_overrides[auth.get_current_user_id] = lambda: "u1"
-    asyncio.run(database.users.insert_one({"id": "u1", "name": "U", "plan": "free", "balance": 0}))
+    asyncio.run(database.users.insert_one({"id": "u1", "name": "U", "plan": "free", "balance": 0, "onboarded": True}))
     return TestClient(app), database, calls
 
 
@@ -239,7 +239,7 @@ def test_referral_reward_for_a_young_inviter_once(env):
     client, db, calls = env
     from datetime import timedelta
     five_days = core.iso(core.now_utc() - timedelta(days=5))
-    asyncio.run(db.users.insert_one({"id": "inv", "name": "I", "plan": "free", "referral_id": "INV1", "created_at": five_days}))
+    asyncio.run(db.users.insert_one({"id": "inv", "name": "I", "plan": "free", "referral_id": "INV1", "created_at": five_days, "onboarded": True}))
     asyncio.run(db.users.update_one({"id": "u1"}, {"$set": {"referred_by": "INV1"}}))
     pay = client.post("/api/payments/create", json={"purpose": "premium", "days": 1}).json()
     _complete(client, pay)

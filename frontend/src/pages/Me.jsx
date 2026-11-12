@@ -1,3 +1,4 @@
+import { isGuest } from "@/lib/guest";
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "@/lib/api";
@@ -51,6 +52,21 @@ export default function Me() {
   });
 
   if (!user) return null;
+
+  // Guest mode: the profile isn't finished yet - one clear next step.
+  if (isGuest(user)) {
+    return (
+      <div className="px-4 md:px-8 pt-6 pb-8 space-y-5" data-testid="me-guest">
+        <h1 className="font-heading text-3xl font-semibold tracking-tight">{t("me")}</h1>
+        <div className="rounded-3xl border-2 border-primary/40 bg-gradient-to-b from-primary/10 to-card p-5 space-y-3">
+          <p className="font-heading text-xl font-semibold">👋 {(user.name || "").split(" ")[0]}, {t("guest_me_title")}</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">{t("guest_me_desc")}</p>
+          <button data-testid="me-guest-register" onClick={() => navigate("/onboarding")} className="btn-primary">{t("reg_sheet_cta")}</button>
+        </div>
+        <Link to="/chat/ai_assistant" className="block rounded-2xl border border-border bg-card p-4 text-sm">🤖 {t("assistant_row_hint")}</Link>
+      </div>
+    );
+  }
 
   // The wallet only matters once there is money in it or top-ups are possible.
   const showBalance = (user.balance || 0) > 0 || !!payCfg?.payments_available;

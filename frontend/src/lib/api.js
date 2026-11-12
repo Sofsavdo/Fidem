@@ -1,3 +1,4 @@
+import { askToRegister } from "@/lib/guest";
 import axios from "axios";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "https://fidem-backend-production.up.railway.app";
@@ -89,6 +90,11 @@ client.interceptors.response.use(
     return r;
   },
   (err) => {
+    // Guest tried an action: show "finish registration" (GETs stay quiet).
+    if (err.response?.status === 403 && err.response?.data?.detail === "onboarding_required"
+        && (err.config?.method || "get") !== "get") {
+      askToRegister(err.config?.url || "");
+    }
     if (err.response?.status === 401) {
       localStorage.removeItem("fidem_token");
       if (!window.location.pathname.startsWith("/auth")) {

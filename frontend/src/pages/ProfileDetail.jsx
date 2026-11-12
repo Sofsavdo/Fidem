@@ -1,3 +1,4 @@
+import { askToRegister, isGuest } from "@/lib/guest";
 import React, { useState, useCallback, useEffect, memo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import posthog from "posthog-js";
@@ -63,13 +64,14 @@ export default function ProfileDetail() {
   }, [id, t, nav]);
 
   const requestFamily = useCallback(() => {
+    if (isGuest(user)) { askToRegister("family"); return; }
     if (!user?.is_admin && !["premium", "vip"].includes(user?.plan)) {
       toast.error(t("family_vip_only"));
       nav("/premium");
       return;
     }
     sendFamilyRequest();
-  }, [user?.plan, user?.is_admin, t, nav, sendFamilyRequest]);
+  }, [user, t, nav, sendFamilyRequest]);
 
   const saveFamilyAndSend = useCallback(async () => {
     if (famPhone.replace(/\D/g, "").length < 9) { toast.error(t("family_phone_invalid")); return; }
@@ -112,6 +114,7 @@ export default function ProfileDetail() {
   }, [c, id, t]);
 
   const unlockPhoto = useCallback(async () => {
+    if (isGuest(user)) { askToRegister("photo"); return; }
     try {
       const r = await api.post("/photo-unlock/request", { target_user_id: id });
       if (r.data.status === "rejected_wait") {
@@ -121,7 +124,7 @@ export default function ProfileDetail() {
       toast.success(r.data.status === "approved" ? t("photo_unlocked_toast") : t("photo_request_sent_toast"));
       queryClient.invalidateQueries({ queryKey: QK.candidateDetail(id) });
     } catch (e) { toast.error(t("error_generic")); }
-  }, [id, t, queryClient]);
+  }, [id, t, queryClient, user]);
 
   // VIP privacy perk: peek this profile's locked photo once, for 5 seconds.
   // The backend enforces "once per profile"; the timer here just ends the
@@ -161,6 +164,7 @@ export default function ProfileDetail() {
   }, [id, peeking, t]);
 
   const toggleSave = useCallback(() => {
+    if (isGuest(user)) { askToRegister("like"); return; }
     toggleSaveMutation.mutate(
       { candidate: c, isSaved: saved },
       {
@@ -174,7 +178,7 @@ export default function ProfileDetail() {
         },
       }
     );
-  }, [saved, c, t, toggleSaveMutation]);
+  }, [saved, c, t, toggleSaveMutation, user]);
 
   if (loading || !c) {
     return (
@@ -195,7 +199,9 @@ export default function ProfileDetail() {
   }
 
   const peekActive = !!peekUrl && peekLeft > 0;
-  const blurred = !c.photo_unlocked && !peekActive;
+  const guest = isGuest(user);
+  const guestLocked = !!c.guest_locked;
+  const blurred = !c.photo_unlocked && !peekActive && !guestLocked;
   const photoUrl = peekActive
     ? photoSrc(peekUrl)
     : photoSrc(c.photo_url);
@@ -208,7 +214,18 @@ export default function ProfileDetail() {
   return (
     <div data-testid="profile-detail" className="pb-8">
       <div className="relative aspect-[4/5] max-h-[70vh] w-full overflow-hidden bg-muted">
-        <PhotoFill key={slides[slide] || "none"} src={slides[slide] || null} contain className={blurred ? "blur-photo" : ""} />
+        {guestLocked ? (
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-secondary/25 to-gold/25" />
+        ) : (
+          <PhotoFill key={slides[slide] || "none"} src={slides[slide] || null} contain className={blurred ? "blur-photo" : ""} />
+        )}
+        {guestLocked && (
+          <div className="absolute inset-0 m-auto h-fit w-fit">
+            <button data-testid="guest-unlock-photo" onClick={() => askToRegister("photo")} className="glass-dark text-white rounded-2xl px-5 py-3 flex items-center gap-2">
+              <Lock className="w-4 h-4" /> {t("guest_photo_locked")}
+            </button>
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/0 to-black/0" />
         {slides.length > 1 && (
           <>
@@ -241,7 +258,7 @@ export default function ProfileDetail() {
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div className="absolute top-4 right-4 flex flex-col gap-2 items-end">
-          <MatchBadge score={c.match_score} />
+          {c.match_score != null && <MatchBadge score={c.match_score} />}
         </div>
         {blurred && (
           <div className="absolute inset-0 m-auto h-fit w-fit flex flex-col items-center gap-2">
@@ -370,7 +387,7 @@ export default function ProfileDetail() {
         )}
 
         {/* AI Compatibility */}
-        <CompatibilityCard targetId={c.id} />
+        {!guest && <CompatibilityCard targetId={c.id} />}
 
         {/* Prompts */}
         {c.prompts && c.prompts.length > 0 && (
@@ -389,7 +406,7 @@ export default function ProfileDetail() {
         )}
 
         {/* match score with reasons */}
-        <div className="rounded-2xl border-2 border-secondary/30 bg-secondary/5 p-4">
+        {c.match_score != null && <div className="rounded-2xl border-2 border-secondary/30 bg-secondary/5 p-4">
           <div className="flex items-center justify-between">
             <h3 className="font-heading text-lg font-semibold">{matchLabel}</h3>
             <MatchBadge score={c.match_score} />
@@ -402,14 +419,14 @@ export default function ProfileDetail() {
               </li>
             ))}
           </ul>
-        </div>
+        </div>}
 
         {/* actions */}
         <div className="flex gap-2 pt-3">
           <button data-testid="profile-save" onClick={toggleSave} disabled={saving} className={`flex-1 rounded-2xl py-3 inline-flex items-center justify-center gap-2 font-medium border transition ${saved ? "bg-primary text-white border-primary" : "bg-card border-border hover:bg-muted"}`}>
             <Heart key={saved ? "on" : "off"} className={`w-4 h-4 ${saved ? "animate-heart-pop" : ""}`} fill={saved ? "currentColor" : "none"} /> {saved ? t("liked") : t("like")}
           </button>
-          <Link data-testid="profile-write" to={`/chat/${c.id}`} className="flex-1 rounded-2xl py-3 inline-flex items-center justify-center gap-2 font-medium bg-secondary text-white">
+          <Link data-testid="profile-write" to={`/chat/${c.id}`} onClick={(e) => { if (guest) { e.preventDefault(); askToRegister("write"); } }} className="flex-1 rounded-2xl py-3 inline-flex items-center justify-center gap-2 font-medium bg-secondary text-white">
             <MessageCircle className="w-4 h-4" /> {t("write")}
           </Link>
           <button data-testid="profile-share" onClick={shareProfile} className="rounded-2xl py-3 px-4 bg-card border border-border hover:bg-muted font-medium">

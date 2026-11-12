@@ -89,6 +89,11 @@ async def _may_access_file(uid: str, is_admin: bool, rec: dict) -> bool:
     # Owner can always access their own files
     if uid == owner_id:
         return True
+    # Guests (profile not finished) see only a few profiles' photos.
+    from guest import guest_scope
+    scope = await guest_scope(uid)
+    if scope is not None and owner_id not in scope:
+        return False
     path = rec.get("storage_path") or ""
     unlocked = None  # looked up lazily, at most once
 
@@ -513,6 +518,22 @@ async def _verify_profile_photo(uid: str, photo_url: str) -> None:
         )
 
 
+@router.post("/profile/guest")
+async def guest_start(search_gender: str = Body(..., embed=True), uid: str = Depends(get_current_user_id)):
+    """Guest mode: the one question before looking around - who they look
+    for, so the feed shows the right people. Nothing else is asked yet."""
+    if search_gender not in ("male", "female"):
+        raise HTTPException(400, "search_gender")
+    user = await get_user(uid)
+    if user.get("onboarded"):
+        return {"ok": True}
+    await db.users.update_one(
+        {"id": uid},
+        {"$set": {"search_gender": search_gender, "guest_started_at": user.get("guest_started_at") or iso(now_utc())}},
+    )
+    return {"ok": True}
+
+
 @router.post("/profile/onboard")
 async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id)):
     update = req.model_dump()
@@ -575,6 +596,8 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
         update["photo_notice_sent"] = True
 
     await db.users.update_one({"id": uid}, {"$set": update})
+    from guest import forget as _forget_guest
+    _forget_guest(uid)   # photos open right away, not after the cache expires
 
     fresh = await get_user(uid)
     completeness = compute_completeness(fresh)
@@ -658,6 +681,7 @@ async def onboard(req: OnboardingProfile, uid: str = Depends(get_current_user_id
 
 @router.patch("/profile")
 async def update_profile(req: UpdateProfileRequest, uid: str = Depends(get_current_user_id)):
+    from ai_service import verify_same_person_photo
     user = await get_user(uid)
     update = {k: v for k, v in req.model_dump().items() if v is not None}
     if user.get("onboarded"):
@@ -677,12 +701,39 @@ async def update_profile(req: UpdateProfileRequest, uid: str = Depends(get_curre
             raise HTTPException(400, "too_many_photos")
         for url in wanted:
             await _require_own_photo(uid, url)
+        # Extra photos must be of the person themselves: no landscapes,
+        # flowers, cars, memes or someone else (checked against the main photo).
+        before = set(own_photos(user))
+        main = own_photo_url(user)
+        for url in wanted:
+            if url in before or not main:
+                continue
+            res = await verify_same_person_photo(main, url, "gallery")
+            if res.get("valid") is False:
+                raise HTTPException(400, f"photo_invalid:{res.get('code') or 'no_person'}")
         update["photos"] = wanted
     new_photo = (update.pop("photo_url", None) or "").strip()
     if new_photo and new_photo != (user.get("photo_url") or ""):
         await _require_own_photo(uid, new_photo)
         await _verify_profile_photo(uid, new_photo)
         update["photo_url"] = new_photo
+        # The selfie check proved the person matches the OLD main photo. A new
+        # main photo keeps the badge only if it is the same face as the
+        # approved selfie; otherwise the selfie has to be done again (this
+        # closes "verify, then swap in someone else's photo").
+        if user.get("verified_selfie"):
+            selfie = await db.verifications.find_one(
+                {"user_id": uid, "kind": "selfie", "status": "approved"}, {"_id": 0, "proof_url": 1},
+                sort=[("created_at", -1)],
+            )
+            same = await verify_same_person_photo(selfie["proof_url"], new_photo, "main_vs_selfie") if selfie and selfie.get("proof_url") else {"valid": None}
+            if same.get("valid") is not True:
+                update["verified_selfie"] = False
+                asyncio.create_task(push_notif(
+                    uid, "verified",
+                    "📸 Asosiy rasmingiz almashdi — selfie tasdiqni qayta o'ting (30 soniya).",
+                    link="/verification",
+                ))
     # Video intro is a VIP perk: setting a NEW video requires the plan;
     # clearing (empty string) is always allowed so a downgraded user can
     # remove theirs.

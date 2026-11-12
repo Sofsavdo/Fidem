@@ -1,3 +1,4 @@
+import { isGuest, rememberReturnPath } from "@/lib/guest";
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import api from "@/lib/api";
@@ -340,6 +341,18 @@ export default function Chat() {
       setMenuOpen(false);
     } catch (e) { toast.error(t("error")); }
   };
+
+  if (isGuest(user) && !isAi && other) {
+    return (
+      <div className="flex flex-col min-h-screen items-center justify-center px-6 text-center gap-4" data-testid="chat-guest-gate">
+        <div className="text-5xl">💬</div>
+        <h2 className="font-heading text-xl font-semibold">{t("guest_chat_title").replace("{name}", other.name || "")}</h2>
+        <p className="text-sm text-muted-foreground max-w-xs">{t("reg_sheet_desc")}</p>
+        <button data-testid="chat-guest-register" onClick={() => { rememberReturnPath(`/chat/${otherId}`); nav("/onboarding"); }} className="btn-primary max-w-xs">{t("reg_sheet_cta")}</button>
+        <Link to="/" className="text-sm text-muted-foreground">← {t("candidates")}</Link>
+      </div>
+    );
+  }
 
   if (!other) {
     return (

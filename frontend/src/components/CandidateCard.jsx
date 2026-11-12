@@ -8,12 +8,15 @@ import { QK } from "@/hooks/queries";
 import api from "@/lib/api";
 import { photoSrc } from "@/lib/photo";
 import PhotoFill from "@/components/PhotoFill";
+import { askToRegister, isGuest } from "@/lib/guest";
 
 function CandidateCardInner({ c, onSave, saved }) {
-  const { t } = useApp();
+  const { t, user } = useApp();
   const queryClient = useQueryClient();
   const photoUrl = photoSrc(c.photo_url);
-  const blurred = !c.photo_unlocked;
+  const guestLocked = !!c.guest_locked;
+  const blurred = !c.photo_unlocked && !guestLocked;
+  const guest = isGuest(user);
 
   // Warm the profile-detail query on touch so opening the profile feels instant.
   const prefetchDetail = useCallback(() => {
@@ -31,13 +34,27 @@ function CandidateCardInner({ c, onSave, saved }) {
     >
       <Link to={`/candidate/${c.id}`} className="block" onPointerDown={prefetchDetail} onMouseEnter={prefetchDetail}>
         <div className="relative aspect-[4/5] overflow-hidden bg-muted">
-          <PhotoFill src={photoUrl} className={`transition-all duration-700 ${blurred ? "blur-photo" : ""}`} />
+          {guestLocked ? (
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-secondary/25 to-gold/25 blur-photo" data-testid="guest-locked-photo" />
+          ) : (
+            <PhotoFill src={photoUrl} className={`transition-all duration-700 ${blurred ? "blur-photo" : ""}`} />
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/0 to-black/0" />
 
           {/* One small match pill — the rest of the badges live in the profile. */}
-          <div className="absolute top-3 left-3">
-            <MatchBadge score={c.match_score ?? 0} />
-          </div>
+          {c.match_score != null && (
+            <div className="absolute top-3 left-3">
+              <MatchBadge score={c.match_score} />
+            </div>
+          )}
+
+          {guestLocked && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="glass-dark text-white rounded-full px-3 py-1.5 text-xs flex items-center gap-1.5">
+                <Lock className="w-3 h-3" /> {t("guest_photo_locked")}
+              </div>
+            </div>
+          )}
 
           {blurred && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -76,7 +93,7 @@ function CandidateCardInner({ c, onSave, saved }) {
         <div className="flex items-center gap-1.5">
           <button
             data-testid={`candidate-save-${c.id}`}
-            onClick={() => onSave?.(c)}
+            onClick={() => (guest ? askToRegister("like") : onSave?.(c))}
             className={`p-2 rounded-full transition ${
               saved ? "bg-primary text-white" : "bg-muted text-foreground hover:bg-border"
             }`}
@@ -86,6 +103,7 @@ function CandidateCardInner({ c, onSave, saved }) {
           </button>
           <Link
             to={`/chat/${c.id}`}
+            onClick={(e) => { if (guest) { e.preventDefault(); askToRegister("write"); } }}
             data-testid={`candidate-message-${c.id}`}
             className="p-2 rounded-full bg-secondary text-white hover:bg-secondary/90"
             title={t("write")}

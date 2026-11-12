@@ -8,6 +8,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Depends, HTTPException
 
 from auth import get_current_user_id
+from guest import require_onboarded
 from core import chat_id_for, db, get_user, iso, log, manager, now_utc, push_notif
 from models import new_id
 
@@ -54,7 +55,7 @@ async def my_family_contact(uid: str = Depends(get_current_user_id)):
 async def request_family_share(
     target_user_id: str = Body(..., embed=True),
     note: str = Body("", embed=True),
-    uid: str = Depends(get_current_user_id),
+    uid: str = Depends(require_onboarded),
 ):
     if target_user_id == uid:
         raise HTTPException(400, "family_self")
@@ -95,7 +96,7 @@ async def request_family_share(
 async def respond_family_share(
     request_id: str,
     accept: bool = Body(..., embed=True),
-    uid: str = Depends(get_current_user_id),
+    uid: str = Depends(require_onboarded),
 ):
     req = await db.family_requests.find_one({"id": request_id})
     if not req:

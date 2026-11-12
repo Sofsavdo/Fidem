@@ -41,5 +41,9 @@ for i in range(5):
         httpx.patch(f"{B}/admin/users/{uid}", json={"verified_selfie": True}, headers={"Authorization": f"Bearer {_adm}"}, timeout=30).raise_for_status()
 # a brand new user who has NOT onboarded (for the onboarding flow)
 r = httpx.post(f"{B}/auth/register", json=dict(email="new@fidem.uz", password="QaPass#2026", name="Yangi"), timeout=30); r.raise_for_status()
+# a guest: signed in, picked who they look for, profile not finished
+g = httpx.post(f"{B}/auth/register", json=dict(email="guest@fidem.uz", password="QaPass#2026", name="Mehmon"), timeout=30).json()
+httpx.post(f"{B}/profile/guest", json={"search_gender": "female"}, headers={"Authorization": f"Bearer {g['token']}"}, timeout=30).raise_for_status()
+out["guest@fidem.uz"] = dict(id=g["user_id"], token=g["token"])
 json.dump(out, open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "users.json"), "w"), indent=1)
 print("seeded", len(out), "users")

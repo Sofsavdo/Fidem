@@ -8,6 +8,8 @@ import ScrollToTop from "@/components/ScrollToTop";
 import PhotoRequired from "@/components/PhotoRequired";
 import PayTransferSheet from "@/components/PayTransferSheet";
 import PremiumPicker from "@/components/PremiumPicker";
+import RegisterSheet from "@/components/RegisterSheet";
+import GuestStart from "@/components/GuestStart";
 import BrandSplash from "@/components/BrandSplash";
 import { applyTheme, getTheme } from "@/lib/theme";
 
@@ -56,11 +58,6 @@ function PageSpinner() {
   return <BrandSplash full={false} />;
 }
 
-const WELCOMED_KEY = "fidem_welcomed";
-function hasSeenWelcome() {
-  try { return Boolean(localStorage.getItem(WELCOMED_KEY)); } catch { return false; }
-}
-
 function Gate({ children }) {
   const { user, loading } = useApp();
   const location = useLocation();
@@ -72,12 +69,11 @@ function Gate({ children }) {
     return <Navigate to="/auth" replace state={{ from: location }} />;
   }
 
-  if (!user.onboarded && location.pathname !== "/onboarding") {
-    // A shared profile link should still open that profile after sign-up.
-    if (location.pathname.startsWith("/candidate/")) {
-      try { sessionStorage.setItem("fidem_after_onboarding", location.pathname); } catch { /* private mode */ }
-    }
-    return <Navigate to="/onboarding" replace />;
+  // Guest mode: a person who hasn't finished the profile can look around
+  // (only the first question - who they look for - is asked up front).
+  // Actions open the "finish registration" sheet (RegisterSheet).
+  if (!user.onboarded && !user.is_admin && location.pathname !== "/onboarding" && !user.search_gender) {
+    return <GuestStart />;
   }
 
   // A profile photo is mandatory - without one there is no app, only the upload.
@@ -117,14 +113,13 @@ function RootRoute() {
 
   if (!user) return <Welcome />;
 
-  // First-time users (incl. Telegram, who are auto-authenticated) see the
-  // Welcome/intro screen once before registration. The Welcome CTA sets the
-  // welcomed flag, so returning users skip straight to onboarding.
-  if (!user.onboarded && !hasSeenWelcome()) return <Welcome />;
+  // Guest mode: a new person (Telegram signs them in automatically) answers
+  // one question and looks around; registration is asked only when they
+  // try to act (RegisterSheet).
+  if (!user.onboarded && user.is_admin) return <Navigate to="/onboarding" replace />;
+  if (!user.onboarded && !user.search_gender) return <GuestStart />;
 
-  if (!user.onboarded) return <Navigate to="/onboarding" replace />;
-
-  if (!user.is_admin && !user.photo_url) return <PhotoRequired />;
+  if (user.onboarded && !user.is_admin && !user.photo_url) return <PhotoRequired />;
 
   return (
     <Layout>
@@ -254,6 +249,7 @@ export default function App() {
           <Toaster position="top-center" richColors visibleToasts={2} duration={2000} expand={false} gap={8} />
           <Inner />
           <PayTransferSheet />
+          <RegisterSheet />
           <PremiumPicker />
         </BrowserRouter>
       </AppProvider>
