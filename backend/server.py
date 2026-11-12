@@ -229,6 +229,10 @@ async def startup() -> None:
     # telegram_r.py) but had no index at all - every signup with a referral
     # code did a full collection scan of users.
     await db.users.create_index("referral_id", sparse=True, name="ix_referral_id")
+    # Ad tracking links (ad_links.py)
+    await db.ad_links.create_index("code", unique=True, name="ux_ad_code")
+    await db.users.create_index("ad_source", sparse=True, name="ix_ad_source")
+    await db.bot_starts.create_index("ad_source", sparse=True, name="ix_bot_ad_source")
     # Drop any existing index on referral_username_lower and recreate with sparse=True
     try:
         existing_indexes = await db.users.list_indexes().to_list(length=None)

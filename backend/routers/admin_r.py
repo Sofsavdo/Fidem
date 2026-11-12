@@ -1071,3 +1071,37 @@ async def admin_decide_manual_topup(
         raise HTTPException(404, "Not found or already decided")
     await log_admin_action(admin_id, "p2p_topup_approve" if approve else "p2p_topup_reject", res.get("user_id"), {"amount": res.get("amount"), "topup_id": tid})
     return {"ok": True}
+
+
+# ---------- Ad tracking links (ad_links.py) ----------
+@router.get("/ad-links")
+async def admin_ad_links(_: str = Depends(get_current_admin)):
+    import ad_links
+    return await ad_links.list_with_stats()
+
+
+@router.post("/ad-links")
+async def admin_create_ad_link(
+    name: str = Body(..., embed=True),
+    code: str = Body("", embed=True),
+    cost_uzs: int = Body(0, embed=True),
+    note: str = Body("", embed=True),
+    admin_uid: str = Depends(get_current_admin),
+):
+    import ad_links
+    try:
+        doc = await ad_links.create(name, code, cost_uzs, note)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    await log_admin_action(admin_uid, "ad_link_create", doc["code"], {"name": doc["name"], "cost_uzs": doc["cost_uzs"]})
+    return {**doc, "link": ad_links.link_for(doc["code"]), "app_link": ad_links.app_link_for(doc["code"])}
+
+
+@router.patch("/ad-links/{code}")
+async def admin_update_ad_link(code: str, fields: dict = Body(...), admin_uid: str = Depends(get_current_admin)):
+    import ad_links
+    doc = await ad_links.update(code, {k: fields.get(k) for k in ("name", "cost_uzs", "note", "active") if k in fields})
+    if not doc:
+        raise HTTPException(404, "not_found")
+    await log_admin_action(admin_uid, "ad_link_update", code, {k: doc.get(k) for k in ("name", "cost_uzs", "active")})
+    return doc
