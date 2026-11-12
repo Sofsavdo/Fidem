@@ -13,7 +13,7 @@ import {
   useAdminStats, useAdminUsers, useAdminRegions, useAdminUserSearch, useUpdateAdminUser,
   useAdminPayments, useAdminPaymentBlock, useAdminVerifications, useAdminDecideVerification,
   useAdminReports, useAdminWithdrawals, useAdminWithdrawalDecision, useAdminConcierge,
-  useAdminConciergeMatch, useAdminReferrals, useAdminReferrers, useAdminReferrerDetail, useAdminMessages, useAdminDeleteMessage, useAdminModeration, useAdminModerationEvents, useAdminModerationActions,
+  useAdminConciergeMatch, useAdminReferrals, useAdminReferrers, useAdminReferrerDetail, useAdminMessages, useAdminDeleteMessage, useAdminModeration, useAdminModerationEvents, useAdminModerationActions, useAdminAiPersonas, useAdminSetAiPersonas,
   useAdminFraud, useAdminMarkSafe, useAdminBroadcast,
   useAdminCeo, useAdminFunnel, useAdminEngagement, useAdminRevenue,
   useAdminConciergeAnalytics, useAdminChatModAnalytics, useAdminAuditLog, useAdminGiftShop,
@@ -70,7 +70,7 @@ const STATUS_UZ = {
 };
 const statusUz = (s) => STATUS_UZ[s] || s || "—";
 const ACTION_UZ = {
-  update_user: "Foydalanuvchini o'zgartirdi", set_women_free: "Ayollar uchun bepul Premium'ni o'zgartirdi", set_ai_moderation: "Chat AI nazoratini o'zgartirdi", unmute_temp: "Yozish taqiqini olib tashladi", delete_demo_users: "Demo profillarni o'chirdi",
+  update_user: "Foydalanuvchini o'zgartirdi", set_women_free: "Ayollar uchun bepul Premium'ni o'zgartirdi", set_ai_moderation: "Chat AI nazoratini o'zgartirdi", set_ai_personas: "AI suhbatdoshlarni yoqdi/o'chirdi", unmute_temp: "Yozish taqiqini olib tashladi", delete_demo_users: "Demo profillarni o'chirdi",
   give_premium: "Premium berdi", give_vip: "VIP berdi", give_standard: "Standard berdi",
   reset_balance: "Balansni tozaladi", reset_likes: "Like'larni tozaladi", mute: "Ovozini o'chirdi",
   unmute: "Ovozini yoqdi", shadow_ban: "Yashirin ban", unshadow_ban: "Yashirin bandan chiqardi",
@@ -81,7 +81,7 @@ const ACTION_UZ = {
   broadcast: "Xabar yubordi",
 };
 const actionUz = (a) => { const k = String(a || "").replace(/^user_action:/, ""); return ACTION_UZ[k] || k; };
-const FIELD_UZ = { women_free: "Ayollar uchun bepul", ai_enabled: "AI nazorat",
+const FIELD_UZ = { women_free: "Ayollar uchun bepul", ai_enabled: "AI nazorat", enabled: "yoqilgan",
   verified_identity: "shaxs", verified_selfie: "selfie", verified_financial: "moliyaviy", add_balance: "balansga qo'shildi",
   plan: "tarif", blocked: "blok", count: "soni", target_ids: "kimlar", days: "kun", amount: "summa", topup_id: "so'rov",
 };
@@ -2285,6 +2285,38 @@ function AdminModerationPanel({ onOpenUser }) {
   );
 }
 
+function AdminAiPersonasPanel() {
+  const { data: st } = useAdminAiPersonas();
+  const setOn = useAdminSetAiPersonas();
+  return (
+    <div className="rounded-3xl bg-card border border-border p-4 space-y-3" data-testid="admin-ai-personas">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">🤖 AI suhbatdoshlar (vaqtinchalik)</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+            20 ta AI nomzod (10 ayol, 10 erkak) ro'yxatda doim online turadi va chatda javob yozadi.
+            Hammasida «🤖 AI» belgisi bor, ular bilan yozishish bepul, real odamlar ro'yxatda har doim oldinda.
+            Real foydalanuvchilar yetarli bo'lganda o'chiring.
+          </p>
+        </div>
+        <button
+          data-testid="admin-ai-personas-toggle"
+          onClick={() => setOn.mutate(!st?.enabled, { onSuccess: () => toast.success(st?.enabled ? "AI suhbatdoshlar o'chirildi" : "AI suhbatdoshlar yoqildi") })}
+          disabled={!st || setOn.isPending}
+          className={`shrink-0 text-xs rounded-full px-3 py-1.5 font-semibold ${st?.enabled ? "bg-secondary text-white" : "bg-muted text-muted-foreground"}`}
+        >
+          {st?.enabled ? "Yoqilgan" : "O'chiq"}
+        </button>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <KpiTile label="AI nomzodlar" value={st?.personas ?? "—"} />
+        <KpiTile label="Yozgan odamlar (24 soat)" value={st?.people_24h ?? "—"} />
+        <KpiTile label="AI javoblari (24 soat)" value={st?.replies_24h ?? "—"} />
+      </div>
+    </div>
+  );
+}
+
 function AdminMessages() {
   const [q, setQ] = useState("");
   const [userIdFilter, setUserIdFilter] = useState("");
@@ -2306,6 +2338,7 @@ function AdminMessages() {
   return (
     <div className="space-y-4" data-testid="admin-messages">
       <AdminModerationPanel onOpenUser={setUserIdFilter} />
+      <AdminAiPersonasPanel />
       <AdminChatModAnalyticsPanel onOpenUser={setUserIdFilter} />
       <div className="space-y-2">
         <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Xabar matni bo'yicha qidirish..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" />

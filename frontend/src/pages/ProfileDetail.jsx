@@ -303,6 +303,12 @@ export default function ProfileDetail() {
           </div>
         )}
 
+        {c.is_ai && (
+          <div data-testid="profile-ai-note" className="rounded-2xl border border-violet-300 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/40 p-3 text-sm leading-relaxed">
+            🤖 {t("ai_profile_note")}
+          </div>
+        )}
+
         {/* Verification badges row */}
         {(c.verified_selfie || c.verified_financial || c.verified_identity || c.location_verified) && (
           <div className="flex gap-2 flex-wrap" data-testid="profile-badges">
@@ -422,14 +428,14 @@ export default function ProfileDetail() {
           </button>
         </div>
         {/* Family Share (VIP only) */}
-        <button
+        {!c.is_ai && <button
           data-testid="profile-family"
           onClick={requestFamily}
           disabled={famSending}
           className="w-full rounded-2xl py-2.5 mt-2 text-sm font-medium border border-secondary/40 bg-secondary/10 text-secondary hover:bg-secondary/20 inline-flex items-center justify-center gap-2"
         >
           📞 {t("family_request_btn")}
-        </button>
+        </button>}
         {famSheet && (
           <div className="fixed inset-0 flex items-end" style={{ zIndex: 10001 }} data-testid="family-sheet">
             <div className="absolute inset-0 bg-black/40" onClick={() => setFamSheet(false)} />

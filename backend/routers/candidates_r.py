@@ -221,6 +221,10 @@ async def candidates(
 
     if me_doc.get("search_gender"):
         query["gender"] = me_doc["search_gender"]
+    # AI conversation partners (labelled) - only while the admin keeps them on.
+    import ai_personas
+    if not await ai_personas.enabled():
+        query["is_ai"] = {"$ne": True}
 
     # Travel Mode: if user has active travel_region, use it as filter unless explicit region passed
     if not region:
@@ -346,6 +350,9 @@ async def candidates(
             trust_bonus = (10 if d.get("verified_selfie") else 0) + (5 if d.get("photo_verified") else 0)
             return (
                 0 if boosted else 1,
+                # Real people always come before the AI conversation partners,
+                # which only fill the list while it's thin.
+                1 if d.get("is_ai") else 0,
                 0 if same_region else 1,
                 -(x.get("match_score", 0) + fresh_bonus + trust_bonus),
                 -x.get("completeness", 0),
@@ -424,7 +431,7 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
     # no profile_views record, no "kim ko'rdi" appearance, no notification,
     # and no bump to the target's view counters further below.
     incognito = bool(me_doc.get("hidden_profile")) and me_doc.get("plan") in INCOGNITO_PLANS
-    hidden_gate = bool(target.get("hidden_profile")) and not me_doc.get("is_admin")
+    hidden_gate = bool(target.get("hidden_profile")) and not target.get("is_ai") and not me_doc.get("is_admin")
 
     # Every read this view needs is independent: run them together (this
     # endpoint used to issue ~8 sequential DB round trips).

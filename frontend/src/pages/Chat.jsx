@@ -212,7 +212,9 @@ export default function Chat() {
   const [shareOpen, setShareOpen] = useState(false);
   const { state: cx, reload: reloadCx } = useContactExchange(otherId);
   // Women write only after the live selfie check (fake female profiles).
-  const needsSelfie = user?.gender === "female" && !user?.verified_selfie && !user?.is_admin;
+  // AI conversation partners: labelled, free, text only, no contact exchange.
+  const isAi = !!(other?.is_ai || access?.is_ai || String(otherId).startsWith("ai_"));
+  const needsSelfie = !isAi && user?.gender === "female" && !user?.verified_selfie && !user?.is_admin;
   const openExchange = () => { setShareOpen(true); reloadCx(true); };
   useEffect(() => {
     if (cx?.status !== "accepted") reloadCx();
@@ -272,6 +274,8 @@ export default function Chat() {
         money_request_blocked: "money_request_blocked_error",
         selfie_required: "selfie_required_error",
         message_blocked: "message_blocked_error",
+        ai_off: "ai_off_error",
+        ai_text_only: "ai_text_only_error",
         muted_temp: "muted_temp_error",
         photo_required: "photo_required_error",
         message_too_long: "msg_too_long_error",
@@ -369,7 +373,10 @@ export default function Chat() {
             )}
           </div>
           <div className="min-w-0">
-            <p className="font-medium truncate">{other.name}, {other.age}</p>
+            <p className="font-medium truncate">
+              {other.ai_role === "assistant" || otherId === "ai_assistant" ? t("assistant_name") : `${other.name}, ${other.age}`}
+              {isAi && <span data-testid="chat-ai-badge" className="ml-1.5 text-[10px] font-bold text-white bg-violet-600 rounded-full px-1.5 py-0.5 align-middle">🤖 AI</span>}
+            </p>
             <p className="text-xs text-muted-foreground truncate">{formatLastActive(other.last_active_minutes, t, other.online)}</p>
           </div>
         </Link>
@@ -400,6 +407,11 @@ export default function Chat() {
           >
             {loadingOlder ? "⏳ ..." : "← Eski xabarlar"}
           </button>
+        )}
+        {isAi && (
+          <p data-testid="chat-ai-note" className="self-center max-w-[92%] text-center text-[11px] text-violet-800 dark:text-violet-200 bg-violet-100 dark:bg-violet-950/50 rounded-2xl px-3 py-1.5">
+            🤖 {otherId === "ai_assistant" ? t("assistant_chat_note") : t("ai_chat_note")}
+          </p>
         )}
         <p data-testid="chat-safety" className="self-center max-w-[92%] text-center text-[11px] text-muted-foreground bg-muted/60 rounded-full px-3 py-1 inline-flex items-center gap-1">
           <ShieldAlert className="w-3 h-3 shrink-0" /> {t("chat_safety_line")}
@@ -565,7 +577,7 @@ export default function Chat() {
           {access?.uses_free_weekly && (
             <p data-testid="chat-free-weekly-hint" className="text-[11px] text-secondary text-center">{t("chat_free_weekly_hint")}</p>
           )}
-          <IncomingExchange state={cx} otherId={otherId} otherName={other.name} onAnswered={() => reloadCx(true)} />
+          {!isAi && <IncomingExchange state={cx} otherId={otherId} otherName={other.name} onAnswered={() => reloadCx(true)} />}
           {!shareOpen && <AcceptedContacts state={cx} />}
           {shareOpen && <ExchangePanel state={cx} otherId={otherId} onClose={() => setShareOpen(false)} onChanged={() => reloadCx(true)} />}
           {needsSelfie && (
@@ -580,6 +592,7 @@ export default function Chat() {
               <Gift className="w-4 h-4" />
             </button>
             )}
+            {!isAi && (
             <button
               data-testid="contact-share-open"
               onClick={() => (shareOpen ? setShareOpen(false) : openExchange())}
@@ -589,7 +602,8 @@ export default function Chat() {
             >
               <Contact className="w-4 h-4" />
             </button>
-            {!access?.requires_unlock && <div className="shrink-0"><ChatVoiceRecorder onSend={sendVoice} /></div>}
+            )}
+            {!access?.requires_unlock && !isAi && <div className="shrink-0"><ChatVoiceRecorder onSend={sendVoice} /></div>}
             <input
               data-testid="chat-input"
               maxLength={2000}

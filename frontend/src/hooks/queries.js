@@ -756,6 +756,22 @@ export function useAdminModerationEvents(params) {
   });
 }
 
+export function useAdminAiPersonas() {
+  return useQuery({
+    queryKey: ["admin", "aiPersonas"],
+    queryFn: () => api.get("/admin/ai-personas").then((r) => r.data),
+    staleTime: 30_000,
+  });
+}
+
+export function useAdminSetAiPersonas() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (on) => api.post("/admin/ai-personas", { enabled: on }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "aiPersonas"] }),
+  });
+}
+
 export function useAdminModerationActions() {
   const queryClient = useQueryClient();
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["admin"] });

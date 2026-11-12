@@ -378,6 +378,9 @@ def user_public(u: dict, include_private: bool = False) -> dict:
         "hidden_profile": bool(u.get("hidden_profile", False)),
         # 15s VIP video intro - public on the profile page by design.
         "video_intro_url": u.get("video_intro_url") or None,
+        # AI conversation partners are always labelled in the app.
+        "is_ai": bool(u.get("is_ai")),
+        "ai_role": u.get("ai_role") if u.get("is_ai") else None,
     }
     if include_private:
         # Contact info, device/IP data and fraud-review fields - only for the
@@ -419,6 +422,7 @@ def user_public_minimal(u: dict) -> dict:
         "education": u.get("education", ""),
         "profession": u.get("profession", ""),
         "bio": u.get("bio", ""),
+        "is_ai": bool(u.get("is_ai")),
         "photo_url": own_photo_url(u),
         "verified_selfie": u.get("verified_selfie", False),
         "verified_financial": u.get("verified_financial", False),

@@ -81,15 +81,16 @@ async def _compute_admin_stats() -> dict:
         pending_payments, pending_verifications, open_reports,
         pending_topups, pending_withdrawals, pending_concierge,
     ) = await asyncio.gather(
-        db.users.count_documents({}),
-        db.users.count_documents({"gender": "male"}),
-        db.users.count_documents({"gender": "female"}),
-        db.users.count_documents({"onboarded": True}),
+        # AI conversation partners are not real users: left out of the counts.
+        db.users.count_documents({"is_ai": {"$ne": True}}),
+        db.users.count_documents({"gender": "male", "is_ai": {"$ne": True}}),
+        db.users.count_documents({"gender": "female", "is_ai": {"$ne": True}}),
+        db.users.count_documents({"onboarded": True, "is_ai": {"$ne": True}}),
         db.users.count_documents({"plan": "premium"}),
         db.users.count_documents({"plan": "vip"}),
-        db.users.count_documents({"last_active": {"$gte": today_iso}}),
-        db.users.count_documents({"last_active": {"$gte": week_iso}}),
-        db.users.count_documents({"last_active": {"$gte": month_iso}}),
+        db.users.count_documents({"last_active": {"$gte": today_iso}, "is_ai": {"$ne": True}}),
+        db.users.count_documents({"last_active": {"$gte": week_iso}, "is_ai": {"$ne": True}}),
+        db.users.count_documents({"last_active": {"$gte": month_iso}, "is_ai": {"$ne": True}}),
         _rev({"status": "success"}),
         _rev({"status": "success", "created_at": {"$gte": today_iso}}),
         _rev({"status": "success", "created_at": {"$gte": week_iso}}),
@@ -953,6 +954,32 @@ async def admin_moderation_events(page: int = 1, limit: int = 30, user_id: str =
     return {"items": rows, "total": total, "page": page, "limit": limit}
 
 
+@router.get("/ai-personas")
+async def admin_get_ai_personas(_: str = Depends(get_current_admin)):
+    import ai_personas
+    since = iso(now_utc() - timedelta(hours=24))
+    chats_24h, replies_24h, total = await asyncio.gather(
+        db.messages.distinct("from_user_id", {"to_user_id": {"$regex": "^ai_"}, "created_at": {"$gte": since}}),
+        db.messages.count_documents({"from_user_id": {"$regex": "^ai_"}, "created_at": {"$gte": since}}),
+        db.users.count_documents({"is_ai": True, "ai_role": "candidate"}),
+    )
+    return {"enabled": await ai_personas.enabled(), "personas": total,
+            "people_24h": len(chats_24h), "replies_24h": replies_24h}
+
+
+@router.post("/ai-personas")
+async def admin_set_ai_personas(enabled: bool = Body(..., embed=True), admin_uid: str = Depends(get_current_admin)):
+    import ai_personas
+    await db.settings.update_one(
+        {"id": "ai_personas"},
+        {"$set": {"id": "ai_personas", "enabled": enabled, "updated_at": iso(now_utc())}},
+        upsert=True,
+    )
+    ai_personas.reset_settings_cache()
+    await log_admin_action(admin_uid, "set_ai_personas", None, {"enabled": enabled})
+    return {"ok": True, "enabled": enabled}
+
+
 @router.post("/users/{target_id}/unmute-temp")
 async def admin_unmute_temp(target_id: str, admin_uid: str = Depends(get_current_admin)):
     await db.users.update_one({"id": target_id}, {"$unset": {"muted_until": ""}})
@@ -965,7 +992,7 @@ async def admin_unmute_temp(target_id: str, admin_uid: str = Depends(get_current
 @router.get("/promo")
 async def admin_get_promo(_: str = Depends(get_current_admin)):
     from core import women_free_active
-    women = await db.users.count_documents({"gender": "female", "onboarded": True})
+    women = await db.users.count_documents({"gender": "female", "onboarded": True, "is_ai": {"$ne": True}})
     return {"women_free": await women_free_active(), "women_count": women}
 
 
