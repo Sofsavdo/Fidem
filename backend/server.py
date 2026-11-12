@@ -442,5 +442,6 @@ app.add_middleware(
     allow_origins=["*"],  # Allow all origins for development and production
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["X-Total-Count"],   # the Nomzodlar list reads it for "N nomzod"
     max_age=600,  # Cache preflight for 10 minutes
 )

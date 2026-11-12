@@ -121,7 +121,20 @@ export default function Candidates() {
     (filters.district ? 1 : 0) +
     (filters.age_min || filters.age_max ? 1 : 0);
 
-  const { data: items = [], isLoading } = useCandidates(filters);
+  const { items, total, isLoading, hasNextPage, isFetchingNextPage, fetchNextPage } = useCandidates(filters);
+
+  // Load the next page as the end of the list scrolls into view (the button
+  // below does the same for anyone who can't scroll into it).
+  const moreRef = React.useRef(null);
+  useEffect(() => {
+    const el = moreRef.current;
+    if (!el || !hasNextPage || typeof IntersectionObserver === "undefined") return undefined;
+    const io = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting && !isFetchingNextPage) fetchNextPage();
+    }, { rootMargin: "600px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, items.length]);
   const { data: savedList = [] } = useSaved("mine");
   const savedIds = useMemo(() => new Set(savedList.map((x) => x.id)), [savedList]);
 
@@ -160,7 +173,7 @@ export default function Candidates() {
         <div>
           <h1 className="font-heading text-3xl md:text-4xl font-semibold tracking-tight">{t("candidates")}</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {items.length} {t("candidates").toLowerCase()}
+            {total || items.length} {t("candidates").toLowerCase()}
           </p>
         </div>
         <button
@@ -258,6 +271,19 @@ export default function Candidates() {
               )}
             </React.Fragment>
           ))}
+        </div>
+      )}
+
+      {hasNextPage && items.length > 0 && (
+        <div ref={moreRef} className="py-6 text-center" data-testid="candidates-more">
+          <button
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
+            className="text-sm font-semibold text-primary disabled:opacity-60"
+            data-testid="candidates-more-btn"
+          >
+            {isFetchingNextPage ? t("loading") : t("candidates_show_more")}
+          </button>
         </div>
       )}
 

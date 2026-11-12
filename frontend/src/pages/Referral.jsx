@@ -95,11 +95,16 @@ export default function Referral() {
               <section className="rounded-3xl border border-gold/40 bg-gold-light/20 p-4" data-testid="ref-bonus-days">
                 <SectionLabel>{t("ref_bonus_title")}</SectionLabel>
                 <p className="text-sm mt-1.5 leading-snug">
-                  {t("ref_bonus_desc")
+                  {t(data.bonus_kind === "boost" ? "ref_bonus_boost_desc" : "ref_bonus_desc")
                     .replace("{days}", data.bonus_days_per_friend)
                     .replace("{earned}", data.bonus_days_earned || 0)
                     .replace("{cap}", data.bonus_days_cap)}
                 </p>
+                {data.bonus_needs_selfie && (
+                  <Link to="/verification" className="block text-xs font-medium text-primary underline mt-2" data-testid="ref-bonus-selfie">
+                    {t("ref_bonus_selfie")}
+                  </Link>
+                )}
               </section>
             )}
 

@@ -1,9 +1,15 @@
 """Invite-a-friend: the bonus, and the notification that offers it.
 
-Bonus (real, immediate, capped):
-- the friend finishes their profile -> the inviter gets BONUS_DAYS_PER_FRIEND
-  days of Premium (on top of the 100 so'm balance that was already there),
-  up to BONUS_DAYS_CAP days in total per inviter;
+Bonus (real, immediate, capped), by who invites:
+- a man: BONUS_DAYS_PER_FRIEND days of Premium per friend who finishes the
+  profile (on top of the 100 so'm balance), up to BONUS_DAYS_CAP days;
+- a woman: Premium is already free for her while the launch promo runs, so
+  days of it would be worth nothing. She gets BOOST_DAYS_PER_FRIEND days of
+  profile Boost (her profile stays at the top of the feed), up to
+  BOOST_DAYS_CAP days. Boost promotes a profile, so it only goes to a
+  selfie-verified woman whose profile is visible (the same "verification is
+  the price" rule as the free Premium), and she is only prompted when it is
+  deliverable;
 - the friend later buys Premium -> the old cash reward (half of the payment,
   paid after a 14-day hold) still applies. That part lives in payments_r.py.
 
@@ -32,28 +38,58 @@ log = logging.getLogger("fidem.invite")
 
 BONUS_DAYS_PER_FRIEND = int(os.environ.get("INVITE_BONUS_DAYS", "2"))
 BONUS_DAYS_CAP = int(os.environ.get("INVITE_BONUS_MAX_DAYS", "14"))
+BOOST_DAYS_PER_FRIEND = int(os.environ.get("INVITE_BOOST_DAYS", "3"))
+BOOST_DAYS_CAP = int(os.environ.get("INVITE_BOOST_MAX_DAYS", "21"))
 MAX_PROMPTS = 3
 MIN_GAP_DAYS = 14
 
 _TEXTS = {
-    "lifecycle": (
+    ("lifecycle", "premium"): (
         "🎁 Do'stingizni FIDEM'ga taklif qiling: u profilini to'ldirsa — sizga +{days} kun Premium, "
         "Premium olsa — to'lovning yarmi ham sizga. Havola shu yerda 👇"
     ),
-    "match": (
+    ("match", "premium"): (
         "💞 Moslik topildi! Do'stingiz ham o'z yarmini shu yerda topsin: u profilini to'ldirsa — "
         "sizga +{days} kun Premium 🎁"
+    ),
+    ("lifecycle", "boost"): (
+        "🎁 Yaqinlaringizni FIDEM'ga taklif qiling: u profilini to'ldirsa — profilingiz +{days} kun "
+        "nomzodlar ro'yxatida tepada turadi (Boost). Premium olsa — to'lovning yarmi ham sizga 👇"
+    ),
+    ("match", "boost"): (
+        "💞 Moslik topildi! Tanishlaringiz ham o'z yarmini shu yerda topsin: u profilini to'ldirsa — "
+        "profilingiz +{days} kun tepada turadi (Boost) 🎁"
     ),
 }
 
 _FIELDS = {
     "_id": 0, "id": 1, "onboarded": 1, "blocked": 1, "is_ai": 1, "invite_prompt_at": 1,
     "invite_prompt_count": 1, "referral_awareness_sent_at": 1, "referral_earnings": 1, "invite_bonus_days": 1,
+    "invite_boost_days": 1, "gender": 1, "verified_selfie": 1, "hidden_profile": 1, "boost_until": 1,
+    "plan": 1, "plan_until": 1,
 }
 
 
+def reward_kind(user: dict) -> str:
+    """What this person is paid in: Boost for a woman, Premium days otherwise."""
+    return "boost" if user.get("gender") == "female" else "premium"
+
+
+def reward_days(kind: str) -> int:
+    return BOOST_DAYS_PER_FRIEND if kind == "boost" else BONUS_DAYS_PER_FRIEND
+
+
 def bonus_left(user: dict) -> int:
+    if reward_kind(user) == "boost":
+        return max(0, BOOST_DAYS_CAP - int(user.get("invite_boost_days") or 0))
     return max(0, BONUS_DAYS_CAP - int(user.get("invite_bonus_days") or 0))
+
+
+def can_receive(user: dict) -> bool:
+    """Whether the reward can actually be delivered to this person now."""
+    if reward_kind(user) == "boost":
+        return bool(user.get("verified_selfie")) and not user.get("hidden_profile")
+    return True
 
 
 def _last_prompt(user: dict):
@@ -68,7 +104,7 @@ def eligible(user: dict | None) -> bool:
         return False
     if user.get("referral_earnings"):          # already takes part
         return False
-    if bonus_left(user) <= 0:
+    if bonus_left(user) <= 0 or not can_receive(user):
         return False
     last = _last_prompt(user)
     return not (last and now_utc() - last < timedelta(days=MIN_GAP_DAYS))
@@ -80,7 +116,8 @@ async def maybe_prompt(uid: str, trigger: str) -> bool:
         user = await core.db.users.find_one({"id": uid}, _FIELDS)
         if not eligible(user):
             return False
-        text = _TEXTS[trigger].format(days=BONUS_DAYS_PER_FRIEND)
+        kind = reward_kind(user)
+        text = _TEXTS[(trigger, kind)].format(days=reward_days(kind))
         now = now_utc()
         # Claim first, atomically: two triggers firing together send one prompt.
         prev = user.get("invite_prompt_at")
@@ -101,19 +138,26 @@ async def maybe_prompt(uid: str, trigger: str) -> bool:
         return False
 
 
-async def grant_friend_bonus(inviter_id: str) -> int:
-    """Premium days for an inviter whose friend finished the profile. Returns
-    the days granted (0 when the cap is used up). An active plan is never cut
-    short: the days are added to it; with no active plan Premium starts now."""
-    inviter = await core.db.users.find_one(
-        {"id": inviter_id}, {"_id": 0, "plan": 1, "plan_until": 1, "invite_bonus_days": 1},
-    )
+async def grant_friend_bonus(inviter_id: str) -> tuple[str, int]:
+    """Reward an inviter whose friend finished the profile. Returns
+    (kind, days): ("premium"|"boost", days granted), days 0 when the cap is
+    used up or the reward can't be delivered."""
+    inviter = await core.db.users.find_one({"id": inviter_id}, _FIELDS)
     if inviter is None:          # {} is a real user who simply has no plan yet
-        return 0
-    days = min(BONUS_DAYS_PER_FRIEND, bonus_left(inviter))
-    if days <= 0:
-        return 0
+        return "premium", 0
+    kind = reward_kind(inviter)
+    days = min(reward_days(kind), bonus_left(inviter))
+    if days <= 0 or not can_receive(inviter):
+        return kind, 0
     now = now_utc()
+    if kind == "boost":
+        current = inviter.get("boost_until")
+        start = max(now, parse_dt(current)) if current else now
+        await core.db.users.update_one(
+            {"id": inviter_id},
+            {"$set": {"boost_until": iso(start + timedelta(days=days))}, "$inc": {"invite_boost_days": days}},
+        )
+        return kind, days
     until = inviter.get("plan_until")
     active = bool(until and parse_dt(until) > now)
     if active and inviter.get("plan") in ("standard", "premium", "vip"):
@@ -125,7 +169,7 @@ async def grant_friend_bonus(inviter_id: str) -> int:
         {"$set": {"plan": plan, "plan_until": iso(start + timedelta(days=days))},
          "$inc": {"invite_bonus_days": days}},
     )
-    return days
+    return kind, days
 
 
 MATCH_PROMPT_DELAY = 120.0   # seconds: after the match notification itself, not on top of it

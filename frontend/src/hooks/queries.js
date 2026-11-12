@@ -1,4 +1,5 @@
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { useMemo } from "react";
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import api from "@/lib/api";
 
 export const QK = {
@@ -15,7 +16,9 @@ export const QK = {
   boostStatus: ["boost", "status"],
   boostAnalytics: ["boost", "analytics"],
   leaderboard: (period) => ["leaderboard", period],
-  candidates: (filters) => ["candidates", filters],
+  // "feed", not the bare filters: an older build saved this key to localStorage
+  // as a plain array, which the paged shape below must never read.
+  candidates: (filters) => ["candidates", "feed", filters],
   candidateDetail: (id) => ["candidates", "detail", id],
   saved: (tab = "mine") => ["saved", tab],
   savedSummary: ["saved", "summary"],
@@ -257,14 +260,39 @@ export function useLeaderboard(period = "all", by = "sent") {
   });
 }
 
+export const FEED_PAGE = 30;
+
+// The Nomzodlar feed, a page at a time: the server ranks everyone once per
+// request and `offset` cuts the next page out of that order. (It used to ask
+// for the first 30 and stop there.)
 export function useCandidates(filters = {}) {
-  return useQuery({
+  const q = useInfiniteQuery({
     queryKey: QK.candidates(filters),
-    queryFn: () => api.get("/candidates", { params: filters }).then((r) => r.data || []),
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
+      const r = await api.get("/candidates", { params: { ...filters, limit: FEED_PAGE, offset: pageParam } });
+      return { items: r.data || [], total: r.headers?.["x-total-count"] || null };
+    },
+    // a short page is the last one
+    getNextPageParam: (last, all) => (last.items.length >= FEED_PAGE ? all.length * FEED_PAGE : undefined),
     // changing a sort pill or filter re-keys the query; keep the previous
     // results on screen (stale-while-revalidate) instead of a skeleton flash
     placeholderData: keepPreviousData,
   });
+  // Ranking is recomputed for every page (boosts expire, people come online),
+  // so the same person can land on two pages: show each once.
+  const items = useMemo(() => {
+    const seen = new Set();
+    const out = [];
+    for (const page of q.data?.pages || []) {
+      for (const c of page.items) {
+        if (!seen.has(c.id)) { seen.add(c.id); out.push(c); }
+      }
+    }
+    return out;
+  }, [q.data]);
+  const total = q.data?.pages?.[0]?.total ?? null;
+  return { ...q, items, total };
 }
 
 export function useCandidateDetail(id) {
