@@ -100,20 +100,41 @@ def test_reply_uses_app_facts(mdb, monkeypatch):
     assert "9,900" in prompts[0] and "@Medik005" in prompts[0]
 
 
-def test_reply_with_a_contact_is_dropped(mdb, monkeypatch):
+def test_answers_about_contacts_and_payments_reach_the_person(mdb, monkeypatch):
+    """The first version ran the person-to-person scam filter on the
+    assistant's own answers, so "how do I exchange contacts / pay" answers
+    (Telegram, card, @Medik005) were silently dropped."""
     import ai_service
 
-    async def leaky(*a, **k):
-        return {"reply": "Telegram: @someone_uz"}
+    async def answer(*a, **k):
+        return {"reply": "Kontakt almashish tugmasi orqali Telegramingizni ulashasiz. To'lov kartaga o'tkazma bilan. Savol bo'lsa: @Medik005"}
 
     async def no_sleep(_):
         return None
 
     monkeypatch.setattr(ai_service, "GEMINI_API_KEY", "x")
-    monkeypatch.setattr(ai_service, "_gemini_json", leaky)
+    monkeypatch.setattr(ai_service, "_gemini_json", answer)
     monkeypatch.setattr(ai_assistant.asyncio, "sleep", no_sleep)
-    run(ai_assistant._reply("me", AID, "c1"))
-    assert run(mdb.messages.count_documents({"from_user_id": AID})) == 0
+    run(ai_assistant._reply("me", AID, core.chat_id_for("me", AID)))
+    got = run(mdb.messages.find_one({"from_user_id": AID}))
+    assert got and "@Medik005" in got["text"]
+
+
+def test_ai_failure_still_answers_with_a_fallback(mdb, monkeypatch):
+    import ai_service
+
+    async def boom(*a, **k):
+        raise RuntimeError("400")
+
+    async def no_sleep(_):
+        return None
+
+    monkeypatch.setattr(ai_service, "GEMINI_API_KEY", "x")
+    monkeypatch.setattr(ai_service, "_gemini_json", boom)
+    monkeypatch.setattr(ai_assistant.asyncio, "sleep", no_sleep)
+    run(ai_assistant._reply("me", AID, core.chat_id_for("me", AID)))
+    got = run(mdb.messages.find_one({"from_user_id": AID}))
+    assert got and got["text"] == ai_assistant.FALLBACK_REPLY
 
 
 def test_text_only_and_no_contact_exchange_or_family(mdb):
