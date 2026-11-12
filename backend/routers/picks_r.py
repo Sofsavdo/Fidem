@@ -56,6 +56,7 @@ async def compute_daily_picks(me_doc: dict) -> list[dict]:
             "blocked": {"$ne": True},
             "hidden_profile": {"$ne": True},
             "is_demo": {"$ne": True},
+            "is_ai": {"$ne": True},
             "photo_url": {"$regex": "/api/files/"},
         }
         if me_doc.get("search_gender"):

@@ -68,10 +68,11 @@ export default function Messages() {
 
       {tab === "chats" && !loading && (
         <div className="space-y-2" data-testid="chat-list">
-          {chats.length === 0 ? (
+          <AssistantRow />
+          {chats.filter((c) => c.other?.id !== ASSISTANT_ID).length === 0 ? (
             <EmptyState icon={<MessageCircle className="w-6 h-6" />} title={t("messages_empty_title")} hint={t("messages_empty_hint")}
               action={<Link to="/" className="text-sm font-semibold text-primary">{t("candidates")} →</Link>} />
-          ) : chats.map((c) => <ChatRowMemo key={c.chat_id} c={c} />)}
+          ) : chats.filter((c) => c.other?.id !== ASSISTANT_ID).map((c) => <ChatRowMemo key={c.chat_id} c={c} />)}
         </div>
       )}
       {tab === "applications" && !loading && (
@@ -108,6 +109,26 @@ function Avatar({ user }) {
 
 const AvatarMemo = React.memo(Avatar);
 
+const ASSISTANT_ID = "ai_assistant";
+
+// The FIDEM assistant (AI): always pinned at the top of the chats.
+function AssistantRow() {
+  const { t } = useApp();
+  return (
+    <Link
+      to={`/chat/${ASSISTANT_ID}`}
+      data-testid="assistant-row"
+      className="flex items-center gap-3 rounded-2xl p-3 border border-violet-200 dark:border-violet-900 bg-gradient-to-r from-violet-50 to-pink-50 dark:from-violet-950/40 dark:to-pink-950/30 hover:shadow-soft transition"
+    >
+      <div className="w-12 h-12 rounded-full grid place-items-center text-2xl bg-gradient-to-br from-pink-500 to-violet-500 shrink-0">🤖</div>
+      <div className="flex-1 min-w-0">
+        <p className="font-medium truncate">{t("assistant_name")} <span className="text-[10px] font-bold text-violet-600 ml-1">AI</span></p>
+        <p className="text-sm text-muted-foreground truncate">{t("assistant_row_hint")}</p>
+      </div>
+    </Link>
+  );
+}
+
 function ChatRow({ c }) {
   return (
     <Link
@@ -118,7 +139,7 @@ function ChatRow({ c }) {
       <AvatarMemo user={c.other} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
-          <p className="font-medium truncate">{c.other.name}</p>
+          <p className="font-medium truncate">{c.other.name}{c.other.is_ai && <span className="text-[10px] font-bold text-violet-600 ml-1.5">🤖 AI</span>}</p>
           {c.unread > 0 && <span className="text-[10px] bg-primary text-white px-1.5 py-0.5 rounded-full">{c.unread}</span>}
         </div>
         <p className="text-sm text-muted-foreground truncate">{c.last_message?.text || "..."}</p>

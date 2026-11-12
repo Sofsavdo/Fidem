@@ -143,6 +143,10 @@ async def startup() -> None:
     # Keeps the in-memory rate-limit buckets from growing forever.
     asyncio.create_task(rate_limiter_gc_loop())
 
+    # The FIDEM assistant (pinned in Messages).
+    import ai_assistant
+    asyncio.create_task(ai_assistant.ensure_assistant())
+
     # AI photo verification (ai_service.verify_face_photo) needs this key.
     # Without it every verification call fails as "verification_unavailable",
     # which deliberately lets users through UNVERIFIED so signups don't break

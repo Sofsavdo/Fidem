@@ -59,7 +59,9 @@ async def request_family_share(
     if target_user_id == uid:
         raise HTTPException(400, "family_self")
     me = await get_user(uid)
-    await get_user(target_user_id)  # 404 for an unknown person
+    target = await get_user(target_user_id)  # 404 for an unknown person
+    if target.get("is_ai"):
+        raise HTTPException(400, "ai_persona")
     if not _is_vip(me):
         raise HTTPException(403, "premium_required")
     if not me.get("family_contact"):

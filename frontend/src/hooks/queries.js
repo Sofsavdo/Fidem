@@ -756,6 +756,22 @@ export function useAdminModerationEvents(params) {
   });
 }
 
+export function useAdminAiAssistant() {
+  return useQuery({
+    queryKey: ["admin", "aiAssistant"],
+    queryFn: () => api.get("/admin/ai-assistant").then((r) => r.data),
+    staleTime: 30_000,
+  });
+}
+
+export function useAdminSetAiAssistant() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (on) => api.post("/admin/ai-assistant", { enabled: on }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "aiAssistant"] }),
+  });
+}
+
 export function useAdminModerationActions() {
   const queryClient = useQueryClient();
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["admin"] });

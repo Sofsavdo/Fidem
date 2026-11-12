@@ -13,7 +13,7 @@ import {
   useAdminStats, useAdminUsers, useAdminRegions, useAdminUserSearch, useUpdateAdminUser,
   useAdminPayments, useAdminPaymentBlock, useAdminVerifications, useAdminDecideVerification,
   useAdminReports, useAdminWithdrawals, useAdminWithdrawalDecision, useAdminConcierge,
-  useAdminConciergeMatch, useAdminReferrals, useAdminReferrers, useAdminReferrerDetail, useAdminMessages, useAdminDeleteMessage, useAdminModeration, useAdminModerationEvents, useAdminModerationActions,
+  useAdminConciergeMatch, useAdminReferrals, useAdminReferrers, useAdminReferrerDetail, useAdminMessages, useAdminDeleteMessage, useAdminModeration, useAdminModerationEvents, useAdminModerationActions, useAdminAiAssistant, useAdminSetAiAssistant,
   useAdminFraud, useAdminMarkSafe, useAdminBroadcast,
   useAdminCeo, useAdminFunnel, useAdminEngagement, useAdminRevenue,
   useAdminConciergeAnalytics, useAdminChatModAnalytics, useAdminAuditLog, useAdminGiftShop,
@@ -70,7 +70,7 @@ const STATUS_UZ = {
 };
 const statusUz = (s) => STATUS_UZ[s] || s || "—";
 const ACTION_UZ = {
-  update_user: "Foydalanuvchini o'zgartirdi", set_women_free: "Ayollar uchun bepul Premium'ni o'zgartirdi", set_ai_moderation: "Chat AI nazoratini o'zgartirdi", unmute_temp: "Yozish taqiqini olib tashladi", delete_demo_users: "Demo profillarni o'chirdi",
+  update_user: "Foydalanuvchini o'zgartirdi", set_women_free: "Ayollar uchun bepul Premium'ni o'zgartirdi", set_ai_moderation: "Chat AI nazoratini o'zgartirdi", set_ai_assistant: "FIDEM yordamchisini yoqdi/o'chirdi", unmute_temp: "Yozish taqiqini olib tashladi", delete_demo_users: "Demo profillarni o'chirdi",
   give_premium: "Premium berdi", give_vip: "VIP berdi", give_standard: "Standard berdi",
   reset_balance: "Balansni tozaladi", reset_likes: "Like'larni tozaladi", mute: "Ovozini o'chirdi",
   unmute: "Ovozini yoqdi", shadow_ban: "Yashirin ban", unshadow_ban: "Yashirin bandan chiqardi",
@@ -81,7 +81,7 @@ const ACTION_UZ = {
   broadcast: "Xabar yubordi",
 };
 const actionUz = (a) => { const k = String(a || "").replace(/^user_action:/, ""); return ACTION_UZ[k] || k; };
-const FIELD_UZ = { women_free: "Ayollar uchun bepul", ai_enabled: "AI nazorat",
+const FIELD_UZ = { women_free: "Ayollar uchun bepul", ai_enabled: "AI nazorat", enabled: "yoqilgan",
   verified_identity: "shaxs", verified_selfie: "selfie", verified_financial: "moliyaviy", add_balance: "balansga qo'shildi",
   plan: "tarif", blocked: "blok", count: "soni", target_ids: "kimlar", days: "kun", amount: "summa", topup_id: "so'rov",
 };
@@ -2285,6 +2285,36 @@ function AdminModerationPanel({ onOpenUser }) {
   );
 }
 
+function AdminAiAssistantPanel() {
+  const { data: st } = useAdminAiAssistant();
+  const setOn = useAdminSetAiAssistant();
+  return (
+    <div className="rounded-3xl bg-card border border-border p-4 space-y-3" data-testid="admin-ai-assistant">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">🤖 FIDEM yordamchisi</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+            Xabarlar bo'limining tepasida turadi: ilova, narxlar, selfie, kontakt almashish va xavfsizlik bo'yicha savollarga javob beradi,
+            profil va birinchi xabar uchun maslahat beradi. Nomzodlar ro'yxatida ko'rinmaydi.
+          </p>
+        </div>
+        <button
+          data-testid="admin-ai-assistant-toggle"
+          onClick={() => setOn.mutate(!st?.enabled, { onSuccess: () => toast.success(st?.enabled ? "Yordamchi o'chirildi" : "Yordamchi yoqildi") })}
+          disabled={!st || setOn.isPending}
+          className={`shrink-0 text-xs rounded-full px-3 py-1.5 font-semibold ${st?.enabled ? "bg-secondary text-white" : "bg-muted text-muted-foreground"}`}
+        >
+          {st?.enabled ? "Yoqilgan" : "O'chiq"}
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <KpiTile label="Yozgan odamlar (24 soat)" value={st?.people_24h ?? "—"} />
+        <KpiTile label="Javoblar (24 soat)" value={st?.replies_24h ?? "—"} />
+      </div>
+    </div>
+  );
+}
+
 function AdminMessages() {
   const [q, setQ] = useState("");
   const [userIdFilter, setUserIdFilter] = useState("");
@@ -2306,6 +2336,7 @@ function AdminMessages() {
   return (
     <div className="space-y-4" data-testid="admin-messages">
       <AdminModerationPanel onOpenUser={setUserIdFilter} />
+      <AdminAiAssistantPanel />
       <AdminChatModAnalyticsPanel onOpenUser={setUserIdFilter} />
       <div className="space-y-2">
         <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Xabar matni bo'yicha qidirish..." className="w-full rounded-2xl border border-border bg-card px-4 py-3" />

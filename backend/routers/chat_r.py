@@ -10,6 +10,7 @@ from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Resp
 from auth import decode_token, get_current_user_id
 from ai_service import detect_contact_info, detect_money_request
 import moderation
+import ai_assistant
 from core import (
     CHAT_GUARANTEE_HOURS,
     CHAT_UNLOCK_COINS,
@@ -132,6 +133,19 @@ async def can_initiate_chat(sender: dict, target_id: str) -> bool:
 async def chat_access(target_id: str, uid: str = Depends(get_current_user_id)):
     if target_id == uid:
         raise HTTPException(400, "self")
+    if target_id == ai_assistant.ASSISTANT_ID:
+        target = await db.users.find_one({"id": target_id}, {"_id": 0, "is_ai": 1})
+        if target and target.get("is_ai"):
+            me_ai = await get_user(uid)
+            on = await ai_assistant.enabled()
+            return {
+                "can_message": on, "is_ai": True, "ai_off": not on, "blocked": False, "is_reply": False,
+                "unlocked": True, "plan": me_ai.get("plan", "free"), "plan_active": _plan_active(me_ai),
+                "requires_unlock": False, "price_uzs": 0, "price_coins": 0,
+                "balance": int(me_ai.get("balance", 0) or 0), "coins": int(me_ai.get("coins", 0) or 0),
+                "free_credits": 0, "free_weekly_left": free_weekly_left(me_ai),
+                "uses_free_weekly": False, "guarantee_hours": CHAT_GUARANTEE_HOURS,
+            }
     # Blocked either way: the composer locks with a "blocked" state instead
     # of misleadingly showing the paywall.
     if await _block_exists(uid, target_id):
@@ -441,15 +455,22 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
         raise sender_doc
     if isinstance(target_doc, Exception):
         raise target_doc
+    # The FIDEM assistant: free to talk to (no paywall, no selfie gate), text
+    # only, and only while the admin keeps it switched on.
+    target_is_ai = bool(target_doc.get("is_ai"))
+    if target_is_ai and not await ai_assistant.enabled():
+        raise HTTPException(403, "ai_off")
+    if target_is_ai and req.kind in ("voice", "video"):
+        raise HTTPException(400, "ai_text_only")
     if sender_doc.get("muted"):
         raise HTTPException(403, "muted")
     if moderation.muted_now(sender_doc):
         raise HTTPException(403, "muted_temp")
     if photo_required_missing(sender_doc):
         raise HTTPException(403, "photo_required")
-    if selfie_required_to_write(sender_doc):
+    if not target_is_ai and selfie_required_to_write(sender_doc):
         raise HTTPException(403, "selfie_required")
-    if not await can_initiate_chat(sender_doc, req.to_user_id):
+    if not target_is_ai and not await can_initiate_chat(sender_doc, req.to_user_id):
         # Free-weekly allowance: a free user may open a limited number of new
         # conversations per week. Consume atomically, then record a free unlock
         # for this target so their follow-up messages here don't re-charge it.
@@ -539,6 +560,10 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
     # below (applications record, response-time analytics), which could take
     # long enough that the sender's own optimistic UI had already cleared
     # before the WS echo arrived, making the just-sent message vanish.
+    if target_is_ai:
+        asyncio.create_task(manager.broadcast_chat([uid], {"type": "message", "data": dict(msg)}))
+        ai_assistant.schedule_reply(uid, req.to_user_id, cid)
+        return msg
     asyncio.create_task(manager.broadcast_chat([uid, req.to_user_id], {"type": "message", "data": dict(msg)}))
     asyncio.create_task(push_notif(
         req.to_user_id, "message",
@@ -709,6 +734,8 @@ async def contact_exchange_request(other_id: str, uid: str = Depends(get_current
     if await db.blocks.find_one({"$or": [{"owner_id": uid, "target_id": other_id}, {"owner_id": other_id, "target_id": uid}]}):
         raise HTTPException(403, "blocked")
     me, other = await asyncio.gather(get_user(uid), get_user(other_id))
+    if other.get("is_ai"):
+        raise HTTPException(400, "ai_persona")
     if not me.get("verified_selfie"):
         raise HTTPException(403, "selfie_required")
     if not other.get("verified_selfie"):

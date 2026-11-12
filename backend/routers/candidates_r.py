@@ -221,6 +221,8 @@ async def candidates(
 
     if me_doc.get("search_gender"):
         query["gender"] = me_doc["search_gender"]
+    # The AI assistant is never a candidate.
+    query["is_ai"] = {"$ne": True}
 
     # Travel Mode: if user has active travel_region, use it as filter unless explicit region passed
     if not region:
@@ -424,7 +426,7 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
     # no profile_views record, no "kim ko'rdi" appearance, no notification,
     # and no bump to the target's view counters further below.
     incognito = bool(me_doc.get("hidden_profile")) and me_doc.get("plan") in INCOGNITO_PLANS
-    hidden_gate = bool(target.get("hidden_profile")) and not me_doc.get("is_admin")
+    hidden_gate = bool(target.get("hidden_profile")) and not target.get("is_ai") and not me_doc.get("is_admin")
 
     # Every read this view needs is independent: run them together (this
     # endpoint used to issue ~8 sequential DB round trips).
@@ -510,6 +512,9 @@ async def candidate_detail(target_id: str, uid: str = Depends(get_current_user_i
             )
         )
 
+    # Share link: opens this profile through the bot (see telegram_r "share_").
+    from core import TELEGRAM_BOT_USERNAME
+    pub["share_url"] = f"https://t.me/{TELEGRAM_BOT_USERNAME}?start=share_{target_id}"
     return strip_locked_photo(pub)
 
 

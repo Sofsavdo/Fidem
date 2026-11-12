@@ -73,6 +73,10 @@ function Gate({ children }) {
   }
 
   if (!user.onboarded && location.pathname !== "/onboarding") {
+    // A shared profile link should still open that profile after sign-up.
+    if (location.pathname.startsWith("/candidate/")) {
+      try { sessionStorage.setItem("fidem_after_onboarding", location.pathname); } catch { /* private mode */ }
+    }
     return <Navigate to="/onboarding" replace />;
   }
 
