@@ -55,6 +55,9 @@ def _client() -> httpx.AsyncClient:
     return _http_client
 
 
+PROTECT_CONTENT = os.environ.get("TELEGRAM_PROTECT_CONTENT", "1").strip().lower() not in ("0", "false", "off", "no")
+
+
 async def _tg_call_as(token: str, method: str, **kwargs) -> Optional[httpx.Response]:
     """POST to a Telegram Bot API method for a given bot token, through the
     shared client, with a single capped-wait retry on HTTP 429 (Telegram's
@@ -121,6 +124,12 @@ async def send_telegram_message_status(chat_id: int, text: str, reply_markup: Op
     so it looked like the bot just never sent anything.
     """
     payload = {"chat_id": chat_id, "text": text}
+    # Protected messages: Telegram blocks forwarding, saving and screenshots
+    # while they are on screen - the only screenshot block Telegram offers
+    # (there is no Mini App API for it). Opening FIDEM from such a message's
+    # button keeps the protection. TELEGRAM_PROTECT_CONTENT=0 turns it off.
+    if PROTECT_CONTENT:
+        payload["protect_content"] = True
     if reply_markup:
         payload["reply_markup"] = reply_markup
     r = await _tg_call("sendMessage", json=payload)
