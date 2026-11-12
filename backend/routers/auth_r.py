@@ -377,6 +377,18 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request):
     await db.users.insert_one(doc)
 
     pend = await db.pending_refs.find_one({"telegram_id": tg_id})
+    # Which ad link brought this person (ad_links.py): the bot /start link, or
+    # a Mini App link opened directly (start_param in the signed initData).
+    try:
+        import ad_links
+        from urllib.parse import parse_qsl
+        start_param = dict(parse_qsl(req.init_data or "")).get("start_param")
+        ad_code = await ad_links.source_for_new_user(tg_id, start_param, pend)
+        if ad_code:
+            await db.users.update_one({"id": uid}, {"$set": {"ad_source": ad_code}})
+            doc["ad_source"] = ad_code
+    except Exception:
+        log.warning("ad source attribution failed", exc_info=True)
     if pend:
         # Sofsavdo click token - independent of the Fidem-internal referral
         # attribution below (a pending_refs doc carries exactly one of the two,

@@ -6,7 +6,7 @@ const fs = require('fs');
 const APP = 'http://127.0.0.1:18101';
 // section -> its sub-tabs (empty = the section is a single screen)
 const NAV = { home: [], users: [], moderation: ['verifications','reports','messages','fraud'], money: ['payments','p2p','withdrawals','referrals'],
-  insights: ['ai','ceo','growth','revenue'], comms: ['broadcast','anons'], concierge: [], auditlog: [] };
+  insights: ['ai','ceo','growth','revenue','adlinks'], comms: ['broadcast','anons'], concierge: [], auditlog: [] };
 (async () => {
   const r = await fetch('http://127.0.0.1:18100/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'admin@fidem.uz', password: 'AdminQa#2026' }) });
   const token = (await r.json()).token;

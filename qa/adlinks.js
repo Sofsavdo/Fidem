@@ -1,0 +1,34 @@
+// Admin > Tahlil > Reklama havolalari: create a link, see it with its stats.
+const { chromium } = require('playwright');
+const APP = 'http://127.0.0.1:18101', API = 'http://127.0.0.1:18100/api';
+const OUT = process.env.OUT || '/tmp/claude-0';
+(async () => {
+  let ok = true;
+  const check = (n, c) => { console.log((c ? 'PASS ' : 'FAIL ') + n); if (!c) ok = false; };
+  const token = (await (await fetch(API + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'admin@fidem.uz', password: 'AdminQa#2026' }) })).json()).token;
+  const b = await chromium.launch();
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
+  await ctx.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const page = await ctx.newPage();
+  page.on('pageerror', (e) => { console.log('PAGEERR', e.message); ok = false; });
+  await page.addInitScript((t) => { localStorage.setItem('fidem_token', t); localStorage.setItem('fidem_lang', 'uz'); }, token);
+  await page.goto(APP + '/admin', { waitUntil: 'networkidle' });
+  await page.click('[data-testid=admin-mobile-menu-open]');
+  await page.click('[data-testid=admin-mobile-tab-insights]');
+  await page.click('[data-testid=admin-sub-adlinks]');
+  await page.waitForSelector('[data-testid=admin-adlinks]');
+  await page.fill('[data-testid=adlink-name]', "Samarqand oilaviy kanal");
+  await page.fill('[data-testid=adlink-cost]', '250000');
+  await page.click('[data-testid=adlink-create]');
+  await page.waitForSelector('[data-testid=adlink-samarqand_oilaviy_kanal]');
+  const card = await page.locator('[data-testid=adlink-samarqand_oilaviy_kanal]').innerText();
+  check('card shows the bot link', /t\.me\/\w+\?start=ad_samarqand_oilaviy_kanal/.test(card));
+  check('card shows the cost', card.includes('250'));
+  const clip = await page.evaluate(() => navigator.clipboard.readText().catch(() => ''));
+  check('link copied on create', clip.includes('start=ad_samarqand_oilaviy_kanal'));
+  check('no horizontal scroll', await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
+  await page.screenshot({ path: OUT + '/admin_adlinks.png' });
+  await b.close();
+  console.log(ok ? 'ALL PASS' : 'SOME FAILED');
+  process.exit(ok ? 0 : 1);
+})();

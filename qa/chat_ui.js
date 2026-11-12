@@ -23,9 +23,8 @@ const OUT = process.env.OUT || '/tmp/claude-0';
   check('empty chat shows openers', (await him.locator('[data-testid=chat-openers]').count()) === 1);
   await him.screenshot({ path: OUT + '/chat_openers.png' });
   await him.click('[data-testid=opener-0]');
-  check('opener fills the input', (await him.inputValue('[data-testid=chat-input]')).length > 10);
-  await him.click('[data-testid=chat-send]');
-  await him.waitForTimeout(800);
+  await him.waitForTimeout(1000);
+  check('tapping an opener sends it at once', (await him.locator('[data-testid^=msg-]').filter({ hasText: 'Assalomu' }).count()) >= 1 && (await him.inputValue('[data-testid=chat-input]')) === '');
 
   await her.goto(APP + '/chat/' + U['m1@fidem.uz'].id, { waitUntil: 'networkidle' });
   await her.waitForTimeout(1200);
@@ -54,8 +53,10 @@ const OUT = process.env.OUT || '/tmp/claude-0';
   // question deck
   await him.click('[data-testid=question-deck-open]');
   await him.waitForSelector('[data-testid=question-deck]');
+  const before = await him.locator('[data-testid^=msg-]').count();
   await him.locator('[data-testid=question-deck] button', { hasText: '?' }).nth(1).click();
-  check('deck question goes into the input', (await him.inputValue('[data-testid=chat-input]')).includes('?'));
+  await him.waitForTimeout(1000);
+  check('tapping a deck question sends it at once', (await him.locator('[data-testid^=msg-]').count()) > before && (await him.locator('[data-testid=question-deck]').count()) === 0);
   await him.screenshot({ path: OUT + '/chat_after.png' });
   await her.screenshot({ path: OUT + '/chat_her.png' });
 

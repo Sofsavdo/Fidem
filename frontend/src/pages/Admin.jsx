@@ -43,6 +43,7 @@ const SECTIONS = [
     { id: "ceo", label: "Ko'rsatkichlar" },
     { id: "growth", label: "Voronka" },
     { id: "revenue", label: "Daromad" },
+    { id: "adlinks", label: "Reklama havolalari" },
     ...(FEATURES.giftShop ? [{ id: "giftshop", label: "Sovg'alar" }] : []),
   ] },
   { id: "comms", icon: Megaphone, label: "Aloqa", subs: [
@@ -70,7 +71,7 @@ const STATUS_UZ = {
 };
 const statusUz = (s) => STATUS_UZ[s] || s || "—";
 const ACTION_UZ = {
-  update_user: "Foydalanuvchini o'zgartirdi", set_women_free: "Ayollar uchun bepul Premium'ni o'zgartirdi", set_ai_moderation: "Chat AI nazoratini o'zgartirdi", set_ai_assistant: "FIDEM yordamchisini yoqdi/o'chirdi", unmute_temp: "Yozish taqiqini olib tashladi", delete_demo_users: "Demo profillarni o'chirdi",
+  update_user: "Foydalanuvchini o'zgartirdi", set_women_free: "Ayollar uchun bepul Premium'ni o'zgartirdi", set_ai_moderation: "Chat AI nazoratini o'zgartirdi", set_ai_assistant: "FIDEM yordamchisini yoqdi/o'chirdi", unmute_temp: "Yozish taqiqini olib tashladi", ad_link_create: "Reklama havolasi yaratdi", ad_link_update: "Reklama havolasini o'zgartirdi", delete_demo_users: "Demo profillarni o'chirdi",
   give_premium: "Premium berdi", give_vip: "VIP berdi", give_standard: "Standard berdi",
   reset_balance: "Balansni tozaladi", reset_likes: "Like'larni tozaladi", mute: "Ovozini o'chirdi",
   unmute: "Ovozini yoqdi", shadow_ban: "Yashirin ban", unshadow_ban: "Yashirin bandan chiqardi",
@@ -81,7 +82,7 @@ const ACTION_UZ = {
   broadcast: "Xabar yubordi",
 };
 const actionUz = (a) => { const k = String(a || "").replace(/^user_action:/, ""); return ACTION_UZ[k] || k; };
-const FIELD_UZ = { women_free: "Ayollar uchun bepul", ai_enabled: "AI nazorat", enabled: "yoqilgan",
+const FIELD_UZ = { cost_uzs: "Narxi", women_free: "Ayollar uchun bepul", ai_enabled: "AI nazorat", enabled: "yoqilgan",
   verified_identity: "shaxs", verified_selfie: "selfie", verified_financial: "moliyaviy", add_balance: "balansga qo'shildi",
   plan: "tarif", blocked: "blok", count: "soni", target_ids: "kimlar", days: "kun", amount: "summa", topup_id: "so'rov",
 };
@@ -290,6 +291,7 @@ export default function Admin() {
           {activeTab === "ai" && <AdminAiInsights />}
           {activeTab === "growth" && <AdminGrowthDashboard />}
           {activeTab === "revenue" && <AdminRevenueDashboard />}
+          {activeTab === "adlinks" && <AdminAdLinks />}
           {activeTab === "giftshop" && <AdminGiftShopDashboard />}
           {activeTab === "auditlog" && <AdminAuditLog />}
 
@@ -2420,6 +2422,131 @@ function AdminFraud() {
         ))}
       </div>
       <AdminPagination page={page} setPage={setPage} total={total} limit={limit} />
+    </div>
+  );
+}
+
+
+// Ad tracking links: one link per channel / blogger / post, and what each
+// brought in (clicks -> sign-ups -> finished profiles -> payers -> money).
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success("Nusxa olindi");
+  } catch {
+    window.prompt("Havolani nusxalang:", text);
+  }
+}
+
+function AdminAdLinks() {
+  const [rows, setRows] = useState(null);
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [cost, setCost] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = React.useCallback(() => {
+    api.get("/admin/ad-links").then((r) => setRows(r.data || [])).catch(() => setRows([]));
+  }, []);
+  React.useEffect(() => { load(); }, [load]);
+
+  const create = async (e) => {
+    e.preventDefault();
+    if (!name.trim() || busy) return;
+    setBusy(true);
+    try {
+      const r = await api.post("/admin/ad-links", { name: name.trim(), code: code.trim().toLowerCase(), cost_uzs: Number(cost) || 0 });
+      toast.success("Havola tayyor");
+      copyText(r.data.link);
+      setName(""); setCode(""); setCost("");
+      load();
+    } catch (err) {
+      const d = err?.response?.data?.detail;
+      toast.error(d === "bad_code" ? "Kod faqat lotin harflari, raqam va _ (2-32 belgi)" : "Saqlanmadi");
+    } finally { setBusy(false); }
+  };
+
+  const patch = async (r, fields) => {
+    try { await api.patch(`/admin/ad-links/${r.code}`, fields); load(); } catch { toast.error("Saqlanmadi"); }
+  };
+  const editCost = (r) => {
+    const v = window.prompt("Reklama narxi (so'm):", String(r.cost_uzs || 0));
+    if (v === null) return;
+    patch(r, { cost_uzs: Number(String(v).replace(/\D/g, "")) || 0 });
+  };
+
+  const total = (rows || []).reduce((acc, r) => {
+    acc.clicks += r.stats.clicks; acc.signups += r.stats.signups; acc.payers += r.stats.payers;
+    acc.revenue += r.stats.revenue_uzs; acc.cost += r.cost_uzs || 0; return acc;
+  }, { clicks: 0, signups: 0, payers: 0, revenue: 0, cost: 0 });
+
+  return (
+    <div className="space-y-3" data-testid="admin-adlinks">
+      <p className="text-xs text-muted-foreground">
+        Har bir kanal, blogger yoki post uchun alohida havola yarating. Shu havola orqali kelganlar hisoblanadi:
+        bosganlar → ro'yxatdan o'tganlar → profilni to'ldirganlar → to'lov qilganlar.
+      </p>
+      <form onSubmit={create} className="rounded-2xl bg-card border border-border p-3 space-y-2" data-testid="adlink-form">
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nomi, masalan: Toshkent oilaviy kanal" className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" data-testid="adlink-name" />
+        <div className="flex gap-2">
+          <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Kod (ixtiyoriy)" className="flex-1 min-w-0 rounded-xl border border-border bg-background px-3 py-2 text-sm" data-testid="adlink-code" />
+          <input value={cost} onChange={(e) => setCost(e.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="Narxi, so'm" className="w-32 rounded-xl border border-border bg-background px-3 py-2 text-sm" data-testid="adlink-cost" />
+        </div>
+        <button type="submit" disabled={!name.trim() || busy} className="w-full rounded-xl bg-primary text-white py-2 text-sm font-medium disabled:opacity-50" data-testid="adlink-create">
+          Havola yaratish
+        </button>
+      </form>
+
+      {rows && rows.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" data-testid="adlink-total">
+          <KpiTile label="Bosganlar" value={total.clicks} />
+          <KpiTile label="Ro'yxatdan o'tgan" value={total.signups} sub={total.clicks ? `${Math.round((100 * total.signups) / total.clicks)}%` : ""} />
+          <KpiTile label="To'lov qilgan" value={total.payers} />
+          <KpiTile label="Tushum / xarajat" value={sumFmt(total.revenue)} sub={total.cost ? `xarajat ${sumFmt(total.cost)}` : ""} accent={total.cost > 0 && total.revenue >= total.cost} />
+        </div>
+      )}
+
+      {rows === null && <p className="text-sm text-muted-foreground py-4 text-center">Yuklanmoqda...</p>}
+      {rows && rows.length === 0 && <p className="text-sm text-muted-foreground py-6 text-center">Hali havola yo'q. Birinchisini yuqorida yarating.</p>}
+      {(rows || []).map((r) => {
+        const s = r.stats;
+        return (
+          <div key={r.code} className={`rounded-2xl bg-card border border-border p-3 space-y-2 ${r.active === false ? "opacity-60" : ""}`} data-testid={`adlink-${r.code}`}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-medium text-sm truncate">{r.name}{r.active === false && <span className="ml-1 text-[10px] text-muted-foreground">(to'xtatilgan)</span>}</p>
+                <p className="text-[11px] text-muted-foreground break-all">{r.link}</p>
+              </div>
+              <button type="button" onClick={() => copyText(r.link)} className="shrink-0 text-xs rounded-full border border-border px-3 py-1.5" data-testid={`adlink-copy-${r.code}`}>
+                Nusxa
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5 text-center">
+              {[
+                ["Bosgan", s.clicks],
+                ["Ro'yxatdan o'tgan", `${s.signups}${s.clicks ? ` (${s.signup_pct}%)` : ""}`],
+                ["Erkak / Ayol", `${s.men} / ${s.women}`],
+                ["Profil to'liq", s.onboarded],
+                ["Selfie tasdiq", s.verified],
+                ["To'lov qilgan", s.payers],
+              ].map(([l, v]) => (
+                <div key={l} className="rounded-xl bg-muted/60 py-1.5">
+                  <p className="text-sm font-semibold tabular-nums">{v}</p>
+                  <p className="text-[10px] text-muted-foreground">{l}</p>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+              <span>Tushum: <b className="text-foreground">{sumFmt(s.revenue_uzs)}</b></span>
+              <button type="button" onClick={() => editCost(r)} className="underline">Narxi: {r.cost_uzs ? sumFmt(r.cost_uzs) : "kiritilmagan"}</button>
+              {s.cost_per_signup != null && <span>1 ro'yxat: {sumFmt(s.cost_per_signup)}</span>}
+              {s.cost_per_payer != null && <span>1 to'lovchi: {sumFmt(s.cost_per_payer)}</span>}
+              <button type="button" onClick={() => patch(r, { active: r.active === false })} className="underline ml-auto">
+                {r.active === false ? "Qayta yoqish" : "To'xtatish"}
+              </button>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

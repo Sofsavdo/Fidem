@@ -119,7 +119,11 @@ async def _handle_start(chat_id: int, tg_user_id: str, text: str) -> None:
     sofsavdo_click_token = start_param if start_param and start_param.startswith("sf_") else None
     # "share_<profile id>": someone shared a profile; open that profile.
     share_target = start_param[6:] if start_param and start_param.startswith("share_") else None
-    ref_code = start_param if start_param and not sofsavdo_click_token and not share_target else None
+    # "ad_<code>": an ad tracking link (ad_links.py) - which placement brought this person.
+    import ad_links
+    ad_code = ad_links.code_from_start(start_param) if start_param and start_param.startswith(ad_links.PREFIX) else None
+    is_ad = bool(start_param and start_param.startswith(ad_links.PREFIX))
+    ref_code = start_param if start_param and not sofsavdo_click_token and not share_target and not is_ad else None
 
     # Record every /start so the onboarding funnel is measurable and the
     # lifecycle nudger can re-engage people who never open the Mini App.
@@ -147,6 +151,9 @@ async def _handle_start(chat_id: int, tg_user_id: str, text: str) -> None:
         {"telegram_id": tg_user_id},
         {"_id": 0, "id": 1, "referred_by": 1, "sofsavdo_click_token": 1},
     )
+
+    if ad_code:
+        await ad_links.record_bot_start(tg_user_id, ad_code, has_account=bool(existing))
 
     if sofsavdo_click_token and (not existing or not existing.get("sofsavdo_click_token")):
         if existing:
