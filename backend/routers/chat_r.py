@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -13,6 +14,8 @@ from ai_service import detect_contact_info, detect_money_request
 import moderation
 import ai_assistant
 from core import (
+    chat_other,
+    in_chat,
     CHAT_GUARANTEE_HOURS,
     CHAT_UNLOCK_COINS,
     FREE_WEEKLY_INITIATIONS,
@@ -382,8 +385,7 @@ async def chat_history(
     Without `before` returns the newest `limit` messages; pass the oldest
     loaded message's created_at as `before` to page further back.
     """
-    a, b = chat_id.split("_", 1)
-    if uid not in (a, b):
+    if not in_chat(chat_id, uid):
         raise HTTPException(403, "Not your chat")
     limit = min(limit, 100)
     query = {"chat_id": chat_id}
@@ -414,7 +416,7 @@ async def chat_history(
     if modified > 0:
         # Let the sender's open chat flip its own bubbles to "read" live,
         # instead of only finding out next time they reload the page.
-        other_id = b if uid == a else a
+        other_id = chat_other(chat_id, uid)
         asyncio.create_task(
             manager.broadcast_chat([other_id], {"type": "read", "data": {"chat_id": chat_id, "reader_id": uid}})
         )
@@ -535,6 +537,13 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
         kind = "text"
     status = "chat"
 
+    reply = None
+    if req.reply_to:
+        q = await db.messages.find_one({"id": req.reply_to, "chat_id": cid}, {"_id": 0, "id": 1, "text": 1, "from_user_id": 1, "kind": 1})
+        if q:
+            reply = {"id": q["id"], "from_user_id": q["from_user_id"], "kind": q.get("kind", "text"),
+                     "text": (q.get("text") or "")[:140]}
+
     msg = {
         "id": new_id(),
         "chat_id": cid,
@@ -546,6 +555,8 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
         "read": False,
         "status": status,
     }
+    if reply:
+        msg["reply_to"] = reply
     if is_voice:
         msg["meta"] = {"voice_url": req.voice_url, "voice_duration": req.voice_duration or 0}
     elif is_video:
@@ -823,11 +834,7 @@ async def get_voice_file(
     if not chat_id:
         raise HTTPException(400, "Invalid message")
     
-    parts = chat_id.split("_", 1)
-    if len(parts) != 2:
-        raise HTTPException(400, "Invalid chat id")
-    a, b = parts
-    if uid not in (a, b):
+    if not in_chat(chat_id, uid):
         raise HTTPException(403, "Not your chat")
     
     # Extract storage path from voice_url
@@ -1067,6 +1074,57 @@ async def leaderboard(period: str = "all", by: str = "sent", uid: str = Depends(
     return rows
 
 
+# ---------- Reactions ----------
+REACTIONS = ("❤️", "😂", "😮", "👍", "🤲", "😢")
+
+
+@router.post("/messages/{mid}/react")
+async def react_to_message(mid: str, emoji: str = Body("", embed=True), uid: str = Depends(require_onboarded)):
+    """Toggle a reaction on a message in one of my chats ("" removes mine)."""
+    if emoji and emoji not in REACTIONS:
+        raise HTTPException(400, "bad_reaction")
+    msg = await db.messages.find_one({"id": mid}, {"_id": 0, "chat_id": 1, "from_user_id": 1, "to_user_id": 1, "reactions": 1})
+    if not msg or not in_chat(msg.get("chat_id", ""), uid):
+        raise HTTPException(404, "not_found")
+    reactions = dict(msg.get("reactions") or {})
+    if not emoji or reactions.get(uid) == emoji:
+        reactions.pop(uid, None)
+    else:
+        reactions[uid] = emoji
+    await db.messages.update_one({"id": mid}, {"$set": {"reactions": reactions}})
+    payload = {"type": "reaction", "data": {"id": mid, "chat_id": msg["chat_id"], "reactions": reactions}}
+    asyncio.create_task(manager.broadcast_chat([msg["from_user_id"], msg["to_user_id"]], payload))
+    return {"ok": True, "reactions": reactions}
+
+
+# ---------- Typing indicator (over the WebSocket) ----------
+_TYPING_LAST: dict[str, float] = {}
+
+
+async def _ws_client_event(uid: str, raw: str) -> None:
+    """{"type": "typing", "to": "<user id>"} -> the other person sees
+    "yozmoqda..." for a few seconds. At most one every 2 s per sender."""
+    try:
+        evt = json.loads(raw)
+    except Exception:
+        return
+    if not isinstance(evt, dict) or evt.get("type") != "typing":
+        return
+    to = str(evt.get("to") or "")
+    if not to or to == uid:
+        return
+    import time as _t
+    now = _t.monotonic()
+    if now - _TYPING_LAST.get(uid, 0) < 2.0:
+        return
+    _TYPING_LAST[uid] = now
+    if len(_TYPING_LAST) > 20000:
+        _TYPING_LAST.clear()
+    if await _block_exists(uid, to):
+        return
+    await manager.send_to_user(to, {"type": "typing", "data": {"from": uid}})
+
+
 # ---------- WebSocket ----------
 @router.websocket("/ws")
 async def ws_endpoint(websocket: WebSocket, token: str = Query(...)):
@@ -1084,6 +1142,8 @@ async def ws_endpoint(websocket: WebSocket, token: str = Query(...)):
             msg = await websocket.receive_text()
             if msg == "ping":
                 await websocket.send_text("pong")
+                continue
+            await _ws_client_event(uid, msg)
     except WebSocketDisconnect:
         pass
     except Exception as e:

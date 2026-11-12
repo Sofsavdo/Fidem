@@ -169,6 +169,28 @@ def chat_id_for(a: str, b: str) -> str:
     return "_".join(sorted([a, b]))
 
 
+def chat_other(chat_id: str, uid: str) -> str:
+    """The other person in a chat with uid, or "" if uid isn't in it. Ids can
+    contain "_" (ai_assistant), so the chat id can't simply be split on it;
+    only the "ai_..." ids have an underscore, user ids (UUIDs) never do."""
+    if not chat_id or not uid:
+        return ""
+    if chat_id.startswith(uid + "_"):
+        other = chat_id[len(uid) + 1:]
+    elif chat_id.endswith("_" + uid):
+        other = chat_id[: -len(uid) - 1]
+    else:
+        return ""
+    for x in (uid, other):
+        if not x or ("_" in x and not x.startswith("ai_")):
+            return ""
+    return other if chat_id_for(uid, other) == chat_id else ""
+
+
+def in_chat(chat_id: str, uid: str) -> bool:
+    return bool(chat_other(chat_id, uid))
+
+
 def sanitize_text(text: str, allow_tags: bool = False) -> str:
     """Sanitize user-provided text to prevent XSS attacks."""
     if not text:

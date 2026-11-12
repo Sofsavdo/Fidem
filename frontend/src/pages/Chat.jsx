@@ -10,6 +10,10 @@ import { giftGradient } from "@/lib/giftVisuals";
 import ChatVoiceRecorder from "@/components/ChatVoiceRecorder";
 import { ArrowLeft, Send, Gift, MoreVertical, Ban, Flag, Play, Check, CheckCheck, Contact, ShieldAlert } from "lucide-react";
 import { useContactExchange, ExchangePanel, IncomingExchange, AcceptedContacts } from "@/components/ContactExchange";
+import {
+  DayDivider, dayLabel, isNewDay, TypingBubble, ReactionChips, ActionBar, QuotedMessage, ReplyPreview,
+  Openers, AssistantChips, QuestionDeckButton, QuestionDeck,
+} from "@/components/chat/ChatExtras";
 import { photoSrc } from "@/lib/photo";
 import { formatLastActive } from "@/lib/time";
 import { tapLight } from "@/lib/haptics";
@@ -57,7 +61,13 @@ export default function Chat() {
   const topRef = useRef(null);
 
   const chatId = user && otherId ? [user.id, otherId].sort().join("_") : null;
-  const { wsEvent } = useApp();
+  const { wsEvent, wsSend, lang } = useApp();
+  const [replyTo, setReplyTo] = useState(null);
+  const [actionFor, setActionFor] = useState(null);
+  const [otherTyping, setOtherTyping] = useState(false);
+  const [deckOpen, setDeckOpen] = useState(false);
+  const typingTimer = useRef(null);
+  const lastTypingSent = useRef(0);
   const { data: payCfg } = usePaymentConfig();
   const payOff = !!payCfg && !payCfg.payments_available; // no way to pay right now
 
@@ -191,6 +201,46 @@ export default function Chat() {
     // eslint-disable-next-line
   }, [wsEvent, chatId, user]);
 
+  // "yozmoqda...": the other person is typing (or the assistant is answering).
+  useEffect(() => {
+    if (!wsEvent || !chatId) return;
+    if (wsEvent.type === "typing" && wsEvent.data?.from === otherId) {
+      setOtherTyping(true);
+      clearTimeout(typingTimer.current);
+      typingTimer.current = setTimeout(() => setOtherTyping(false), 4500);
+    }
+    if (wsEvent.type === "message" && wsEvent.data?.from_user_id === otherId) setOtherTyping(false);
+    if (wsEvent.type === "reaction" && wsEvent.data?.chat_id === chatId) {
+      setMessages((prev) => prev.map((m) => (m.id === wsEvent.data.id ? { ...m, reactions: wsEvent.data.reactions } : m)));
+    }
+    // eslint-disable-next-line
+  }, [wsEvent, chatId, otherId]);
+  useEffect(() => () => clearTimeout(typingTimer.current), []);
+
+  const onType = (v) => {
+    setText(v);
+    const now = Date.now();
+    if (v && now - lastTypingSent.current > 2500 && !String(otherId).startsWith("ai_")) {
+      lastTypingSent.current = now;
+      wsSend?.({ type: "typing", to: otherId });
+    }
+  };
+
+  const react = async (m, emoji) => {
+    setActionFor(null);
+    tapLight();
+    const prevR = m.reactions || {};
+    const next = { ...prevR };
+    if (next[user.id] === emoji) delete next[user.id]; else next[user.id] = emoji;
+    setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, reactions: next } : x)));
+    try {
+      const r = await api.post(`/messages/${m.id}/react`, { emoji });
+      setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, reactions: r.data.reactions } : x)));
+    } catch {
+      setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, reactions: prevR } : x)));
+    }
+  };
+
   // The other side just opened this chat and read our messages - flip our
   // sent bubbles to "read" live instead of only on next reload.
   useEffect(() => {
@@ -246,14 +296,17 @@ export default function Chat() {
       kind: "text",
       created_at: new Date().toISOString(),
       sending: true,
+      reply_to: replyTo ? { id: replyTo.id, text: (replyTo.text || "").slice(0, 140), from_user_id: replyTo.from_user_id, kind: replyTo.kind } : undefined,
     };
+    const replyId = replyTo?.id;
+    setReplyTo(null);
     setMessages((prev) => [...prev, tempMsg]);
     setText("");
 
     sendLockRef.current = true;
     setSending(true);
     try {
-      const r = await api.post("/messages/send", { to_user_id: otherId, text: finalText });
+      const r = await api.post("/messages/send", { to_user_id: otherId, text: finalText, reply_to: replyId || undefined });
       // Swap the temp bubble for the server's confirmed copy directly - don't
       // wait on the WebSocket echo to know the message made it. The WS
       // dedup check (by id) below already ignores it if it arrives after.
@@ -390,7 +443,10 @@ export default function Chat() {
               {other.ai_role === "assistant" || otherId === "ai_assistant" ? t("assistant_name") : `${other.name}, ${other.age}`}
               {isAi && <span data-testid="chat-ai-badge" className="ml-1.5 text-[10px] font-bold text-white bg-violet-600 rounded-full px-1.5 py-0.5 align-middle">🤖 AI</span>}
             </p>
-            <p className="text-xs text-muted-foreground truncate">{formatLastActive(other.last_active_minutes, t, other.online)}</p>
+            <p className={`text-xs truncate ${otherTyping ? "text-primary font-medium" : "text-muted-foreground"}`} data-testid="chat-status">
+              {otherTyping ? t("chat_typing") : formatLastActive(other.last_active_minutes, t, other.online)}
+              {!otherTyping && !isAi && other.match_score != null && <span className="text-primary"> · 💞 {other.match_score}%</span>}
+            </p>
           </div>
         </Link>
         <div className="relative">
@@ -429,14 +485,22 @@ export default function Chat() {
         <p data-testid="chat-safety" className="self-center max-w-[92%] text-center text-[11px] text-muted-foreground bg-muted/60 rounded-full px-3 py-1 inline-flex items-center gap-1">
           <ShieldAlert className="w-3 h-3 shrink-0" /> {t("chat_safety_line")}
         </p>
-        {messages.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground text-sm">
-            👋
-          </div>
+        {messages.length === 0 && messagesLoaded && !isAi && !access?.requires_unlock && (
+          <Openers other={other} onPick={(o) => { setText(o); track("chat_opener_used"); }} />
         )}
-        {messages.map((m) => {
+        {messages.length === 0 && (isAi || !messagesLoaded || access?.requires_unlock) && (
+          <div className="text-center py-12 text-muted-foreground text-sm">👋</div>
+        )}
+        {messages.map((m, idx) => {
           const mine = m.from_user_id === user?.id;
-          const footer = (
+          const prevM = messages[idx - 1];
+          const nextM = messages[idx + 1];
+          const divider = isNewDay(prevM, m) ? <DayDivider label={dayLabel(m.created_at, t, lang)} /> : null;
+          // Consecutive messages from one person within 3 min form a group:
+          // only the last one shows the time / ticks.
+          const lastInGroup = !nextM || nextM.from_user_id !== m.from_user_id ||
+            new Date(nextM.created_at) - new Date(m.created_at) > 180000 || isNewDay(m, nextM);
+          const footer = !lastInGroup ? null : (
             <div className={`flex items-center gap-1 mt-0.5 px-1 text-[10px] text-muted-foreground ${mine ? "flex-row-reverse" : ""}`} data-testid={`msg-meta-${m.id}`}>
               <span>{formatMsgTime(m.created_at)}</span>
               {mine && !m.sending && (
@@ -453,7 +517,8 @@ export default function Chat() {
           // celebration animation finished playing.
           if (m.kind === "gift" && m.meta) {
             return (
-              <div key={m.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
+              <React.Fragment key={m.id}>{divider}
+              <div className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
                 <div
                   className={`relative overflow-hidden rounded-3xl w-40 p-3 flex flex-col text-white shadow-lg bg-gradient-to-br ${giftGradient(m.meta)}`}
                   data-testid={`gift-msg-${m.id}`}
@@ -477,16 +542,24 @@ export default function Chat() {
                 </div>
                 {footer}
               </div>
+              </React.Fragment>
             );
           }
 
+          const canAct = !m.sending && !isAi && !String(m.id).startsWith("temp-");
           return (
-            <div key={m.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
-              <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
+            <React.Fragment key={m.id}>{divider}
+            <div className={`flex flex-col gap-1 ${mine ? "items-end" : "items-start"} ${lastInGroup ? "" : "-mb-1"}`}>
+              <div
+                onClick={() => canAct && setActionFor((x) => (x === m.id ? null : m.id))}
+                onDoubleClick={() => canAct && react(m, "❤️")}
+                data-testid={`msg-${m.id}`}
+                className={`max-w-[78%] rounded-2xl px-3.5 py-2 text-[15px] leading-snug whitespace-pre-wrap break-words select-text transition ${
                 mine
-                  ? "bg-primary text-white rounded-br-sm"
-                  : "bg-card border border-border rounded-bl-sm"
-              }`}>
+                  ? `bg-gradient-to-br from-primary to-secondary text-white shadow-sm ${lastInGroup ? "rounded-br-md" : ""}`
+                  : `bg-card border border-border shadow-sm ${lastInGroup ? "rounded-bl-md" : ""}`
+              } ${m.sending ? "opacity-70" : ""} ${actionFor === m.id ? "ring-2 ring-primary/40" : ""}`}>
+                <QuotedMessage q={m.reply_to} mine={mine} myId={user?.id} otherName={other.name} />
                 {m.kind === "voice" && m.meta?.voice_url ? (
                   <div className="flex items-center gap-2 min-w-[200px]" data-testid={`voice-msg-${m.id}`}>
                     <span className="text-[9px] uppercase tracking-wider opacity-70">🎙 · {m.meta.voice_duration || 0}s</span>
@@ -508,10 +581,17 @@ export default function Chat() {
                   m.text
                 )}
               </div>
+              <ReactionChips reactions={m.reactions} mine={mine} myId={user?.id} onToggle={(e) => react(m, e)} />
+              {actionFor === m.id && (
+                <ActionBar mine={mine} current={m.reactions?.[user?.id]} onReact={(e) => react(m, e)}
+                  onReply={() => { setReplyTo(m); setActionFor(null); }} />
+              )}
               {footer}
             </div>
+            </React.Fragment>
           );
         })}
+        {otherTyping && <TypingBubble />}
         <div ref={endRef} />
       </div>
 
@@ -598,6 +678,8 @@ export default function Chat() {
               📸 {t("selfie_required_error")} <span className="underline font-medium">{t("selfie_start")}</span>
             </Link>
           )}
+          <ReplyPreview msg={replyTo} myId={user?.id} otherName={other.name} onCancel={() => setReplyTo(null)} />
+          {isAi && messages.length < 6 && <AssistantChips onPick={(c) => send(c)} />}
           {/* Always-visible message composer (disabled when locked) */}
           <div className="flex items-end gap-1.5 min-w-0">
             {FEATURES.giftShop && (
@@ -617,16 +699,23 @@ export default function Chat() {
             </button>
             )}
             {!access?.requires_unlock && !isAi && <div className="shrink-0"><ChatVoiceRecorder onSend={sendVoice} /></div>}
+            <div className="relative flex-1 min-w-0">
             <input
               data-testid="chat-input"
               maxLength={2000}
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => onType(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.repeat && !e.nativeEvent?.isComposing && !access?.requires_unlock && send()}
               disabled={!!access?.requires_unlock || !!access?.blocked}
               placeholder={access?.blocked ? t("user_blocked_error") : access?.requires_unlock ? t("chat_locked_inline") : t("type_message")}
-              className="flex-1 min-w-0 rounded-full border border-border bg-card px-4 h-10 text-sm outline-none focus:border-primary disabled:opacity-60 disabled:cursor-not-allowed"
+              className={`w-full rounded-full border border-border bg-card pl-4 ${isAi ? "pr-4" : "pr-10"} h-10 text-sm outline-none focus:border-primary disabled:opacity-60 disabled:cursor-not-allowed`}
             />
+            {!isAi && (
+              <div className="absolute right-0.5 top-0.5 scale-[0.8] origin-right">
+                <QuestionDeckButton onClick={() => setDeckOpen(true)} disabled={!!access?.requires_unlock || !!access?.blocked} />
+              </div>
+            )}
+            </div>
             <button
               data-testid="chat-send"
               onClick={() => send()}
@@ -638,6 +727,8 @@ export default function Chat() {
           </div>
         </div>
       </div>
+      <QuestionDeck open={deckOpen} onClose={() => setDeckOpen(false)}
+        onPick={(q) => { setText(q); setDeckOpen(false); track("chat_deck_question_used"); }} />
       {giftOpen && (
         <GiftModal
           targetId={otherId}

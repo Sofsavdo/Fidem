@@ -200,6 +200,7 @@ async def _reply(uid: str, pid: str, chat_id: str) -> None:
         from ai_service import detect_contact_info, detect_money_request
         if detect_contact_info(text) or detect_money_request(text):
             return
+        await manager.send_to_user(uid, {"type": "typing", "data": {"from": pid}})
         await asyncio.sleep(min(1.5 + len(text) / 30.0, 9.0))  # "typing"
         await core.db.messages.update_many({"chat_id": chat_id, "to_user_id": pid, "read": False}, {"$set": {"read": True}})
         msg = {

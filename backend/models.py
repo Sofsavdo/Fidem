@@ -182,6 +182,7 @@ class SendMessageRequest(BaseModel):
     video_url: Optional[str] = None
     video_duration: Optional[int] = None  # seconds
     video_thumbnail: Optional[str] = None
+    reply_to: Optional[str] = None   # id of a message in the same chat being answered
 
 
 class MessageOut(BaseModel):
