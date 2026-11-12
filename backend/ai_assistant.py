@@ -171,17 +171,42 @@ def schedule_reply(uid: str, pid: str, chat_id: str) -> None:
     _pending[chat_id] = asyncio.ensure_future(_reply(uid, pid, chat_id))
 
 
+FALLBACK_REPLY = ("Kechirasiz, hozir javob bera olmadim. Birozdan keyin qayta yozib ko'ring "
+                  "yoki savolingizni @Medik005 ga yuboring.")
+
+
+async def _send_reply(uid: str, pid: str, chat_id: str, text: str, name: str) -> None:
+    await manager.send_to_user(uid, {"type": "typing", "data": {"from": pid}})
+    await asyncio.sleep(min(1.5 + len(text) / 30.0, 9.0))  # "typing"
+    await core.db.messages.update_many({"chat_id": chat_id, "to_user_id": pid, "read": False}, {"$set": {"read": True}})
+    msg = {
+        "id": new_id(), "chat_id": chat_id, "from_user_id": pid, "to_user_id": uid,
+        "text": text, "kind": "text", "created_at": iso(now_utc()), "read": False, "status": "chat",
+    }
+    await core.db.messages.insert_one(dict(msg))
+    await manager.broadcast_chat([uid], {"type": "message", "data": msg})
+    await push_notif(uid, "message", f"🤖 {name} javob yozdi", link=f"/chat/{pid}")
+
+
 async def _reply(uid: str, pid: str, chat_id: str) -> None:
+    """Every outcome is logged: a reply that silently never comes is the
+    worst case (the first version dropped answers that mentioned Telegram or
+    card payments - the person-to-person scam filter - without a trace)."""
+    p = None
     try:
-        await asyncio.sleep(random.uniform(2.5, 6.0))      # "reading"
+        await asyncio.sleep(random.uniform(1.5, 3.5))      # "reading"
         p = _persona_by_id(pid)
-        if not p or not await enabled():
+        if not p:
+            return
+        if not await enabled():
+            log.info("assistant: switched off, no reply to %s", uid[:8])
             return
         since = iso(now_utc() - timedelta(hours=24))
         sent_today = await core.db.messages.count_documents(
             {"to_user_id": uid, "from_user_id": ASSISTANT_ID, "created_at": {"$gte": since}},
         )
         if sent_today >= DAILY_REPLY_CAP:
+            log.info("assistant: daily cap reached for %s", uid[:8])
             return
         me = await core.db.users.find_one({"id": uid}, {"_id": 0, "name": 1, "birth_date": 1, "region": 1})
         rows = await core.db.messages.find(
@@ -190,30 +215,30 @@ async def _reply(uid: str, pid: str, chat_id: str) -> None:
         history = list(reversed(rows))
         from ai_service import GEMINI_API_KEY, _gemini_json
         if not GEMINI_API_KEY:
+            log.warning("assistant: GEMINI_API_KEY is not set")
+            await _send_reply(uid, pid, chat_id, FALLBACK_REPLY, p["name"])
             return
         res = await _gemini_json(_persona_prompt(p, me or {}, history, pid), [], _SCHEMA,
-                                 max_tokens=400, timeout=25.0, thinking_budget=0)
-        text = (res.get("reply") or "").strip()[:800]
+                                 max_tokens=600, timeout=25.0, thinking_budget=0)
+        text = (res.get("reply") or "").strip()[:1200]
         if not text:
-            return
-        # the same safety net as for people
-        from ai_service import detect_contact_info, detect_money_request
-        if detect_contact_info(text) or detect_money_request(text):
-            return
-        await manager.send_to_user(uid, {"type": "typing", "data": {"from": pid}})
-        await asyncio.sleep(min(1.5 + len(text) / 30.0, 9.0))  # "typing"
-        await core.db.messages.update_many({"chat_id": chat_id, "to_user_id": pid, "read": False}, {"$set": {"read": True}})
-        msg = {
-            "id": new_id(), "chat_id": chat_id, "from_user_id": pid, "to_user_id": uid,
-            "text": text, "kind": "text", "created_at": iso(now_utc()), "read": False, "status": "chat",
-        }
-        await core.db.messages.insert_one(dict(msg))
-        await manager.broadcast_chat([uid], {"type": "message", "data": msg})
-        await push_notif(uid, "message", f"🤖 {p['name']} javob yozdi", link=f"/chat/{pid}")
+            log.warning("assistant: empty answer from the AI")
+            text = FALLBACK_REPLY
+        # No contact/money filter here: those catch scams between people, and
+        # the assistant's own answers are about exactly those topics (contact
+        # exchange, card payments, @Medik005). Its prompt forbids asking for
+        # contacts or money.
+        await _send_reply(uid, pid, chat_id, text, p["name"])
+        log.info("assistant: replied to %s (%d chars)", uid[:8], len(text))
     except asyncio.CancelledError:
         pass
     except Exception:
-        log.warning("ai persona reply failed", exc_info=True)
+        log.warning("assistant reply failed", exc_info=True)
+        if p:
+            try:
+                await _send_reply(uid, pid, chat_id, FALLBACK_REPLY, p["name"])
+            except Exception:
+                log.warning("assistant fallback reply failed", exc_info=True)
     finally:
         if _pending.get(chat_id) is asyncio.current_task():
             _pending.pop(chat_id, None)
