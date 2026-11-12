@@ -449,94 +449,120 @@ def compute_match(viewer: dict, candidate: dict, lang: str = "uz") -> tuple[int,
         tmpl = templates.get(key, {}).get(lang) or templates.get(key, {}).get("uz", key)
         return tmpl.format(**kwargs)
 
-    score = 0
+    # Each part gives a share (0..1) of its weight, so two different people
+    # almost never land on the same number - the old all-or-nothing buckets
+    # put most pairs on the same 70-something score.
+    parts: dict[str, float] = {}
     reasons: list[str] = []
 
     v_age = age_from_birth(viewer.get("birth_date", "2000-01-01"))
     c_age = age_from_birth(candidate.get("birth_date", "2000-01-01"))
 
-    # 1. Gender preference (mandatory)
-    if viewer.get("search_gender") and viewer["search_gender"] == candidate.get("gender"):
-        score += 5
-    if candidate.get("search_gender") and candidate["search_gender"] == viewer.get("gender"):
-        score += 5
+    def age_fit(age: int, lo, hi) -> float:
+        lo, hi = int(lo or 18), int(hi or 60)
+        if lo > hi:
+            lo, hi = hi, lo
+        mid, half = (lo + hi) / 2, max(1.0, (hi - lo) / 2)
+        if lo <= age <= hi:
+            return 1.0 - 0.4 * abs(age - mid) / half      # 0.6 at the edge, 1.0 in the middle
+        return max(0.0, 0.5 - 0.12 * min(abs(age - lo), abs(age - hi)))
 
-    # 2. Age within viewer's search range (20 pts)
-    a_min = viewer.get("search_age_min", 18)
-    a_max = viewer.get("search_age_max", 60)
-    if a_min <= c_age <= a_max:
-        score += 20
+    # 1. Age, both ways: is she in my range, am I in hers (25)
+    mine = age_fit(c_age, viewer.get("search_age_min", 18), viewer.get("search_age_max", 60))
+    theirs = age_fit(v_age, candidate.get("search_age_min", 18), candidate.get("search_age_max", 60))
+    parts["age"] = 15 * mine + 10 * theirs
+    if mine >= 0.6:
         reasons.append(reason("age_in_range", age=c_age))
-    elif abs(c_age - (a_min + a_max) / 2) <= 5:
-        score += 10
 
-    # 3. Region (20 pts)
-    if viewer.get("region") and candidate.get("region"):
-        if viewer.get("search_region", "any") in ("", "any", candidate["region"]):
-            score += 10
-            reasons.append(candidate["region"])
-        if viewer["region"] == candidate["region"]:
-            score += 10
+    # 2. Looking for each other's gender (gate, not points)
+    gender_ok = (not viewer.get("search_gender") or viewer.get("search_gender") == candidate.get("gender")) and \
+                (not candidate.get("search_gender") or candidate.get("search_gender") == viewer.get("gender"))
 
-    # 4. Marital status alignment (10 pts)
-    if viewer.get("marital_status") == candidate.get("marital_status"):
-        score += 10
-        reasons.append(reason("marital"))
+    # 3. Location (15)
+    vr, cr = viewer.get("region") or "", candidate.get("region") or ""
+    loc = 0.0
+    if vr and cr and vr == cr:
+        loc = 12.0
+        if viewer.get("district") and viewer.get("district") == candidate.get("district"):
+            loc += 3.0
+        reasons.append(cr)
+    elif vr and cr:
+        loc = 6.0 if (viewer.get("relocation") or candidate.get("relocation")) else 2.0
+        if viewer.get("search_region") in (cr,):
+            loc += 4.0
+    else:
+        loc = 5.0
+    parts["location"] = loc
 
-    # 5. Children alignment (10 pts)
-    if viewer.get("has_children") == candidate.get("has_children"):
-        score += 10
-        if not candidate.get("has_children"):
-            reasons.append(reason("no_children"))
-        else:
-            reasons.append(reason("has_children"))
+    # 4. Family situation (15)
+    vm, cm = viewer.get("marital_status"), candidate.get("marital_status")
+    if vm and cm:
+        fam = 8.0 if vm == cm else (6.0 if {vm, cm} <= {"divorced", "widowed"} else 3.0)
+        if vm == cm:
+            reasons.append(reason("marital"))
+    else:
+        fam = 4.0
+    vk, ck = bool(viewer.get("has_children")), bool(candidate.get("has_children"))
+    if vk == ck:
+        fam += 7.0 if not vk else 6.0
+        reasons.append(reason("has_children") if ck else reason("no_children"))
+    else:
+        fam += 3.0
+    parts["family"] = fam
 
-    # 6. Height delta (10 pts) — prefer opposite-gender adult-typical
-    vh = viewer.get("height_cm") or 170   # unknown (0) -> neutral
-    ch = candidate.get("height_cm") or 170
-    if 5 <= abs(vh - ch) <= 30:
-        score += 10
+    # 5. Values and habits (15)
+    vals = 0.0
+    if viewer.get("religion") and candidate.get("religion"):
+        if viewer["religion"].strip().lower() == candidate["religion"].strip().lower():
+            vals += 10.0
+            reasons.append(reason("religion", religion=candidate.get("religion")))
+    else:
+        vals += 5.0
+    order = {"no": 0, "sometimes": 1, "yes": 2}
+    for habit in ("smoking", "alcohol"):
+        a, b = order.get(viewer.get(habit) or ""), order.get(candidate.get(habit) or "")
+        vals += 1.25 if a is None or b is None else 2.5 * (1 - abs(a - b) / 2)
+    parts["values"] = vals
+
+    # 6. Education (5)
+    levels = {"o'rta": 0, "o'rta maxsus": 1, "talaba": 2, "bakalavr": 2, "oliy": 3, "magistr": 4, "phd": 5}
+    norm = lambda v: str(v or "").strip().lower().replace("‘", "'").replace("’", "'").replace("ʻ", "'")
+    ea, eb = levels.get(norm(viewer.get("education"))), levels.get(norm(candidate.get("education")))
+    parts["education"] = 2.5 if ea is None or eb is None else max(0.0, 5.0 - 1.5 * abs(ea - eb))
+
+    # 7. Height (5): for a man and a woman, the man a bit taller fits best;
+    # unknown (0) is neutral.
+    vh, ch = viewer.get("height_cm") or 0, candidate.get("height_cm") or 0
+    if not vh or not ch or viewer.get("gender") == candidate.get("gender"):
+        hfit = 0.5
+    else:
+        man, woman = (vh, ch) if viewer.get("gender") == "male" else (ch, vh)
+        d = man - woman
+        hfit = 1.0 if 2 <= d <= 25 else (0.5 if -2 < d < 2 else max(0.0, 0.5 - abs(d) / 40) if d < 0 else 0.6)
+    parts["height"] = 5 * hfit
+    if hfit >= 1.0:
         reasons.append(reason("height"))
-    elif abs(vh - ch) < 5:
-        score += 5
 
-    # 7. Religion (10 pts)
-    if viewer.get("religion") and viewer.get("religion") == candidate.get("religion"):
-        score += 10
-        reasons.append(reason("religion", religion=candidate.get("religion")))
+    # 8. Goals, about-me and job words (10)
+    def words(u: dict) -> set:
+        txt = " ".join(str(u.get(k) or "") for k in ("looking_for", "bio", "profession")).lower()
+        return {w.strip(".,!?;:()\"'") for w in txt.split() if len(w) >= 4}
+    wa, wb = words(viewer), words(candidate)
+    if wa and wb:
+        j = len(wa & wb) / max(1, len(wa | wb))
+        parts["goals"] = 10 * min(1.0, j * 3.0) if j else 1.0   # a third of the words shared = full
+        if j >= 0.25:
+            reasons.append(reason("goals_close"))
+        elif j > 0.08:
+            reasons.append(reason("interests"))
+    else:
+        parts["goals"] = 3.0
 
-    # 8. Goal text & looking_for similarity (10 pts) — token overlap
-    a = (viewer.get("looking_for") or "").lower()
-    b = (candidate.get("looking_for") or "").lower()
-    if a and b:
-        a_tokens = set(t for t in a.split() if len(t) >= 3)
-        b_tokens = set(t for t in b.split() if len(t) >= 3)
-        if a_tokens and b_tokens:
-            overlap = len(a_tokens & b_tokens) / max(1, len(a_tokens | b_tokens))
-            if overlap >= 0.4:
-                score += 10
-                reasons.append(reason("goals_close"))
-            elif overlap > 0:
-                score += 5
-                reasons.append(reason("goals_partial"))
-            else:
-                score += 2  # both have goal text — minor bonus
-                reasons.append(reason("family_goal"))
-        else:
-            score += 3
-    # Bio token overlap (5 pts)
-    ba = (viewer.get("bio") or "").lower()
-    bb = (candidate.get("bio") or "").lower()
-    if ba and bb:
-        ba_tokens = set(t for t in ba.split() if len(t) >= 4)
-        bb_tokens = set(t for t in bb.split() if len(t) >= 4)
-        if ba_tokens and bb_tokens:
-            o = len(ba_tokens & bb_tokens) / max(1, len(ba_tokens | bb_tokens))
-            if o >= 0.2:
-                score += 5
-                reasons.append(reason("interests"))
-
-    return min(100, score), reasons[:6]
+    total = sum(parts.values()) / 90.0 * 100.0
+    if not gender_ok:
+        total *= 0.5
+    score = int(round(max(0.0, min(100.0, total))))
+    return score, reasons[:6]
 
 
 def match_label(score: int) -> str:

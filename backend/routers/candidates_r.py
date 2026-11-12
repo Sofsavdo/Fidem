@@ -26,36 +26,31 @@ def compute_ai_match(viewer: dict, candidate: dict, lang: str = "uz") -> tuple[i
     ai_boost = 0
     ai_reasons = []
     
-    # 1. Activity pattern matching (premium feature)
-    viewer_active = viewer.get("last_active_minutes", 9999)
-    candidate_active = candidate.get("last_active_minutes", 9999)
-    if abs(viewer_active - candidate_active) < 60:  # Both active within 1 hour
-        ai_boost += 5
-        if lang == "uz":
-            ai_reasons.append("Faollik vaqti mos")
-        elif lang == "ru":
-            ai_reasons.append("Активность совпадает")
-        else:
-            ai_reasons.append("Activity patterns match")
-    
-    # 2. Response time compatibility (premium feature)
-    viewer_response = viewer.get("avg_response_min", 999)
-    candidate_response = candidate.get("avg_response_min", 999)
-    if viewer_response and candidate_response:
-        if abs(viewer_response - candidate_response) < 30:
-            ai_boost += 5
-            if lang == "uz":
-                ai_reasons.append("Javob tezligi mos")
-            elif lang == "ru":
-                ai_reasons.append("Скорость ответа совпадает")
-            else:
-                ai_reasons.append("Response speed compatible")
-    
+    # 1. Both active in the last day (real timestamps; the old check compared
+    #    a field that isn't stored, so it gave every pair +5).
+    def _recent(u: dict) -> bool:
+        if not u.get("last_active"):
+            return False      # parse_dt(None) means "now" - not a real visit
+        try:
+            return (now_utc() - parse_dt(u.get("last_active"))) < timedelta(hours=24)
+        except Exception:
+            return False
+    if _recent(viewer) and _recent(candidate):
+        ai_boost += 3
+        ai_reasons.append({"uz": "Ikkalangiz ham faol", "ru": "Оба активны", "en": "Both active"}.get(lang, "Ikkalangiz ham faol"))
+
+    # 2. Reply speed - only when both have a measured average (it used to
+    #    default to 999 for both and count as a match).
+    vr, cr = viewer.get("avg_response_min"), candidate.get("avg_response_min")
+    if isinstance(vr, (int, float)) and isinstance(cr, (int, float)) and abs(vr - cr) < 30:
+        ai_boost += 3
+        ai_reasons.append({"uz": "Javob tezligi mos", "ru": "Скорость ответа совпадает", "en": "Response speed compatible"}.get(lang, "Javob tezligi mos"))
+
     # 3. Profile completeness bonus (premium feature)
     viewer_completeness = viewer.get("completeness", 0)
     candidate_completeness = candidate.get("completeness", 0)
     if viewer_completeness > 80 and candidate_completeness > 80:
-        ai_boost += 5
+        ai_boost += 2
         if lang == "uz":
             ai_reasons.append("Ikkala profil ham to'liq")
         elif lang == "ru":
@@ -67,25 +62,13 @@ def compute_ai_match(viewer: dict, candidate: dict, lang: str = "uz") -> tuple[i
     viewer_verified = viewer.get("verified_selfie", False) or viewer.get("verified_identity", False)
     candidate_verified = candidate.get("verified_selfie", False) or candidate.get("verified_identity", False)
     if viewer_verified and candidate_verified:
-        ai_boost += 8
+        ai_boost += 4
         if lang == "uz":
             ai_reasons.append("Ikkala taraf ham tasdiqlangan")
         elif lang == "ru":
             ai_reasons.append("Оба подтверждены")
         else:
             ai_reasons.append("Both verified")
-    
-    # 5. Plan compatibility (premium feature)
-    viewer_plan = viewer.get("plan", "free")
-    candidate_plan = candidate.get("plan", "free")
-    if viewer_plan == candidate_plan and viewer_plan != "free":
-        ai_boost += 5
-        if lang == "uz":
-            ai_reasons.append(f"{viewer_plan.capitalize()} foydalanuvchilar")
-        elif lang == "ru":
-            ai_reasons.append(f"{viewer_plan.capitalize()} пользователи")
-        else:
-            ai_reasons.append(f"{viewer_plan.capitalize()} users")
     
     # 7. Big5 personality compatibility (if available)
     viewer_big5 = viewer.get("big5_scores", {})
@@ -104,7 +87,7 @@ def compute_ai_match(viewer: dict, candidate: dict, lang: str = "uz") -> tuple[i
                 personality_match += (100 - abs(v_score - c_score)) / 10
         
         if personality_match > 30:
-            ai_boost += int(personality_match / 10)
+            ai_boost += int(personality_match / 15)
             if lang == "uz":
                 ai_reasons.append("Shaxsiyat mosligi yuqori")
             elif lang == "ru":
