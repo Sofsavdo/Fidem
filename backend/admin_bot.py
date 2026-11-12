@@ -247,8 +247,64 @@ async def build_stats_text() -> str:
     )
 
 
+async def notify_admins_verification(doc: dict, ai: dict | None) -> None:
+    """A selfie the AI could not decide on (or the AI call failed): send the
+    photo + the requested gesture to the admins with approve/reject buttons,
+    so a woman waiting to write is not stuck in a queue nobody watches."""
+    admins = await get_admin_chat_ids()
+    if not admins:
+        return
+    u = await db.users.find_one({"id": doc["user_id"]}, {"_id": 0, "name": 1, "gender": 1, "region": 1}) or {}
+    gender = {"female": "ayol", "male": "erkak"}.get(u.get("gender"), "—")
+    ai_line = ""
+    if ai:
+        ai_line = f"\n\n🤖 AI: {ai.get('verdict')} ({ai.get('confidence')}%)\n{ai.get('reason') or '—'}"
+    else:
+        ai_line = "\n\n🤖 AI javob bermadi — o'zingiz ko'ring."
+    caption = (
+        "📸 SELFIE TEKSHIRUVI\n\n"
+        f"👤 {u.get('name') or doc['user_id']} · {gender} · {u.get('region') or '—'}\n"
+        f"✋ So'ralgan ishora: {doc.get('gesture_text') or '—'}\n"
+        "Ishora va yuz ko'rinmasa — rad eting."
+        f"{ai_line}"
+    )
+    keyboard = {"inline_keyboard": [[
+        {"text": "✅ Tasdiqlash", "callback_data": f"vrf:a:{doc['id']}"},
+        {"text": "❌ Rad etish", "callback_data": f"vrf:r:{doc['id']}"},
+    ]]}
+    photo: bytes | None = None
+    try:
+        from storage import get_object
+
+        oid = (doc.get("proof_url") or "").rstrip("/").rsplit("/", 1)[-1]
+        if oid:
+            photo, _ct = await get_object(oid)
+    except Exception as e:
+        log.warning(f"selfie fetch for admin alert failed: {e}")
+    for chat_id in admins:
+        if photo and await send_admin_alert_photo(chat_id, photo, caption, reply_markup=keyboard):
+            continue
+        await send_admin_alert(chat_id, caption, reply_markup=keyboard)
+
+
+async def _handle_verification_callback(cb_id: str, from_id: int, data: str, chat_id, message_id, msg: dict) -> None:
+    _, action, vid = data.split(":", 2)
+    approve = action == "a"
+    from routers.payments_r import apply_verification_decision
+
+    done = await apply_verification_decision(
+        vid, approve,
+        reason="" if approve else "Selfie'da yuzingiz yoki so'ralgan ishora aniq ko'rinmadi. Qayta urinib ko'ring.",
+        decided_by=f"tg:{from_id}",
+    )
+    verdict = ("✅ TASDIQLANDI" if approve else "❌ RAD ETILDI") if done else "⚠️ Allaqachon ko'rib chiqilgan"
+    await answer_admin_alert_callback(cb_id, verdict)
+    if chat_id and message_id:
+        await edit_admin_alert_caption(chat_id, message_id, (msg.get("caption") or msg.get("text") or "") + f"\n\n{verdict}")
+
+
 async def handle_admin_callback(cb: dict) -> None:
-    """callback_query router for admin inline buttons (mtu:a/r:<id>)."""
+    """callback_query router for admin inline buttons (mtu:a/r:<id>, vrf:a/r:<id>)."""
     cb_id = cb.get("id", "")
     from_id = int(cb.get("from", {}).get("id", 0) or 0)
     data = cb.get("data", "") or ""
@@ -256,10 +312,13 @@ async def handle_admin_callback(cb: dict) -> None:
     chat_id = (msg.get("chat") or {}).get("id")
     message_id = msg.get("message_id")
 
-    if not data.startswith("mtu:"):
+    if not (data.startswith("mtu:") or data.startswith("vrf:")):
         return
     if not await is_admin_tg(from_id):
         await answer_admin_alert_callback(cb_id, "Ruxsat yo'q")
+        return
+    if data.startswith("vrf:"):
+        await _handle_verification_callback(cb_id, from_id, data, chat_id, message_id, msg)
         return
 
     _, action, tid = data.split(":", 2)

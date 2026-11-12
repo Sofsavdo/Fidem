@@ -264,9 +264,22 @@ async def _ai_review_verification(doc: dict) -> None:
             await apply_verification_decision(doc["id"], True, decided_by="ai")
         elif res["verdict"] == "reject" and res["confidence"] >= 80:
             await apply_verification_decision(doc["id"], False, reason=res["reason"], decided_by="ai")
-        # otherwise: stays pending, admin sees the AI hint
+        elif doc.get("kind") == "selfie":
+            # Unclear: a person is waiting to write - ask the admins now.
+            await _alert_admins_selfie(doc, res)
     except Exception:
         log.warning("ai verification review failed", exc_info=True)
+        if doc.get("kind") == "selfie":
+            await _alert_admins_selfie(doc, None)
+
+
+async def _alert_admins_selfie(doc: dict, ai: dict | None) -> None:
+    try:
+        from admin_bot import notify_admins_verification
+
+        await notify_admins_verification(doc, ai)
+    except Exception:
+        log.warning("selfie admin alert failed", exc_info=True)
 
 
 # Live-selfie check: right before the photo the person is asked for a random
@@ -292,7 +305,7 @@ async def selfie_challenge(uid: str = Depends(get_current_user_id)):
 
 @router.post("/verification/request")
 async def request_verification(req: VerificationRequest, request: Request, uid: str = Depends(get_current_user_id)):
-    rate_limit_verification(request)
+    rate_limit_verification(request, uid)
     doc = {
         "id": new_id(),
         "user_id": uid,
@@ -335,7 +348,7 @@ async def my_verifications(uid: str = Depends(get_current_user_id)):
 
 @router.post("/payments/create")
 async def create_payment(req: CreatePaymentRequest, request: Request, uid: str = Depends(get_current_user_id)):
-    rate_limit_payment(request)
+    rate_limit_payment(request, uid)
     # One paid plan (Premium) is on sale. Standard/VIP stay valid for people who
     # already hold them (and admin grants) but can no longer be bought.
     if req.purpose in ("standard", "vip"):
@@ -1083,7 +1096,7 @@ async def manual_topup(
     proof_url: str = Body(..., embed=True),
     uid: str = Depends(get_current_user_id),
 ):
-    rate_limit_payment(request)
+    rate_limit_payment(request, uid)
     cfg = await db.settings.find_one({"id": "topup_config"}) or {}
     if not cfg.get("p2p_enabled"):
         raise HTTPException(400, "p2p_disabled")
