@@ -26,7 +26,8 @@ def db(monkeypatch):
         monkeypatch.setattr(mod, "db", database, raising=False)
     core.reset_promo_cache()
     asyncio.run(database.users.insert_many([
-        {"id": "w", "name": "W", "gender": "female", "plan": "free", "onboarded": True},
+        {"id": "w", "name": "W", "gender": "female", "plan": "free", "onboarded": True, "verified_selfie": True},
+        {"id": "u", "name": "U", "gender": "female", "plan": "free", "onboarded": True},
         {"id": "m", "name": "M", "gender": "male", "plan": "free", "onboarded": True},
     ]))
     yield database
@@ -57,3 +58,12 @@ def test_paid_woman_keeps_her_own_plan(db):
     asyncio.run(db.users.update_one({"id": "w"}, {"$set": {"plan": "premium", "plan_until": "2099-01-01T00:00:00+00:00"}}))
     w = asyncio.run(core.get_user("w"))
     assert w["plan"] == "premium" and "plan_source" not in w
+
+
+def test_unverified_woman_must_pass_selfie_first(db):
+    u = asyncio.run(core.get_user("u"))
+    assert u["plan"] == "free" and u["women_promo"] == "needs_selfie"
+    assert core.selfie_required_to_write(u) is True
+    assert auth_r._build_me_payload(u)["women_promo"] == "needs_selfie"
+    w = asyncio.run(core.get_user("w"))
+    assert core.selfie_required_to_write(w) is False

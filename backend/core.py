@@ -203,14 +203,25 @@ def reset_promo_cache() -> None:
 
 
 def apply_women_free(user: dict, active: bool) -> dict:
-    """Give a woman Premium for this request while the promo is on. The
-    stored plan is untouched: paid_plan keeps the real one for public
-    badges, revenue and referral logic."""
+    """Give a selfie-verified woman Premium for this request while the promo
+    is on. Verification is the price of the free plan: fake "women" (men or
+    scammers behind someone else's photos) cannot pass a live selfie, so the
+    promo never powers them. The stored plan is untouched: paid_plan keeps
+    the real one for public badges, revenue and referral logic."""
     if active and user.get("gender") == "female" and user.get("plan", "free") not in PAID_PLANS:
-        user["paid_plan"] = user.get("plan", "free")
-        user["plan"] = "premium"
-        user["plan_source"] = "women_free"
+        if user.get("verified_selfie"):
+            user["paid_plan"] = user.get("plan", "free")
+            user["plan"] = "premium"
+            user["plan_source"] = "women_free"
+        else:
+            user["women_promo"] = "needs_selfie"
     return user
+
+
+def selfie_required_to_write(user: dict) -> bool:
+    """Women must pass the live selfie check before they can write: almost
+    every scam on dating sites is a fake female profile in the chat."""
+    return user.get("gender") == "female" and not user.get("verified_selfie") and not user.get("is_admin")
 
 
 async def get_user(uid: str) -> dict:

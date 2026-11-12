@@ -52,7 +52,7 @@ a = req("GET", f"/chat/access/{f2}").json(); chk("access says locked + price", a
 r = req("POST", "/saved", k="f0@fidem.uz", json={"user_id": me}); 
 chk("mutual save -> match chat open", req("GET", f"/chat/access/{f0}").json().get("can_message") is True)
 r = req("POST", "/messages/send", json={"to_user_id": f0, "text": "Assalomu alaykum"}); chk("message to match ok", r.status_code == 200, (r.status_code, r.text[:100]))
-r = req("POST", "/messages/send", json={"to_user_id": f0, "text": "yozing telegram @qatester yoki +998901234567"}); chk("free user sharing contact blocked", r.status_code == 403 and "contact_free_blocked" in r.text, (r.status_code, r.text[:100]))
+r = req("POST", "/messages/send", json={"to_user_id": f0, "text": "yozing telegram @qatester yoki +998901234567"}); chk("free user sharing contact blocked", r.status_code == 403 and "contact_use_button" in r.text, (r.status_code, r.text[:100]))
 r = req("POST", "/messages/send", k="f0@fidem.uz", json={"to_user_id": me, "text": "Va alaykum assalom"}); chk("reply from match ok", r.status_code == 200, r.status_code)
 cid = "_".join(sorted([me, f0])); h = req("GET", f"/messages/{cid}").json()
 chk("history has 2 msgs in order", len(h) == 2 and h[0]["text"] == "Assalomu alaykum", [x["text"] for x in h])
@@ -68,7 +68,8 @@ r = req("PATCH", f"/admin/users/{me}", k="ADMIN", json={"add_balance": 200000});
 bal = req("GET", "/auth/me").json().get("balance"); chk("balance 200000", bal == 200000, bal)
 r = req("POST", "/payments/create", json={"purpose": "premium", "amount": 79000, "months": 1}); print("   buy premium w/ balance:", r.status_code, r.text[:160])
 m = req("GET", "/auth/me").json(); chk("plan premium after balance purchase", m.get("plan") == "premium", (m.get("plan"), m.get("balance")))
-r = req("POST", "/messages/send", json={"to_user_id": f2, "text": "salom, telegram @qatester"}); chk("premium user cold message + contact ok", r.status_code == 200, (r.status_code, r.text[:100]))
+r = req("POST", "/messages/send", json={"to_user_id": f2, "text": "salom, telegram @qatester"}); chk("premium user: contact in text also blocked (use the exchange button)", r.status_code == 403 and "contact_use_button" in r.text, (r.status_code, r.text[:100]))
+r = req("POST", "/messages/send", json={"to_user_id": f2, "text": "salom, tanishsak bo'ladimi?"}); chk("premium user cold message ok", r.status_code == 200, (r.status_code, r.text[:100]))
 # ---- PRIVACY
 r = req("POST", "/settings/privacy", json={"hidden_profile": True}); print("   privacy hidden:", r.status_code, r.text[:100])
 c2 = req("GET", "/candidates", k="f3@fidem.uz").json(); chk("hidden user not in others' feed", me not in [x["id"] for x in c2] , len(c2))

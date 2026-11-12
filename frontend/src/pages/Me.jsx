@@ -90,6 +90,9 @@ export default function Me() {
               {user.plan_source === "women_free" && (
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary/15 text-secondary font-semibold" data-testid="women-free-pill">{t("women_free_pill")}</span>
               )}
+              {user.women_promo === "needs_selfie" && (
+                <Link to="/verification" className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-white font-semibold" data-testid="women-selfie-pill">📸 {t("women_selfie_pill")}</Link>
+              )}
               {user.plan !== "free" && user.plan_until && (() => {
                 const daysLeft = Math.max(0, Math.ceil((new Date(user.plan_until) - Date.now()) / 86400000));
                 return (

@@ -250,7 +250,8 @@ async def _ai_review_verification(doc: dict) -> None:
                     pass
         images.append(await _load_image_b64(proof, ""))
 
-        res = await analyze_verification(doc.get("kind", ""), images, has_profile_photo=has_profile)
+        gesture = SELFIE_GESTURES.get(doc.get("gesture") or "", (None, None, None, ""))[3]
+        res = await analyze_verification(doc.get("kind", ""), images, has_profile_photo=has_profile, gesture=gesture)
         await db.verifications.update_one(
             {"id": doc["id"]},
             {"$set": {
@@ -268,6 +269,27 @@ async def _ai_review_verification(doc: dict) -> None:
         log.warning("ai verification review failed", exc_info=True)
 
 
+# Live-selfie check: right before the photo the person is asked for a random
+# hand gesture. A stolen or old picture of someone else cannot show it, so a
+# fake profile behind another woman's photos does not pass.
+SELFIE_GESTURES = {
+    "two_fingers": ("Bir qo'lingiz bilan ✌️ — 2 ta barmoq ko'rsating", "Покажите одной рукой ✌️ — два пальца", "Show ✌️ — two fingers — with one hand", "one hand raised showing exactly two fingers (a V / peace sign)"),
+    "thumbs_up": ("Bosh barmog'ingizni yuqoriga ko'taring 👍", "Поднимите большой палец вверх 👍", "Give a thumbs up 👍", "one hand giving a thumbs-up"),
+    "three_fingers": ("Bir qo'lingiz bilan 3 ta barmoq ko'rsating", "Покажите одной рукой три пальца", "Show three fingers with one hand", "one hand raised showing exactly three fingers"),
+    "palm_cheek": ("Kaftingizni yonog'ingizga qo'ying", "Приложите ладонь к щеке", "Put your palm on your cheek", "one open palm placed against the cheek"),
+    "ok_sign": ("👌 belgisini ko'rsating", "Покажите жест 👌", "Make the 👌 sign", "one hand making the OK sign (thumb and index finger forming a circle)"),
+}
+SELFIE_CHALLENGE_MINUTES = 30
+
+
+@router.get("/verification/selfie-challenge")
+async def selfie_challenge(uid: str = Depends(get_current_user_id)):
+    code = random.choice(list(SELFIE_GESTURES))
+    await db.users.update_one({"id": uid}, {"$set": {"selfie_challenge": {"code": code, "at": iso(now_utc())}}})
+    uz, ru, en, _ = SELFIE_GESTURES[code]
+    return {"code": code, "text_uz": uz, "text_ru": ru, "text_en": en, "valid_minutes": SELFIE_CHALLENGE_MINUTES}
+
+
 @router.post("/verification/request")
 async def request_verification(req: VerificationRequest, request: Request, uid: str = Depends(get_current_user_id)):
     rate_limit_verification(request)
@@ -280,6 +302,15 @@ async def request_verification(req: VerificationRequest, request: Request, uid: 
         "status": "pending",
         "created_at": iso(now_utc()),
     }
+    if req.kind == "selfie":
+        me = await db.users.find_one({"id": uid}, {"_id": 0, "selfie_challenge": 1})
+        ch = (me or {}).get("selfie_challenge") or {}
+        fresh = ch.get("at") and parse_dt(ch["at"]) > now_utc() - timedelta(minutes=SELFIE_CHALLENGE_MINUTES)
+        if not ch.get("code") or not fresh or ch["code"] not in SELFIE_GESTURES:
+            raise HTTPException(400, "challenge_required")
+        doc["gesture"] = ch["code"]
+        doc["gesture_text"] = SELFIE_GESTURES[ch["code"]][0]
+        await db.users.update_one({"id": uid}, {"$unset": {"selfie_challenge": ""}})
     await db.verifications.insert_one(doc)
     # AI reviews in the background - the user gets an instant answer when the
     # model is confident, and the admin queue only holds the unclear cases.

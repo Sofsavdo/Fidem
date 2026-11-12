@@ -157,6 +157,14 @@ export default function Premium() {
             </div>
           )}
 
+          {!womenFree && user?.women_promo === "needs_selfie" && (
+            <Link to="/verification" data-testid="women-needs-selfie" className="block rounded-3xl border-2 border-secondary/50 bg-gradient-to-b from-secondary/15 to-card p-5 space-y-2 active:scale-[0.99] transition">
+              <p className="font-heading text-lg font-semibold">📸 {t("women_selfie_title")}</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">{t("women_selfie_desc")}</p>
+              <span className="inline-block rounded-full bg-primary text-white text-sm font-semibold px-4 py-2">{t("selfie_start")}</span>
+            </Link>
+          )}
+
           {womenFree ? (
             <div className="rounded-3xl border-2 border-secondary/40 bg-gradient-to-b from-secondary/10 to-card p-5 space-y-3" data-testid="women-free-card">
               <p className="font-heading text-xl font-semibold">{t("women_free_title")}</p>

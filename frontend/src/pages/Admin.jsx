@@ -1839,6 +1839,9 @@ function AdminVerifications() {
                   </span>
                 )}
               </p>
+              {v.gesture_text && (
+                <p className="text-xs mt-0.5" data-testid={`adm-verif-gesture-${v.id}`}>✋ So'ralgan ishora: <b>{v.gesture_text}</b> — rasmda bo'lmasa rad eting</p>
+              )}
               {v.note && <p className="text-xs text-muted-foreground mt-0.5">{v.note}</p>}
               <div className="mt-1.5">{aiBadge(v)}</div>
               {v.ai_reason && <p className="text-[11px] text-muted-foreground mt-1 leading-snug">{v.ai_reason}</p>}
@@ -1862,15 +1865,22 @@ function AdminVerifications() {
   );
 }
 
+const REPORT_REASON_UZ = { money_request: "💸 Pul / karta so'radi (avtomatik aniqlandi)" };
+
 function AdminReports() {
   const { data: list = [] } = useAdminReports();
   return (
     <div className="space-y-2" data-testid="admin-reports">
       {list.length === 0 && <p className="text-sm text-muted-foreground">Shikoyatlar yo'q</p>}
+      <p className="text-[11px] text-muted-foreground">2 xil odam shikoyat qilsa yoki 3 marta pul so'ralsa, profil avtomatik yashiriladi. Foydalanuvchi kartasidan «Yashirishni bekor qilish» bilan qaytarasiz.</p>
       {list.map((r) => (
-        <div key={r.id} className="rounded-2xl bg-card border border-border p-3">
-          <p className="text-sm">{r.reason}</p>
-          <p className="text-xs text-muted-foreground">From {r.reporter_id?.slice(0, 8)} → {r.target_id?.slice(0, 8)}</p>
+        <div key={r.id} className={`rounded-2xl bg-card border p-3 ${r.reason === "money_request" ? "border-rose-300" : "border-border"}`} data-testid={`adm-report-${r.id}`}>
+          <p className="text-sm font-medium">{REPORT_REASON_UZ[r.reason] || r.reason}</p>
+          {r.details && <p className="text-xs mt-0.5 bg-muted rounded-lg px-2 py-1">«{r.details}»</p>}
+          <p className="text-xs text-muted-foreground mt-1">
+            {r.reporter_id === "system" ? "Avtomatik (tizim)" : `Kimdan: ${r.reporter_id?.slice(0, 8)}`} → {r.target_id?.slice(0, 8)}
+            {r.created_at && ` · ${new Date(r.created_at).toLocaleString()}`}
+          </p>
         </div>
       ))}
     </div>
