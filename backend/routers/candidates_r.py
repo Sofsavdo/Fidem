@@ -6,7 +6,7 @@ import random
 from datetime import timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 
 from auth import get_current_user_id
 from guest import require_onboarded
@@ -16,6 +16,9 @@ from models import PhotoUnlockDecision, PhotoUnlockRequest, SaveRequest, new_id
 from services import age_from_birth, compute_match
 
 router = APIRouter(tags=["candidates"])
+
+FEED_POOL = 400    # people ranked per request (cut before ranking: boosted, then most recently active)
+MAX_PAGE = 60      # biggest page a client may ask for
 
 
 def compute_ai_match(viewer: dict, candidate: dict, lang: str = "uz") -> tuple[int, list[str]]:
@@ -151,8 +154,15 @@ async def candidates(
     max_distance_km: Optional[int] = None,
     sort: str = "match",
     limit: int = 30,
+    offset: int = 0,
+    response: Response = None,
     uid: str = Depends(get_current_user_id),
 ):
+    # Paged: the feed is ranked once per request over a pool of FEED_POOL
+    # people and `offset`/`limit` cut a page out of that order. (It used to
+    # return the first 30 and nothing else, with no way to ask for more.)
+    limit = max(1, min(int(limit), MAX_PAGE))
+    offset = max(0, int(offset))
     me_doc = await get_user(uid)
     match_lang = me_doc.get("language", "uz")
     if match_lang not in ("uz", "ru", "en"):
@@ -252,8 +262,14 @@ async def candidates(
     except Exception:
         pass
 
-    cursor = db.users.find(query, {"_id": 0, "password_hash": 0}).limit(200)
-    docs = await cursor.to_list(length=200)
+    # The pool is cut BEFORE ranking, so it must hold the people who would rank
+    # first anyway: boosted profiles, then the most recently active. (It used
+    # to be the first 200 in database order, so with more candidates than that
+    # boosts and same-region ranking silently stopped working.)
+    cursor = db.users.find(query, {"_id": 0, "password_hash": 0}).sort(
+        [("boost_until", -1), ("last_active", -1)]
+    ).limit(FEED_POOL)
+    docs = await cursor.to_list(length=FEED_POOL)
 
     unlocked_set = {p["target_id"] for p in photo_unlocks}
 
@@ -352,12 +368,15 @@ async def candidates(
         # Genuinely new profiles (signup date), not merely recently active.
         enriched.sort(key=lambda x: docs_by_id.get(x["id"], {}).get("created_at", ""), reverse=True)
 
-    result = enriched[:limit]
+    if response is not None:
+        # "400+" once the pool is full: more people match than we rank.
+        response.headers["X-Total-Count"] = f"{len(enriched)}+" if len(docs) >= FEED_POOL else str(len(enriched))
+    result = enriched[offset:offset + limit]
     if guest:
         from guest import lock_photos, open_ids
         allowed = await open_ids(me_doc, [x["id"] for x in result])
         result = [x if x["id"] in allowed else lock_photos(x) for x in result]
-    if not result:
+    if not result and offset == 0:
         log.info(
             "feed empty: viewer=%s photo=%s matched=%d (gender=%s age=%s-%s region=%s) kept=%d",
             uid[:8], photo_kind(me_doc), len(docs), query.get("gender"), a_lo, a_hi, query.get("region"), len(enriched),

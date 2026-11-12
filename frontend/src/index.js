@@ -130,7 +130,15 @@ const Providers = persister
         maxAge: PERSIST_MAX_AGE,
         dehydrateOptions: {
           // Never persist admin-only data to a device's local storage.
-          shouldDehydrateQuery: (query) => query.queryKey[0] !== "admin",
+          shouldDehydrateQuery: (query) => {
+            if (query.queryKey[0] === "admin") return false;
+            // A feed scrolled through many pages is not worth the storage
+            // quota; the first page is what a relaunch paints instantly.
+            if (query.queryKey[0] === "candidates" && query.queryKey[1] === "feed") {
+              return query.state.status === "success" && (query.state.data?.pages?.length || 0) <= 1;
+            }
+            return true;
+          },
         },
       }}
     >
