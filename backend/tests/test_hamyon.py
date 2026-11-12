@@ -216,3 +216,44 @@ def test_background_reconcile_settles_a_lost_callback(env):
     assert _user(db)["plan"] == "premium" and _pay(db, pay["id"])["status"] == "success"
     # nothing left to do on the next pass
     assert asyncio.run(payments_r.reconcile_open_hamyon_payments()) == 0
+
+
+def test_premium_periods_by_days(env):
+    client, db, calls = env
+    cfg = client.get("/api/payments/topup-config").json()
+    assert cfg["premium_periods"] == {"1": 9900, "15": 49900, "30": 79000}
+    pay = client.post("/api/payments/create", json={"purpose": "premium", "days": 1}).json()
+    assert pay["pay_amount"] == 9900
+    _complete(client, pay)
+    u = _user(db)
+    left = core.parse_dt(u["plan_until"]) - core.now_utc()
+    assert u["plan"] == "premium" and 0.9 < left.total_seconds() / 86400 <= 1.01
+    pay15 = client.post("/api/payments/create", json={"purpose": "premium", "days": 15}).json()
+    assert pay15["pay_amount"] == 49900
+    _complete(client, pay15)
+    left = core.parse_dt(_user(db)["plan_until"]) - core.now_utc()
+    assert 15.9 < left.total_seconds() / 86400 <= 16.01   # 1 day left + 15 days
+
+
+def test_referral_reward_for_a_young_inviter_once(env):
+    client, db, calls = env
+    from datetime import timedelta
+    five_days = core.iso(core.now_utc() - timedelta(days=5))
+    asyncio.run(db.users.insert_one({"id": "inv", "name": "I", "plan": "free", "referral_id": "INV1", "created_at": five_days}))
+    asyncio.run(db.users.update_one({"id": "u1"}, {"$set": {"referred_by": "INV1"}}))
+    pay = client.post("/api/payments/create", json={"purpose": "premium", "days": 1}).json()
+    _complete(client, pay)
+    inv = _user(db, "inv")
+    assert inv["referral_earnings_pending"] == 4950          # 50% of 9,900
+    assert _user(db)["first_paid_at"]
+    # a renewal pays nothing more
+    pay2 = client.post("/api/payments/create", json={"purpose": "premium", "days": 15}).json()
+    _complete(client, pay2)
+    assert _user(db, "inv")["referral_earnings_pending"] == 4950
+
+
+def test_first_paid_is_marked_without_a_referrer(env):
+    client, db, calls = env
+    pay = client.post("/api/payments/create", json={"purpose": "premium", "days": 1}).json()
+    _complete(client, pay)
+    assert _user(db).get("first_paid_at")

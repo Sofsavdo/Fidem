@@ -228,6 +228,8 @@ class CreatePaymentRequest(BaseModel):
     # Subscription purchases only (premium/standard/vip): 1/3/12-month plans,
     # 3 and 12 months priced at a discount vs. months * the 1-month rate.
     months: Literal[1, 3, 12] = 1
+    # Premium periods in days (1 / 15 / 30) - takes precedence over months.
+    days: Optional[Literal[1, 15, 30]] = None
 
 
 class PaymentOut(BaseModel):

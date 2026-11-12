@@ -1,50 +1,27 @@
-// One-tap plan activation. Every plan-specific upsell button (privacy
-// center, who-viewed promo, profile tier hint, chat paywall, ...) charges
-// through here directly instead of dumping the user onto the generic plans
-// page — an extra navigation step measurably kills purchase intent.
-import api from "@/lib/api";
-import { toast } from "sonner";
-import { startPayment, payErrorText } from "@/lib/payFlow";
+// Premium purchase entry point. Every upsell (who liked me, chat paywall,
+// filters, privacy...) opens the same quick picker sheet
+// (components/PremiumPicker) where the person chooses 1 day / 15 days /
+// 1 month and pays without leaving the screen they were on.
 
-export const PLAN_PRICES = { standard: 34900, premium: 79000, vip: 199000 };
+export const PICKER_EVENT = "fidem:premium-picker";
+
+// Mirrors backend core.PREMIUM_PERIODS (days -> so'm); the server's numbers
+// from /payments/topup-config win when loaded.
+export const PREMIUM_PERIODS_DEFAULT = { 1: 9900, 15: 49900, 30: 79000 };
+
+// Kept for screens that show a monthly reference price.
+export const PLAN_PRICES = { standard: 34900, premium: PREMIUM_PERIODS_DEFAULT[30], vip: 199000 };
 
 // Tier order used to tell whether a plan is already covered by the user's
-// current one — VIP is a superset of Premium which is a superset of
-// Standard, so a VIP user must never be offered a "buy" button for Premium
-// as if they still needed it.
+// current one (VIP includes Premium includes Standard).
 export const PLAN_RANK = { free: 0, standard: 1, premium: 2, vip: 3 };
 
-let inFlight = false;
-
 /**
- * Start a plan purchase immediately (balance-first, CLICK for remainder).
- * opts: { t, navigate, onPaid } — navigate is used for the P2P fallback,
- * onPaid runs after an instant balance-funded activation (refresh user).
+ * Open the Premium picker. opts: { onPaid, source, reason } - onPaid runs
+ * after an instant balance-funded activation (a card payment is followed by
+ * the pay sheet, which refreshes the account itself).
  */
-export async function purchasePlan(plan, { t, navigate, onPaid } = {}) {
-  if (inFlight || !PLAN_PRICES[plan]) return false;
-  inFlight = true;
-  try {
-    const r = await api.post("/payments/create", { purpose: plan, amount: PLAN_PRICES[plan] });
-    if (r.data?.status === "paid") {
-      toast.success(t ? t("payment_success") : "OK");
-      if (onPaid) await onPaid();
-      return true;
-    }
-    return startPayment(r.data, t);
-  } catch (e) {
-    const detail = (e?.response?.data?.detail || "").toString();
-    if (detail === "click_disabled") {
-      if (t) toast.info(t("click_disabled_error"));
-      // Carry the exact price over so the P2P top-up screen pre-fills the
-      // right amount instead of defaulting to an unrelated package size -
-      // the user shouldn't have to remember/re-enter what they were buying.
-      if (navigate) navigate(`/premium?tab=balance&amount=${PLAN_PRICES[plan]}`);
-    } else if (t) {
-      toast.error(payErrorText(detail, t) || t("error_generic"));
-    }
-    return false;
-  } finally {
-    inFlight = false;
-  }
+export function purchasePlan(plan = "premium", { onPaid, source, reason } = {}) {
+  window.dispatchEvent(new CustomEvent(PICKER_EVENT, { detail: { plan, onPaid, source, reason } }));
+  return true;
 }

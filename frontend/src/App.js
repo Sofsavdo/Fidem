@@ -7,6 +7,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import ScrollToTop from "@/components/ScrollToTop";
 import PhotoRequired from "@/components/PhotoRequired";
 import PayTransferSheet from "@/components/PayTransferSheet";
+import PremiumPicker from "@/components/PremiumPicker";
 import BrandSplash from "@/components/BrandSplash";
 import { applyTheme, getTheme } from "@/lib/theme";
 
@@ -249,6 +250,7 @@ export default function App() {
           <Toaster position="top-center" richColors visibleToasts={2} duration={2000} expand={false} gap={8} />
           <Inner />
           <PayTransferSheet />
+          <PremiumPicker />
         </BrowserRouter>
       </AppProvider>
     </ErrorBoundary>

@@ -335,6 +335,28 @@ def detect_contact_info(text: str) -> bool:
     return bool(_CONTACT_RE.search((text or "").lower()))
 
 
+# Requests for money / card details: the classic dating-site scam ("I need
+# money for a ticket", "send it to my card"). A 16-digit card number in any
+# grouping, or a money verb next to a transfer word, in uz / ru / en.
+_MONEY_PATTERNS = [
+    r"(?<!\d)(?:\d[\s\-]?){15}\d(?!\d)",                                  # card number
+    r"\bkarta\w*\s*(?:raqam|nomer)\w*", r"\bkartam\w*\s*ga\b|\bkartamga\b",
+    r"\bpul\w*\s*(?:o[':’ʻ`]?tkaz|tashla|yubor|jo[':’ʻ`]?nat|ber(?:ing|asizmi|ib))\w*",
+    r"\b(?:o[':’ʻ`]?tkazib|tashlab|yuborib)\s*(?:bering|yuboring|qo[':’ʻ`]?ying)\b.*\b(?:pul|so[':’ʻ`]?m|karta)",
+    r"\bqarz\w*\s*(?:ber|bering|kerak|so[':’ʻ`]?ra)",
+    r"\b(?:click|payme|paynet|uzum\s*bank)\w*\s*(?:ga|orqali)?\s*(?:tashla|o[':’ʻ`]?tkaz|yubor)",
+    r"номер\w*\s+карт\w*", r"\bна\s+карт\w*", r"(?:перевед|скинь|скиньте|отправ)\w*\s+(?:мне\s+)?(?:деньг|денег|сумм|\d)",
+    r"\bв\s+долг\b|\bзайми\w*|\bодолж\w*",
+    r"\bcard\s*number\b|\bsend\s+(?:me\s+)?money\b|\bwire\s+(?:me|the)\b|\blend\s+me\b",
+]
+_MONEY_RE = re.compile("|".join(f"(?:{p})" for p in _MONEY_PATTERNS), re.IGNORECASE)
+
+
+def detect_money_request(text: str) -> bool:
+    """True when a chat message asks for money or card details."""
+    return bool(_MONEY_RE.search((text or "").lower()))
+
+
 def quick_moderation(text: str) -> tuple[bool, str]:
     t = (text or "").lower()
 
@@ -741,7 +763,7 @@ _VERIF_SCHEMA_GEMINI = {
 }
 
 
-async def analyze_verification(kind: str, images: list[tuple[str, str]], has_profile_photo: bool = False) -> dict:
+async def analyze_verification(kind: str, images: list[tuple[str, str]], has_profile_photo: bool = False, gesture: str = "") -> dict:
     """AI review of a verification submission.
 
     images: [(media_type, b64), ...] - for selfies, the user's profile photo
@@ -755,6 +777,13 @@ async def analyze_verification(kind: str, images: list[tuple[str, str]], has_pro
         profile_hint="Image 1 is their existing profile photo; image 2 is the new verification selfie. " if has_profile_photo else "",
         match_clause=" AND clearly the same person as the profile photo" if has_profile_photo else "",
     ) if kind == "selfie" else prompt_tpl
+    if kind == "selfie" and gesture:
+        # A random hand gesture asked right before the photo: an old or
+        # stolen picture of someone else cannot show it.
+        prompt += (
+            f" The person was asked to make this exact hand gesture in the selfie: {gesture}. "
+            "If that gesture is not clearly visible, verdict must be reject."
+        )
 
     if GEMINI_API_KEY:
         try:

@@ -32,6 +32,13 @@ def mk(email, name, gender, i, pw="QaPass#2026"):
 mk("qa@fidem.uz", "QA Tester", "male", 3)
 for i, n in enumerate(f_names): mk(f"f{i}@fidem.uz", n, "female", i + 1)
 for i, n in enumerate(m_names): mk(f"m{i}@fidem.uz", n, "male", i + 2)
+# Women write only after the live selfie check: verify f0..f4 the way the
+# admin would; f5/f6 stay unverified for the safety tests (qa/safety.py).
+_adm = httpx.post(f"{B}/auth/login", json=dict(email="admin@fidem.uz", password="AdminQa#2026"), timeout=30).json()["token"]
+for i in range(5):
+    uid = out.get(f"f{i}@fidem.uz", {}).get("id")
+    if uid:
+        httpx.patch(f"{B}/admin/users/{uid}", json={"verified_selfie": True}, headers={"Authorization": f"Bearer {_adm}"}, timeout=30).raise_for_status()
 # a brand new user who has NOT onboarded (for the onboarding flow)
 r = httpx.post(f"{B}/auth/register", json=dict(email="new@fidem.uz", password="QaPass#2026", name="Yangi"), timeout=30); r.raise_for_status()
 json.dump(out, open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "users.json"), "w"), indent=1)

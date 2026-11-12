@@ -7,7 +7,8 @@ import GiftModal from "@/components/GiftModal";
 import GiftCelebration, { tierFromPrice } from "@/components/GiftCelebration";
 import { giftGradient } from "@/lib/giftVisuals";
 import ChatVoiceRecorder from "@/components/ChatVoiceRecorder";
-import { ArrowLeft, Send, Gift, MoreVertical, Ban, Flag, Play, Check, CheckCheck, Contact, AlertTriangle, X } from "lucide-react";
+import { ArrowLeft, Send, Gift, MoreVertical, Ban, Flag, Play, Check, CheckCheck, Contact, ShieldAlert } from "lucide-react";
+import { useContactExchange, ExchangePanel, IncomingExchange, AcceptedContacts } from "@/components/ContactExchange";
 import { photoSrc } from "@/lib/photo";
 import { formatLastActive } from "@/lib/time";
 import { tapLight } from "@/lib/haptics";
@@ -15,12 +16,12 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { QK, usePaymentConfig } from "@/hooks/queries";
 import { startPayment, payErrorText, onPaid } from "@/lib/payFlow";
-import { PLAN_PRICES } from "@/lib/purchase";
+import { purchasePlan, PREMIUM_PERIODS_DEFAULT } from "@/lib/purchase";
 import { FEATURES } from "@/lib/features";
 
 // Mirrors the Standard plan price in Premium.jsx — shown next to the one-time
 // unlock so the user can compare "pay once" vs "unlimited messaging".
-const STANDARD_PRICE = PLAN_PRICES.premium; // the single paid plan on sale
+const PREMIUM_FROM = PREMIUM_PERIODS_DEFAULT[1]; // cheapest Premium period (1 day)
 
 function formatMsgTime(iso) {
   try {
@@ -137,33 +138,12 @@ export default function Chat() {
     else unlockChat("click");
   };
 
-  // Subscribe straight from chat: create the Standard payment and open CLICK,
-  // instead of bouncing to the plans page to pick again.
-  const subscribeStandard = async () => {
+  // Premium from the chat paywall: the quick picker (1 day / 15 days / month).
+  const subscribeStandard = () => {
     if (unlocking) return;
-    setUnlocking(true);
-    try {
-      const r = await api.post("/payments/create", { purpose: "premium", amount: STANDARD_PRICE });
-      if (r.data?.status === "paid") {
-        toast.success(t("payment_success"));
-        await refreshAccess();
-      } else {
-        startPayment(r.data, t);
-      }
-    } catch (err) {
-      const detail = (err?.response?.data?.detail || "").toString();
-      if (detail === "click_disabled") {
-        toast.info(t("click_disabled_error"));
-        nav(`/premium?tab=balance&amount=${STANDARD_PRICE}`);
-      } else {
-        toast.error(payErrorText(detail, t) || t("error_generic"));
-      }
-    } finally {
-      setUnlocking(false);
-    }
+    purchasePlan("premium", { source: "chat", reason: t("chat_unlimited_desc"), onPaid: refreshAccess });
   };
 
-  // A card-transfer payment confirmed in the pay sheet: reopen the chat state.
   useEffect(() => onPaid(() => { refreshAccess(); }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [otherId]);
@@ -225,26 +205,32 @@ export default function Chat() {
   }, [messages.length]);
 
   // Off-platform contact detection (mirrors backend detect_contact_info).
-  // Free plan: sharing contacts is a paid perk — blocked with an upsell.
-  // Paid plans: allowed, but a compact confirm bar appears first so nobody
-  // leaks their phone number with an accidental Enter.
+  // Phone / Telegram / Instagram in a message is blocked for everyone; the
+  // contact-exchange panel (both selfie-verified, real conversation, consent)
+  // is the only way to swap contacts. Checking here keeps the typed text.
   const CONTACT_RE = /(\+?998[\s-]?\d{2}[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2})|(\d{2}[\s-]\d{3}[\s-]\d{2}[\s-]\d{2})|(\d{9,12})|(t\.me\/|telegram\.me\/|wa\.me\/|instagram\.com\/)|(@[a-z0-9_.]{4,})|(telegram)|(\btg\b)|(insta)|(whats?app)|(vatsap)|(viber)|(\bimo\b)|(raqam\w*\s*(ber|yubor|yoz|tashla))|(nomer)|(телефон)|(номер)|(телеграм)|(инстаграм)|(ватсап)|((?:\b(?:nol|bir|ikki|uch|to['’ʻ`]?rt|besh|olti|yetti|sakkiz|to['’ʻ`]?qqiz|o['’ʻ`]?n|yigirma|o['’ʻ`]?ttiz|qirq|ellik|oltmish|yetmish|sakson|to['’ʻ`]?qson|yuz)\b[\s,.-]*){4,})|((?:\b(?:ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто)\b[\s,.-]*){4,})/i;
-  const [contactConfirm, setContactConfirm] = useState(null); // text awaiting confirm
   const [shareOpen, setShareOpen] = useState(false);
-  const isPaidPlan = ["standard", "premium", "vip"].includes(user?.plan);
+  const { state: cx, reload: reloadCx } = useContactExchange(otherId);
+  // Women write only after the live selfie check (fake female profiles).
+  const needsSelfie = user?.gender === "female" && !user?.verified_selfie && !user?.is_admin;
+  const openExchange = () => { setShareOpen(true); reloadCx(true); };
+  useEffect(() => {
+    if (cx?.status !== "accepted") reloadCx();
+  }, [messages.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const send = async (txt, opts = {}) => {
+  const send = async (txt) => {
     const finalText = txt ?? text;
     if (!finalText.trim()) return;
     // Enter key-repeat / double tap can fire a second send before React has
     // re-rendered with the cleared input - a ref blocks that window.
     if (sendLockRef.current) return;
-    if (!opts.skipContactCheck && CONTACT_RE.test(finalText)) {
-      if (!isPaidPlan) {
-        toast.error(t("contact_free_blocked_error"));
-        return;
-      }
-      setContactConfirm(finalText);
+    if (needsSelfie) {
+      toast.error(t("selfie_required_error"), { action: { label: t("selfie_start"), onClick: () => nav("/verification") } });
+      return;
+    }
+    if (CONTACT_RE.test(finalText)) {
+      toast.error(t("contact_use_button_error"));
+      openExchange();
       return;
     }
     tapLight();
@@ -282,35 +268,26 @@ export default function Chat() {
       const detail = (e.response?.data?.detail || "").toString();
       // Never show a raw backend code to the user.
       const known = {
-        contact_free_blocked: "contact_free_blocked_error",
+        contact_use_button: "contact_use_button_error",
+        money_request_blocked: "money_request_blocked_error",
+        selfie_required: "selfie_required_error",
+        photo_required: "photo_required_error",
         message_too_long: "msg_too_long_error",
         empty_message: "msg_empty_error",
         blocked: "msg_blocked_error",
         muted: "msg_muted_error",
       };
-      toast.error(t(known[detail] || "error_generic"));
+      if (detail === "selfie_required") {
+        toast.error(t("selfie_required_error"), { action: { label: t("selfie_start"), onClick: () => nav("/verification") } });
+      } else {
+        toast.error(t(known[detail] || "error_generic"));
+      }
       setMessages((prev) => prev.filter((m) => m.id !== tempMsg.id));
-      // Give the text back so a too-long message can be shortened, not retyped.
-      if (detail === "message_too_long") setText(finalText);
+      // Give the text back so it can be fixed, not retyped.
+      if (detail === "message_too_long" || detail === "contact_use_button") setText(finalText);
+      if (detail === "contact_use_button") openExchange();
       load();
     } finally { sendLockRef.current = false; setSending(false); }
-  };
-
-  // "Share my contact" — composes a message from the contacts saved in
-  // Sozlamalar (phone / telegram / instagram) and sends it through the same
-  // confirm flow.
-  const savedContacts = [
-    user?.contact_phone && `📞 ${user.contact_phone}`,
-    user?.contact_telegram && `Telegram: @${String(user.contact_telegram).replace(/^@/, "")}`,
-    user?.contact_instagram && `Instagram: @${String(user.contact_instagram).replace(/^@/, "")}`,
-  ].filter(Boolean);
-  const shareContacts = () => {
-    if (!isPaidPlan) {
-      toast.error(t("contact_free_blocked_error"));
-      return;
-    }
-    setShareOpen(false);
-    setContactConfirm(savedContacts.join(" · "));
   };
 
   const sendVoice = async ({ voice_url, voice_duration }) => {
@@ -422,6 +399,9 @@ export default function Chat() {
             {loadingOlder ? "⏳ ..." : "← Eski xabarlar"}
           </button>
         )}
+        <p data-testid="chat-safety" className="self-center max-w-[92%] text-center text-[11px] text-muted-foreground bg-muted/60 rounded-full px-3 py-1 inline-flex items-center gap-1">
+          <ShieldAlert className="w-3 h-3 shrink-0" /> {t("chat_safety_line")}
+        </p>
         {messages.length === 0 && (
           <div className="text-center py-12 text-muted-foreground text-sm">
             👋
@@ -567,7 +547,7 @@ export default function Chat() {
                   <span className="absolute -top-2 right-2 rounded-full bg-primary text-white text-[8px] font-bold px-1.5 py-0.5 uppercase tracking-wide">{t("best_value")}</span>
                   <p className="text-[10px] uppercase tracking-wide text-primary font-semibold">Premium</p>
                   <p className="font-heading text-lg font-bold tabular-nums leading-tight mt-0.5">
-                    {STANDARD_PRICE.toLocaleString()}<span className="text-[10px] font-medium opacity-60"> {t("sum")}{t("plan_per_month")}</span>
+                    <span className="text-sm">{t("price_per_day_from").replace("{price}", PREMIUM_FROM.toLocaleString())}</span>
                   </p>
                   <p className="text-[10px] text-secondary mt-0.5 leading-tight font-medium">{t("chat_unlimited_desc")}</p>
                   <span className="mt-2 block text-center rounded-lg bg-primary text-white text-xs py-1.5 font-semibold">{t("pay_with_click")}</span>
@@ -583,36 +563,13 @@ export default function Chat() {
           {access?.uses_free_weekly && (
             <p data-testid="chat-free-weekly-hint" className="text-[11px] text-secondary text-center">{t("chat_free_weekly_hint")}</p>
           )}
-          {/* Contact-share confirm — compact one-liner, never covers the chat */}
-          {contactConfirm && (
-            <div data-testid="contact-confirm" className="flex items-center gap-2 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 px-3 py-2">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-              <p className="text-[11px] text-amber-800 dark:text-amber-300 flex-1 min-w-0 truncate">{t("contact_confirm_hint")}</p>
-              <button
-                data-testid="contact-confirm-send"
-                onClick={() => { const msg = contactConfirm; setContactConfirm(null); setText(""); send(msg, { skipContactCheck: true }); }}
-                className="shrink-0 rounded-full bg-amber-600 text-white text-[11px] font-semibold px-3 py-1"
-              >
-                {t("send")}
-              </button>
-              <button data-testid="contact-confirm-cancel" onClick={() => setContactConfirm(null)} className="shrink-0 p-1 rounded-full hover:bg-amber-100 dark:hover:bg-amber-900">
-                <X className="w-3.5 h-3.5 text-amber-700" />
-              </button>
-            </div>
-          )}
-          {/* Contact-share sheet — compact */}
-          {shareOpen && (
-            <div data-testid="contact-share-panel" className="flex items-center gap-2 rounded-2xl bg-card border border-border px-3 py-2">
-              {savedContacts.length > 0 ? (
-                <>
-                  <p className="text-[11px] text-muted-foreground flex-1 min-w-0 truncate">{savedContacts.join(" · ")}</p>
-                  <button data-testid="contact-share-send" onClick={shareContacts} className="shrink-0 rounded-full bg-primary text-white text-[11px] font-semibold px-3 py-1">{t("contact_share_cta")}</button>
-                </>
-              ) : (
-                <Link to="/me/settings" className="text-[11px] text-primary underline flex-1">{t("contact_share_empty")}</Link>
-              )}
-              <button onClick={() => setShareOpen(false)} className="shrink-0 p-1 rounded-full hover:bg-muted"><X className="w-3.5 h-3.5" /></button>
-            </div>
+          <IncomingExchange state={cx} otherId={otherId} otherName={other.name} onAnswered={() => reloadCx(true)} />
+          {!shareOpen && <AcceptedContacts state={cx} />}
+          {shareOpen && <ExchangePanel state={cx} otherId={otherId} onClose={() => setShareOpen(false)} onChanged={() => reloadCx(true)} />}
+          {needsSelfie && (
+            <Link to="/verification" data-testid="chat-selfie-gate" className="block rounded-2xl border border-secondary/40 bg-secondary/10 px-3 py-2 text-xs">
+              📸 {t("selfie_required_error")} <span className="underline font-medium">{t("selfie_start")}</span>
+            </Link>
           )}
           {/* Always-visible message composer (disabled when locked) */}
           <div className="flex items-end gap-1.5 min-w-0">
@@ -623,10 +580,10 @@ export default function Chat() {
             )}
             <button
               data-testid="contact-share-open"
-              onClick={() => { setShareOpen((v) => !v); setContactConfirm(null); }}
+              onClick={() => (shareOpen ? setShareOpen(false) : openExchange())}
               disabled={access?.requires_unlock}
               className="shrink-0 w-10 h-10 grid place-items-center rounded-full bg-muted hover:bg-border disabled:opacity-40"
-              title={t("contact_share_cta")}
+              title={t("cx_request")}
             >
               <Contact className="w-4 h-4" />
             </button>

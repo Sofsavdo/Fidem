@@ -209,13 +209,16 @@ async def _handle_start(chat_id: int, tg_user_id: str, text: str) -> None:
 
     webapp_url = get_webapp_url()
 
+    from core import women_free_active
+    promo_line = "🎁 Ayollar uchun Premium hozir bepul\n\n" if await women_free_active() else ""
     reply = (
         "💖 FIDEM\n\n"
         "Jiddiy munosabat va oila qurish uchun platforma.\n\n"
-        "✅ Mos nomzodlar\n"
-        "✅ Xavfsiz chat\n"
-        "✅ Premium imkoniyatlar\n"
-        "✅ Telegram ichida ishlaydi\n\n"
+        "✅ Tekshirilgan, jiddiy niyatli nomzodlar\n"
+        "✅ Xavfsiz chat, yopiq rasmlar\n"
+        "✅ Oilaviy aloqa — ota-onalar ham ishtirok etadi\n"
+        "✅ Telegram ichida, o'rnatish shart emas\n\n"
+        + promo_line +
         "👇 Ilovani ochish uchun tugmani bosing"
     )
 

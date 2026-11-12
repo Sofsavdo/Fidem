@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
 
 from auth import decode_token, get_current_user_id
-from ai_service import detect_contact_info, quick_moderation
+from ai_service import detect_contact_info, detect_money_request, quick_moderation
 from core import (
     CHAT_GUARANTEE_HOURS,
     CHAT_UNLOCK_COINS,
@@ -19,6 +19,7 @@ from core import (
     db,
     get_user,
     photo_required_missing,
+    selfie_required_to_write,
     iso,
     log,
     manager,
@@ -443,6 +444,8 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
         raise HTTPException(403, "muted")
     if photo_required_missing(sender_doc):
         raise HTTPException(403, "photo_required")
+    if selfie_required_to_write(sender_doc):
+        raise HTTPException(403, "selfie_required")
     if not await can_initiate_chat(sender_doc, req.to_user_id):
         # Free-weekly allowance: a free user may open a limited number of new
         # conversations per week. Consume atomically, then record a free unlock
@@ -475,12 +478,17 @@ async def send_message(req: SendMessageRequest, uid: str = Depends(get_current_u
         ok, reason = quick_moderation(sanitized_text)
         if not ok:
             raise HTTPException(422, reason)
-        # Off-platform contact exchange (phone / telegram / instagram / ...):
-        # a paid perk. Free senders are refused with a code the frontend
-        # turns into an upsell ("aloqa almashish pullik tariflarda"); paid
-        # senders pass - the frontend already asked them to confirm.
-        if detect_contact_info(sanitized_text) and sender_doc.get("plan", "free") not in PAID_PLANS:
-            raise HTTPException(403, "contact_free_blocked")
+        # Asking for money / card details is the classic scam: blocked for
+        # everyone and flagged for the admin.
+        if detect_money_request(sanitized_text):
+            await _flag_money_request(uid, req.to_user_id, sanitized_text)
+            raise HTTPException(422, "money_request_blocked")
+        # Phone / Telegram / Instagram in the text is blocked for everyone:
+        # contacts are exchanged only through the consent button
+        # (/chat/contact-exchange), after a real conversation, between two
+        # selfie-verified people.
+        if detect_contact_info(sanitized_text):
+            raise HTTPException(403, "contact_use_button")
         req.text = sanitized_text
 
     sender = sender_doc
@@ -590,8 +598,42 @@ async def block_user(req: SaveRequest, uid: str = Depends(get_current_user_id)):
     return {"ok": True}
 
 
+# Two different people reporting the same profile hide it from the feed
+# until the admin looks (shadow ban with a reason; "unshadow_ban" restores).
+REPORTS_TO_HIDE = 2
+MONEY_FLAGS_TO_HIDE = 3
+
+
+async def _hide_for_review(target_id: str, reason: str) -> None:
+    res = await db.users.update_one(
+        {"id": target_id, "shadow_banned": {"$ne": True}, "is_admin": {"$ne": True}},
+        {"$set": {"shadow_banned": True, "shadow_ban_reason": reason, "shadow_banned_at": iso(now_utc())}},
+    )
+    if res.modified_count:
+        log.info("profile %s hidden for review (%s)", target_id, reason)
+
+
+async def _flag_money_request(uid: str, to_user_id: str, text: str) -> None:
+    await db.reports.insert_one({
+        "id": new_id(),
+        "reporter_id": "system",
+        "target_id": uid,
+        "reason": "money_request",
+        "details": text[:300],
+        "to_user_id": to_user_id,
+        "created_at": iso(now_utc()),
+        "status": "open",
+    })
+    await db.users.update_one({"id": uid}, {"$inc": {"money_request_flags": 1}})
+    doc = await db.users.find_one({"id": uid}, {"_id": 0, "money_request_flags": 1})
+    if (doc or {}).get("money_request_flags", 0) >= MONEY_FLAGS_TO_HIDE:
+        await _hide_for_review(uid, "money_requests")
+
+
 @router.post("/messages/report")
 async def report_user(req: ReportRequest, uid: str = Depends(get_current_user_id)):
+    if req.user_id == uid:
+        raise HTTPException(400, "cannot_report_self")
     await db.reports.insert_one({
         "id": new_id(),
         "reporter_id": uid,
@@ -600,7 +642,105 @@ async def report_user(req: ReportRequest, uid: str = Depends(get_current_user_id
         "created_at": iso(now_utc()),
         "status": "open",
     })
+    reporters = await db.reports.distinct(
+        "reporter_id", {"target_id": req.user_id, "status": "open", "reporter_id": {"$ne": "system"}},
+    )
+    if len(reporters) >= REPORTS_TO_HIDE:
+        await _hide_for_review(req.user_id, "reports")
     return {"ok": True}
+
+
+# ---------- Contact exchange (the only sanctioned way off the app) ----------
+CONTACT_MIN_MESSAGES = 10   # from EACH side before contacts can be exchanged
+
+
+def _contacts_of(u: dict) -> dict:
+    tg = (u.get("contact_telegram") or u.get("telegram_username") or "").strip().lstrip("@")
+    out = {}
+    if tg:
+        out["telegram"] = tg
+    if (u.get("contact_phone") or "").strip():
+        out["phone"] = u["contact_phone"].strip()
+    return out
+
+
+async def _exchange_state(uid: str, other_id: str) -> dict:
+    cid = chat_id_for(uid, other_id)
+    mine, theirs, ex = await asyncio.gather(
+        db.messages.count_documents({"chat_id": cid, "from_user_id": uid}),
+        db.messages.count_documents({"chat_id": cid, "from_user_id": other_id}),
+        db.contact_exchanges.find_one({"chat_id": cid, "status": {"$in": ["pending", "accepted"]}}, {"_id": 0}),
+    )
+    return {"chat_id": cid, "mine": mine, "theirs": theirs, "ex": ex}
+
+
+@router.get("/chat/contact-exchange/{other_id}")
+async def contact_exchange_status(other_id: str, uid: str = Depends(get_current_user_id)):
+    me, other = await asyncio.gather(get_user(uid), get_user(other_id))
+    st = await _exchange_state(uid, other_id)
+    ex = st["ex"]
+    out = {
+        "status": (ex or {}).get("status", "none"),
+        "direction": None if not ex else ("outgoing" if ex["from_id"] == uid else "incoming"),
+        "my_messages": st["mine"],
+        "their_messages": st["theirs"],
+        "need_messages": CONTACT_MIN_MESSAGES,
+        "me_verified": bool(me.get("verified_selfie")),
+        "other_verified": bool(other.get("verified_selfie")),
+        "me_premium": me.get("plan", "free") in PAID_PLANS,
+        "me_has_contacts": bool(_contacts_of(me)),
+    }
+    if ex and ex["status"] == "accepted":
+        out["contacts"] = _contacts_of(other)
+    return out
+
+
+@router.post("/chat/contact-exchange/{other_id}")
+async def contact_exchange_request(other_id: str, uid: str = Depends(get_current_user_id)):
+    if other_id == uid:
+        raise HTTPException(400, "cannot_self")
+    if await db.blocks.find_one({"$or": [{"owner_id": uid, "target_id": other_id}, {"owner_id": other_id, "target_id": uid}]}):
+        raise HTTPException(403, "blocked")
+    me, other = await asyncio.gather(get_user(uid), get_user(other_id))
+    if not me.get("verified_selfie"):
+        raise HTTPException(403, "selfie_required")
+    if not other.get("verified_selfie"):
+        raise HTTPException(403, "other_not_verified")
+    if me.get("plan", "free") not in PAID_PLANS:
+        raise HTTPException(402, "premium_required")
+    if not _contacts_of(me):
+        raise HTTPException(400, "add_contact_first")
+    st = await _exchange_state(uid, other_id)
+    if st["ex"]:
+        return {"ok": True, "status": st["ex"]["status"]}
+    if st["mine"] < CONTACT_MIN_MESSAGES or st["theirs"] < CONTACT_MIN_MESSAGES:
+        raise HTTPException(400, "need_more_messages")
+    await db.contact_exchanges.insert_one({
+        "id": new_id(), "chat_id": st["chat_id"], "from_id": uid, "to_id": other_id,
+        "status": "pending", "created_at": iso(now_utc()),
+    })
+    await push_notif(other_id, "contact_exchange", f"📇 {me.get('name', '')} siz bilan kontakt almashishni so'radi", link=f"/chat/{uid}")
+    return {"ok": True, "status": "pending"}
+
+
+@router.post("/chat/contact-exchange/{other_id}/respond")
+async def contact_exchange_respond(other_id: str, accept: bool = Body(..., embed=True), uid: str = Depends(get_current_user_id)):
+    me = await get_user(uid)
+    ex = await db.contact_exchanges.find_one({"chat_id": chat_id_for(uid, other_id), "to_id": uid, "status": "pending"}, {"_id": 0})
+    if not ex:
+        raise HTTPException(404, "not_found")
+    if accept:
+        if not me.get("verified_selfie"):
+            raise HTTPException(403, "selfie_required")
+        if not _contacts_of(me):
+            raise HTTPException(400, "add_contact_first")
+    await db.contact_exchanges.update_one(
+        {"id": ex["id"], "status": "pending"},
+        {"$set": {"status": "accepted" if accept else "declined", "answered_at": iso(now_utc())}},
+    )
+    if accept:
+        await push_notif(other_id, "contact_exchange", f"✅ {me.get('name', '')} kontakt almashishga rozi bo'ldi", link=f"/chat/{uid}")
+    return {"ok": True, "status": "accepted" if accept else "declined"}
 
 
 @router.get("/chat/voice/{message_id}")

@@ -71,6 +71,12 @@ PLAN_PRICES = {
     "premium": {1: PRICE_PREMIUM, 3: 199_000, 12: 649_000},
     "vip": {1: PRICE_VIP, 3: 499_000, 12: 1_699_000},
 }
+# Premium sold by the day count: a cheap 1-day try, 15 days and a month.
+PREMIUM_PERIODS = {
+    1: int(os.environ.get("PRICE_PREMIUM_1D_UZS", "9900")),
+    15: int(os.environ.get("PRICE_PREMIUM_15D_UZS", "49900")),
+    30: int(os.environ.get("PRICE_PREMIUM_30D_UZS", str(PRICE_PREMIUM))),
+}
 # Temporarily lowered 9900 -> 4900 until the user base reaches ~500 (empty-
 # market paywall pricing, see FIDEM strategic audit 2026-07). Override via env.
 PRICE_CHAT_UNLOCK = int(os.environ.get("PRICE_CHAT_UNLOCK_UZS", "4900"))
@@ -174,6 +180,50 @@ def sanitize_text(text: str, allow_tags: bool = False) -> str:
     return bleach.clean(text, tags=[], strip=True)
 
 
+# ---- Launch promo: Premium is free for women ----
+# Many more men than women use dating apps here; while the promo is on every
+# woman gets all Premium features for free, so the gender balance (and the
+# value of Premium for men) can grow. Admin switches it in the panel
+# (settings.promo.women_free); WOMEN_FREE_PREMIUM=0 changes the default.
+WOMEN_FREE_DEFAULT = os.environ.get("WOMEN_FREE_PREMIUM", "1").strip() != "0"
+_PROMO_CACHE: dict = {"at": 0.0, "val": None}
+
+
+async def women_free_active() -> bool:
+    if _PROMO_CACHE["val"] is not None and time.time() - _PROMO_CACHE["at"] < 30:
+        return _PROMO_CACHE["val"]
+    doc = await db.settings.find_one({"id": "promo"}, {"_id": 0, "women_free": 1}) or {}
+    val = bool(doc["women_free"]) if "women_free" in doc else WOMEN_FREE_DEFAULT
+    _PROMO_CACHE.update(at=time.time(), val=val)
+    return val
+
+
+def reset_promo_cache() -> None:
+    _PROMO_CACHE.update(at=0.0, val=None)
+
+
+def apply_women_free(user: dict, active: bool) -> dict:
+    """Give a selfie-verified woman Premium for this request while the promo
+    is on. Verification is the price of the free plan: fake "women" (men or
+    scammers behind someone else's photos) cannot pass a live selfie, so the
+    promo never powers them. The stored plan is untouched: paid_plan keeps
+    the real one for public badges, revenue and referral logic."""
+    if active and user.get("gender") == "female" and user.get("plan", "free") not in PAID_PLANS:
+        if user.get("verified_selfie"):
+            user["paid_plan"] = user.get("plan", "free")
+            user["plan"] = "premium"
+            user["plan_source"] = "women_free"
+        else:
+            user["women_promo"] = "needs_selfie"
+    return user
+
+
+def selfie_required_to_write(user: dict) -> bool:
+    """Women must pass the live selfie check before they can write: almost
+    every scam on dating sites is a fake female profile in the chat."""
+    return user.get("gender") == "female" and not user.get("verified_selfie") and not user.get("is_admin")
+
+
 async def get_user(uid: str) -> dict:
     user = await db.users.find_one({"id": uid}, {"_id": 0})
     if not user:
@@ -191,6 +241,8 @@ async def get_user(uid: str) -> dict:
                 user["plan_until"] = None
         except Exception:
             pass
+    if user.get("gender") == "female":
+        apply_women_free(user, await women_free_active())
     return user
 
 
@@ -315,7 +367,7 @@ def user_public(u: dict, include_private: bool = False) -> dict:
         "online": is_online(la),
         "completeness": u.get("completeness", compute_completeness(u)),
         "avg_response_min": u.get("avg_response_min"),
-        "plan": u.get("plan", "free"),
+        "plan": u.get("plan", "free") if include_private else u.get("paid_plan", u.get("plan", "free")),
         "blocked": u.get("blocked", False),
         "prompts": u.get("prompts") or [],
         "big5_scores": u.get("big5_scores") or {},
@@ -374,7 +426,7 @@ def user_public_minimal(u: dict) -> dict:
         "last_active": la,
         "last_active_label": last_active_label(la),
         "online": is_online(la),
-        "plan": u.get("plan", "free"),
+        "plan": u.get("paid_plan", u.get("plan", "free")),
         "blocked": u.get("blocked", False),
         "photo_public": photo_is_public(u),
     }
