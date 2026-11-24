@@ -8,7 +8,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
 
-from auth import decode_token, get_current_user_id
+from auth import check_account, decode_token, get_current_user_id
 from guest import require_onboarded
 from ai_service import detect_contact_info, detect_money_request
 import moderation
@@ -819,6 +819,7 @@ async def get_voice_file(
     uid = payload.get("sub")
     if not uid:
         raise HTTPException(401, "Invalid token")
+    await check_account(uid, payload.get("iat"))
 
     # Fetch the message
     msg = await db.messages.find_one({"id": message_id}, {"_id": 0})
@@ -1131,6 +1132,7 @@ async def ws_endpoint(websocket: WebSocket, token: str = Query(...)):
     try:
         data = decode_token(token)
         uid = data["sub"]
+        await check_account(uid, data.get("iat"))
     except Exception:
         await websocket.close(code=4401)
         return

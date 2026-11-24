@@ -9,6 +9,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { photoSrc } from "@/lib/photo";
 import { getTheme, setTheme } from "@/lib/theme";
 import { FEATURES } from "@/lib/features";
+import EmailLogin from "@/components/EmailLogin";
+import DeleteAccount from "@/components/DeleteAccount";
 
 // Client-side duration probe: reject anything over ~16s before uploading.
 function probeVideoDuration(file) {
@@ -271,6 +273,9 @@ export default function MeSettings() {
           </div>
         )}
 
+        {/* How to sign in without Telegram (the phone app has no Telegram) */}
+        <EmailLogin />
+
         {/* Remaining preference screens */}
         <div className="rounded-3xl bg-card border border-border divide-y">
           <Link to="/settings" data-testid="link-message-filters" className="flex items-center justify-between p-4">
@@ -282,6 +287,8 @@ export default function MeSettings() {
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </Link>
         </div>
+
+        <DeleteAccount />
       </div>
     </div>
   );

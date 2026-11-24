@@ -39,6 +39,7 @@ const Referral = lazy(() => import("@/pages/Referral"));
 const Rankings = lazy(() => import("@/pages/Rankings"));
 const Terms = lazy(() => import("@/pages/Terms"));
 const Privacy = lazy(() => import("@/pages/Privacy"));
+const DeleteAccountPage = lazy(() => import("@/pages/DeleteAccountPage"));
 const MeSettings = lazy(() => import("@/pages/MeSettings"));
 const PrivacyCenter = lazy(() => import("@/pages/PrivacyCenter"));
 const Announcements = lazy(() => import("@/pages/Announcements"));
@@ -190,6 +191,7 @@ function Inner() {
         <Route path="/faq" element={<FAQ />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/delete-account" element={<DeleteAccountPage />} />
         <Route path="/auth" element={isTelegramWebApp() ? <Navigate to="/" replace /> : <Auth />} />
         <Route path="/onboarding" element={<Gate><Onboarding /></Gate>} />
         <Route path="/" element={<RootRoute />} />

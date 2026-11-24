@@ -69,6 +69,7 @@ from routers.settings_r import router as settings_router  # noqa: E402
 from routers.picks_r import router as picks_router  # noqa: E402
 from routers.announcements_r import router as announcements_router  # noqa: E402
 from routers.gift_shop_r import router as gift_shop_router  # noqa: E402
+from account import router as account_router  # noqa: E402
 from lifecycle import lifecycle_loop  # noqa: E402
 from referral_earnings import referral_release_loop  # noqa: E402
 from services import compute_completeness  # noqa: E402
@@ -100,6 +101,7 @@ api.include_router(settings_router)
 api.include_router(picks_router)
 api.include_router(announcements_router)
 api.include_router(gift_shop_router)
+api.include_router(account_router)
 app.include_router(api)
 
 
@@ -231,6 +233,8 @@ async def startup() -> None:
     await db.users.create_index("referral_id", sparse=True, name="ix_referral_id")
     # Ad tracking links (ad_links.py)
     await db.ad_links.create_index("code", unique=True, name="ux_ad_code")
+    await db.auth_codes.create_index([("purpose", 1), ("key", 1)], name="ix_auth_codes")
+    await db.banned_identities.create_index("hash", unique=True, name="ux_banned_hash")
     await db.users.create_index("ad_source", sparse=True, name="ix_ad_source")
     await db.bot_starts.create_index("ad_source", sparse=True, name="ix_bot_ad_source")
     # Drop any existing index on referral_username_lower and recreate with sparse=True

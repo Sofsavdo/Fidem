@@ -22,7 +22,7 @@ const T = {
         "Foydalanuvchi o'zi haqida haqqoniy ma'lumot kiritish, o'z rasmini joylash va bir kishiga bitta profil qoidasiga rioya qilish majburiyatini oladi. Profil rasmlari tekshiruvdan o'tadi; soxta, boshqa shaxsga tegishli yoki qoidalarga zid rasmlar rad etiladi.",
       ]],
       ["To'lovlar va tariflar", [
-        "Tarif to'lovlari IXTIYORIY tanlanadi va qo'shimcha imkoniyatlar beradi. Barcha to'lovlar CLICK to'lov tizimi orqali avtomatik amalga oshiriladi.",
+        "Tarif to'lovlari IXTIYORIY tanlanadi va qo'shimcha imkoniyatlar beradi. Barcha to'lovlar bank kartasiga o'tkazma orqali amalga oshiriladi va to'lov hamkori tomonidan tasdiqlanadi.",
         "TARIF AKTIVATSIYA QILINGANDAN SO'NG TO'LANGAN PUL QAYTARILMAYDI. Tarif 30 kun amal qiladi va muddati tugagach avtomatik to'xtaydi.",
         "Ilova ichidagi balans faqat ilova ichidagi xizmatlar uchun ishlatiladi va naqd pulga yechib olinmaydi. Yechib olish faqat referal daromadiga tegishli (4-band).",
       ]],
@@ -63,7 +63,7 @@ const T = {
         "Пользователь обязуется указывать достоверные сведения о себе, размещать собственные фотографии и соблюдать правило «один человек — один профиль». Фотографии проходят проверку; поддельные, чужие или нарушающие правила фото отклоняются.",
       ]],
       ["Платежи и тарифы", [
-        "Тарифы выбираются ДОБРОВОЛЬНО и дают дополнительные возможности. Все платежи проводятся автоматически через платёжную систему CLICK.",
+        "Тарифы выбираются ДОБРОВОЛЬНО и дают дополнительные возможности. Все платежи проводятся переводом на банковскую карту и подтверждаются платёжным партнёром.",
         "ПОСЛЕ АКТИВАЦИИ ТАРИФА ОПЛАТА НЕ ВОЗВРАЩАЕТСЯ. Тариф действует 30 дней и автоматически прекращается по истечении срока.",
         "Внутренний баланс используется только для услуг внутри приложения и не обналичивается. Вывод средств касается только реферального дохода (раздел 4).",
       ]],
@@ -104,7 +104,7 @@ const T = {
         "The user undertakes to provide truthful information, upload their own photos, and follow the one-person-one-profile rule. Profile photos are verified; fake, third-party or rule-breaking photos are rejected.",
       ]],
       ["Payments and plans", [
-        "Plans are VOLUNTARY and unlock additional features. All payments are processed automatically via the CLICK payment system.",
+        "Plans are VOLUNTARY and unlock additional features. All payments are made by bank-card transfer and confirmed by our payment partner.",
         "PAYMENTS ARE NON-REFUNDABLE ONCE A PLAN IS ACTIVATED. A plan is valid for 30 days and ends automatically.",
         "The in-app balance is used only for in-app services and cannot be cashed out. Withdrawal applies only to referral earnings (section 4).",
       ]],

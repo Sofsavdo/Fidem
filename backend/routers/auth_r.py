@@ -12,6 +12,7 @@ from fastapi import APIRouter, Body, Depends, File, Header, HTTPException, Query
 from starlette.responses import Response
 
 from auth import (
+    check_account,
     create_token,
     decode_token,
     get_current_user_id,
@@ -221,6 +222,8 @@ def _build_me_payload(user: dict) -> dict:
     telegram-auth can embed it directly and skip a follow-up /auth/me call."""
     pub = user_public(user, include_private=True)
     pub["email"] = user.get("email")
+    pub["email_verified"] = bool(user.get("email_verified"))
+    pub["has_password"] = bool(user.get("password_hash"))
     pub["telegram_id"] = user.get("telegram_id")
     pub["telegram_username"] = user.get("telegram_username")
     pub["onboarded"] = user.get("onboarded", False)
@@ -249,12 +252,22 @@ def _build_me_payload(user: dict) -> dict:
     return pub
 
 
+async def _is_banned(kind: str, value: str) -> bool:
+    """Was this email / Telegram id banned before its account was deleted? (account.py)"""
+    import account
+    return await db.banned_identities.find_one({"hash": account.identity_hash(kind, value)}, {"_id": 1}) is not None
+
+
 @router.post("/auth/register", response_model=AuthResponse)
 async def register(req: RegisterRequest, request: Request):
     rate_limit_auth(request, req.email)
+    import account
+    account.check_password(req.password)
     existing = await db.users.find_one({"email": req.email.lower()})
     if existing:
         raise HTTPException(400, "Email already registered")
+    if await _is_banned("email", req.email):
+        raise HTTPException(403, "account_blocked")
     
     # Get client IP and user agent for analytics
     client_ip = _client_ip(request)
@@ -264,6 +277,7 @@ async def register(req: RegisterRequest, request: Request):
     doc = {
         "id": uid,
         "email": req.email.lower(),
+        "email_verified": False,
         # bcrypt takes ~0.2 s of CPU: off the event loop so one sign-up
         # doesn't stall every other request in this single worker.
         "password_hash": await asyncio.to_thread(hash_pw, req.password),
@@ -339,6 +353,8 @@ async def auth_telegram(req: TelegramAuthRequest, request: Request):
             user=_build_me_payload(existing),
         )
 
+    if await _is_banned("tg", tg_id):
+        raise HTTPException(403, "account_blocked")
     uid = new_id()
     name = (tg_user.get("first_name", "") + " " + tg_user.get("last_name", "")).strip() or f"User{tg_id[-4:]}"
     
@@ -858,6 +874,7 @@ async def serve_file(
     uid = payload.get("sub")
     if not uid:
         raise HTTPException(401, "Invalid token")
+    await check_account(uid, payload.get("iat"))
 
     rec = await db.files.find_one(
         {"storage_path": path, "is_deleted": False},

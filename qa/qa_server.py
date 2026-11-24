@@ -27,6 +27,28 @@ for name, mod in list(sys.modules.items()):
     for lim in ("auth_limiter", "payment_limiter", "verification_limiter"):
         if mod is not None and hasattr(mod, lim):
             getattr(mod, lim).check = lambda *a, **k: None
+# Email: no provider in QA. Codes are appended to a file the browser scripts read.
+import json as _json, mailer
+QA_MAIL_FILE = os.environ.get("QA_MAIL_FILE", "/tmp/claude-0/qa_mail.jsonl")
+mailer.configured = lambda: os.environ.get("QA_MAIL", "1") == "1"
+async def _qa_send(to, subject, text):
+    with open(QA_MAIL_FILE, "a") as f:
+        f.write(_json.dumps({"to": to, "subject": subject, "text": text}) + "\n")
+    return True
+mailer.send_email = _qa_send
+# A person who joined through Telegram: an account with a telegram_id and no email/password.
+from core import new_id as _new_id, iso as _iso, now_utc as _now
+from auth import create_token as _create_token
+@server.app.post("/api/qa/telegram-user")
+async def qa_telegram_user():
+    uid = _new_id()
+    await core.db.users.insert_one({
+        "id": uid, "telegram_id": "9" + uid[:8].replace("-", "")[:8], "name": "Telegram Tester", "gender": "male",
+        "birth_date": "1995-05-05", "region": "Toshkent", "onboarded": True,
+        "photo_url": "/api/files/" + "c" * 24, "photo_verified": True, "plan": "free", "balance": 0,
+        "created_at": _iso(_now()), "last_active": _iso(_now()),
+    })
+    return {"id": uid, "token": _create_token(uid)}
 import zlib, struct
 from fastapi import Response
 def _png(r, g, b, w=240, h=320):
