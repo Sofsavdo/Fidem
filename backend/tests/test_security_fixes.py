@@ -559,6 +559,7 @@ def test_auth_telegram_real_signup_does_not_pay_instant_balance_bonus(monkeypatc
     fake_db = type("FakeDb", (), {})()
     fake_db.users = fake_users
     fake_db.pending_refs = fake_pending
+    fake_db.banned_identities = _FakeCollection()      # nobody is banned
     monkeypatch.setattr(auth_r, "db", fake_db)
     monkeypatch.setattr(auth_r, "TELEGRAM_BOT_TOKEN", "123456:FAKE-BOT-TOKEN-FOR-TESTS")
 
@@ -627,6 +628,7 @@ def test_auth_telegram_copies_sofsavdo_click_token_from_pending_without_setting_
     fake_db = type("FakeDb", (), {})()
     fake_db.users = fake_users
     fake_db.pending_refs = _FakeSofsavdoPendingRefs()
+    fake_db.banned_identities = _FakeCollection()      # nobody is banned
     monkeypatch.setattr(auth_r, "db", fake_db)
     monkeypatch.setattr(auth_r, "TELEGRAM_BOT_TOKEN", "123456:FAKE-BOT-TOKEN-FOR-TESTS")
 

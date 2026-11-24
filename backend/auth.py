@@ -1,5 +1,7 @@
 """Authentication helpers: Telegram WebApp + JWT."""
 from __future__ import annotations
+
+import time
 import hashlib
 import hmac
 import json
@@ -66,6 +68,38 @@ def validate_telegram_init_data(init_data: str, bot_token: str) -> dict:
     return json.loads(parsed["user"])
 
 
+# ---- is this token still good? (deleted account / password reset) ----
+# A token is a signed 30-day pass and says nothing about the account behind
+# it. Two things must end a pass early: the account was deleted, and the
+# password was reset (`tokens_valid_after`: everything issued before it dies).
+# One indexed lookup per account per _ACCOUNT_TTL seconds, not per request.
+_ACCOUNT_TTL = 30.0
+_ACCOUNT_CACHE: dict[str, tuple[float, bool, int]] = {}
+
+
+def forget_account(uid: str) -> None:
+    """Drop the cached answer after deleting an account or resetting a password."""
+    _ACCOUNT_CACHE.pop(uid, None)
+
+
+async def check_account(uid: str, iat) -> None:
+    from core import db  # lazy: core imports this module
+
+    now = time.monotonic()
+    hit = _ACCOUNT_CACHE.get(uid)
+    if not hit or hit[0] < now:
+        doc = await db.users.find_one({"id": uid}, {"_id": 0, "tokens_valid_after": 1})
+        if len(_ACCOUNT_CACHE) > 20000:
+            _ACCOUNT_CACHE.clear()
+        hit = (now + _ACCOUNT_TTL, doc is not None, int((doc or {}).get("tokens_valid_after") or 0))
+        _ACCOUNT_CACHE[uid] = hit
+    _, exists, valid_after = hit
+    if not exists:
+        raise HTTPException(status_code=401, detail="Account not found")
+    if valid_after and int(iat or 0) < valid_after:
+        raise HTTPException(status_code=401, detail="Session expired")
+
+
 # ---- FastAPI dependency to extract user from Authorization header ----
 async def get_current_user_id(authorization: Optional[str] = Header(default=None)) -> str:
     if not authorization or not authorization.lower().startswith("bearer "):
@@ -75,6 +109,7 @@ async def get_current_user_id(authorization: Optional[str] = Header(default=None
     user_id = data.get("sub")
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token payload")
+    await check_account(user_id, data.get("iat"))
     return user_id
 
 

@@ -59,3 +59,13 @@ async def get_object(path: str) -> Tuple[bytes, str]:
         content_type = grid_out.metadata["content_type"]
 
     return data, content_type
+
+
+async def delete_object(path: str) -> bool:
+    """Remove a stored file. A missing one counts as already deleted."""
+    try:
+        bucket = AsyncIOMotorGridFSBucket(db, bucket_name="uploads")
+        await bucket.delete(ObjectId(path))
+        return True
+    except Exception:
+        return False

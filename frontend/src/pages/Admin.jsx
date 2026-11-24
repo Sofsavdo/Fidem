@@ -71,7 +71,7 @@ const STATUS_UZ = {
 };
 const statusUz = (s) => STATUS_UZ[s] || s || "—";
 const ACTION_UZ = {
-  update_user: "Foydalanuvchini o'zgartirdi", set_women_free: "Ayollar uchun bepul Premium'ni o'zgartirdi", set_ai_moderation: "Chat AI nazoratini o'zgartirdi", set_ai_assistant: "FIDEM yordamchisini yoqdi/o'chirdi", unmute_temp: "Yozish taqiqini olib tashladi", ad_link_create: "Reklama havolasi yaratdi", ad_link_update: "Reklama havolasini o'zgartirdi", delete_demo_users: "Demo profillarni o'chirdi",
+  update_user: "Foydalanuvchini o'zgartirdi", set_women_free: "Ayollar uchun bepul Premium'ni o'zgartirdi", set_ai_moderation: "Chat AI nazoratini o'zgartirdi", set_ai_assistant: "FIDEM yordamchisini yoqdi/o'chirdi", unmute_temp: "Yozish taqiqini olib tashladi", ad_link_create: "Reklama havolasi yaratdi", account_deleted_by_user: "Foydalanuvchi hisobini o'zi o'chirdi", ad_link_update: "Reklama havolasini o'zgartirdi", delete_demo_users: "Demo profillarni o'chirdi",
   give_premium: "Premium berdi", give_vip: "VIP berdi", give_standard: "Standard berdi",
   reset_balance: "Balansni tozaladi", reset_likes: "Like'larni tozaladi", mute: "Ovozini o'chirdi",
   unmute: "Ovozini yoqdi", shadow_ban: "Yashirin ban", unshadow_ban: "Yashirin bandan chiqardi",

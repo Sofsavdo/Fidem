@@ -23,6 +23,44 @@ export default function Auth() {
     }
   }, [user, nav]);
 
+  // "Parolni unutdingizmi?": email -> 6-digit code + new password -> signed in.
+  const [forgot, setForgot] = useState(null);        // null | "email" | "code"
+  const [resetCode, setResetCode] = useState("");
+  const [mailOn, setMailOn] = useState(true);
+  useEffect(() => {
+    api.get("/auth/email/status").then((r) => setMailOn(!!r.data?.enabled)).catch(() => {});
+  }, []);
+
+  const authError = (err) => {
+    const d = (err?.response?.data?.detail || "").toString();
+    if (d === "weak_password") return t("auth_weak_password").replace("{n}", 8);
+    if (d === "invalid_code") return t("auth_invalid_code");
+    if (d === "email_unavailable" || d === "email_send_failed") return t("auth_email_unavailable");
+    if (d === "account_blocked") return t("auth_account_blocked");
+    if (err?.response?.status === 429) return t("retry");
+    return t("error");
+  };
+
+  const sendReset = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await api.post("/auth/password/forgot", { email });
+      setForgot("code");
+      toast.success(t("auth_code_sent"));
+    } catch (err) { toast.error(authError(err)); } finally { setLoading(false); }
+  };
+
+  const doReset = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const r = await api.post("/auth/password/reset", { email, code: resetCode, password });
+      localStorage.setItem("fidem_token", r.data.token);
+      await refresh(r.data.user);
+    } catch (err) { toast.error(authError(err)); } finally { setLoading(false); }
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -31,7 +69,10 @@ export default function Auth() {
       else await login(email, password);
     } catch (err) {
       const status = err.response?.status;
-      if (status === 401) toast.error(t("error"));
+      const detail = (err.response?.data?.detail || "").toString();
+      if (detail === "weak_password") toast.error(t("auth_weak_password").replace("{n}", 8));
+      else if (detail === "account_blocked") toast.error(t("auth_account_blocked"));
+      else if (status === 401) toast.error(t("error"));
       else if (status === 400) toast.error(mode === "register" ? t("email") + " ✕" : t("error"));
       else if (status === 429) toast.error(t("retry"));
       else toast.error(t("error"));
@@ -116,6 +157,35 @@ export default function Auth() {
             />
           </div>
 
+          {forgot ? (
+            <form onSubmit={forgot === "email" ? sendReset : doReset} className="mt-5 space-y-3" data-testid="forgot-form">
+              <p className="font-heading font-semibold">{t("auth_forgot_title")}</p>
+              {!mailOn && <p className="text-sm text-muted-foreground" data-testid="forgot-unavailable">{t("auth_email_unavailable")}</p>}
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input data-testid="forgot-email" type="email" required disabled={forgot === "code"} placeholder={t("email")}
+                  value={email} onChange={(e) => setEmail(e.target.value)} className="input !pl-11" />
+              </div>
+              {forgot === "code" && (
+                <>
+                  <input data-testid="forgot-code" inputMode="numeric" maxLength={6} required placeholder={t("auth_code")}
+                    value={resetCode} onChange={(e) => setResetCode(e.target.value.replace(/\D/g, ""))}
+                    className="input tracking-[0.4em] text-center" />
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input data-testid="forgot-password" type="password" required placeholder={t("auth_new_password")}
+                      value={password} onChange={(e) => setPassword(e.target.value)} className="input !pl-11" />
+                  </div>
+                </>
+              )}
+              <button data-testid="forgot-submit" type="submit" disabled={loading || !mailOn} className="btn-primary mt-2">
+                {forgot === "email" ? t("auth_send_code") : t("auth_reset_btn")}
+              </button>
+              <button type="button" onClick={() => { setForgot(null); setResetCode(""); }} className="w-full text-sm text-muted-foreground">
+                {t("cancel")}
+              </button>
+            </form>
+          ) : (
           <form onSubmit={submit} className="mt-5 space-y-3" data-testid="auth-form">
             {mode === "register" && (
               <div className="relative">
@@ -162,6 +232,14 @@ export default function Auth() {
               </button>
             </div>
 
+            {mode === "login" && (
+              <button type="button" data-testid="btn-forgot" onClick={() => setForgot("email")}
+                className="block ml-auto text-xs text-muted-foreground hover:text-foreground">
+                {t("auth_forgot")}
+              </button>
+            )}
+            {mode === "register" && <p className="text-[11px] text-muted-foreground">{t("auth_password_hint").replace("{n}", 8)}</p>}
+
             <button
               data-testid="btn-submit"
               type="submit"
@@ -178,6 +256,7 @@ export default function Auth() {
               )}
             </button>
           </form>
+          )}
 
           <div className="divider-with-label my-5">
             <span>{t("continue_with_tg") ? "or" : "or"}</span>
